@@ -10,7 +10,7 @@ import (
 )
 
 /*
-	Create a folder under current user's main directory
+   Create a folder under current user's main directory
 */
 func CreateHomeConfigFolder(folder string) string {
 	u, err := user.Current()
@@ -27,7 +27,7 @@ func CreateHomeConfigFolder(folder string) string {
 }
 
 /*
-	Create a secure folder by a absolute path
+   Create a secure folder by a absolute path
 */
 func CreateSecureFolder(folder string) string {
 	if exists, _ := Exists(folder); !exists {
@@ -40,7 +40,7 @@ func CreateSecureFolder(folder string) string {
 }
 
 /*
-	Returns the current directory.
+   Returns the current directory.
 */
 
 func Pwd() string {
@@ -52,7 +52,7 @@ func Pwd() string {
 }
 
 /*
-	Check whether the given file or directory exists.
+   Check whether the given file or directory exists.
 */
 func Exists(path string) (bool, error) {
 	_, err := os.Stat(path)
@@ -66,7 +66,7 @@ func Exists(path string) (bool, error) {
 }
 
 /*
-	Creates a file with wr permission for user only and returns
+   Creates a file with wr permission for user only and returns the file handle
 */
 func CreateSecureFile(file string) (*os.File, error) {
 	fd, err := os.Create(file)
@@ -81,7 +81,7 @@ func CreateSecureFile(file string) (*os.File, error) {
 }
 
 /*
-	Returns the list of file names included in the given path or error
+   Returns the list of file names included in the given path or error
 */
 func Files(path string) ([]string, error) {
 	fi, err := ioutil.ReadDir(path)
@@ -98,8 +98,8 @@ func Files(path string) ([]string, error) {
 }
 
 /*
-	Check if the given name is a file in the given path. name
-	must be the "basename" of the file and path must be the folder where it lies.
+   Check if the given name is a file in the given path. name
+   must be the "basename" of the file and path must be the folder where it lies.
 */
 func FileExists(path string, name string) bool {
 	list, err := Files(path)
