@@ -1,4 +1,4 @@
-## <img align="left" width=30 src="media/logo-white.jpg"> &nbsp;Core libraries
+## <img align="left" width=30 src="media/logo-white.jpg"> Core libraries
 
 ### Components
 - Shamir's secret sharing 
