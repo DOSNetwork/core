@@ -3,14 +3,15 @@ package bls
 import (
 	"testing"
 
-	"github.com/dedis/kyber/pairing/bn256"
+	"github.com/DOSNetwork/core-lib/suites"
 	"github.com/dedis/kyber/util/random"
 	"github.com/stretchr/testify/require"
 )
 
+var suite = suites.MustFind("bn256")
+
 func TestBLS(t *testing.T) {
 	msg := []byte("Hello Boneh-Lynn-Shacham")
-	suite := bn256.NewSuite()
 	private, public := NewKeyPair(suite, random.New())
 	sig, err := Sign(suite, private, msg)
 	require.Nil(t, err)
@@ -20,7 +21,6 @@ func TestBLS(t *testing.T) {
 
 func TestBLSFailSig(t *testing.T) {
 	msg := []byte("Hello Boneh-Lynn-Shacham")
-	suite := bn256.NewSuite()
 	private, public := NewKeyPair(suite, random.New())
 	sig, err := Sign(suite, private, msg)
 	require.Nil(t, err)
@@ -32,7 +32,6 @@ func TestBLSFailSig(t *testing.T) {
 
 func TestBLSFailKey(t *testing.T) {
 	msg := []byte("Hello Boneh-Lynn-Shacham")
-	suite := bn256.NewSuite()
 	private, _ := NewKeyPair(suite, random.New())
 	sig, err := Sign(suite, private, msg)
 	require.Nil(t, err)

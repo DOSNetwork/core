@@ -4,8 +4,8 @@ import (
 	"math/rand"
 	"testing"
 
+	"github.com/DOSNetwork/core-lib/suites"
 	"github.com/dedis/kyber"
-	"github.com/dedis/kyber/group/edwards25519"
 	"github.com/dedis/kyber/sign/schnorr"
 	"github.com/dedis/kyber/xof/blake2xb"
 	"github.com/stretchr/testify/assert"
@@ -14,7 +14,8 @@ import (
 
 var rng = blake2xb.New(nil)
 
-var suite = edwards25519.NewBlakeSHA256Ed25519WithRand(rng)
+//var suite = suites.MustFind("Ed25519")
+var suite = suites.MustFind("bn256")
 
 var nbVerifiers = 7
 
@@ -600,6 +601,7 @@ func TestVSSContext(t *testing.T) {
 }
 
 func genPair() (kyber.Scalar, kyber.Point) {
+
 	secret := suite.Scalar().Pick(suite.RandomStream())
 	public := suite.Point().Mul(secret, nil)
 	return secret, public

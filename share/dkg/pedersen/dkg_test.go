@@ -4,15 +4,19 @@ import (
 	"crypto/rand"
 	"testing"
 
+	"github.com/DOSNetwork/core-lib/share"
+	vss "github.com/DOSNetwork/core-lib/share/vss/pedersen"
+	bls "github.com/DOSNetwork/core-lib/sign/bls"
+	tbls "github.com/DOSNetwork/core-lib/sign/tbls"
+	"github.com/DOSNetwork/core-lib/suites"
+
 	"github.com/dedis/kyber"
-	"github.com/dedis/kyber/group/edwards25519"
-	"github.com/dedis/kyber/share"
-	vss "github.com/dedis/kyber/share/vss/pedersen"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-var suite = edwards25519.NewBlakeSHA256Ed25519()
+//var suite = suites.MustFind("Ed25519")
+var suite = suites.MustFind("bn256")
 
 var nbParticipants = 7
 
@@ -309,6 +313,61 @@ func TestDistKeyShare(t *testing.T) {
 
 	commitSecret := suite.Point().Mul(secret, nil)
 	assert.Equal(t, dkss[0].Public().String(), commitSecret.String())
+}
+
+func TestTBLS(t *testing.T) {
+	msg := []byte("Hello threshold Boneh-Lynn-Shacham")
+	fullExchange(t)
+
+	for _, dkg := range dkgs {
+		assert.True(t, dkg.Certified())
+	}
+	// verify integrity of shares etc
+	dkss := make([]*DistKeyShare, nbParticipants)
+	var poly *share.PriPoly
+	for i, dkg := range dkgs {
+		dks, err := dkg.DistKeyShare()
+		require.Nil(t, err)
+		require.NotNil(t, dks)
+		require.NotNil(t, dks.PrivatePoly)
+		dkss[i] = dks
+		assert.Equal(t, dkg.index, uint32(dks.Share.I))
+
+		pripoly := share.CoefficientsToPriPoly(suite, dks.PrivatePoly)
+		if poly == nil {
+			poly = pripoly
+			continue
+		}
+		poly, err = poly.Add(pripoly)
+		require.NoError(t, err)
+	}
+
+	shares := make([]*share.PriShare, nbParticipants)
+	sigShares := make([][]byte, 0)
+	for i, dks := range dkss {
+		assert.True(t, checkDks(dks, dkss[0]), "dist key share not equal %d vs %d", dks.Share.I, 0)
+		shares[i] = dks.Share
+		if i >= 3 {
+			sig, _ := tbls.Sign(suite, shares[i], msg)
+			sigShares = append(sigShares, sig)
+		}
+	}
+	dks := dkss[0]
+	pubPoly := share.NewPubPoly(suite, suite.Point().Base(), dks.Commitments())
+	sig, err := tbls.Recover(suite, pubPoly, msg, sigShares, nbParticipants/2+1, nbParticipants)
+
+	err = bls.Verify(suite, pubPoly.Commit(), msg, sig)
+	require.Nil(t, err)
+
+	secret, err := share.RecoverSecret(suite, shares, nbParticipants, nbParticipants)
+	assert.Nil(t, err)
+
+	secretCoeffs := poly.Coefficients()
+	require.Equal(t, secret.String(), secretCoeffs[0].String())
+
+	commitSecret := suite.Point().Mul(secret, nil)
+	assert.Equal(t, dkss[0].Public().String(), commitSecret.String())
+
 }
 
 func dkgGen() []*DistKeyGenerator {

@@ -14,10 +14,12 @@ import (
 	"bytes"
 	"encoding/binary"
 
-	"github.com/dedis/kyber/pairing"
-	"github.com/dedis/kyber/share"
-	"github.com/dedis/kyber/sign/bls"
+	"github.com/DOSNetwork/core-lib/share"
+	"github.com/DOSNetwork/core-lib/sign/bls"
+	"github.com/DOSNetwork/core-lib/suites"
 )
+
+type Suite suites.Suite
 
 // SigShare encodes a threshold BLS signature share Si = i || v where the 2-byte
 // big-endian value i corresponds to the share's index and v represents the
@@ -42,7 +44,7 @@ func (s *SigShare) Value() []byte {
 
 // Sign creates a threshold BLS signature Si = xi * H(m) on the given message m
 // using the provided secret key share xi.
-func Sign(suite pairing.Suite, private *share.PriShare, msg []byte) ([]byte, error) {
+func Sign(suite Suite, private *share.PriShare, msg []byte) ([]byte, error) {
 	buf := new(bytes.Buffer)
 	if err := binary.Write(buf, binary.BigEndian, uint16(private.I)); err != nil {
 		return nil, err
@@ -61,7 +63,7 @@ func Sign(suite pairing.Suite, private *share.PriShare, msg []byte) ([]byte, err
 // the public key share Xi that is associated to the secret key share xi. This
 // public key share Xi can be computed by evaluating the public sharing
 // polynonmial at the share's index i.
-func Verify(suite pairing.Suite, public *share.PubPoly, msg, sig []byte) error {
+func Verify(suite Suite, public *share.PubPoly, msg, sig []byte) error {
 	s := SigShare(sig)
 	i, err := s.Index()
 	if err != nil {
@@ -75,7 +77,7 @@ func Verify(suite pairing.Suite, public *share.PubPoly, msg, sig []byte) error {
 // can be verified through the regular BLS verification routine using the
 // shared public key X. The shared public key can be computed by evaluating the
 // public sharing polynomial at index 0.
-func Recover(suite pairing.Suite, public *share.PubPoly, msg []byte, sigs [][]byte, t, n int) ([]byte, error) {
+func Recover(suite Suite, public *share.PubPoly, msg []byte, sigs [][]byte, t, n int) ([]byte, error) {
 	pubShares := make([]*share.PubShare, 0)
 	for _, sig := range sigs {
 		s := SigShare(sig)

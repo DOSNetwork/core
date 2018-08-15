@@ -5,14 +5,14 @@ package dkg
 import (
 	"errors"
 
+	"github.com/DOSNetwork/core-lib/share"
+	vss "github.com/DOSNetwork/core-lib/share/vss/pedersen"
+	"github.com/DOSNetwork/core-lib/suites"
 	"github.com/dedis/kyber"
-
-	"github.com/dedis/kyber/share"
-	vss "github.com/dedis/kyber/share/vss/pedersen"
 )
 
 // Suite wraps the functionalities needed by the dkg package
-type Suite vss.Suite
+type Suite suites.Suite
 
 // DistKeyShare holds the share of a distributed key for a participant.
 type DistKeyShare struct {

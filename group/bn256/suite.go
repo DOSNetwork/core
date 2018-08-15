@@ -61,6 +61,23 @@ func NewSuiteRand(rand cipher.Stream) *Suite {
 	return s
 }
 
+// test
+func (s *Suite) Point() kyber.Point {
+	//fmt.Println("test point")
+	return s.g2.Point()
+}
+
+// test
+func (s *Suite) Scalar() kyber.Scalar {
+	//fmt.Println("test Scalar")
+	return s.g1.Scalar()
+}
+
+// String returns a recognizable string that this is a combined suite.
+func (c Suite) String() string {
+	return "bn256"
+}
+
 // G1 returns the group G1 of the BN256 pairing.
 func (s *Suite) G1() kyber.Group {
 	return s.g1

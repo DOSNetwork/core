@@ -3,19 +3,21 @@ package share
 import (
 	"testing"
 
-	"github.com/dedis/kyber/group/edwards25519"
+	"github.com/DOSNetwork/core-lib/suites"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
+//var suite = suites.MustFind("Ed25519")
+var suite = suites.MustFind("bn256")
+
 func TestSecretRecovery(test *testing.T) {
-	g := edwards25519.NewBlakeSHA256Ed25519()
 	n := 10
 	t := n/2 + 1
-	poly := NewPriPoly(g, t, nil, g.RandomStream())
+	poly := NewPriPoly(suite, t, nil, suite.RandomStream())
 	shares := poly.Shares(n)
 
-	recovered, err := RecoverSecret(g, shares, t, n)
+	recovered, err := RecoverSecret(suite, shares, t, n)
 	if err != nil {
 		test.Fatal(err)
 	}
@@ -26,10 +28,9 @@ func TestSecretRecovery(test *testing.T) {
 }
 
 func TestSecretRecoveryDelete(test *testing.T) {
-	g := edwards25519.NewBlakeSHA256Ed25519()
 	n := 10
 	t := n/2 + 1
-	poly := NewPriPoly(g, t, nil, g.RandomStream())
+	poly := NewPriPoly(suite, t, nil, suite.RandomStream())
 	shares := poly.Shares(n)
 
 	// Corrupt a few shares
@@ -38,7 +39,7 @@ func TestSecretRecoveryDelete(test *testing.T) {
 	shares[7] = nil
 	shares[8] = nil
 
-	recovered, err := RecoverSecret(g, shares, t, n)
+	recovered, err := RecoverSecret(suite, shares, t, n)
 	if err != nil {
 		test.Fatal(err)
 	}
@@ -49,11 +50,10 @@ func TestSecretRecoveryDelete(test *testing.T) {
 }
 
 func TestSecretRecoveryDeleteFail(test *testing.T) {
-	g := edwards25519.NewBlakeSHA256Ed25519()
 	n := 10
 	t := n/2 + 1
 
-	poly := NewPriPoly(g, t, nil, g.RandomStream())
+	poly := NewPriPoly(suite, t, nil, suite.RandomStream())
 	shares := poly.Shares(n)
 
 	// Corrupt one more share than acceptable
@@ -63,20 +63,19 @@ func TestSecretRecoveryDeleteFail(test *testing.T) {
 	shares[7] = nil
 	shares[8] = nil
 
-	_, err := RecoverSecret(g, shares, t, n)
+	_, err := RecoverSecret(suite, shares, t, n)
 	if err == nil {
 		test.Fatal("recovered secret unexpectably")
 	}
 }
 
 func TestSecretPolyEqual(test *testing.T) {
-	g := edwards25519.NewBlakeSHA256Ed25519()
 	n := 10
 	t := n/2 + 1
 
-	p1 := NewPriPoly(g, t, nil, g.RandomStream())
-	p2 := NewPriPoly(g, t, nil, g.RandomStream())
-	p3 := NewPriPoly(g, t, nil, g.RandomStream())
+	p1 := NewPriPoly(suite, t, nil, suite.RandomStream())
+	p2 := NewPriPoly(suite, t, nil, suite.RandomStream())
+	p3 := NewPriPoly(suite, t, nil, suite.RandomStream())
 
 	p12, _ := p1.Add(p2)
 	p13, _ := p1.Add(p3)
@@ -90,11 +89,10 @@ func TestSecretPolyEqual(test *testing.T) {
 }
 
 func TestPublicCheck(test *testing.T) {
-	g := edwards25519.NewBlakeSHA256Ed25519()
 	n := 10
 	t := n/2 + 1
 
-	priPoly := NewPriPoly(g, t, nil, g.RandomStream())
+	priPoly := NewPriPoly(suite, t, nil, suite.RandomStream())
 	priShares := priPoly.Shares(n)
 	pubPoly := priPoly.Commit(nil)
 
@@ -106,15 +104,14 @@ func TestPublicCheck(test *testing.T) {
 }
 
 func TestPublicRecovery(test *testing.T) {
-	g := edwards25519.NewBlakeSHA256Ed25519()
 	n := 10
 	t := n/2 + 1
 
-	priPoly := NewPriPoly(g, t, nil, g.RandomStream())
+	priPoly := NewPriPoly(suite, t, nil, suite.RandomStream())
 	pubPoly := priPoly.Commit(nil)
 	pubShares := pubPoly.Shares(n)
 
-	recovered, err := RecoverCommit(g, pubShares, t, n)
+	recovered, err := RecoverCommit(suite, pubShares, t, n)
 	if err != nil {
 		test.Fatal(err)
 	}
@@ -125,11 +122,10 @@ func TestPublicRecovery(test *testing.T) {
 }
 
 func TestPublicRecoveryDelete(test *testing.T) {
-	g := edwards25519.NewBlakeSHA256Ed25519()
 	n := 10
 	t := n/2 + 1
 
-	priPoly := NewPriPoly(g, t, nil, g.RandomStream())
+	priPoly := NewPriPoly(suite, t, nil, suite.RandomStream())
 	pubPoly := priPoly.Commit(nil)
 	shares := pubPoly.Shares(n)
 
@@ -139,7 +135,7 @@ func TestPublicRecoveryDelete(test *testing.T) {
 	shares[7] = nil
 	shares[8] = nil
 
-	recovered, err := RecoverCommit(g, shares, t, n)
+	recovered, err := RecoverCommit(suite, shares, t, n)
 	if err != nil {
 		test.Fatal(err)
 	}
@@ -150,11 +146,10 @@ func TestPublicRecoveryDelete(test *testing.T) {
 }
 
 func TestPublicRecoveryDeleteFail(test *testing.T) {
-	g := edwards25519.NewBlakeSHA256Ed25519()
 	n := 10
 	t := n/2 + 1
 
-	priPoly := NewPriPoly(g, t, nil, g.RandomStream())
+	priPoly := NewPriPoly(suite, t, nil, suite.RandomStream())
 	pubPoly := priPoly.Commit(nil)
 	shares := pubPoly.Shares(n)
 
@@ -165,19 +160,18 @@ func TestPublicRecoveryDeleteFail(test *testing.T) {
 	shares[7] = nil
 	shares[8] = nil
 
-	_, err := RecoverCommit(g, shares, t, n)
+	_, err := RecoverCommit(suite, shares, t, n)
 	if err == nil {
 		test.Fatal("recovered commit unexpectably")
 	}
 }
 
 func TestPrivateAdd(test *testing.T) {
-	g := edwards25519.NewBlakeSHA256Ed25519()
 	n := 10
 	t := n/2 + 1
 
-	p := NewPriPoly(g, t, nil, g.RandomStream())
-	q := NewPriPoly(g, t, nil, g.RandomStream())
+	p := NewPriPoly(suite, t, nil, suite.RandomStream())
+	q := NewPriPoly(suite, t, nil, suite.RandomStream())
 
 	r, err := p.Add(q)
 	if err != nil {
@@ -186,7 +180,7 @@ func TestPrivateAdd(test *testing.T) {
 
 	ps := p.Secret()
 	qs := q.Secret()
-	rs := g.Scalar().Add(ps, qs)
+	rs := suite.Scalar().Add(ps, qs)
 
 	if !rs.Equal(r.Secret()) {
 		test.Fatal("addition of secret sharing polynomials failed")
@@ -194,15 +188,14 @@ func TestPrivateAdd(test *testing.T) {
 }
 
 func TestPublicAdd(test *testing.T) {
-	g := edwards25519.NewBlakeSHA256Ed25519()
 	n := 10
 	t := n/2 + 1
 
-	G := g.Point().Pick(g.RandomStream())
-	H := g.Point().Pick(g.RandomStream())
+	G := suite.Point().Pick(suite.RandomStream())
+	H := suite.Point().Pick(suite.RandomStream())
 
-	p := NewPriPoly(g, t, nil, g.RandomStream())
-	q := NewPriPoly(g, t, nil, g.RandomStream())
+	p := NewPriPoly(suite, t, nil, suite.RandomStream())
+	q := NewPriPoly(suite, t, nil, suite.RandomStream())
 
 	P := p.Commit(G)
 	Q := q.Commit(H)
@@ -213,14 +206,14 @@ func TestPublicAdd(test *testing.T) {
 	}
 
 	shares := R.Shares(n)
-	recovered, err := RecoverCommit(g, shares, t, n)
+	recovered, err := RecoverCommit(suite, shares, t, n)
 	if err != nil {
 		test.Fatal(err)
 	}
 
 	x := P.Commit()
 	y := Q.Commit()
-	z := g.Point().Add(x, y)
+	z := suite.Point().Add(x, y)
 
 	if !recovered.Equal(z) {
 		test.Fatal("addition of public commitment polynomials failed")
@@ -228,15 +221,14 @@ func TestPublicAdd(test *testing.T) {
 }
 
 func TestPublicPolyEqual(test *testing.T) {
-	g := edwards25519.NewBlakeSHA256Ed25519()
 	n := 10
 	t := n/2 + 1
 
-	G := g.Point().Pick(g.RandomStream())
+	G := suite.Point().Pick(suite.RandomStream())
 
-	p1 := NewPriPoly(g, t, nil, g.RandomStream())
-	p2 := NewPriPoly(g, t, nil, g.RandomStream())
-	p3 := NewPriPoly(g, t, nil, g.RandomStream())
+	p1 := NewPriPoly(suite, t, nil, suite.RandomStream())
+	p2 := NewPriPoly(suite, t, nil, suite.RandomStream())
+	p3 := NewPriPoly(suite, t, nil, suite.RandomStream())
 
 	P1 := p1.Commit(G)
 	P2 := p2.Commit(G)
@@ -254,7 +246,6 @@ func TestPublicPolyEqual(test *testing.T) {
 }
 
 func TestPriPolyMul(test *testing.T) {
-	suite := edwards25519.NewBlakeSHA256Ed25519()
 	n := 10
 	t := n/2 + 1
 	a := NewPriPoly(suite, t, nil, suite.RandomStream())
@@ -281,7 +272,6 @@ func TestPriPolyMul(test *testing.T) {
 }
 
 func TestRecoverPriPoly(test *testing.T) {
-	suite := edwards25519.NewBlakeSHA256Ed25519()
 	n := 10
 	t := n/2 + 1
 	a := NewPriPoly(suite, t, nil, suite.RandomStream())
@@ -305,7 +295,6 @@ func TestRecoverPriPoly(test *testing.T) {
 }
 
 func TestPriPolyCoefficients(test *testing.T) {
-	suite := edwards25519.NewBlakeSHA256Ed25519()
 	n := 10
 	t := n/2 + 1
 	a := NewPriPoly(suite, t, nil, suite.RandomStream())

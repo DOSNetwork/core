@@ -12,19 +12,14 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/DOSNetwork/core-lib/suites"
 	"github.com/dedis/kyber"
 	"github.com/dedis/kyber/share"
 	"github.com/dedis/kyber/sign/schnorr"
 	"github.com/dedis/protobuf"
 )
 
-// Suite defines the capabilities required by the vss package.
-type Suite interface {
-	kyber.Group
-	kyber.HashFactory
-	kyber.XOFFactory
-	kyber.Random
-}
+type Suite suites.Suite
 
 // Dealer encapsulates for creating and distributing the shares and for
 // replying to any Responses.

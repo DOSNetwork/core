@@ -27,8 +27,8 @@ func TestScalarMarshal(t *testing.T) {
 
 func TestScalarOps(t *testing.T) {
 	suite := NewSuite()
-	a := suite.G1().Scalar().Pick(random.New())
-	b := suite.G1().Scalar().Pick(random.New())
+	a := suite.Scalar().Pick(random.New())
+	b := suite.Scalar().Pick(random.New())
 	c := suite.G1().Scalar().Pick(random.New())
 	d := suite.G1().Scalar()
 	e := suite.G1().Scalar()
@@ -137,8 +137,8 @@ func TestG2Marshal(t *testing.T) {
 
 func TestG2Ops(t *testing.T) {
 	suite := NewSuite()
-	a := suite.G2().Point().Pick(random.New())
-	b := suite.G2().Point().Pick(random.New())
+	a := suite.Point().Pick(random.New())
+	b := suite.Point().Pick(random.New())
 	c := a.Clone()
 	a.Neg(a)
 	a.Neg(a)

@@ -6,7 +6,6 @@ import (
 	"hash"
 
 	"github.com/dedis/kyber"
-
 	"golang.org/x/crypto/hkdf"
 )
 
