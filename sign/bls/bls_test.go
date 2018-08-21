@@ -3,7 +3,7 @@ package bls
 import (
 	"testing"
 
-	"github.com/DOSNetwork/core-lib/suites"
+	"github.com/DOSNetwork/core/suites"
 	"github.com/dedis/kyber/util/random"
 	"github.com/stretchr/testify/require"
 )

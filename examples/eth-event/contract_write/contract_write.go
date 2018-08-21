@@ -10,7 +10,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 
-	store "./contracts" // for demo
+	store "github.com/DOSNetwork/core/examples/eth-event/contracts" // for demo
 )
 
 const key = ``

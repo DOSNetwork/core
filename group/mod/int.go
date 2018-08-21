@@ -9,7 +9,7 @@ import (
 	"io"
 	"math/big"
 
-	"github.com/DOSNetwork/core-lib/group/internal/marshalling"
+	"github.com/DOSNetwork/core/group/internal/marshalling"
 	"github.com/dedis/kyber"
 	"github.com/dedis/kyber/util/random"
 )

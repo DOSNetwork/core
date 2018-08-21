@@ -7,7 +7,7 @@ import (
 	"crypto/cipher"
 	"errors"
 
-	"github.com/DOSNetwork/core-lib/suites"
+	"github.com/DOSNetwork/core/suites"
 	"github.com/dedis/kyber"
 )
 

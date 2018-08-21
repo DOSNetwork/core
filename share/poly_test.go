@@ -3,7 +3,7 @@ package share
 import (
 	"testing"
 
-	"github.com/DOSNetwork/core-lib/suites"
+	"github.com/DOSNetwork/core/suites"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

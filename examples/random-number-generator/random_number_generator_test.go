@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/DOSNetwork/core-lib/suites"
+	"github.com/DOSNetwork/core/suites"
 	"github.com/stretchr/testify/require"
 )
 

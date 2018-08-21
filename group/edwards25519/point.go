@@ -21,7 +21,7 @@ import (
 	"io"
 
 	"github.com/dedis/kyber"
-	"github.com/DOSNetwork/core-lib/group/internal/marshalling"
+	"github.com/DOSNetwork/core/group/internal/marshalling"
 )
 
 type point struct {

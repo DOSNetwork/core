@@ -14,9 +14,9 @@ import (
 	"bytes"
 	"encoding/binary"
 
-	"github.com/DOSNetwork/core-lib/share"
-	"github.com/DOSNetwork/core-lib/sign/bls"
-	"github.com/DOSNetwork/core-lib/suites"
+	"github.com/DOSNetwork/core/share"
+	"github.com/DOSNetwork/core/sign/bls"
+	"github.com/DOSNetwork/core/suites"
 )
 
 type Suite suites.Suite

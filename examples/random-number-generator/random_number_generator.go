@@ -1,11 +1,11 @@
 package example
 
 import (
-	"github.com/DOSNetwork/core-lib/suites"
-	"github.com/DOSNetwork/core-lib/share"
-	"github.com/DOSNetwork/core-lib/share/dkg/pedersen"
-	"github.com/DOSNetwork/core-lib/sign/tbls"
-	"github.com/DOSNetwork/core-lib/sign/bls"
+	"github.com/DOSNetwork/core/suites"
+	"github.com/DOSNetwork/core/share"
+	"github.com/DOSNetwork/core/share/dkg/pedersen"
+	"github.com/DOSNetwork/core/sign/tbls"
+	"github.com/DOSNetwork/core/sign/bls"
 
 	"github.com/dedis/kyber"
 	"errors"

@@ -4,7 +4,7 @@ import (
 	"math/rand"
 	"testing"
 
-	"github.com/DOSNetwork/core-lib/suites"
+	"github.com/DOSNetwork/core/suites"
 	"github.com/dedis/kyber"
 	"github.com/dedis/kyber/sign/schnorr"
 	"github.com/dedis/kyber/xof/blake2xb"

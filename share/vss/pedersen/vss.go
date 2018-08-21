@@ -12,7 +12,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/DOSNetwork/core-lib/suites"
+	"github.com/DOSNetwork/core/suites"
 	"github.com/dedis/kyber"
 	"github.com/dedis/kyber/share"
 	"github.com/dedis/kyber/sign/schnorr"

@@ -4,11 +4,11 @@ import (
 	"crypto/rand"
 	"testing"
 
-	"github.com/DOSNetwork/core-lib/share"
-	vss "github.com/DOSNetwork/core-lib/share/vss/pedersen"
-	bls "github.com/DOSNetwork/core-lib/sign/bls"
-	tbls "github.com/DOSNetwork/core-lib/sign/tbls"
-	"github.com/DOSNetwork/core-lib/suites"
+	"github.com/DOSNetwork/core/share"
+	vss "github.com/DOSNetwork/core/share/vss/pedersen"
+	bls "github.com/DOSNetwork/core/sign/bls"
+	tbls "github.com/DOSNetwork/core/sign/tbls"
+	"github.com/DOSNetwork/core/suites"
 
 	"github.com/dedis/kyber"
 	"github.com/stretchr/testify/assert"

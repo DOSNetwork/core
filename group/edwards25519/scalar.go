@@ -13,7 +13,7 @@ import (
 	"math/big"
 
 	"github.com/dedis/kyber"
-	"github.com/DOSNetwork/core-lib/group/internal/marshalling"
+	"github.com/DOSNetwork/core/group/internal/marshalling"
 	"github.com/dedis/kyber/group/mod"
 	"github.com/dedis/kyber/util/random"
 )
