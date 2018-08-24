@@ -11,7 +11,7 @@ import (
 
 func TestRandomNumberGenerator(t *testing.T) {
 	suite := suites.MustFind("bn256")
-	nbParticipants := 15
+	nbParticipants := 7
 	randomNumberGenerator, err := InitialRandomNumberGenerator(suite, nbParticipants)
 	require.Nil(t, err)
 	require.NotNil(t, randomNumberGenerator)

@@ -66,21 +66,7 @@ func InitialRandomNumberGenerator(suite suites.Suite, nbParticipants int) (*Rand
 
 // generate takes a seed to generate random number by SHA256 using the tBLS signature to the seed
 func (r *RandomNumberGenerator) generate(seed []byte) ([]byte, error) {
-
-	shares := make([]*share.PriShare, r.nbParticipants)
-	sigShares := make([][]byte, 0)
-	for i, dks := range r.dkss {
-		shares[i] = dks.Share
-		if i < (r.nbParticipants / 2 + 1) {
-			sig, _ := tbls.Sign(r.suite, shares[i], seed)
-			sigShares = append(sigShares, sig)
-		}
-	}
-	dks := r.dkss[0]
-	pubPoly := share.NewPubPoly(r.suite, r.suite.Point().Base(), dks.Commitments())
-	sig, _ := tbls.Recover(r.suite, pubPoly, seed, sigShares, r.nbParticipants/2+1, r.nbParticipants)
-
-	err := bls.Verify(r.suite, pubPoly.Commit(), seed, sig)
+	sig, err := r.TBlsSign(seed)
 	if err == nil {
 		hashSig := sha256.Sum256(sig)
 		converted := hashSig[:]
@@ -88,7 +74,28 @@ func (r *RandomNumberGenerator) generate(seed []byte) ([]byte, error) {
 	} else {
 		return nil, err
 	}
+}
 
+func (r *RandomNumberGenerator) TBlsSign(msg []byte) ([]byte, error)  {
+	shares := make([]*share.PriShare, r.nbParticipants)
+	sigShares := make([][]byte, 0)
+	for i, dks := range r.dkss {
+		shares[i] = dks.Share
+		if i < (r.nbParticipants / 2 + 1) {
+			sig, _ := tbls.Sign(r.suite, shares[i], msg)
+			sigShares = append(sigShares, sig)
+		}
+	}
+	dks := r.dkss[0]
+	pubPoly := share.NewPubPoly(r.suite, r.suite.Point().Base(), dks.Commitments())
+	sig, _ := tbls.Recover(r.suite, pubPoly, msg, sigShares, r.nbParticipants/2+1, r.nbParticipants)
+
+	err := bls.Verify(r.suite, pubPoly.Commit(), msg, sig)
+	if err != nil {
+		return nil, err
+	} else {
+		return sig, nil
+	}
 }
 
 func fullExchange(dkgs []*dkg.DistKeyGenerator, nbParticipants int) error{
