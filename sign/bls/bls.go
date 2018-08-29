@@ -5,10 +5,12 @@ package bls
 
 import (
 	"crypto/cipher"
+	"encoding/hex"
 	"errors"
 
 	"github.com/DOSNetwork/core/suites"
 	"github.com/dedis/kyber"
+	"github.com/ethereum/go-ethereum/crypto/sha3"
 )
 
 type Suite suites.Suite
@@ -39,23 +41,34 @@ func Sign(suite Suite, x kyber.Scalar, msg []byte) ([]byte, error) {
 // the base point from curve G2.
 func Verify(suite Suite, X kyber.Point, msg, sig []byte) error {
 	HM := hashToPoint(suite, msg)
-	left := suite.Pair(HM, X)
 	s := suite.G1().Point()
 	if err := s.UnmarshalBinary(sig); err != nil {
 		return err
 	}
-	right := suite.Pair(s, suite.G2().Point().Base())
-	if !left.Equal(right) {
+	s.Neg(s)
+	if !suite.PairingCheck([]kyber.Point{s, HM}, []kyber.Point{suite.G2().Point().Base(), X}) {
 		return errors.New("bls: invalid signature")
 	}
 	return nil
 }
 
+func decodeHex(src []byte) []byte {
+	dst := make([]byte, hex.DecodedLen(len(src)))
+	_, err := hex.Decode(dst, src)
+	if err != nil {
+		return nil
+	}
+	return dst
+}
+
 // hashToPoint hashes a message to a point on curve G1. XXX: This should be replaced
 // eventually by a proper hash-to-point mapping like Elligator.
 func hashToPoint(suite Suite, msg []byte) kyber.Point {
-	h := suite.Hash()
-	h.Write(msg)
-	x := suite.G1().Scalar().SetBytes(h.Sum(nil))
-	return suite.G1().Point().Mul(x, nil)
+	hash := sha3.NewKeccak256()
+	var buf []byte
+	hash.Write(decodeHex(msg))
+	buf = hash.Sum(buf)
+	x := suite.G1().Scalar().SetBytes(buf)
+	point := suite.G1().Point().Mul(x, nil)
+	return point
 }

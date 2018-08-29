@@ -585,3 +585,19 @@ func (p *pointGT) Pair(p1, p2 kyber.Point) kyber.Point {
 	p.g.Set(optimalAte(b, a))
 	return p
 }
+
+// PairingCheck calculates the Optimal Ate pairing for a set of points.
+func (p *pointGT) PairingCheck(a []kyber.Point, b []kyber.Point) bool {
+	acc := new(gfP12)
+	acc.SetOne()
+
+	for i := 0; i < len(a); i++ {
+		ap := a[i].(*pointG1).g
+		bp := b[i].(*pointG2).g
+		if ap.IsInfinity() || bp.IsInfinity() {
+			continue
+		}
+		acc.Mul(acc, miller(bp, ap))
+	}
+	return finalExponentiation(acc).IsOne()
+}

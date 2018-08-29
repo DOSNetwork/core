@@ -99,6 +99,12 @@ func (s *Suite) Pair(p1 kyber.Point, p2 kyber.Point) kyber.Point {
 	return s.GT().Point().(*pointGT).Pair(p1, p2)
 }
 
+// Pair takes the points p1 and p2 in groups G1 and G2, respectively, as input
+// and computes their pairing in GT.
+func (s *Suite) PairingCheck(a []kyber.Point, b []kyber.Point) bool {
+	return s.GT().Point().(*pointGT).PairingCheck(a, b)
+}
+
 // Not used other than for reflect.TypeOf()
 var aScalar kyber.Scalar
 var aPoint kyber.Point

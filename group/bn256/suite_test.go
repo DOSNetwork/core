@@ -3,10 +3,11 @@ package bn256
 import (
 	"testing"
 
+	"github.com/dedis/kyber"
 	"github.com/dedis/kyber/group/mod"
 	"github.com/dedis/kyber/util/random"
+	"github.com/ethereum/go-ethereum/crypto/bn256"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/crypto/bn256"
 )
 
 func TestScalarMarshal(t *testing.T) {
@@ -156,21 +157,57 @@ func TestG2Ops(t *testing.T) {
 	}
 }
 
-func TestGT(t *testing.T) {
+func TestPairingCheck(t *testing.T) {
 	suite := NewSuite()
-	k := suite.GT().Scalar().Pick(random.New())
-	pa := suite.GT().Point().Mul(k, nil)
-	ma, err := pa.MarshalBinary()
+	//Get G2 public key
+	x := suite.G2().Scalar().Pick(random.New())
+	X1 := suite.G2().Point().Mul(x, nil)
+	m1, err := X1.MarshalBinary()
 	require.Nil(t, err)
-	mx, err := suite.GT().Point().Base().MarshalBinary()
+	//Get G2 base point
+	base1 := suite.G2().Point().Base()
+	mbase1, err := base1.MarshalBinary()
 	require.Nil(t, err)
-	pb, ok := new(bn256.GT).Unmarshal(mx)
-	if !ok {
-		t.Fatal("unmarshal not ok")
+	//Get G1 H(m)
+	h := suite.G1().Scalar().Pick(random.New())
+	hm := suite.G1().Point().Mul(h, nil)
+	mh1, err := hm.MarshalBinary()
+	require.Nil(t, err)
+	//Get G1 signature
+	sig := suite.G1().Point().Mul(x, hm)
+	sig.Neg(sig)
+	msig1, err := sig.MarshalBinary()
+	require.Nil(t, err)
+	if !suite.PairingCheck([]kyber.Point{sig, hm}, []kyber.Point{base1, X1}) {
+		t.Fatal("bn256.GT: PairingCheck failed")
 	}
-	pb.ScalarMult(pb, &k.(*mod.Int).V)
-	mb := pb.Marshal()
-	require.Equal(t, ma, mb)
+
+	//Get G1 H(m) on ethereum
+	hm2 := new(bn256.G1).ScalarBaseMult(&h.(*mod.Int).V)
+	mh2 := hm2.Marshal()
+	require.Equal(t, mh1, mh2)
+
+	//Get G1 signature on ethereum
+	sig2 := new(bn256.G1).ScalarMult(hm2, &x.(*mod.Int).V)
+	sig2.Neg(sig2)
+	msig2 := sig2.Marshal()
+	require.Equal(t, msig1, msig2)
+
+	//Get G2 public key on ethereum
+	X2 := new(bn256.G2).ScalarBaseMult(&x.(*mod.Int).V)
+	m2 := X2.Marshal()
+	m2 = append([]byte{0x01}, m2...)
+	require.Equal(t, m1, m2)
+
+	//Get G2 base point on ethereum
+	x.SetInt64(1)
+	base2 := new(bn256.G2).ScalarBaseMult(&x.(*mod.Int).V)
+	mbase2 := base2.Marshal()
+	mbase2 = append([]byte{0x01}, mbase2...)
+	require.Equal(t, mbase1, mbase2)
+	if !bn256.PairingCheck([]*bn256.G1{sig2, hm2}, []*bn256.G2{base2, X2}) {
+		t.Fatal("bn256.GT: PairingCheck failed")
+	}
 }
 
 func TestGTMarshal(t *testing.T) {

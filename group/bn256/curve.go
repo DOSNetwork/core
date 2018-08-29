@@ -16,7 +16,7 @@ var curveB = newGFp(3)
 // curveGen is the generator of G₁.
 var curveGen = &curvePoint{
 	x: *newGFp(1),
-	y: *newGFp(-2),
+	y: *newGFp(2),
 	z: *newGFp(1),
 	t: *newGFp(1),
 }

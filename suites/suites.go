@@ -22,6 +22,7 @@ type Suite interface {
 	G2() kyber.Group
 	GT() kyber.Group
 	Pair(p1, p2 kyber.Point) kyber.Point
+	PairingCheck(a []kyber.Point, b []kyber.Point) bool
 	kyber.Group
 	kyber.Encoding
 	kyber.HashFactory
