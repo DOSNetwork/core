@@ -5,7 +5,6 @@ package bls
 
 import (
 	"crypto/cipher"
-	"encoding/hex"
 	"errors"
 
 	"github.com/DOSNetwork/core/suites"
@@ -52,21 +51,12 @@ func Verify(suite Suite, X kyber.Point, msg, sig []byte) error {
 	return nil
 }
 
-func decodeHex(src []byte) []byte {
-	dst := make([]byte, hex.DecodedLen(len(src)))
-	_, err := hex.Decode(dst, src)
-	if err != nil {
-		return nil
-	}
-	return dst
-}
-
 // hashToPoint hashes a message to a point on curve G1. XXX: This should be replaced
 // eventually by a proper hash-to-point mapping like Elligator.
 func hashToPoint(suite Suite, msg []byte) kyber.Point {
 	hash := sha3.NewKeccak256()
 	var buf []byte
-	hash.Write(decodeHex(msg))
+	hash.Write(msg)
 	buf = hash.Sum(buf)
 	x := suite.G1().Scalar().SetBytes(buf)
 	point := suite.G1().Point().Mul(x, nil)

@@ -1,8 +1,8 @@
 package example
 
 import (
-	"testing"
 	"fmt"
+	"testing"
 	"time"
 
 	"github.com/DOSNetwork/core/suites"

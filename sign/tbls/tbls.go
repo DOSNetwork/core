@@ -13,7 +13,6 @@ package tbls
 import (
 	"bytes"
 	"encoding/binary"
-
 	"github.com/DOSNetwork/core/share"
 	"github.com/DOSNetwork/core/sign/bls"
 	"github.com/DOSNetwork/core/suites"
