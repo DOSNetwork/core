@@ -2,9 +2,11 @@
 
 ### Components
 - Shamir's secret sharing 
-- Pedersen's DKG approach
-- Paring
-- BLS Signature
-- . . .
+- Feldman/Pedersen's DKG approach
+- Paring Library and BLS Signature
+- DHT & Gossip implementation
+- P2P NAT Support
+- On-chain Verification Contracts
+- .
 
 
