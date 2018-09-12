@@ -1,0 +1,15 @@
+syntax = "proto3";
+package internal;
+
+message Chat {
+  string content = 1;
+}
+
+message Person {
+  string name = 1;
+}
+
+message Company {
+  int32 id = 1;
+}
+

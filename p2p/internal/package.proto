@@ -1,0 +1,10 @@
+syntax = "proto3";
+package internal;
+
+import "protobuf/ptypes/any/any.proto";
+
+message Package {
+    google.protobuf.Any anything = 1;
+    bytes signature = 2;
+}
+
