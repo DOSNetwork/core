@@ -8,19 +8,24 @@ import (
 	"io"
 	"log"
 	"net"
+
+	"github.com/DOSNetwork/core/p2p/internal"
+	"github.com/golang/protobuf/proto"
+	"github.com/golang/protobuf/ptypes"
 )
 
 type PeerClient struct {
 	conn        *net.Conn
 	rw          *bufio.ReadWriter
-	MessageChan chan []byte
+	messageChan chan P2PMessage
 	id          string
+	status      int
+	//private key
+	//public key
 }
 
 func (p *PeerClient) Dial(addr string) {
-	// Dial the remote process.
-	// Note that the local port is chosen on the fly. If the local port
-	// must be a specific one, use DialTCP() instead.
+
 	log.Println("Dial " + addr)
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
@@ -29,21 +34,23 @@ func (p *PeerClient) Dial(addr string) {
 	p.conn = &conn
 }
 
-func (p *PeerClient) HandleMessages() {
+func (p *PeerClient) HandlePackages() {
 	for {
-		buf, err := p.receiveMessage()
-		fmt.Println("receive ", string(buf))
+		buf, err := p.receivePackage()
 		switch {
 		case err == io.EOF:
+			fmt.Println("PeerClient ", p.id, " end")
 			return
 		case err != nil:
+			fmt.Println("PeerClient ", p.id, " end")
 			return
 		}
-		p.MessageChan <- buf
+		//fmt.Println("PeerClient ", p.id, " receive", string(buf))
+		p.messageChan <- p.decodePackage(buf)
 	}
 }
 
-func (p *PeerClient) receiveMessage() ([]byte, error) {
+func (p *PeerClient) receivePackage() ([]byte, error) {
 	var err error
 
 	// Read until all header bytes have been read.
@@ -61,7 +68,6 @@ func (p *PeerClient) receiveMessage() ([]byte, error) {
 
 	// Decode message size.
 	size := binary.BigEndian.Uint32(buffer)
-	fmt.Println("receiveMessage : size ", size)
 	if size == 0 {
 		return nil, errors.New("received an empty message from a peer")
 	}
@@ -78,13 +84,34 @@ func (p *PeerClient) receiveMessage() ([]byte, error) {
 	return buffer, nil
 }
 
-func (p *PeerClient) SendMessage(buffer []byte) error {
+func (p *PeerClient) decodePackage(bytes []byte) P2PMessage {
+	pa := new(internal.Package)
+	_ = proto.Unmarshal(bytes, pa)
+
+	//Todo verify pa.Signature by public key
+
+	var ptr ptypes.DynamicAny
+	_ = ptypes.UnmarshalAny(pa.Anything, &ptr)
+
+	return P2PMessage{Msg: ptr, Sender: p.id}
+}
+
+func (p *PeerClient) SendPackage(msg *proto.Message) error {
+	anything, _ := ptypes.MarshalAny(*msg)
+	pa := &internal.Package{
+		Anything: anything,
+	}
+	//sign the package
+	//pa.Signature =
+
+	//Encode the package
+	bytes, _ := proto.Marshal(pa)
 	// Serialize size.
 	prefix := make([]byte, 4)
-	binary.BigEndian.PutUint32(prefix, uint32(len(buffer)))
+	binary.BigEndian.PutUint32(prefix, uint32(len(bytes)))
 
-	buffer = append(prefix, buffer...)
-	p.rw.Write(buffer)
+	bytes = append(prefix, bytes...)
+	p.rw.Write(bytes)
 	p.rw.Flush()
 	return nil
 }

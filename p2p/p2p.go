@@ -6,15 +6,15 @@ import (
 	"net"
 	"os"
 	"sync"
+
+	"github.com/golang/protobuf/proto"
 )
 
 type P2P struct {
-	Port int
 	//Map of connection addresses (string) <-> *p2p.PeerClient
-	Peers *sync.Map
+	peers *sync.Map
 	// Channels are thread safe
-	MessageChan chan []byte
-	Kill        chan struct{}
+	messageChan chan P2PMessage
 }
 
 func (n *P2P) getLocalIp() string {
@@ -38,52 +38,65 @@ func (n *P2P) getLocalIp() string {
 func (n *P2P) Listen() error {
 	var err error
 	var listener net.Listener
-	Port := fmt.Sprintf(":%v", n.Port)
-	listener, err = net.Listen("tcp", Port)
+	listener, err = net.Listen("tcp", ":0")
 	if err != nil {
 		return err
 	}
-	fmt.Println("Listen on", n.getLocalIp(), "", n.Port)
+	fmt.Println("Listen on ", n.getLocalIp(), ":", listener.Addr())
 
 	// Handle new clients.
 	for {
 		if conn, err := listener.Accept(); err == nil {
 			//Create a peer client
-			peer, err := n.CreatePeer("", &conn)
+			err := n.CreatePeer("", &conn)
 			if err != nil {
 				return err
 			}
-			go peer.HandleMessages()
 
 		} else {
-			// if the Shutdown flag is set, no need to continue with the for loop
-			select {
-			case <-n.Kill:
-				fmt.Println("Shutting down server")
-				return nil
-			default:
-				fmt.Println("Failed accepting a connection request:", err)
-				return err
-			}
+			fmt.Println("Failed accepting a connection request:", err)
+			return err
 		}
 	}
 }
 
-func (n *P2P) CreatePeer(addr string, c *net.Conn) (*PeerClient, error) {
+func (n *P2P) Broadcast(m *proto.Message) {
+	n.peers.Range(func(key, value interface{}) bool {
+		ip := key.(string)
+		client := value.(*PeerClient)
+		fmt.Printf("key[%s]\n", ip)
+		client.SendPackage(m)
+		return true
+	})
+}
 
-	client := &PeerClient{
+func (n *P2P) SendMessageById(id string, m *proto.Message) {
+	value, loaded := n.peers.Load(id)
+	if loaded {
+		client := value.(*PeerClient)
+		client.SendPackage(m)
+	}
+}
+
+func (n *P2P) GetTunnel() chan P2PMessage {
+	return n.messageChan
+}
+
+func (n *P2P) CreatePeer(addr string, c *net.Conn) error {
+	peer := &PeerClient{
 		conn: c,
 	}
 	if addr != "" {
-		client.Dial(addr)
-		client.id = addr
+		peer.Dial(addr)
+		peer.id = addr
 	} else {
 		conn := *c
-		client.id = conn.RemoteAddr().String()
+		peer.id = conn.RemoteAddr().String()
 	}
-	client.rw = bufio.NewReadWriter(bufio.NewReader(*client.conn), bufio.NewWriter(*client.conn))
-	n.Peers.LoadOrStore(client.id, client)
-	client.MessageChan = n.MessageChan
-	fmt.Println("InitClient id ", client.id)
-	return client, nil
+	peer.rw = bufio.NewReadWriter(bufio.NewReader(*peer.conn), bufio.NewWriter(*peer.conn))
+	n.peers.LoadOrStore(peer.id, peer)
+	peer.messageChan = n.messageChan
+	fmt.Println("InitClient id ", peer.id)
+	go peer.HandlePackages()
+	return nil
 }
