@@ -3,7 +3,10 @@ package p2p
 import (
 	"bufio"
 	"fmt"
+	"github.com/DOSNetwork/core/p2p/nat"
+	"log"
 	"net"
+	"strconv"
 
 	"sync"
 
@@ -25,27 +28,55 @@ type P2P struct {
 }
 
 func (n *P2P) Listen() error {
-	var err error
-	var listener net.Listener
-	listener, err = net.Listen("tcp", ":0")
+	listener, err := net.Listen("tcp", ":0")
 	if err != nil {
 		return err
 	}
-	fmt.Println("listen ", listener.Addr().String())
-	// Handle new clients.
-	for {
-		if conn, err := listener.Accept(); err == nil {
-			//Create a peer client
-			err := n.CreatePeer("", &conn)
-			if err != nil {
-				return err
-			}
 
-		} else {
-			fmt.Println("Failed accepting a connection request:", err)
+	isPrivateIp, err := nat.IsPrivateIp()
+	if err != nil {
+		return err
+	}
+
+	if isPrivateIp {
+		externalPort := nat.RandomPort()
+		nat, err := nat.SetMapping("tcp", externalPort, listener.Addr().(*net.TCPAddr).Port, "DosNode")
+		if err != nil {
 			return err
 		}
+
+		externalIp, err := nat.GetExternalAddress()
+		if err != nil {
+			return err
+		}
+
+		n.ip = externalIp.String() + ":" + strconv.Itoa(externalPort)
+	} else {
+		n.ip = n.ip + ":" + strconv.Itoa(listener.Addr().(*net.TCPAddr).Port)
 	}
+	n.id = n.ip + n.pubKey.String()[:15]
+
+
+	fmt.Println("listen ", n.ip)
+	// Handle new clients.
+
+	go func() {
+		for {
+			if conn, err := listener.Accept(); err == nil {
+				//Create a peer client
+				err := n.CreatePeer("", &conn)
+				if err != nil {
+					log.Fatal(err)
+				}
+
+			} else {
+				fmt.Println("Failed accepting a connection request:", err)
+				log.Fatal(err)
+			}
+		}
+	}()
+
+	return nil
 }
 
 func (n *P2P) Broadcast(m *proto.Message) {
