@@ -22,16 +22,15 @@ func main() {
 	tunnel := make(chan p2p.P2PMessage)
 	p, _ := p2p.CreateP2PNetwork(tunnel)
 	defer close(tunnel)
+	//2)Start to listen incoming connection
+	go p.Listen()
 
-	//2)Dial to peers to build peerClient
+	//3)Dial to peers to build peerClient
 	if *connect != "" {
 		fmt.Println("Create peerclients")
 		_ = p.CreatePeer(*connect, nil)
 		//p.SendMessageById(*connect, []byte("hello"))
 	}
-
-	//3)Start to listen incoming connection
-	go p.Listen()
 
 	//4)Handle message from peer
 	go func() {

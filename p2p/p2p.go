@@ -4,9 +4,11 @@ import (
 	"bufio"
 	"fmt"
 	"net"
-	"os"
+
 	"sync"
 
+	"github.com/DOSNetwork/core/suites"
+	"github.com/dedis/kyber"
 	"github.com/golang/protobuf/proto"
 )
 
@@ -15,26 +17,13 @@ type P2P struct {
 	peers *sync.Map
 	// Channels are thread safe
 	messageChan chan P2PMessage
+	suite       suites.Suite
+	id          string
+	ip          string
+	secKey      kyber.Scalar
+	pubKey      kyber.Point
 }
 
-func (n *P2P) getLocalIp() string {
-	addrs, err := net.InterfaceAddrs()
-	if err != nil {
-		os.Stderr.WriteString("Oops: " + err.Error() + "\n")
-		os.Exit(1)
-	}
-
-	for _, a := range addrs {
-		if ipnet, ok := a.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
-			if ipnet.IP.To4() != nil {
-				os.Stdout.WriteString(ipnet.IP.String() + "\n")
-				fmt.Println("Your IP is:", ipnet.IP.String())
-				return ipnet.IP.String()
-			}
-		}
-	}
-	return ""
-}
 func (n *P2P) Listen() error {
 	var err error
 	var listener net.Listener
@@ -42,8 +31,7 @@ func (n *P2P) Listen() error {
 	if err != nil {
 		return err
 	}
-	fmt.Println("Listen on ", n.getLocalIp(), ":", listener.Addr())
-
+	fmt.Println("listen ", listener.Addr().String())
 	// Handle new clients.
 	for {
 		if conn, err := listener.Accept(); err == nil {
@@ -84,19 +72,18 @@ func (n *P2P) GetTunnel() chan P2PMessage {
 
 func (n *P2P) CreatePeer(addr string, c *net.Conn) error {
 	peer := &PeerClient{
-		conn: c,
+		conn:   c,
+		p2pnet: n,
 	}
 	if addr != "" {
 		peer.Dial(addr)
-		peer.id = addr
-	} else {
-		conn := *c
-		peer.id = conn.RemoteAddr().String()
 	}
 	peer.rw = bufio.NewReadWriter(bufio.NewReader(*peer.conn), bufio.NewWriter(*peer.conn))
-	n.peers.LoadOrStore(peer.id, peer)
+	//n.peers.LoadOrStore(peer.id, peer)
 	peer.messageChan = n.messageChan
-	fmt.Println("InitClient id ", peer.id)
+
+	//fmt.Println("InitClient id ", peer.id)
 	go peer.HandlePackages()
+	peer.SayHi()
 	return nil
 }
