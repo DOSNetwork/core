@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"net"
+	"sync"
 
 	"github.com/DOSNetwork/core/p2p/internal"
 	"github.com/golang/protobuf/proto"
@@ -26,6 +27,7 @@ type PeerClient struct {
 	id          string
 	ip          string
 	pubKey      kyber.Point
+	wg          sync.WaitGroup
 }
 
 func (p *PeerClient) Dial(addr string) {
@@ -49,7 +51,10 @@ func (p *PeerClient) HandlePackages() {
 			fmt.Println("PeerClient ", p.id, " end")
 			return
 		}
-		ptr := p.decodePackage(buf)
+		ptr, err := p.decodePackage(buf)
+		if err != nil {
+			return
+		}
 		switch content := ptr.Message.(type) {
 		case *internal.Hi:
 			if p.id == "" {
@@ -60,6 +65,7 @@ func (p *PeerClient) HandlePackages() {
 				p.pubKey = pub
 				p.p2pnet.peers.LoadOrStore(p.id, p)
 				fmt.Println("Receive Hi id = ", p.id, " ip = ", p.id)
+				p.wg.Done()
 			} else {
 				fmt.Println("Ignore Hi")
 			}
@@ -107,7 +113,7 @@ func (p *PeerClient) receivePackage() ([]byte, error) {
 	return buffer, nil
 }
 
-func (p *PeerClient) decodePackage(bytes []byte) ptypes.DynamicAny {
+func (p *PeerClient) decodePackage(bytes []byte) (ptypes.DynamicAny, error) {
 	pa := new(internal.Package)
 	_ = proto.Unmarshal(bytes, pa)
 
@@ -116,13 +122,10 @@ func (p *PeerClient) decodePackage(bytes []byte) ptypes.DynamicAny {
 	_ = pub.UnmarshalBinary(pa.Pubkey)
 
 	err := bls.Verify(p.p2pnet.suite, pub, pa.Anything.Value, pa.Signature)
-	if err == nil {
-		fmt.Println("bls verify okokok")
-	}
 
 	var ptr ptypes.DynamicAny
 	_ = ptypes.UnmarshalAny(pa.Anything, &ptr)
-	return ptr
+	return ptr, err
 }
 
 func (p *PeerClient) SayHi() {
@@ -134,7 +137,9 @@ func (p *PeerClient) SayHi() {
 		Pubkey: pub,
 	}
 	msg := proto.Message(pa)
+	p.wg.Add(1)
 	p.SendPackage(&msg)
+	p.wg.Wait()
 }
 
 func (p *PeerClient) SendPackage(msg *proto.Message) error {

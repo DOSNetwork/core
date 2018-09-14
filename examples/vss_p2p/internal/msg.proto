@@ -1,11 +1,15 @@
 syntax = "proto3";
-package msg;
+package internal;
 
 message EncryptedDeal {
     bytes DHKey = 1;
     bytes Signature = 2;
     bytes Nonce = 3;
     bytes Cipher = 4;
+}
+
+message EncryptedDeals {
+    repeated EncryptedDeal Deals = 1;
 }
 
 message Response {
@@ -15,6 +19,9 @@ message Response {
     bytes Signature = 4;
 }
 
+message Responses {
+    repeated Response Responses = 1;
+}
 message Justification {
     bytes SessionID = 1;
     uint32 Index = 2;
@@ -26,6 +33,10 @@ message PublicKey {
     bytes PublicKey = 1;
 }
 
+message Signature {
+    uint32 Index = 1;
+    bytes Signature = 2;
+}
 message PublicKeys {
     repeated bytes PublicKey = 1;
 }

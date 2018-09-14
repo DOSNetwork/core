@@ -12,9 +12,10 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/DOSNetwork/core/share"
 	"github.com/DOSNetwork/core/suites"
 	"github.com/dedis/kyber"
-	"github.com/dedis/kyber/share"
+
 	"github.com/dedis/kyber/sign/schnorr"
 	"github.com/dedis/protobuf"
 )
