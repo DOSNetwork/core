@@ -12,16 +12,20 @@ import (
 	"github.com/DOSNetwork/core/p2p/internal"
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes"
+
+	"github.com/DOSNetwork/core/sign/bls"
+	"github.com/dedis/kyber"
 )
 
 type PeerClient struct {
+	p2pnet      *P2P
 	conn        *net.Conn
 	rw          *bufio.ReadWriter
 	messageChan chan P2PMessage
-	id          string
 	status      int
-	//private key
-	//public key
+	id          string
+	ip          string
+	pubKey      kyber.Point
 }
 
 func (p *PeerClient) Dial(addr string) {
@@ -45,8 +49,27 @@ func (p *PeerClient) HandlePackages() {
 			fmt.Println("PeerClient ", p.id, " end")
 			return
 		}
+		ptr := p.decodePackage(buf)
+		switch content := ptr.Message.(type) {
+		case *internal.Hi:
+			if p.id == "" {
+				p.id = content.Id
+				p.ip = content.Ip
+				pub := suite.G2().Point()
+				_ = pub.UnmarshalBinary(content.Pubkey)
+				p.pubKey = pub
+				p.p2pnet.peers.LoadOrStore(p.id, p)
+				fmt.Println("Receive Hi id = ", p.id, " ip = ", p.id)
+			} else {
+				fmt.Println("Ignore Hi")
+			}
+
+		default:
+			msg := P2PMessage{Msg: ptr, Sender: ""}
+			p.messageChan <- msg
+		}
 		//fmt.Println("PeerClient ", p.id, " receive", string(buf))
-		p.messageChan <- p.decodePackage(buf)
+
 	}
 }
 
@@ -84,28 +107,50 @@ func (p *PeerClient) receivePackage() ([]byte, error) {
 	return buffer, nil
 }
 
-func (p *PeerClient) decodePackage(bytes []byte) P2PMessage {
+func (p *PeerClient) decodePackage(bytes []byte) ptypes.DynamicAny {
 	pa := new(internal.Package)
 	_ = proto.Unmarshal(bytes, pa)
 
 	//Todo verify pa.Signature by public key
+	pub := suite.G2().Point()
+	_ = pub.UnmarshalBinary(pa.Pubkey)
+
+	err := bls.Verify(p.p2pnet.suite, pub, pa.Anything.Value, pa.Signature)
+	if err == nil {
+		fmt.Println("bls verify okokok")
+	}
 
 	var ptr ptypes.DynamicAny
 	_ = ptypes.UnmarshalAny(pa.Anything, &ptr)
+	return ptr
+}
 
-	return P2PMessage{Msg: ptr, Sender: p.id}
+func (p *PeerClient) SayHi() {
+	fmt.Println("say hi")
+	pub, _ := p.p2pnet.pubKey.MarshalBinary()
+	pa := &internal.Hi{
+		Id:     p.p2pnet.id,
+		Ip:     p.p2pnet.ip,
+		Pubkey: pub,
+	}
+	msg := proto.Message(pa)
+	p.SendPackage(&msg)
 }
 
 func (p *PeerClient) SendPackage(msg *proto.Message) error {
+	var bytes []byte
+	pub, _ := p.p2pnet.pubKey.MarshalBinary()
 	anything, _ := ptypes.MarshalAny(*msg)
+	sig, _ := bls.Sign(p.p2pnet.suite, p.p2pnet.secKey, anything.Value)
+
 	pa := &internal.Package{
-		Anything: anything,
+		Anything:  anything,
+		Pubkey:    pub,
+		Signature: sig,
 	}
-	//sign the package
-	//pa.Signature =
 
 	//Encode the package
-	bytes, _ := proto.Marshal(pa)
+	bytes, _ = proto.Marshal(pa)
 	// Serialize size.
 	prefix := make([]byte, 4)
 	binary.BigEndian.PutUint32(prefix, uint32(len(bytes)))

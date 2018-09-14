@@ -5,6 +5,11 @@ import "protobuf/ptypes/any/any.proto";
 
 message Package {
     google.protobuf.Any anything = 1;
-    bytes signature = 2;
+    bytes pubkey = 2;
+    bytes signature = 3;
 }
-
+message Hi {
+    string id = 1;
+    string ip = 2;
+    bytes pubkey = 3;
+}
