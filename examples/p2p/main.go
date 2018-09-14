@@ -23,7 +23,7 @@ func main() {
 	p, _ := p2p.CreateP2PNetwork(tunnel)
 	defer close(tunnel)
 	//2)Start to listen incoming connection
-	go p.Listen()
+	p.Listen()
 
 	//3)Dial to peers to build peerClient
 	if *connect != "" {

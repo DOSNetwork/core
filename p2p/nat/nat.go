@@ -4,6 +4,8 @@ package nat
 import (
 	"errors"
 	"log"
+	"math"
+	"math/rand"
 	"net"
 	"time"
 
@@ -132,4 +134,8 @@ func IsPrivateIp() (bool, error) {
 	return netutil.IsLAN(ip), nil
 }
 
+func RandomPort() int {
+	rand.Seed(time.Now().UnixNano())
+	return rand.Intn(math.MaxUint16-10000) + 10000
+}
 
