@@ -1,4 +1,4 @@
-package main
+package msgParser
 
 import (
 	"log"
@@ -9,7 +9,7 @@ import (
 	"github.com/golang/protobuf/proto"
 )
 
-func packEncryptedDeal(encryptedDeal *vss.EncryptedDeal) proto.Message {
+func PackEncryptedDeal(encryptedDeal *vss.EncryptedDeal) proto.Message {
 	p := &internal.EncryptedDeal{
 		DHKey:     encryptedDeal.DHKey,
 		Signature: encryptedDeal.Signature,
@@ -19,7 +19,7 @@ func packEncryptedDeal(encryptedDeal *vss.EncryptedDeal) proto.Message {
 	return proto.Message(p)
 }
 
-func unpackEncryptedDeal(encryptedDeal *internal.EncryptedDeal) *vss.EncryptedDeal {
+func UnpackEncryptedDeal(encryptedDeal *internal.EncryptedDeal) *vss.EncryptedDeal {
 	return &vss.EncryptedDeal{
 		DHKey:     encryptedDeal.GetDHKey(),
 		Signature: encryptedDeal.GetSignature(),
@@ -27,7 +27,8 @@ func unpackEncryptedDeal(encryptedDeal *internal.EncryptedDeal) *vss.EncryptedDe
 		Cipher:    encryptedDeal.GetCipher(),
 	}
 }
-func packEncryptedDeals(encryptedDeals []*vss.EncryptedDeal) proto.Message {
+
+func PackEncryptedDeals(encryptedDeals []*vss.EncryptedDeal) proto.Message {
 	size := len(encryptedDeals)
 	deals := make([]*internal.EncryptedDeal, size)
 	for i := 0; i < size; i++ {
@@ -45,7 +46,8 @@ func packEncryptedDeals(encryptedDeals []*vss.EncryptedDeal) proto.Message {
 	}
 	return proto.Message(msg)
 }
-func unpackEncryptedDeals(encryptedDeals *internal.EncryptedDeals) []*vss.EncryptedDeal {
+
+func UnpackEncryptedDeals(encryptedDeals *internal.EncryptedDeals) []*vss.EncryptedDeal {
 	size := len(encryptedDeals.Deals)
 	deals := make([]*vss.EncryptedDeal, size)
 	for i := 0; i < size; i++ {
@@ -61,7 +63,8 @@ func unpackEncryptedDeals(encryptedDeals *internal.EncryptedDeals) []*vss.Encryp
 
 	return deals
 }
-func packResonse(response *vss.Response) proto.Message {
+
+func PackResponse(response *vss.Response) proto.Message {
 	p := &internal.Response{
 		SessionID: response.SessionID,
 		Index:     response.Index,
@@ -71,7 +74,7 @@ func packResonse(response *vss.Response) proto.Message {
 	return proto.Message(p)
 }
 
-func unpackResonse(response *internal.Response) *vss.Response {
+func UnpackResponse(response *internal.Response) *vss.Response {
 	return &vss.Response{
 		SessionID: response.GetSessionID(),
 		Index:     response.GetIndex(),
@@ -79,7 +82,8 @@ func unpackResonse(response *internal.Response) *vss.Response {
 		Signature: response.GetSignature(),
 	}
 }
-func packResonses(responses []*vss.Response) proto.Message {
+
+func PackResponses(responses []*vss.Response) proto.Message {
 	size := len(responses)
 	r := make([]*internal.Response, size)
 	for i := 0; i < size; i++ {
@@ -97,11 +101,12 @@ func packResonses(responses []*vss.Response) proto.Message {
 	}
 	return proto.Message(msg)
 }
-func unpackResonses(resposes *internal.Responses) []*vss.Response {
-	size := len(resposes.Responses)
+
+func UnpackResponses(responses *internal.Responses) []*vss.Response {
+	size := len(responses.Responses)
 	r := make([]*vss.Response, size)
 	for i := 0; i < size; i++ {
-		response := resposes.Responses[i]
+		response := responses.Responses[i]
 		p := &vss.Response{
 			SessionID: response.GetSessionID(),
 			Index:     response.GetIndex(),
@@ -113,7 +118,8 @@ func unpackResonses(resposes *internal.Responses) []*vss.Response {
 
 	return r
 }
-func packJustification(justification *vss.Justification) proto.Message {
+
+func PackJustification(justification *vss.Justification) proto.Message {
 	dealBytes, err := justification.Deal.MarshalBinary()
 	if err != nil {
 		log.Fatal(err)
@@ -128,7 +134,7 @@ func packJustification(justification *vss.Justification) proto.Message {
 	return proto.Message(p)
 }
 
-func unpackJustification(s vss.Suite, justification *internal.Justification) *vss.Justification {
+func UnpackJustification(s vss.Suite, justification *internal.Justification) *vss.Justification {
 	deal := &vss.Deal{}
 	err := deal.UnmarshalBinary(s, justification.GetDeal())
 	if err != nil {
@@ -143,7 +149,21 @@ func unpackJustification(s vss.Suite, justification *internal.Justification) *vs
 	}
 }
 
-func packPublicKey(publicKey kyber.Point) proto.Message {
+func PackSignature(index uint32, queryID, content string, sig []byte) proto.Message {
+	p := &internal.Signature{
+		Index:     index,
+		QueryId:   queryID,
+		Content:   content,
+		Signature: sig,
+	}
+	return proto.Message(p)
+}
+
+func UnpackSignature(signature *internal.Signature) (index uint32, queryID, content string, sig []byte) {
+	return signature.GetIndex(), signature.GetQueryId(), signature.GetContent(), signature.GetSignature()
+}
+
+func PackPublicKey(publicKey kyber.Point) proto.Message {
 	publicKeyBytes, err := publicKey.MarshalBinary()
 
 	if err != nil {
@@ -156,33 +176,27 @@ func packPublicKey(publicKey kyber.Point) proto.Message {
 	return proto.Message(p)
 }
 
-func unpackPublicKey(s vss.Suite, publicKeyBytes *internal.PublicKey) kyber.Point {
+func UnpackPublicKey(s vss.Suite, publicKeyBytes *internal.PublicKey) *kyber.Point {
 	publicKey := s.G2().Point()
 	err := publicKey.UnmarshalBinary(publicKeyBytes.GetPublicKey())
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	return publicKey
-}
-func packSignature(sig []byte, index int) proto.Message {
-	p := &internal.Signature{
-		Index:     uint32(index),
-		Signature: sig,
-	}
-	return proto.Message(p)
+	return &publicKey
 }
 
-func packPublicKeys(publicKeys []kyber.Point) proto.Message {
-
-	publicKeysBytes := make([][]byte, 0)
+func PackPublicKeys(publicKeys []kyber.Point) proto.Message {
+	publicKeysBytes := make([]*internal.PublicKey, 0)
 	for _, publicKey := range publicKeys {
 		publicKeyBytes, err := publicKey.MarshalBinary()
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		publicKeysBytes = append(publicKeysBytes, publicKeyBytes)
+		publicKeysBytes = append(publicKeysBytes, &internal.PublicKey{
+			PublicKey: publicKeyBytes,
+		})
 	}
 
 	p := &internal.PublicKeys{
@@ -191,12 +205,11 @@ func packPublicKeys(publicKeys []kyber.Point) proto.Message {
 	return proto.Message(p)
 }
 
-func unpackPublicKeys(s vss.Suite, publicKeysBytes *internal.PublicKeys) []kyber.Point {
-
+func UnpackPublicKeys(s vss.Suite, publicKeysBytes *internal.PublicKeys) *[]kyber.Point {
 	publicKeys := make([]kyber.Point, 0)
 	for _, publicKeyBytes := range publicKeysBytes.GetPublicKey() {
 		publicKey := s.G2().Point()
-		err := publicKey.UnmarshalBinary(publicKeyBytes)
+		err := publicKey.UnmarshalBinary(publicKeyBytes.GetPublicKey())
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -204,5 +217,5 @@ func unpackPublicKeys(s vss.Suite, publicKeysBytes *internal.PublicKeys) []kyber
 		publicKeys = append(publicKeys, publicKey)
 	}
 
-	return publicKeys
+	return &publicKeys
 }

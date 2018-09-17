@@ -22,6 +22,7 @@ message Response {
 message Responses {
     repeated Response Responses = 1;
 }
+
 message Justification {
     bytes SessionID = 1;
     uint32 Index = 2;
@@ -33,10 +34,21 @@ message PublicKey {
     bytes PublicKey = 1;
 }
 
+message PublicKeys {
+    repeated PublicKey PublicKey = 1;
+}
+
 message Signature {
     uint32 Index = 1;
-    bytes Signature = 2;
+    string QueryId = 2;
+    string Content = 3;
+    bytes Signature = 4;
 }
-message PublicKeys {
-    repeated bytes PublicKey = 1;
+
+message Cmd{
+    enum Type {
+        CHECKURL = 0;
+    }
+    Type Ctype = 1;
+    string Args = 2;
 }
