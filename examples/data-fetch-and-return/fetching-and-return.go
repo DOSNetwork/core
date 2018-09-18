@@ -19,23 +19,56 @@ import (
 	"time"
 )
 
+const key = ``
+const passphrase = ``
+
 var ethReomteNode = "wss://rinkeby.infura.io/ws"
 var contractAddressHex = "0xbD5784b224D40213df1F9eeb572961E2a859Cb80"
 var stopKeyWord = "https://api.coinbase.com/v2/prices/ETH-USD/spot"
 var groupId = big.NewInt(123)
-const key = ``
-const passphrase = ``
 
 
 func subscribePubKey(proxy *dosproxy.DOSProxy, ch chan *dosproxy.DOSProxyLogSuccPubKeySub, done chan bool) {
 
 	fmt.Println("Establishing listen channel to group public key...")
 
+	connected := false
+
+	retried := false
+
+	go func() {
+		time.Sleep(3 * time.Second)
+		if !connected {
+			retried = true
+			fmt.Println("retry")
+
+
+			client, err := ethclient.Dial(ethReomteNode)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			contractAddress := common.HexToAddress(contractAddressHex)
+			proxy, err = dosproxy.NewDOSProxy(contractAddress, client)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			go subscribePubKey(proxy, ch, done)
+		}
+	}()
+
 	opt := &bind.WatchOpts{}
 	sub, err := proxy.DOSProxyFilterer.WatchLogSuccPubKeySub(opt, ch)
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	if retried {
+		return
+	}
+
+	connected = true
 
 	done <- true
 
@@ -52,12 +85,41 @@ func subscribePubKey(proxy *dosproxy.DOSProxy, ch chan *dosproxy.DOSProxyLogSucc
 
 
 func subscribeEvent(client *ethclient.Client, proxy *dosproxy.DOSProxy, ch chan *dosproxy.DOSProxyLogUrl, signers *example.RandomNumberGenerator) {
+	connected := false
+
+	retried := false
+
+	go func() {
+		time.Sleep(3 * time.Second)
+		if !connected {
+			retried = true
+			fmt.Println("retry")
+
+			client, err := ethclient.Dial(ethReomteNode)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			contractAddress := common.HexToAddress(contractAddressHex)
+			proxy, err = dosproxy.NewDOSProxy(contractAddress, client)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			go subscribeEvent(client, proxy, ch, signers)
+		}
+	}()
 	opt := &bind.WatchOpts{}
 	sub, err := proxy.DOSProxyFilterer.WatchLogUrl(opt, ch)
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	if retried {
+		return
+	}
+
+	connected = true
 
 	for i := range ch {
 		fmt.Printf("Query-ID: %v \n", i.QueryId)

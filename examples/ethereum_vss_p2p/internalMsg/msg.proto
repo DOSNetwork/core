@@ -1,5 +1,5 @@
 syntax = "proto3";
-package internal;
+package internalMsg;
 
 message EncryptedDeal {
     bytes DHKey = 1;
@@ -41,7 +41,7 @@ message PublicKeys {
 message Signature {
     uint32 Index = 1;
     string QueryId = 2;
-    string Content = 3;
+    bytes Content = 3;
     bytes Signature = 4;
 }
 

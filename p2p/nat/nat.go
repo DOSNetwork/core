@@ -19,7 +19,7 @@ const (
 )
 
 var ErrNoExternalAddress = errors.New("no external address")
-var ErrNoInternalAddress = errors.New("no internal address")
+var ErrNoInternalAddress = errors.New("no internalMsg address")
 var ErrNoNATFound = errors.New("no NAT found")
 
 // protocol is either "udp" or "tcp"
@@ -27,7 +27,7 @@ type NAT interface {
 	// Type returns the kind of NAT port mapping service that is used
 	getType() string
 
-	// GetDeviceAddress returns the internal address of the gateway device.
+	// GetDeviceAddress returns the internalMsg address of the gateway device.
 	getDeviceAddress() (addr net.IP, err error)
 
 	// GetExternalAddress returns the external address of the gateway device.

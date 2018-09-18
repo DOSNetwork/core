@@ -11,7 +11,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/DOSNetwork/core/examples/vss_p2p/internal"
+	"github.com/DOSNetwork/core/examples/vss_p2p/internalMsg"
 	"github.com/DOSNetwork/core/p2p"
 	"github.com/DOSNetwork/core/share"
 	"github.com/DOSNetwork/core/share/vss/pedersen"
@@ -103,7 +103,7 @@ func main() {
 			//event from peer
 			case msg := <-tunnel:
 				switch content := msg.Msg.Message.(type) {
-				case *internal.PublicKey:
+				case *internalMsg.PublicKey:
 					if dealer != nil {
 						if dealer.currentVerifier < dealer.nbVerifiers {
 							dealer.verifiersPub[dealer.currentVerifier] = *msgParser.UnpackPublicKey(suite, content)
@@ -132,12 +132,12 @@ func main() {
 						}
 					}
 					//fmt.Println("receive PublicKey", unpackPublicKey(content).String())
-				case *internal.PublicKeys:
+				case *internalMsg.PublicKeys:
 					if verifier != nil {
 						verifiersPub := msgParser.UnpackPublicKeys(suite, content)
 						verifier.vssVerifier, _ = vss.NewVerifier(suite, verifier.priKey, verifier.dealerPubKey, *verifiersPub)
 					}
-				case *internal.EncryptedDeals:
+				case *internalMsg.EncryptedDeals:
 					deals := msgParser.UnpackEncryptedDeals(content)
 					for _, deal := range deals {
 						res, err := verifier.vssVerifier.ProcessEncryptedDeal(deal)
@@ -148,7 +148,7 @@ func main() {
 							p.Broadcast(&packedMessage)
 						}
 					}
-				case *internal.Response:
+				case *internalMsg.Response:
 					resp := msgParser.UnpackResponse(content)
 					dealer.responses[resp.Index] = resp
 					_, err := dealer.vssDealer.ProcessResponse(resp)
@@ -164,7 +164,7 @@ func main() {
 						packedMessage = msgParser.PackResponses(dealer.responses)
 						p.Broadcast(&packedMessage)
 					}
-				case *internal.Responses:
+				case *internalMsg.Responses:
 					resps := msgParser.UnpackResponses(content)
 					for _, r := range resps {
 						verifier.vssVerifier.ProcessResponse(r)
@@ -174,10 +174,10 @@ func main() {
 					s := verifier.vssVerifier.Deal().SecShare
 					sig, _ := tbls.Sign(suite, s, []byte("test"))
 
-					packedMessage = msgParser.PackSignature(uint32(verifier.vssVerifier.Index()), "", "", sig)
+					packedMessage = msgParser.PackSignature(uint32(verifier.vssVerifier.Index()), "", []byte(""), sig)
 					p.Broadcast(&packedMessage)
 
-				case *internal.Signature:
+				case *internalMsg.Signature:
 					dealer.sigShares = append(dealer.sigShares, content.GetSignature())
 					fmt.Println("len sigShares ", len(dealer.sigShares))
 					if len(dealer.sigShares) == dealer.nbVerifiers {
