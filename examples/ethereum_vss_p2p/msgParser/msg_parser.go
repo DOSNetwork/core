@@ -3,7 +3,7 @@ package msgParser
 import (
 	"log"
 
-	"github.com/DOSNetwork/core/examples/vss_p2p/internalMsg"
+	"github.com/DOSNetwork/core/examples/ethereum_vss_p2p/internalMsg"
 	"github.com/DOSNetwork/core/share/vss/pedersen"
 	"github.com/dedis/kyber"
 	"github.com/golang/protobuf/proto"

@@ -67,7 +67,7 @@ func InitialRandomNumberGenerator(suite suites.Suite, nbParticipants int) (*Rand
 
 func (r *RandomNumberGenerator) GetPubKey() (*big.Int, *big.Int, *big.Int, *big.Int, error){
 	pubKey := share.NewPubPoly(r.suite, r.suite.Point().Base(), r.dkss[0].Commitments()).Commit()
-	pubkKeyMar, err := pubKey.MarshalBinary()
+	pubKeyMar, err := pubKey.MarshalBinary()
 	if err != nil {
 		return nil,nil,nil,nil,err
 	}
@@ -76,10 +76,10 @@ func (r *RandomNumberGenerator) GetPubKey() (*big.Int, *big.Int, *big.Int, *big.
 	x1 := big.NewInt(0)
 	y0 := big.NewInt(0)
 	y1 := big.NewInt(0)
-	x0.SetBytes(pubkKeyMar[1:33])
-	x1.SetBytes(pubkKeyMar[33:65])
-	y0.SetBytes(pubkKeyMar[65:97])
-	y1.SetBytes(pubkKeyMar[97:])
+	x0.SetBytes(pubKeyMar[1:33])
+	x1.SetBytes(pubKeyMar[33:65])
+	y0.SetBytes(pubKeyMar[65:97])
+	y1.SetBytes(pubKeyMar[97:])
 	return x0, x1, y0, y1, nil
 }
 

@@ -128,8 +128,8 @@ func (m *Hi) GetPubkey() []byte {
 }
 
 func init() {
-	proto.RegisterType((*Package)(nil), "internal.Package")
-	proto.RegisterType((*Hi)(nil), "internal.Hi")
+	proto.RegisterType((*Package)(nil), "internalMsg.Package")
+	proto.RegisterType((*Hi)(nil), "internalMsg.Hi")
 }
 
 func init() { proto.RegisterFile("package.proto", fileDescriptor_ae8103ff0e06fb71) }

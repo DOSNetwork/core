@@ -13,7 +13,7 @@ https://rinkeby.etherscan.io/address/0xbD5784b224D40213df1F9eeb572961E2a859Cb80
 
 #### Steps:
 1. Open `fetching-and-return.go`, copy content of keyStore json file to `key`, and corresponding passphrase to `passphrase`.
-2. `$ go run fetching-and return.go`. Please retry if stuck at "Establishing listen channel to group public key...".
+2. `$ go run fetching-and return.go`.
 3. Please wait until "Group set-up finished, start listening to query..." is printed.
 4. Go to [myetherwallet.com](https://www.myetherwallet.com/#contracts)
 5. Switch to `rinkeby net`

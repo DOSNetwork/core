@@ -133,9 +133,9 @@ func (m *Company) GetId() int32 {
 }
 
 func init() {
-	proto.RegisterType((*Chat)(nil), "internal.Chat")
-	proto.RegisterType((*Person)(nil), "internal.Person")
-	proto.RegisterType((*Company)(nil), "internal.Company")
+	proto.RegisterType((*Chat)(nil), "internalMsg.Chat")
+	proto.RegisterType((*Person)(nil), "internalMsg.Person")
+	proto.RegisterType((*Company)(nil), "internalMsg.Company")
 }
 
 func init() { proto.RegisterFile("content.proto", fileDescriptor_61cc9617ce0cf609) }

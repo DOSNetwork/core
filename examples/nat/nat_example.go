@@ -49,8 +49,8 @@ func server() {
 
 	fmt.Println("external address: ", externalAddress)
 	fmt.Println("external port: ", externalPort)
-	fmt.Println("internal address: ", internalAddress)
-	fmt.Println("internal port: ", internalPort)
+	fmt.Println("internalMsg address: ", internalAddress)
+	fmt.Println("internalMsg port: ", internalPort)
 	fmt.Println("nat type: ", nat.GetType())
 
 	address := internalAddress.String() + ":" + strconv.Itoa(internalPort)

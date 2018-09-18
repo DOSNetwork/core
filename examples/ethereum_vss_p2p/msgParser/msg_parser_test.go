@@ -4,7 +4,7 @@ import (
 	"log"
 	"testing"
 
-	"github.com/DOSNetwork/core/examples/vss_p2p/internalMsg"
+	"github.com/DOSNetwork/core/examples/ethereum_vss_p2p/internalMsg"
 	"github.com/DOSNetwork/core/share/vss/pedersen"
 	"github.com/DOSNetwork/core/suites"
 	"github.com/dedis/kyber"

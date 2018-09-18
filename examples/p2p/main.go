@@ -72,7 +72,7 @@ func main() {
 			continue
 		}
 		if strings.TrimRight(input, "\n") == "company" {
-			//raw, _ := ptypes.MarshalAny(&internal.Company{Id: 2})
+			//raw, _ := ptypes.MarshalAny(&internalMsg.Company{Id: 2})
 			pb := proto.Message(&internal.Company{Id: 2})
 			p.Broadcast(&pb)
 			continue
