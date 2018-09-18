@@ -20,7 +20,7 @@ func genPair() (kyber.Scalar, kyber.Point) {
 	return secret, public
 }
 
-func CreateP2PNetwork(tunnel chan P2PMessage) (P2PInterface, error) {
+func CreateP2PNetwork(tunnel chan P2PMessage, port int) (P2PInterface, error) {
 	secKey, pubKey := genPair()
 	id := getLocalIp() + pubKey.String()[:15]
 	p := &P2P{
@@ -31,6 +31,7 @@ func CreateP2PNetwork(tunnel chan P2PMessage) (P2PInterface, error) {
 		pubKey:      pubKey,
 		id:          id,
 		ip:          getLocalIp(),
+		port:        port,
 	}
 	return p, nil
 }

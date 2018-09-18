@@ -3,10 +3,11 @@ package p2p
 import (
 	"bufio"
 	"fmt"
-	"github.com/DOSNetwork/core/p2p/nat"
 	"log"
 	"net"
 	"strconv"
+
+	"github.com/DOSNetwork/core/p2p/nat"
 
 	"sync"
 
@@ -23,12 +24,15 @@ type P2P struct {
 	suite       suites.Suite
 	id          string
 	ip          string
+	port        int
 	secKey      kyber.Scalar
 	pubKey      kyber.Point
 }
 
 func (n *P2P) Listen() error {
-	listener, err := net.Listen("tcp", ":0")
+	p := fmt.Sprintf(":%d", n.port)
+
+	listener, err := net.Listen("tcp", p)
 	if err != nil {
 		return err
 	}
@@ -56,7 +60,6 @@ func (n *P2P) Listen() error {
 	}
 	n.id = n.ip + n.pubKey.String()[:15]
 
-
 	fmt.Println("listen ", n.ip)
 	// Handle new clients.
 
@@ -81,9 +84,7 @@ func (n *P2P) Listen() error {
 
 func (n *P2P) Broadcast(m *proto.Message) {
 	n.peers.Range(func(key, value interface{}) bool {
-		ip := key.(string)
 		client := value.(*PeerClient)
-		fmt.Printf("key[%s]\n", ip)
 		client.SendPackage(m)
 		return true
 	})
