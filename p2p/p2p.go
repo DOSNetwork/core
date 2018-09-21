@@ -82,7 +82,7 @@ func (n *P2P) Listen() error {
 	return nil
 }
 
-func (n *P2P) Broadcast(m *proto.Message) {
+func (n *P2P) Broadcast(m proto.Message) {
 	n.peers.Range(func(key, value interface{}) bool {
 		client := value.(*PeerClient)
 		client.SendPackage(m)
@@ -90,7 +90,7 @@ func (n *P2P) Broadcast(m *proto.Message) {
 	})
 }
 
-func (n *P2P) SendMessageById(id string, m *proto.Message) {
+func (n *P2P) SendMessageById(id string, m proto.Message) {
 	value, loaded := n.peers.Load(id)
 	if loaded {
 		client := value.(*PeerClient)

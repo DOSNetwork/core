@@ -136,16 +136,15 @@ func (p *PeerClient) SayHi() {
 		Ip:     p.p2pnet.ip,
 		Pubkey: pub,
 	}
-	msg := proto.Message(pa)
 	p.wg.Add(1)
-	p.SendPackage(&msg)
+	p.SendPackage(pa)
 	p.wg.Wait()
 }
 
-func (p *PeerClient) SendPackage(msg *proto.Message) error {
+func (p *PeerClient) SendPackage(msg proto.Message) error {
 	var bytes []byte
 	pub, _ := p.p2pnet.pubKey.MarshalBinary()
-	anything, _ := ptypes.MarshalAny(*msg)
+	anything, _ := ptypes.MarshalAny(msg)
 	sig, _ := bls.Sign(p.p2pnet.suite, p.p2pnet.secKey, anything.Value)
 
 	pa := &internal.Package{

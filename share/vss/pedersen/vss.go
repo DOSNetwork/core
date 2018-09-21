@@ -60,6 +60,7 @@ type Deal struct {
 // correct recipient. The encryption is performed in a similar manner as what is
 // done in TLS. The dealer generates a temporary key pair, signs it with its
 // longterm secret key.
+/*
 type EncryptedDeal struct {
 	// Ephemeral Diffie Hellman key
 	DHKey []byte
@@ -74,15 +75,16 @@ type EncryptedDeal struct {
 // Response is sent by the verifiers to all participants and holds each
 // individual validation or refusal of a Deal.
 type Response struct {
-	// SessionID related to this run of the protocol
-	SessionID []byte
-	// Index of the verifier issuing this Response
-	Index uint32
-	// false = NO APPROVAL == Complaint , true = APPROVAL
-	Status bool
-	// Signature over the whole packet
-	Signature []byte
+       // SessionID related to this run of the protocol
+       SessionID []byte
+       // Index of the verifier issuing this Response
+       Index uint32
+       // false = NO APPROVAL == Complaint , true = APPROVAL
+       Status bool
+       // Signature over the whole packet
+       Signature []byte
 }
+*/
 
 const (
 	// StatusComplaint is a constant value meaning that a verifier issues
@@ -751,4 +753,63 @@ func (j *Justification) Hash(s Suite) []byte {
 	buff, _ := j.Deal.MarshalBinary()
 	_, _ = h.Write(buff)
 	return h.Sum(nil)
+}
+
+func (e *EncryptedDeals) SetEncryptedDealsArray(deals []*EncryptedDeal) {
+	e.Deals = make([]*EncryptedDeal, len(deals))
+	for i, deal := range deals {
+		e.Deals[i] = deal
+	}
+	return
+}
+
+func (p *Responses) SetResponseArray(s Suite, responses []*Response) {
+	p.Responses = make([]*Response, len(responses))
+	for i, r := range responses {
+		p.Responses[i] = r
+	}
+	return
+}
+
+func (p *PublicKeys) SetPointArray(s Suite, points []kyber.Point) (err error) {
+	var binary []byte
+	p.Keys = make([]*PublicKey, len(points))
+	for i, point := range points {
+		binary, err = point.MarshalBinary()
+		if err != nil {
+			return
+		}
+		p.Keys[i] = &PublicKey{Binary: binary}
+	}
+	return
+}
+
+func (ps *PublicKeys) GetPointArray(s Suite) (ret []kyber.Point, err error) {
+	pubkeys := ps.Keys
+	ret = make([]kyber.Point, len(pubkeys))
+	for i, pubkey := range pubkeys {
+		point := s.G2().Point()
+		err = point.UnmarshalBinary(pubkey.Binary)
+		if err != nil {
+			return
+		}
+		ret[i] = point
+	}
+	return
+}
+func (p *PublicKey) GetPoint(s Suite) (ret kyber.Point, err error) {
+	ret = s.G2().Point()
+	err = ret.UnmarshalBinary(p.Binary)
+	if err != nil {
+		return
+	}
+	return
+}
+
+func (p *PublicKey) SetPoint(s Suite, point kyber.Point) (err error) {
+	p.Binary, err = point.MarshalBinary()
+	if err != nil {
+		return
+	}
+	return
 }

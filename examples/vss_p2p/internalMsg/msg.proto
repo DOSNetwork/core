@@ -1,50 +1,6 @@
 syntax = "proto3";
 package internalMsg;
 
-message EncryptedDeal {
-    bytes DHKey = 1;
-    bytes Signature = 2;
-    bytes Nonce = 3;
-    bytes Cipher = 4;
-}
-
-message EncryptedDeals {
-    repeated EncryptedDeal Deals = 1;
-}
-
-message Response {
-    bytes SessionID = 1;
-    uint32 Index = 2;
-    bool Status = 3;
-    bytes Signature = 4;
-}
-
-message Responses {
-    repeated Response Responses = 1;
-}
-
-message Justification {
-    bytes SessionID = 1;
-    uint32 Index = 2;
-    bytes Deal = 3;
-    bytes Signature = 4;
-}
-
-message PublicKey {
-    bytes PublicKey = 1;
-}
-
-message PublicKeys {
-    repeated PublicKey PublicKey = 1;
-}
-
-message Signature {
-    uint32 Index = 1;
-    string QueryId = 2;
-    bytes Content = 3;
-    bytes Signature = 4;
-}
-
 message Cmd{
     enum Type {
         CHECKURL = 0;
