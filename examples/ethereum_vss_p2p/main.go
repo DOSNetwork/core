@@ -5,11 +5,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"github.com/DOSNetwork/core/examples/ethereum_vss_p2p/contract"
-	"github.com/DOSNetwork/core/group/bn256"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethclient"
 	"io/ioutil"
 	"log"
 	"math/big"
@@ -18,6 +13,12 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/DOSNetwork/core/examples/ethereum_vss_p2p/contract"
+	"github.com/DOSNetwork/core/group/bn256"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/ethclient"
 
 	"github.com/DOSNetwork/core/examples/ethereum_vss_p2p/internalMsg"
 	"github.com/DOSNetwork/core/examples/ethereum_vss_p2p/msgParser"
@@ -48,8 +49,8 @@ func genPair() (kyber.Scalar, kyber.Point) {
 }
 
 type dataFeed struct {
-	data	[]byte
-	sig		[][]byte
+	data []byte
+	sig  [][]byte
 }
 
 type Dealer struct {
@@ -64,7 +65,7 @@ type Dealer struct {
 	currentVerifier int
 	vssDealer       *vss.Dealer
 	pubPoly         *share.PubPoly
-	mux 			sync.Mutex
+	mux             sync.Mutex
 }
 type Verifier struct {
 	dealerPubKey kyber.Point
@@ -88,7 +89,7 @@ func main() {
 	//1)Build a p2p network
 	fmt.Println(*roleFlag)
 	tunnel := make(chan p2p.P2PMessage)
-	p, _ := p2p.CreateP2PNetwork(tunnel)
+	p, _ := p2p.CreateP2PNetwork(tunnel, 0)
 	defer close(tunnel)
 	//2)Start to listen incoming connection
 	p.Listen()
@@ -117,7 +118,7 @@ func main() {
 		}
 		_ = p.CreatePeer(dealerAddr, nil)
 		msg := msgParser.PackPublicKey(verifierPub)
-		p.Broadcast(&msg)
+		p.Broadcast(msg)
 	}
 
 	//3.5) Connect to ethereum
@@ -149,17 +150,17 @@ func main() {
 							if dealer.currentVerifier == dealer.nbVerifiers {
 								//Send dealer public key to all verifiers
 								packedMessage := msgParser.PackPublicKey(dealer.pubKey)
-								p.Broadcast(&packedMessage)
+								p.Broadcast(packedMessage)
 								//Send all of verifier's pubkey to all verifiers
 								packedMessage = msgParser.PackPublicKeys(dealer.verifiersPub)
-								p.Broadcast(&packedMessage)
+								p.Broadcast(packedMessage)
 								//Build a new dealer
 								dealer.vssDealer, _ = vss.NewDealer(suite, dealer.priKey, dealer.secret, dealer.verifiersPub, dealer.vssThreshold)
 
 								// 1. dispatch encrypted deals to all verifiers
 								encDeals, _ := dealer.vssDealer.EncryptedDeals()
 								packedMessage = msgParser.PackEncryptedDeals(encDeals)
-								p.Broadcast(&packedMessage)
+								p.Broadcast(packedMessage)
 								dealer.currentVerifier = 0
 							}
 						}
@@ -182,7 +183,7 @@ func main() {
 							fmt.Println("ProcessEncryptedDeal err ", err)
 						} else {
 							packedMessage = msgParser.PackResponse(res)
-							p.Broadcast(&packedMessage)
+							p.Broadcast(packedMessage)
 						}
 					}
 				case *internalMsg.Response:
@@ -216,11 +217,11 @@ func main() {
 							log.Fatal(err)
 						}
 
-						<- done
+						<-done
 						fmt.Println("Group set-up finished, start listening to query...")
 
 						packedMessage = msgParser.PackResponses(dealer.responses)
-						p.Broadcast(&packedMessage)
+						p.Broadcast(packedMessage)
 					}
 
 				case *internalMsg.Responses:
@@ -230,7 +231,6 @@ func main() {
 					}
 					fmt.Println("vssVerifier ", verifier.vssVerifier.Index(), "dealCetified ", verifier.vssVerifier.DealCertified())
 
-
 					chUrl := make(chan *dosproxy.DOSProxyLogUrl)
 					go subscribeEvent(p, verifier, proxy, chUrl)
 
@@ -238,8 +238,8 @@ func main() {
 					dealer.mux.Lock()
 					if _, ok := dealer.sigShares[content.GetQueryId()]; !ok {
 						newDataFeed := &dataFeed{
-							data:content.GetContent(),
-							sig:make([][]byte, 0),
+							data: content.GetContent(),
+							sig:  make([][]byte, 0),
 						}
 						newDataFeed.sig = append(newDataFeed.sig, content.GetSignature())
 						dealer.sigShares[content.GetQueryId()] = newDataFeed
@@ -294,11 +294,11 @@ func main() {
 	fmt.Println("finish)")
 }
 
-func getPubKey(pubPoly *share.PubPoly) (*big.Int, *big.Int, *big.Int, *big.Int, error){
+func getPubKey(pubPoly *share.PubPoly) (*big.Int, *big.Int, *big.Int, *big.Int, error) {
 	pubKey := pubPoly.Commit()
 	pubKeyMar, err := pubKey.MarshalBinary()
 	if err != nil {
-		return nil,nil,nil,nil,err
+		return nil, nil, nil, nil, err
 	}
 
 	x0 := big.NewInt(0)
@@ -324,7 +324,6 @@ func subscribePubKey(proxy *dosproxy.DOSProxy, ch chan *dosproxy.DOSProxyLogSucc
 		if !connected {
 			retried = true
 			fmt.Println("retry")
-
 
 			client, err := ethclient.Dial(ethReomteNode)
 			if err != nil {
@@ -366,7 +365,7 @@ func subscribePubKey(proxy *dosproxy.DOSProxy, ch chan *dosproxy.DOSProxyLogSucc
 	close(ch)
 }
 
-func uploadPubKey(client *ethclient.Client, proxy *dosproxy.DOSProxy, groupId, x0, x1, y0, y1 *big.Int) error{
+func uploadPubKey(client *ethclient.Client, proxy *dosproxy.DOSProxy, groupId, x0, x1, y0, y1 *big.Int) error {
 	fmt.Println("Starting submitting group public key...")
 
 	gasPrice, err := client.SuggestGasPrice(context.Background())
@@ -460,10 +459,10 @@ func queryFulfill(p p2p.P2PInterface, verifier *Verifier, queryId *big.Int, url 
 	}
 
 	packedMessage := msgParser.PackSignature(uint32(verifier.vssVerifier.Index()), queryId.String(), data, sig)
-	p.Broadcast(&packedMessage)
+	p.Broadcast(packedMessage)
 }
 
-func dataFetch(url string) ([]byte, error){
+func dataFetch(url string) ([]byte, error) {
 	client := &http.Client{Timeout: 10 * time.Second}
 	r, err := client.Get(url)
 	if err != nil {
@@ -483,7 +482,7 @@ func dataFetch(url string) ([]byte, error){
 
 }
 
-func dataSign(verifier *Verifier, data []byte) ([]byte, error){
+func dataSign(verifier *Verifier, data []byte) ([]byte, error) {
 	s := verifier.vssVerifier.Deal().SecShare
 	sig, err := tbls.Sign(suite, s, data)
 	if err != nil {
@@ -499,14 +498,14 @@ func negate(sig []byte) (*big.Int, *big.Int) {
 	x.SetBytes(sig[0:32])
 	y.SetBytes(sig[32:])
 
-	if x.Cmp(big.NewInt(0)) == 0 && y.Cmp(big.NewInt(0)) == 0{
+	if x.Cmp(big.NewInt(0)) == 0 && y.Cmp(big.NewInt(0)) == 0 {
 		return big.NewInt(0), big.NewInt(0)
 	}
 
-	return x, big.NewInt(0).Sub(bn256.P,big.NewInt(0).Mod(y, bn256.P))
+	return x, big.NewInt(0).Sub(bn256.P, big.NewInt(0).Mod(y, bn256.P))
 }
 
-func dataReturn(client *ethclient.Client, proxy *dosproxy.DOSProxy, queryId *big.Int, data []byte, x, y *big.Int) error{
+func dataReturn(client *ethclient.Client, proxy *dosproxy.DOSProxy, queryId *big.Int, data []byte, x, y *big.Int) error {
 	gasPrice, err := client.SuggestGasPrice(context.Background())
 	if err != nil {
 		return err

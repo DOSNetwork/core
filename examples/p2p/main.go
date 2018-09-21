@@ -20,7 +20,7 @@ func main() {
 	//1)Build a p2p network
 
 	tunnel := make(chan p2p.P2PMessage)
-	p, _ := p2p.CreateP2PNetwork(tunnel)
+	p, _ := p2p.CreateP2PNetwork(tunnel, 0)
 	defer close(tunnel)
 	//2)Start to listen incoming connection
 	p.Listen()
@@ -68,17 +68,17 @@ func main() {
 		if strings.TrimRight(input, "\n") == "person" {
 			pb := proto.Message(&internal.Person{Name: "Eric"})
 			//raw, _ := ptypes.MarshalAny(pb)
-			p.Broadcast(&pb)
+			p.Broadcast(pb)
 			continue
 		}
 		if strings.TrimRight(input, "\n") == "company" {
 			//raw, _ := ptypes.MarshalAny(&internalMsg.Company{Id: 2})
 			pb := proto.Message(&internal.Company{Id: 2})
-			p.Broadcast(&pb)
+			p.Broadcast(pb)
 			continue
 		}
 		pb := proto.Message(&internal.Chat{Content: input})
-		p.Broadcast(&pb)
+		p.Broadcast(pb)
 	}
 	fmt.Println("finish)")
 }

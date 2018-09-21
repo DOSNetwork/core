@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/DOSNetwork/core/examples/vss_p2p/internalMsg"
-	"github.com/DOSNetwork/core/examples/vss_p2p/msgParser"
 	"github.com/DOSNetwork/core/p2p"
 
 	"github.com/DOSNetwork/core/share"
@@ -32,16 +31,20 @@ var suite = suites.MustFind("bn256")
 var startTime time.Time
 var endTime time.Time
 
-func genPair() (kyber.Scalar, kyber.Point) {
+func genPair() (kyber.Scalar, vss.PublicKey) {
 
 	secret := suite.Scalar().Pick(suite.RandomStream())
-	public := suite.Point().Mul(secret, nil)
+	public := vss.PublicKey{}
+	err := public.SetPoint(suite, suite.Point().Mul(secret, nil))
+	if err != nil {
+		log.Fatal(err)
+	}
 	return secret, public
 }
 
 type Dealer struct {
 	secret         kyber.Scalar
-	pubKey         kyber.Point
+	pubKey         vss.PublicKey
 	priKey         kyber.Scalar
 	responses      []*vss.Response
 	sigShares      [][]byte
@@ -57,9 +60,10 @@ type Dealer struct {
 	signMap        *sync.Map
 	contentMap     *sync.Map
 }
+
 type Verifier struct {
-	dealerPubKey kyber.Point
-	pubKey       kyber.Point
+	dealerPubKey vss.PublicKey
+	pubKey       vss.PublicKey
 	priKey       kyber.Scalar
 	verifiersPub []kyber.Point
 	vssVerifier  *vss.Verifier
@@ -90,22 +94,29 @@ func dataFetch(url string) ([]byte, error) {
 }
 
 func (dealer *Dealer) afterReceivePubkey(e *fsm.Event) {
-	fmt.Printf("EVENT:afterReceivePubkey currentVerifier =%d %d\n", cap(dealer.verifiersPub), len(dealer.verifiersPub))
 	//Wait for all verifiers
 	if len(dealer.verifiersPub) == dealer.nbVerifiers {
 		//Send dealer public key to all verifiers
-		packedMessage := msgParser.PackPublicKey(dealer.pubKey)
-		(*dealer.network).Broadcast(&packedMessage)
+		(*dealer.network).Broadcast(&dealer.pubKey)
+
 		//Send all of verifier's pubkey to all verifiers
-		packedMessage = msgParser.PackPublicKeys(dealer.verifiersPub)
-		(*dealer.network).Broadcast(&packedMessage)
+		publicKeys := vss.PublicKeys{}
+		err := publicKeys.SetPointArray(suite, dealer.verifiersPub)
+		if err != nil {
+			log.Fatal(err)
+		}
+		(*dealer.network).Broadcast(&publicKeys)
 		//Build a new dealer
 		dealer.vssDealer, _ = vss.NewDealer(suite, dealer.priKey, dealer.secret, dealer.verifiersPub, dealer.vssThreshold)
 
 		// 1. dispatch encrypted deals to all verifiers
-		encDeals, _ := dealer.vssDealer.EncryptedDeals()
-		packedMessage = msgParser.PackEncryptedDeals(encDeals)
-		(*dealer.network).Broadcast(&packedMessage)
+		encDeals, err := dealer.vssDealer.EncryptedDeals()
+		if err != nil {
+			log.Fatal(err)
+		}
+		deals := vss.EncryptedDeals{}
+		deals.SetEncryptedDealsArray(encDeals)
+		(*dealer.network).Broadcast(&deals)
 		dealer.totalResponses = 0
 		dealer.currentResp = 0
 	}
@@ -121,8 +132,9 @@ func (dealer *Dealer) afterReceiveResponse(e *fsm.Event) {
 	if dealer.vssDealer.DealCertified() {
 		fmt.Println("dealer EnoughApprovals ", dealer.vssDealer.EnoughApprovals(), " DealCertified ", dealer.vssDealer.DealCertified())
 		dealer.pubPoly = share.NewPubPoly(suite, suite.Point().Base(), dealer.vssDealer.Commits())
-		packedMessage := msgParser.PackResponses(dealer.responses)
-		(*dealer.network).Broadcast(&packedMessage)
+		responses := vss.Responses{}
+		responses.SetResponseArray(suite, dealer.responses)
+		(*dealer.network).Broadcast(&responses)
 	}
 }
 func (dealer *Dealer) enterVerified(e *fsm.Event) {
@@ -222,52 +234,63 @@ func main() {
 			network: &p,
 		}
 		_ = p.CreatePeer(dealerAddr, nil)
-		msg := msgParser.PackPublicKey(verifierPub)
-		p.Broadcast(&msg)
+		p.Broadcast(&verifierPub)
 	}
 	//
 	//4)Handle message from peer
 	go func() {
-		var packedMessage proto.Message
 		for {
 			select {
 			//event from peer
 			case msg := <-tunnel:
 				switch content := msg.Msg.Message.(type) {
-				case *internalMsg.PublicKey:
+				case *vss.PublicKey:
 					if dealer != nil {
-						dealer.verifiersPub = append(dealer.verifiersPub, *msgParser.UnpackPublicKey(suite, content))
-						err := dealer.FSM.Event("receivePubkey")
+						p, err := content.GetPoint(suite)
+						if err != nil {
+							log.Fatal(err)
+						}
+						dealer.verifiersPub = append(dealer.verifiersPub, p)
+						err = dealer.FSM.Event("receivePubkey")
 						if err != nil {
 							fmt.Println(err)
 						}
 					} else {
 						if verifier != nil {
-							verifier.dealerPubKey = *msgParser.UnpackPublicKey(suite, content)
+							verifier.dealerPubKey = *content
 						}
 					}
-					//fmt.Println("receive PublicKey", unpackPublicKey(content).String())
-				case *internalMsg.PublicKeys:
+				case *vss.PublicKeys:
 					if verifier != nil {
-						verifiersPub := msgParser.UnpackPublicKeys(suite, content)
-						verifier.vssVerifier, _ = vss.NewVerifier(suite, verifier.priKey, verifier.dealerPubKey, *verifiersPub)
+						verifiersPub, err := content.GetPointArray(suite)
+						if err != nil {
+							log.Fatal(err)
+						}
+						p, err := verifier.dealerPubKey.GetPoint(suite)
+						if err != nil {
+							log.Fatal(err)
+						}
+						verifier.vssVerifier, err = vss.NewVerifier(suite, verifier.priKey, p, verifiersPub)
+						if err != nil {
+							log.Fatal(err)
+						}
 					}
-				case *internalMsg.EncryptedDeals:
-					deals := msgParser.UnpackEncryptedDeals(content)
-					for _, deal := range deals {
+				case *vss.EncryptedDeals:
+					deals := content.Deals
+					for i, deal := range deals {
 						res, err := verifier.vssVerifier.ProcessEncryptedDeal(deal)
 						if err != nil {
 							fmt.Println("ProcessEncryptedDeal err ", err)
 						} else {
-							packedMessage = msgParser.PackResponse(res)
-							p.Broadcast(&packedMessage)
+							fmt.Println("ProcessEncryptedDeal SUCCESS ", i)
+							p.Broadcast(res)
 						}
 					}
-				case *internalMsg.Response:
+				case *vss.Response:
 					if dealer != nil {
 						if uint32(cap(dealer.responses)) > content.Index {
 							dealer.currentResp = content.Index
-							dealer.responses[content.Index] = msgParser.UnpackResponse(content)
+							dealer.responses[dealer.currentResp] = content
 							err := dealer.FSM.Event("receiveResponse")
 							if err != nil {
 								fmt.Println(err)
@@ -283,14 +306,16 @@ func main() {
 						}
 
 					}
-				case *internalMsg.Responses:
-					resps := msgParser.UnpackResponses(content)
+				case *vss.Responses:
+					//fmt.Println("vssVerifier receive vss.Responses", content)
+
+					resps := content.Responses
 					for _, r := range resps {
 						verifier.vssVerifier.ProcessResponse(r)
 					}
 					fmt.Println("vssVerifier ", verifier.vssVerifier.Index(), "dealCetified ", verifier.vssVerifier.DealCertified())
 
-				case *internalMsg.Signature:
+				case *vss.Signature:
 					if dealer != nil {
 						var sigShares [][]byte
 						result, ok := (*dealer.signMap).Load(content.QueryId)
@@ -326,8 +351,13 @@ func main() {
 						if err != nil {
 							log.Fatal(err)
 						}
-						packedMessage = msgParser.PackSignature(uint32(verifier.vssVerifier.Index()), url, result, sig)
-						p.Broadcast(&packedMessage)
+						sign := &vss.Signature{
+							Index:     uint32(verifier.vssVerifier.Index()),
+							QueryId:   url,
+							Content:   result,
+							Signature: sig,
+						}
+						p.Broadcast(sign)
 					}
 				default:
 					fmt.Println("unknown")
@@ -362,7 +392,7 @@ func main() {
 					Args:  words[1],
 				}
 				pb := proto.Message(cmd)
-				(*dealer.network).Broadcast(&pb)
+				(*dealer.network).Broadcast(pb)
 			}
 		}
 	}

@@ -61,8 +61,8 @@ type P2PMessage struct {
 type P2PInterface interface {
 	// Listen starts listening for peers on a port.
 	Listen() error
-	Broadcast(*proto.Message)
-	SendMessageById(string, *proto.Message)
+	Broadcast(proto.Message)
+	SendMessageById(string, proto.Message)
 	CreatePeer(string, *net.Conn) error
 	GetTunnel() chan P2PMessage
 }

@@ -1,0 +1,40 @@
+syntax = "proto3";
+package vss;
+
+
+message EncryptedDeal {
+    bytes dHKey = 1;
+    bytes signature = 2;
+    bytes nonce = 3;
+    bytes cipher = 4;
+}
+
+message EncryptedDeals {
+    repeated EncryptedDeal deals = 1;
+}
+
+message Response {
+    bytes sessionID = 1;
+    uint32 index = 2;
+    bool status = 3;
+    bytes signature = 4;
+}
+
+message Responses {
+    repeated Response responses = 1;
+}
+
+message PublicKey {
+    bytes binary = 1;
+}
+
+message PublicKeys {
+    repeated PublicKey keys = 1;
+}
+
+message Signature {
+    uint32 index = 1;
+    string queryId = 2;
+    bytes content = 3;
+    bytes signature = 4;
+}
