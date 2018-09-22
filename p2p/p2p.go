@@ -55,10 +55,11 @@ func (n *P2P) Listen() error {
 		}
 
 		n.ip = externalIp.String() + ":" + strconv.Itoa(externalPort)
+		n.port = externalPort
 	} else {
-		n.ip = n.ip + ":" + strconv.Itoa(listener.Addr().(*net.TCPAddr).Port)
+		n.port = listener.Addr().(*net.TCPAddr).Port
+		n.ip = n.ip + ":" + strconv.Itoa(n.port)
 	}
-	n.id = n.ip + n.pubKey.String()[:15]
 
 	fmt.Println("listen ", n.ip)
 	// Handle new clients.
