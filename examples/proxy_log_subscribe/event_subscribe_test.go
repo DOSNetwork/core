@@ -5,7 +5,7 @@ import (
 	"log"
 	"testing"
 
-	dosproxy "github.com/DOSNetwork/core/examples/proxy-log-subscribe/contracts" // for demo
+	dosproxy "github.com/DOSNetwork/core/examples/proxy_log_subscribe/contracts" // for demo
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/stretchr/testify/require"

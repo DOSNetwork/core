@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"log"
 	"os"
 	"strings"
 
@@ -23,12 +24,14 @@ func main() {
 	p, _ := p2p.CreateP2PNetwork(tunnel, 0)
 	defer close(tunnel)
 	//2)Start to listen incoming connection
-	p.Listen()
+	if err := p.Listen(); err != nil {
+		log.Fatal(err)
+	}
 
 	//3)Dial to peers to build peerClient
 	if *connect != "" {
 		fmt.Println("Create peerclients")
-		_ = p.CreatePeer(*connect, nil)
+		p.CreatePeer(*connect, nil)
 		//p.SendMessageById(*connect, []byte("hello"))
 	}
 
