@@ -1,45 +1,39 @@
-package endpoint
+package dht
 
 import (
 	"bytes"
-	"crypto/sha1"
 	"encoding/hex"
 	"fmt"
-	"github.com/dedis/kyber"
-	"log"
 	"math/bits"
+
+	"golang.org/x/crypto/blake2b"
+
+	"github.com/DOSNetwork/core/p2p/internal"
+
 )
 
 // ID is an identity of nodes, using its public key hash and network address.
-type endpoint struct {
-	address		string
-	pubKey      kyber.Point
-	id          []byte
-}
+type ID internal.ID
 
 // CreateID is a factory function creating ID.
-func CreateEndpoint(address string, publicKey kyber.Point) *endpoint {
-	publicKeyBytes, err := publicKey.MarshalBinary()
-	if err != nil {
-		log.Fatal("Unable to marshal public key")
-	}
-
-	return &endpoint{address: address, pubKey: publicKey, id:sha1.Sum(publicKeyBytes)[:]}
+func CreateID(address string, publicKey []byte) ID {
+	id := blake2b.Sum256(publicKey)
+	return ID{Address: address, PublicKey: publicKey, Id: id[:]}
 }
 
 // String returns the identity address and public key.
-func (endPoint *endpoint) String() string {
-	return fmt.Sprintf("ID{Address: %v, Id: %v}", endPoint.address, endPoint.id)
+func (id ID) String() string {
+	return fmt.Sprintf("ID{Address: %v, Id: %v}", id.Address, id.Id)
 }
 
 // Equals determines if two peer IDs are equal to each other based on the contents of their public keys.
-func (endpoint *endpoint) Equals(other *endpoint) bool {
-	return bytes.Equal(endpoint.id, other.id)
+func (id ID) Equals(other ID) bool {
+	return bytes.Equal(id.Id, other.Id)
 }
 
 // Less determines if this peer ID's public key is less than other ID's public key.
-func (endpoint *endpoint) Less(other interface{}) bool {
-	if other, is := other.(node); is {
+func (id ID) Less(other interface{}) bool {
+	if other, is := other.(ID); is {
 		return bytes.Compare(id.Id, other.Id) == -1
 	}
 	return false

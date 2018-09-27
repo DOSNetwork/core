@@ -1,14 +1,16 @@
 package p2p
 
 import (
+	"errors"
 	"net"
-	"os"
 	"sync"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes"
 
+	"github.com/DOSNetwork/core/p2p/dht"
 	"github.com/DOSNetwork/core/suites"
+
 	"github.com/dedis/kyber"
 )
 
@@ -21,48 +23,44 @@ func genPair() (kyber.Scalar, kyber.Point) {
 }
 
 func CreateP2PNetwork(tunnel chan P2PMessage, port int) (P2PInterface, error) {
-	secKey, pubKey := genPair()
-	id := getLocalIp() + pubKey.String()[:15]
 	p := &P2P{
-		peers:       new(sync.Map),
-		messageChan: tunnel,
-		suite:       suite,
-		secKey:      secKey,
-		pubKey:      pubKey,
-		id:          id,
-		ip:          getLocalIp(),
-		port:        port,
+		peers:			new(sync.Map),
+		messageChan:	tunnel,
+		suite:       	suite,
+		port:        	port,
 	}
 	return p, nil
 }
-func getLocalIp() string {
+func getLocalIp() (string, error) {
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {
-		os.Stderr.WriteString("Oops: " + err.Error() + "\n")
-		os.Exit(1)
+		return "", err
 	}
 
 	for _, a := range addrs {
 		if ipnet, ok := a.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
 			if ipnet.IP.To4() != nil {
-				os.Stdout.WriteString(ipnet.IP.String() + "\n")
-				return ipnet.IP.String()
+				return ipnet.IP.String(), nil
 			}
 		}
 	}
-	return ""
+	return "", errors.New("ip not found")
 }
 
 type P2PMessage struct {
 	Msg    ptypes.DynamicAny
-	Sender string
+	Sender []byte
 }
 
 type P2PInterface interface {
 	// Listen starts listening for peers on a port.
+	GetId() dht.ID
 	Listen() error
 	Broadcast(proto.Message)
-	SendMessageById(string, proto.Message)
-	CreatePeer(string, *net.Conn) error
+	SendMessageById([]byte, proto.Message)
+	CreatePeer(string, *net.Conn)
 	GetTunnel() chan P2PMessage
+	FindNodeById(id []byte) []dht.ID
+	FindNode(targetID dht.ID, alpha int, disjointPaths int) (results []dht.ID)
+	GetRoutingTable() *dht.RoutingTable
 }

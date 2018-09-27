@@ -7,9 +7,52 @@ message Package {
     google.protobuf.Any anything = 1;
     bytes pubkey = 2;
     bytes signature = 3;
+
+    // Sender's address and public key.
+    ID sender = 4;
+
+    // request_nonce is the request/response ID. Null if ID associated to a message is not a request/response.
+    uint64 request_nonce = 5;
+
+    // message_nonce is the sequence ID.
+    uint64 message_nonce = 6;
+
+    // reply_flag indicates this is a reply to a request
+    bool reply_flag = 7;
 }
+
 message Hi {
-    string id = 1;
-    string ip = 2;
-    bytes pubkey = 3;
+    // public_key of the peer (we no longer use the public key as the peer ID, but use it to verify messages)
+    bytes public_key = 1;
+    // address is the network address of the peer
+    string address = 2;
+    // id is the computed hash of the public key
+    bytes id = 3;
+}
+
+message ID {
+    // public_key of the peer (we no longer use the public key as the peer ID, but use it to verify messages)
+    bytes public_key = 1;
+    // address is the network address of the peer
+    string address = 2;
+    // id is the computed hash of the public key
+    bytes id = 3;
+}
+
+message Ping {
+}
+
+message Pong {
+}
+
+message LookupNodeRequest {
+    ID target = 1;
+}
+
+message LookupNodeResponse {
+    repeated ID peers = 1;
+}
+
+message Bytes {
+    bytes data = 1;
 }

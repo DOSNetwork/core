@@ -20,9 +20,17 @@ var _ = math.Inf
 const _ = proto.ProtoPackageIsVersion2 // please upgrade the proto package
 
 type Package struct {
-	Anything             *any.Any `protobuf:"bytes,1,opt,name=anything,proto3" json:"anything,omitempty"`
-	Pubkey               []byte   `protobuf:"bytes,2,opt,name=pubkey,proto3" json:"pubkey,omitempty"`
-	Signature            []byte   `protobuf:"bytes,3,opt,name=signature,proto3" json:"signature,omitempty"`
+	Anything  *any.Any `protobuf:"bytes,1,opt,name=anything,proto3" json:"anything,omitempty"`
+	Pubkey    []byte   `protobuf:"bytes,2,opt,name=pubkey,proto3" json:"pubkey,omitempty"`
+	Signature []byte   `protobuf:"bytes,3,opt,name=signature,proto3" json:"signature,omitempty"`
+	// Sender's address and public key.
+	Sender *ID `protobuf:"bytes,4,opt,name=sender,proto3" json:"sender,omitempty"`
+	// request_nonce is the request/response ID. Null if ID associated to a message is not a request/response.
+	RequestNonce uint64 `protobuf:"varint,5,opt,name=request_nonce,json=requestNonce,proto3" json:"request_nonce,omitempty"`
+	// message_nonce is the sequence ID.
+	MessageNonce uint64 `protobuf:"varint,6,opt,name=message_nonce,json=messageNonce,proto3" json:"message_nonce,omitempty"`
+	// reply_flag indicates this is a reply to a request
+	ReplyFlag            bool     `protobuf:"varint,7,opt,name=reply_flag,json=replyFlag,proto3" json:"reply_flag,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
@@ -32,7 +40,7 @@ func (m *Package) Reset()         { *m = Package{} }
 func (m *Package) String() string { return proto.CompactTextString(m) }
 func (*Package) ProtoMessage()    {}
 func (*Package) Descriptor() ([]byte, []int) {
-	return fileDescriptor_ae8103ff0e06fb71, []int{0}
+	return fileDescriptor_package_e71f04067b664858, []int{0}
 }
 func (m *Package) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Package.Unmarshal(m, b)
@@ -73,10 +81,41 @@ func (m *Package) GetSignature() []byte {
 	return nil
 }
 
+func (m *Package) GetSender() *ID {
+	if m != nil {
+		return m.Sender
+	}
+	return nil
+}
+
+func (m *Package) GetRequestNonce() uint64 {
+	if m != nil {
+		return m.RequestNonce
+	}
+	return 0
+}
+
+func (m *Package) GetMessageNonce() uint64 {
+	if m != nil {
+		return m.MessageNonce
+	}
+	return 0
+}
+
+func (m *Package) GetReplyFlag() bool {
+	if m != nil {
+		return m.ReplyFlag
+	}
+	return false
+}
+
 type Hi struct {
-	Id                   string   `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Ip                   string   `protobuf:"bytes,2,opt,name=ip,proto3" json:"ip,omitempty"`
-	Pubkey               []byte   `protobuf:"bytes,3,opt,name=pubkey,proto3" json:"pubkey,omitempty"`
+	// public_key of the peer (we no longer use the public key as the peer ID, but use it to verify messages)
+	PublicKey []byte `protobuf:"bytes,1,opt,name=public_key,json=publicKey,proto3" json:"public_key,omitempty"`
+	// address is the network address of the peer
+	Address string `protobuf:"bytes,2,opt,name=address,proto3" json:"address,omitempty"`
+	// id is the computed hash of the public key
+	Id                   []byte   `protobuf:"bytes,3,opt,name=id,proto3" json:"id,omitempty"`
 	XXX_NoUnkeyedLiteral struct{} `json:"-"`
 	XXX_unrecognized     []byte   `json:"-"`
 	XXX_sizecache        int32    `json:"-"`
@@ -86,7 +125,7 @@ func (m *Hi) Reset()         { *m = Hi{} }
 func (m *Hi) String() string { return proto.CompactTextString(m) }
 func (*Hi) ProtoMessage()    {}
 func (*Hi) Descriptor() ([]byte, []int) {
-	return fileDescriptor_ae8103ff0e06fb71, []int{1}
+	return fileDescriptor_package_e71f04067b664858, []int{1}
 }
 func (m *Hi) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_Hi.Unmarshal(m, b)
@@ -106,46 +145,295 @@ func (m *Hi) XXX_DiscardUnknown() {
 
 var xxx_messageInfo_Hi proto.InternalMessageInfo
 
-func (m *Hi) GetId() string {
+func (m *Hi) GetPublicKey() []byte {
+	if m != nil {
+		return m.PublicKey
+	}
+	return nil
+}
+
+func (m *Hi) GetAddress() string {
+	if m != nil {
+		return m.Address
+	}
+	return ""
+}
+
+func (m *Hi) GetId() []byte {
 	if m != nil {
 		return m.Id
 	}
-	return ""
+	return nil
 }
 
-func (m *Hi) GetIp() string {
+type ID struct {
+	// public_key of the peer (we no longer use the public key as the peer ID, but use it to verify messages)
+	PublicKey []byte `protobuf:"bytes,1,opt,name=public_key,json=publicKey,proto3" json:"public_key,omitempty"`
+	// address is the network address of the peer
+	Address string `protobuf:"bytes,2,opt,name=address,proto3" json:"address,omitempty"`
+	// id is the computed hash of the public key
+	Id                   []byte   `protobuf:"bytes,3,opt,name=id,proto3" json:"id,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *ID) Reset()         { *m = ID{} }
+func (m *ID) String() string { return proto.CompactTextString(m) }
+func (*ID) ProtoMessage()    {}
+func (*ID) Descriptor() ([]byte, []int) {
+	return fileDescriptor_package_e71f04067b664858, []int{2}
+}
+func (m *ID) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_ID.Unmarshal(m, b)
+}
+func (m *ID) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_ID.Marshal(b, m, deterministic)
+}
+func (dst *ID) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_ID.Merge(dst, src)
+}
+func (m *ID) XXX_Size() int {
+	return xxx_messageInfo_ID.Size(m)
+}
+func (m *ID) XXX_DiscardUnknown() {
+	xxx_messageInfo_ID.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_ID proto.InternalMessageInfo
+
+func (m *ID) GetPublicKey() []byte {
 	if m != nil {
-		return m.Ip
+		return m.PublicKey
+	}
+	return nil
+}
+
+func (m *ID) GetAddress() string {
+	if m != nil {
+		return m.Address
 	}
 	return ""
 }
 
-func (m *Hi) GetPubkey() []byte {
+func (m *ID) GetId() []byte {
 	if m != nil {
-		return m.Pubkey
+		return m.Id
+	}
+	return nil
+}
+
+type Ping struct {
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *Ping) Reset()         { *m = Ping{} }
+func (m *Ping) String() string { return proto.CompactTextString(m) }
+func (*Ping) ProtoMessage()    {}
+func (*Ping) Descriptor() ([]byte, []int) {
+	return fileDescriptor_package_e71f04067b664858, []int{3}
+}
+func (m *Ping) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_Ping.Unmarshal(m, b)
+}
+func (m *Ping) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_Ping.Marshal(b, m, deterministic)
+}
+func (dst *Ping) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Ping.Merge(dst, src)
+}
+func (m *Ping) XXX_Size() int {
+	return xxx_messageInfo_Ping.Size(m)
+}
+func (m *Ping) XXX_DiscardUnknown() {
+	xxx_messageInfo_Ping.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_Ping proto.InternalMessageInfo
+
+type Pong struct {
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *Pong) Reset()         { *m = Pong{} }
+func (m *Pong) String() string { return proto.CompactTextString(m) }
+func (*Pong) ProtoMessage()    {}
+func (*Pong) Descriptor() ([]byte, []int) {
+	return fileDescriptor_package_e71f04067b664858, []int{4}
+}
+func (m *Pong) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_Pong.Unmarshal(m, b)
+}
+func (m *Pong) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_Pong.Marshal(b, m, deterministic)
+}
+func (dst *Pong) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Pong.Merge(dst, src)
+}
+func (m *Pong) XXX_Size() int {
+	return xxx_messageInfo_Pong.Size(m)
+}
+func (m *Pong) XXX_DiscardUnknown() {
+	xxx_messageInfo_Pong.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_Pong proto.InternalMessageInfo
+
+type LookupNodeRequest struct {
+	Target               *ID      `protobuf:"bytes,1,opt,name=target,proto3" json:"target,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *LookupNodeRequest) Reset()         { *m = LookupNodeRequest{} }
+func (m *LookupNodeRequest) String() string { return proto.CompactTextString(m) }
+func (*LookupNodeRequest) ProtoMessage()    {}
+func (*LookupNodeRequest) Descriptor() ([]byte, []int) {
+	return fileDescriptor_package_e71f04067b664858, []int{5}
+}
+func (m *LookupNodeRequest) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_LookupNodeRequest.Unmarshal(m, b)
+}
+func (m *LookupNodeRequest) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_LookupNodeRequest.Marshal(b, m, deterministic)
+}
+func (dst *LookupNodeRequest) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_LookupNodeRequest.Merge(dst, src)
+}
+func (m *LookupNodeRequest) XXX_Size() int {
+	return xxx_messageInfo_LookupNodeRequest.Size(m)
+}
+func (m *LookupNodeRequest) XXX_DiscardUnknown() {
+	xxx_messageInfo_LookupNodeRequest.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_LookupNodeRequest proto.InternalMessageInfo
+
+func (m *LookupNodeRequest) GetTarget() *ID {
+	if m != nil {
+		return m.Target
+	}
+	return nil
+}
+
+type LookupNodeResponse struct {
+	Peers                []*ID    `protobuf:"bytes,1,rep,name=peers,proto3" json:"peers,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *LookupNodeResponse) Reset()         { *m = LookupNodeResponse{} }
+func (m *LookupNodeResponse) String() string { return proto.CompactTextString(m) }
+func (*LookupNodeResponse) ProtoMessage()    {}
+func (*LookupNodeResponse) Descriptor() ([]byte, []int) {
+	return fileDescriptor_package_e71f04067b664858, []int{6}
+}
+func (m *LookupNodeResponse) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_LookupNodeResponse.Unmarshal(m, b)
+}
+func (m *LookupNodeResponse) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_LookupNodeResponse.Marshal(b, m, deterministic)
+}
+func (dst *LookupNodeResponse) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_LookupNodeResponse.Merge(dst, src)
+}
+func (m *LookupNodeResponse) XXX_Size() int {
+	return xxx_messageInfo_LookupNodeResponse.Size(m)
+}
+func (m *LookupNodeResponse) XXX_DiscardUnknown() {
+	xxx_messageInfo_LookupNodeResponse.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_LookupNodeResponse proto.InternalMessageInfo
+
+func (m *LookupNodeResponse) GetPeers() []*ID {
+	if m != nil {
+		return m.Peers
+	}
+	return nil
+}
+
+type Bytes struct {
+	Data                 []byte   `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
+}
+
+func (m *Bytes) Reset()         { *m = Bytes{} }
+func (m *Bytes) String() string { return proto.CompactTextString(m) }
+func (*Bytes) ProtoMessage()    {}
+func (*Bytes) Descriptor() ([]byte, []int) {
+	return fileDescriptor_package_e71f04067b664858, []int{7}
+}
+func (m *Bytes) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_Bytes.Unmarshal(m, b)
+}
+func (m *Bytes) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_Bytes.Marshal(b, m, deterministic)
+}
+func (dst *Bytes) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_Bytes.Merge(dst, src)
+}
+func (m *Bytes) XXX_Size() int {
+	return xxx_messageInfo_Bytes.Size(m)
+}
+func (m *Bytes) XXX_DiscardUnknown() {
+	xxx_messageInfo_Bytes.DiscardUnknown(m)
+}
+
+var xxx_messageInfo_Bytes proto.InternalMessageInfo
+
+func (m *Bytes) GetData() []byte {
+	if m != nil {
+		return m.Data
 	}
 	return nil
 }
 
 func init() {
-	proto.RegisterType((*Package)(nil), "internalMsg.Package")
-	proto.RegisterType((*Hi)(nil), "internalMsg.Hi")
+	proto.RegisterType((*Package)(nil), "internal.Package")
+	proto.RegisterType((*Hi)(nil), "internal.Hi")
+	proto.RegisterType((*ID)(nil), "internal.ID")
+	proto.RegisterType((*Ping)(nil), "internal.Ping")
+	proto.RegisterType((*Pong)(nil), "internal.Pong")
+	proto.RegisterType((*LookupNodeRequest)(nil), "internal.LookupNodeRequest")
+	proto.RegisterType((*LookupNodeResponse)(nil), "internal.LookupNodeResponse")
+	proto.RegisterType((*Bytes)(nil), "internal.Bytes")
 }
 
-func init() { proto.RegisterFile("package.proto", fileDescriptor_ae8103ff0e06fb71) }
+func init() { proto.RegisterFile("package.proto", fileDescriptor_package_e71f04067b664858) }
 
-var fileDescriptor_ae8103ff0e06fb71 = []byte{
-	// 191 bytes of a gzipped FileDescriptorProto
-	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe2, 0xe2, 0x2d, 0x48, 0x4c, 0xce,
-	0x4e, 0x4c, 0x4f, 0xd5, 0x2b, 0x28, 0xca, 0x2f, 0xc9, 0x17, 0xe2, 0xc8, 0xcc, 0x2b, 0x49, 0x2d,
-	0xca, 0x4b, 0xcc, 0x91, 0x92, 0x05, 0x0b, 0x24, 0x95, 0xa6, 0xe9, 0x17, 0x94, 0x54, 0x16, 0xa4,
-	0x16, 0xeb, 0x27, 0xe6, 0x55, 0x82, 0x30, 0x44, 0xa1, 0x52, 0x21, 0x17, 0x7b, 0x00, 0x44, 0xa7,
-	0x90, 0x01, 0x17, 0x47, 0x62, 0x5e, 0x65, 0x49, 0x46, 0x66, 0x5e, 0xba, 0x04, 0xa3, 0x02, 0xa3,
-	0x06, 0xb7, 0x91, 0x88, 0x5e, 0x7a, 0x7e, 0x7e, 0x7a, 0x0e, 0xd4, 0xd0, 0xa4, 0xd2, 0x34, 0x3d,
-	0xc7, 0xbc, 0xca, 0x20, 0xb8, 0x2a, 0x21, 0x31, 0x2e, 0xb6, 0x82, 0xd2, 0xa4, 0xec, 0xd4, 0x4a,
-	0x09, 0x26, 0x05, 0x46, 0x0d, 0x9e, 0x20, 0x28, 0x4f, 0x48, 0x86, 0x8b, 0xb3, 0x38, 0x33, 0x3d,
-	0x2f, 0xb1, 0xa4, 0xb4, 0x28, 0x55, 0x82, 0x19, 0x2c, 0x85, 0x10, 0x50, 0xb2, 0xe1, 0x62, 0xf2,
-	0xc8, 0x14, 0xe2, 0xe3, 0x62, 0xca, 0x4c, 0x01, 0xdb, 0xc3, 0x19, 0xc4, 0x94, 0x99, 0x02, 0xe6,
-	0x17, 0x80, 0xcd, 0x01, 0xf1, 0x0b, 0x90, 0xcc, 0x66, 0x46, 0x36, 0x3b, 0x89, 0x0d, 0xec, 0x16,
-	0x63, 0x40, 0x00, 0x00, 0x00, 0xff, 0xff, 0x3b, 0xe9, 0xc0, 0x9d, 0xf1, 0x00, 0x00, 0x00,
+var fileDescriptor_package_e71f04067b664858 = []byte{
+	// 375 bytes of a gzipped FileDescriptorProto
+	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xac, 0x52, 0xc1, 0x8e, 0xd3, 0x30,
+	0x10, 0x55, 0xb2, 0x69, 0xda, 0x0e, 0x5d, 0x24, 0x2c, 0x84, 0x2c, 0x60, 0xa5, 0x28, 0x70, 0xc8,
+	0x29, 0x8b, 0xe0, 0x02, 0x47, 0xd0, 0x0a, 0x51, 0x01, 0x55, 0x95, 0x1f, 0xa8, 0x9c, 0x66, 0x6a,
+	0xac, 0x06, 0xdb, 0xd8, 0xce, 0xc1, 0x37, 0x3e, 0x1d, 0xc5, 0x76, 0x01, 0xc1, 0x75, 0x0f, 0x96,
+	0x3d, 0xef, 0xbd, 0x19, 0xcf, 0x1b, 0x1b, 0xae, 0x35, 0x3b, 0x9e, 0x19, 0xc7, 0x56, 0x1b, 0xe5,
+	0x14, 0x59, 0x09, 0xe9, 0xd0, 0x48, 0x36, 0x3e, 0xbd, 0x09, 0x40, 0x3f, 0x9d, 0x6e, 0xb5, 0xf3,
+	0x1a, 0xed, 0x2d, 0x93, 0x7e, 0x5e, 0x51, 0x58, 0xff, 0xcc, 0x61, 0xb9, 0x8f, 0xa9, 0xe4, 0x15,
+	0xac, 0x98, 0xf4, 0xee, 0x9b, 0x90, 0x9c, 0x66, 0x55, 0xd6, 0x3c, 0x78, 0xfd, 0xb8, 0xe5, 0x4a,
+	0xf1, 0x31, 0x55, 0xed, 0xa7, 0x53, 0xfb, 0x5e, 0xfa, 0xee, 0xb7, 0x8a, 0x3c, 0x81, 0x52, 0x4f,
+	0xfd, 0x19, 0x3d, 0xcd, 0xab, 0xac, 0xd9, 0x74, 0x29, 0x22, 0xcf, 0x61, 0x6d, 0x05, 0x97, 0xcc,
+	0x4d, 0x06, 0xe9, 0x55, 0xa0, 0xfe, 0x00, 0xe4, 0x25, 0x94, 0x16, 0xe5, 0x80, 0x86, 0x16, 0xe1,
+	0x96, 0x4d, 0x7b, 0xe9, 0xb6, 0xdd, 0xde, 0x75, 0x89, 0x23, 0x2f, 0xe0, 0xda, 0xe0, 0x8f, 0x09,
+	0xad, 0x3b, 0x48, 0x25, 0x8f, 0x48, 0x17, 0x55, 0xd6, 0x14, 0xdd, 0x26, 0x81, 0xbb, 0x19, 0x9b,
+	0x45, 0xdf, 0xd1, 0x5a, 0xc6, 0x31, 0x89, 0xca, 0x28, 0x4a, 0x60, 0x14, 0xdd, 0x00, 0x18, 0xd4,
+	0xa3, 0x3f, 0x9c, 0x46, 0xc6, 0xe9, 0xb2, 0xca, 0x9a, 0x55, 0xb7, 0x0e, 0xc8, 0xc7, 0x91, 0xf1,
+	0xfa, 0x2b, 0xe4, 0x9f, 0xc4, 0x2c, 0xd2, 0x53, 0x3f, 0x8a, 0xe3, 0x61, 0xb6, 0x93, 0xc5, 0x9e,
+	0x23, 0xf2, 0x19, 0x3d, 0xa1, 0xb0, 0x64, 0xc3, 0x60, 0xd0, 0xda, 0x60, 0x75, 0xdd, 0x5d, 0x42,
+	0xf2, 0x10, 0x72, 0x31, 0x24, 0x93, 0xb9, 0x18, 0xe6, 0x72, 0xdb, 0xbb, 0xfb, 0x2b, 0x57, 0x42,
+	0xb1, 0x17, 0x92, 0x87, 0x5d, 0x49, 0x5e, 0xbf, 0x83, 0x47, 0x5f, 0x94, 0x3a, 0x4f, 0x7a, 0xa7,
+	0x06, 0xec, 0xe2, 0x2c, 0xe6, 0x89, 0x3a, 0x66, 0x38, 0xba, 0xf4, 0x6e, 0xff, 0x4c, 0x34, 0x72,
+	0xf5, 0x5b, 0x20, 0x7f, 0xa7, 0x5a, 0xad, 0xa4, 0x45, 0x52, 0xc3, 0x42, 0x23, 0x1a, 0x4b, 0xb3,
+	0xea, 0xea, 0xbf, 0xd4, 0x48, 0xd5, 0xcf, 0x60, 0xf1, 0xc1, 0x3b, 0xb4, 0x84, 0x40, 0x31, 0x30,
+	0xc7, 0x92, 0xa1, 0x70, 0xee, 0xcb, 0xf0, 0x39, 0xde, 0xfc, 0x0a, 0x00, 0x00, 0xff, 0xff, 0x93,
+	0x7a, 0xd2, 0xeb, 0x83, 0x02, 0x00, 0x00,
 }

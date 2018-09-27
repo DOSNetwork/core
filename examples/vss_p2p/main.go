@@ -188,7 +188,9 @@ func main() {
 	p, _ := p2p.CreateP2PNetwork(tunnel, port)
 	defer close(tunnel)
 	//2)Start to listen incoming connection
-	p.Listen()
+	if err := p.Listen(); err != nil {
+		log.Fatal(err)
+	}
 
 	//3)
 	var verifier *Verifier
@@ -233,7 +235,7 @@ func main() {
 			priKey:  verifierSec,
 			network: &p,
 		}
-		_ = p.CreatePeer(dealerAddr, nil)
+		p.CreatePeer(dealerAddr, nil)
 		p.Broadcast(&verifierPub)
 	}
 	//

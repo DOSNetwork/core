@@ -1,22 +1,22 @@
 package main
 
 import (
-	"fmt"
-	"github.com/DOSNetwork/core/group/bn256"
-	"github.com/ethereum/go-ethereum/common"
-	"log"
-
 	"context"
-	"github.com/DOSNetwork/core/examples/data-fetch-and-return/contract" // for demo
-	"github.com/DOSNetwork/core/examples/random-number-generator"
-	"github.com/DOSNetwork/core/suites"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/ethclient"
+	"fmt"
 	"io/ioutil"
+	"log"
 	"math/big"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/DOSNetwork/core/examples/data_fetch_return/contract" // for demo
+	"github.com/DOSNetwork/core/examples/random_number_generator"
+	"github.com/DOSNetwork/core/group/bn256"
+	"github.com/DOSNetwork/core/suites"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/ethclient"
 )
 
 const key = ``

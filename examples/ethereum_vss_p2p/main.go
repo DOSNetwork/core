@@ -92,7 +92,9 @@ func main() {
 	p, _ := p2p.CreateP2PNetwork(tunnel, 0)
 	defer close(tunnel)
 	//2)Start to listen incoming connection
-	p.Listen()
+	if err := p.Listen(); err != nil {
+		log.Fatal(err)
+	}
 
 	//3)
 	var verifier *Verifier
@@ -116,7 +118,7 @@ func main() {
 			pubKey: verifierPub,
 			priKey: verifierSec,
 		}
-		_ = p.CreatePeer(dealerAddr, nil)
+		p.CreatePeer(dealerAddr, nil)
 		msg := msgParser.PackPublicKey(verifierPub)
 		p.Broadcast(msg)
 	}
