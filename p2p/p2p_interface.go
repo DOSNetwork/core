@@ -31,6 +31,7 @@ func CreateP2PNetwork(tunnel chan P2PMessage, port int) (P2PInterface, error) {
 	}
 	return p, nil
 }
+
 func getLocalIp() (string, error) {
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {

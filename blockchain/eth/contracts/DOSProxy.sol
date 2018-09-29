@@ -60,9 +60,7 @@ contract DOSProxy {
     function query(address from, uint block_number, uint timeout, string query_type, string query_path) {
         if (getCodeSize(from) > 0) {
             uint query_id = uint(keccak256(from, block_number, timeout, query_type, query_path));
-
             pending_queries[query_id] = from;
-
             // Only supporting api/url for demos.
             if (strEqual(query_type, 'API')) {
                 queryKeyMapping[query_id] = groupKeyMapping[currentGroup];

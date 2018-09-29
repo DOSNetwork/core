@@ -1,152 +1,35 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"math/big"
 	"net/http"
-	"strings"
 	"time"
 
-	"github.com/DOSNetwork/core/examples/data_fetch_return/contract" // for demo
+	"github.com/DOSNetwork/core/blockchain"
+	"github.com/DOSNetwork/core/blockchain/eventMsg"
 	"github.com/DOSNetwork/core/examples/random_number_generator"
 	"github.com/DOSNetwork/core/group/bn256"
 	"github.com/DOSNetwork/core/suites"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethclient"
 )
 
-const key = ``
-const passphrase = ``
-
-var ethReomteNode = "wss://rinkeby.infura.io/ws"
-var contractAddressHex = "0xbD5784b224D40213df1F9eeb572961E2a859Cb80"
-var stopKeyWord = "https://api.coinbase.com/v2/prices/ETH-USD/spot"
 var groupId = big.NewInt(123)
 
-
-func subscribePubKey(proxy *dosproxy.DOSProxy, ch chan *dosproxy.DOSProxyLogSuccPubKeySub, done chan bool) {
-
-	fmt.Println("Establishing listen channel to group public key...")
-
-	connected := false
-
-	retried := false
-
-	go func() {
-		time.Sleep(3 * time.Second)
-		if !connected {
-			retried = true
-			fmt.Println("retry")
-
-
-			client, err := ethclient.Dial(ethReomteNode)
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			contractAddress := common.HexToAddress(contractAddressHex)
-			proxy, err = dosproxy.NewDOSProxy(contractAddress, client)
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			go subscribePubKey(proxy, ch, done)
-		}
-	}()
-
-	opt := &bind.WatchOpts{}
-	sub, err := proxy.DOSProxyFilterer.WatchLogSuccPubKeySub(opt, ch)
+func dataPrepare(signers *example.RandomNumberGenerator, url string) (data []byte, x *big.Int, y *big.Int, err error) {
+	data, err = dataFetch(url)
 	if err != nil {
-		log.Fatal(err)
-	}
-
-	if retried {
 		return
-	}
-
-	connected = true
-
-	done <- true
-
-	fmt.Println("Channel established.")
-
-	for range ch {
-		fmt.Println("Group public key submitted event Caught.")
-		done <- true
-		break
-	}
-	sub.Unsubscribe()
-	close(ch)
-}
-
-
-func subscribeEvent(client *ethclient.Client, proxy *dosproxy.DOSProxy, ch chan *dosproxy.DOSProxyLogUrl, signers *example.RandomNumberGenerator) {
-	connected := false
-
-	retried := false
-
-	go func() {
-		time.Sleep(3 * time.Second)
-		if !connected {
-			retried = true
-			fmt.Println("retry")
-
-			client, err := ethclient.Dial(ethReomteNode)
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			contractAddress := common.HexToAddress(contractAddressHex)
-			proxy, err = dosproxy.NewDOSProxy(contractAddress, client)
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			go subscribeEvent(client, proxy, ch, signers)
-		}
-	}()
-	opt := &bind.WatchOpts{}
-	sub, err := proxy.DOSProxyFilterer.WatchLogUrl(opt, ch)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	if retried {
-		return
-	}
-
-	connected = true
-
-	for i := range ch {
-		fmt.Printf("Query-ID: %v \n", i.QueryId)
-		fmt.Println("Query Url: ", i.Url)
-		go queryFulfill(client, proxy, signers, i.QueryId, i.Url)
-	}
-	sub.Unsubscribe()
-	close(ch)
-}
-
-func queryFulfill(client *ethclient.Client, proxy *dosproxy.DOSProxy, signers *example.RandomNumberGenerator, queryId *big.Int, url string) {
-	data, err := dataFetch(url)
-	if err != nil {
-		log.Fatal(err)
 	}
 
 	sig, err := dataSign(signers, data)
 	if err != nil {
-		log.Fatal(err)
+		return
 	}
 
-	x, y := negate(sig)
-
-	err = dataReturn(client, proxy, queryId, data, x, y)
-	if err != nil {
-		log.Fatal(err)
-	}
+	x, y = negate(sig)
+	return
 }
 
 func dataFetch(url string) ([]byte, error){
@@ -163,7 +46,7 @@ func dataFetch(url string) ([]byte, error){
 
 	r.Body.Close()
 
-	fmt.Println("Detched data: ", string(body))
+	fmt.Println("Fetched data: ", string(body))
 
 	return body, nil
 
@@ -176,31 +59,6 @@ func dataSign(signers *example.RandomNumberGenerator, data []byte) ([]byte, erro
 		return nil, err
 	}
 	return sig, nil
-}
-
-func dataReturn(client *ethclient.Client, proxy *dosproxy.DOSProxy, queryId *big.Int, data []byte, x, y *big.Int) error{
-	gasPrice, err := client.SuggestGasPrice(context.Background())
-	if err != nil {
-		return err
-	}
-
-	auth, err := bind.NewTransactor(strings.NewReader(key), passphrase)
-	if err != nil {
-		return err
-	}
-
-	auth.GasLimit = uint64(500000) // in units
-	auth.GasPrice = gasPrice
-
-	tx, err := proxy.TriggerCallback(auth, queryId, data, x, y)
-	if err != nil {
-		return err
-	}
-
-	fmt.Println("tx sent: ", tx.Hash().Hex())
-	fmt.Printf("Query_ID %v request fulfilled \n", queryId)
-
-	return nil
 }
 
 
@@ -232,76 +90,57 @@ func groupSetup(nbParticipants int) (*example.RandomNumberGenerator, *big.Int, *
 	return signers, x0, x1, y0, y1, nil
 }
 
-func uploadPubKey(client *ethclient.Client, proxy *dosproxy.DOSProxy, groupId, x0, x1, y0, y1 *big.Int) error{
 
-	fmt.Println("Starting submitting group public key...")
-
-	gasPrice, err := client.SuggestGasPrice(context.Background())
-	if err != nil {
-		return err
-	}
-
-	auth, err := bind.NewTransactor(strings.NewReader(key), passphrase)
-	if err != nil {
-		return err
-	}
-
-	auth.GasLimit = uint64(300000) // in units
-	auth.GasPrice = gasPrice
-
-	tx, err := proxy.SetPublicKey(auth, groupId, x0, x1, y0, y1)
-
-	if err != nil {
-		return err
-	}
-
-	fmt.Println("tx sent: ", tx.Hash().Hex())
-	fmt.Println("groupId: ", groupId)
-	fmt.Println("x0: ", x0)
-	fmt.Println("x1: ", x1)
-	fmt.Println("y0: ", y0)
-	fmt.Println("y1: ", y1)
-	fmt.Println("Group public key submitted, waiting for confirmation...")
-
-	return nil
-}
 
 
 func main() {
-
 	signers, x0, x1, y0, y1, err := groupSetup(7)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	client, err := ethclient.Dial(ethReomteNode)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	contractAddress := common.HexToAddress(contractAddressHex)
-	proxy, err := dosproxy.NewDOSProxy(contractAddress, client)
+	onChainConn, err := blockchain.CreateOnChainConn("Eth")
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	fmt.Println("Start")
 
-	chPubKey := make(chan *dosproxy.DOSProxyLogSuccPubKeySub)
-	done := make(chan bool)
-	go subscribePubKey(proxy, chPubKey, done)
+	chPubKey := make(chan interface{})
+	go func() {
+		chPubKey <- &eventMsg.DOSProxyLogSuccPubKeySub{}
+	}()
+	onChainConn.SubscribeEvent(chPubKey)
 
-	<-done
-
-	err = uploadPubKey(client, proxy, groupId, x0, x1, y0, y1)
+	err = onChainConn.UploadPubKey(groupId, x0, x1, y0, y1)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	<- done
+	<- chPubKey
+
+	chUrl := make(chan interface{})
+	go func() {
+		chUrl <- &eventMsg.DOSProxyLogUrl{}
+	}()
+	onChainConn.SubscribeEvent(chUrl)
+
 	fmt.Println("Group set-up finished, start listening to query...")
 
-	chUrl := make(chan *dosproxy.DOSProxyLogUrl)
-	go subscribeEvent(client, proxy, chUrl, signers)
-	<- done
+	for i := range chUrl {
+		go func() {
+			switch i.(type) {
+			case *eventMsg.DOSProxyLogUrl:
+				fmt.Printf("Query-ID: %v \n", i.(*eventMsg.DOSProxyLogUrl).QueryId)
+				fmt.Println("Query Url: ", i.(*eventMsg.DOSProxyLogUrl).Url)
+				data, x, y, err := dataPrepare(signers, i.(*eventMsg.DOSProxyLogUrl).Url)
+				if err != nil {
+					log.Fatal(err)
+				}
+				onChainConn.DataReturn(i.(*eventMsg.DOSProxyLogUrl).QueryId, data, x, y)
+			default:
+				fmt.Println("type mismatch")
+			}
+		}()
+	}
 }
