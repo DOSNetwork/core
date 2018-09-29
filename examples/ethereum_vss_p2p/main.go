@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/DOSNetwork/core/examples/ethereum_vss_p2p/contract"
+	"github.com/DOSNetwork/core/blockchain/eth/contracts"
 	"github.com/DOSNetwork/core/group/bn256"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"

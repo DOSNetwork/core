@@ -143,8 +143,6 @@ func (n *P2P) SendMessageById(id []byte, m proto.Message) {
 		if err := client.SendPackage(prepared); err != nil {
 			log.Fatal(err)
 		}
-
-		client.SendPackage(prepared)
 	}
 }
 
