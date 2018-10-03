@@ -1,4 +1,4 @@
-package eventMsg
+package eth
 
 import (
 	"github.com/ethereum/go-ethereum/common"
@@ -10,7 +10,7 @@ type DOSProxyLogCallbackTriggeredFor struct {
 	Result           []byte
 }
 
-type DOSProxyLogInvalidSignature struct {}
+type DOSProxyLogInvalidSignature struct{}
 
 type DOSProxyLogNonContractCall struct {
 	From common.Address
@@ -20,9 +20,9 @@ type DOSProxyLogNonSupportedType struct {
 	QueryType string
 }
 
-type DOSProxyLogQueryFromNonExistentUC struct {}
+type DOSProxyLogQueryFromNonExistentUC struct{}
 
-type DOSProxyLogSuccPubKeySub struct {}
+type DOSProxyLogSuccPubKeySub struct{}
 
 type DOSProxyLogUrl struct {
 	QueryId *big.Int

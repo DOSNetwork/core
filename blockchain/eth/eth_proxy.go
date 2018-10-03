@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/DOSNetwork/core/blockchain/eth/contracts"
-	"github.com/DOSNetwork/core/blockchain/eventMsg"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -24,9 +23,9 @@ const contractAddressHex = "0xbD5784b224D40213df1F9eeb572961E2a859Cb80"
 var contractAddress = common.HexToAddress(contractAddressHex)
 
 type EthConn struct {
-	client	*ethclient.Client
-	proxy	*dosproxy.DOSProxy
-	lock	*sync.Mutex
+	client *ethclient.Client
+	proxy  *dosproxy.DOSProxy
+	lock   *sync.Mutex
 }
 
 func (e *EthConn) Init() (err error) {
@@ -51,16 +50,16 @@ func (e *EthConn) Init() (err error) {
 	return
 }
 
-func (e *EthConn) SubscribeEvent(ch chan interface{}) (err error){
+func (e *EthConn) SubscribeEvent(ch chan interface{}) (err error) {
 	opt := &bind.WatchOpts{}
-	identity :=<- ch
+	identity := <-ch
 	done := make(chan bool)
 
 	go e.subscribeEventAttempt(ch, opt, identity, done)
 
 	for {
 		select {
-		case <- done:
+		case <-done:
 			fmt.Println("subscribing done.")
 			return
 		case <-time.After(3 * time.Second):
@@ -88,12 +87,12 @@ func (e *EthConn) SubscribeEvent(ch chan interface{}) (err error){
 func (e *EthConn) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchOpts, identity interface{}, done chan bool) {
 	fmt.Println("attempt to subscribe event...")
 	switch identity.(type) {
-	case *eventMsg.DOSProxyLogCallbackTriggeredFor:
-	case *eventMsg.DOSProxyLogInvalidSignature:
-	case *eventMsg.DOSProxyLogNonContractCall:
-	case *eventMsg.DOSProxyLogNonSupportedType:
-	case *eventMsg.DOSProxyLogQueryFromNonExistentUC:
-	case *eventMsg.DOSProxyLogSuccPubKeySub:
+	case *DOSProxyLogCallbackTriggeredFor:
+	case *DOSProxyLogInvalidSignature:
+	case *DOSProxyLogNonContractCall:
+	case *DOSProxyLogNonSupportedType:
+	case *DOSProxyLogQueryFromNonExistentUC:
+	case *DOSProxyLogSuccPubKeySub:
 		fmt.Println("subscribing DOSProxyLogSuccPubKeySub event...")
 		transitChan := make(chan *dosproxy.DOSProxyLogSuccPubKeySub)
 		sub, err := e.proxy.DOSProxyFilterer.WatchLogSuccPubKeySub(opt, transitChan)
@@ -106,13 +105,13 @@ func (e *EthConn) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchOpts
 		done <- true
 		for {
 			select {
-			case err := <- sub.Err():
+			case err := <-sub.Err():
 				log.Fatal(err)
-			case _ = <- transitChan:
-				ch <- &eventMsg.DOSProxyLogSuccPubKeySub{}
+			case _ = <-transitChan:
+				ch <- &DOSProxyLogSuccPubKeySub{}
 			}
 		}
-	case *eventMsg.DOSProxyLogUrl:
+	case *DOSProxyLogUrl:
 		fmt.Println("subscribing DOSProxyLogUrl event...")
 		transitChan := make(chan *dosproxy.DOSProxyLogUrl)
 		sub, err := e.proxy.DOSProxyFilterer.WatchLogUrl(opt, transitChan)
@@ -125,13 +124,13 @@ func (e *EthConn) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchOpts
 		done <- true
 		for {
 			select {
-			case err := <- sub.Err():
+			case err := <-sub.Err():
 				log.Fatal(err)
-			case i := <- transitChan:
-				ch <- &eventMsg.DOSProxyLogUrl{
-					QueryId:	i.QueryId,
-					Url:		i.Url,
-					Timeout:	i.Timeout,
+			case i := <-transitChan:
+				ch <- &DOSProxyLogUrl{
+					QueryId: i.QueryId,
+					Url:     i.Url,
+					Timeout: i.Timeout,
 				}
 			}
 		}
