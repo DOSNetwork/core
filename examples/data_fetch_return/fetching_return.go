@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/DOSNetwork/core/blockchain"
-	"github.com/DOSNetwork/core/blockchain/eventMsg"
+	"github.com/DOSNetwork/core/blockchain/eth"
 	"github.com/DOSNetwork/core/examples/random_number_generator"
 	"github.com/DOSNetwork/core/group/bn256"
 	"github.com/DOSNetwork/core/suites"
@@ -32,7 +32,7 @@ func dataPrepare(signers *example.RandomNumberGenerator, url string) (data []byt
 	return
 }
 
-func dataFetch(url string) ([]byte, error){
+func dataFetch(url string) ([]byte, error) {
 	client := &http.Client{Timeout: 10 * time.Second}
 	r, err := client.Get(url)
 	if err != nil {
@@ -52,7 +52,7 @@ func dataFetch(url string) ([]byte, error){
 
 }
 
-func dataSign(signers *example.RandomNumberGenerator, data []byte) ([]byte, error){
+func dataSign(signers *example.RandomNumberGenerator, data []byte) ([]byte, error) {
 
 	sig, err := signers.TBlsSign(data)
 	if err != nil {
@@ -61,37 +61,33 @@ func dataSign(signers *example.RandomNumberGenerator, data []byte) ([]byte, erro
 	return sig, nil
 }
 
-
 func negate(sig []byte) (*big.Int, *big.Int) {
 	x := big.NewInt(0)
 	y := big.NewInt(0)
 	x.SetBytes(sig[0:32])
 	y.SetBytes(sig[32:])
 
-	if x.Cmp(big.NewInt(0)) == 0 && y.Cmp(big.NewInt(0)) == 0{
+	if x.Cmp(big.NewInt(0)) == 0 && y.Cmp(big.NewInt(0)) == 0 {
 		return big.NewInt(0), big.NewInt(0)
 	}
 
-	return x, big.NewInt(0).Sub(bn256.P,big.NewInt(0).Mod(y, bn256.P))
+	return x, big.NewInt(0).Sub(bn256.P, big.NewInt(0).Mod(y, bn256.P))
 }
 
-func groupSetup(nbParticipants int) (*example.RandomNumberGenerator, *big.Int, *big.Int, *big.Int, *big.Int, error){
+func groupSetup(nbParticipants int) (*example.RandomNumberGenerator, *big.Int, *big.Int, *big.Int, *big.Int, error) {
 	suite := suites.MustFind("bn256")
 	signers, err := example.InitialRandomNumberGenerator(suite, nbParticipants)
 	if err != nil {
-		return nil,nil,nil,nil,nil,err
+		return nil, nil, nil, nil, nil, err
 	}
 
 	x0, x1, y0, y1, err := signers.GetPubKey()
 	if err != nil {
-		return nil,nil,nil,nil,nil,err
+		return nil, nil, nil, nil, nil, err
 	}
 
 	return signers, x0, x1, y0, y1, nil
 }
-
-
-
 
 func main() {
 	signers, x0, x1, y0, y1, err := groupSetup(7)
@@ -99,7 +95,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	onChainConn, err := blockchain.CreateOnChainConn("Eth")
+	chainConn, err := blockchain.AdaptTo("ETH")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -108,36 +104,36 @@ func main() {
 
 	chPubKey := make(chan interface{})
 	go func() {
-		chPubKey <- &eventMsg.DOSProxyLogSuccPubKeySub{}
+		chPubKey <- &eth.DOSProxyLogSuccPubKeySub{}
 	}()
-	onChainConn.SubscribeEvent(chPubKey)
+	chainConn.SubscribeEvent(chPubKey)
 
-	err = onChainConn.UploadPubKey(groupId, x0, x1, y0, y1)
+	err = chainConn.UploadPubKey(groupId, x0, x1, y0, y1)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	<- chPubKey
+	<-chPubKey
 
 	chUrl := make(chan interface{})
 	go func() {
-		chUrl <- &eventMsg.DOSProxyLogUrl{}
+		chUrl <- &eth.DOSProxyLogUrl{}
 	}()
-	onChainConn.SubscribeEvent(chUrl)
+	chainConn.SubscribeEvent(chUrl)
 
 	fmt.Println("Group set-up finished, start listening to query...")
 
 	for i := range chUrl {
 		go func() {
 			switch i.(type) {
-			case *eventMsg.DOSProxyLogUrl:
-				fmt.Printf("Query-ID: %v \n", i.(*eventMsg.DOSProxyLogUrl).QueryId)
-				fmt.Println("Query Url: ", i.(*eventMsg.DOSProxyLogUrl).Url)
-				data, x, y, err := dataPrepare(signers, i.(*eventMsg.DOSProxyLogUrl).Url)
+			case *eth.DOSProxyLogUrl:
+				fmt.Printf("Query-ID: %v \n", i.(*eth.DOSProxyLogUrl).QueryId)
+				fmt.Println("Query Url: ", i.(*eth.DOSProxyLogUrl).Url)
+				data, x, y, err := dataPrepare(signers, i.(*eth.DOSProxyLogUrl).Url)
 				if err != nil {
 					log.Fatal(err)
 				}
-				onChainConn.DataReturn(i.(*eventMsg.DOSProxyLogUrl).QueryId, data, x, y)
+				chainConn.DataReturn(i.(*eth.DOSProxyLogUrl).QueryId, data, x, y)
 			default:
 				fmt.Println("type mismatch")
 			}
