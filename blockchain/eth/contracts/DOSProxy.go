@@ -16,10 +16,10 @@ import (
 )
 
 // DOSProxyABI is the input ABI used to generate the binding from.
-const DOSProxyABI = "[{\"constant\":false,\"inputs\":[{\"name\":\"query_id\",\"type\":\"uint256\"},{\"name\":\"result\",\"type\":\"bytes\"},{\"name\":\"x\",\"type\":\"uint256\"},{\"name\":\"y\",\"type\":\"uint256\"}],\"name\":\"triggerCallback\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"from\",\"type\":\"address\"},{\"name\":\"block_number\",\"type\":\"uint256\"},{\"name\":\"timeout\",\"type\":\"uint256\"},{\"name\":\"query_type\",\"type\":\"string\"},{\"name\":\"query_path\",\"type\":\"string\"}],\"name\":\"query\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"group_id\",\"type\":\"uint256\"}],\"name\":\"getPublicKey\",\"outputs\":[{\"name\":\"\",\"type\":\"uint256\"},{\"name\":\"\",\"type\":\"uint256\"},{\"name\":\"\",\"type\":\"uint256\"},{\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"group_id\",\"type\":\"uint256\"},{\"name\":\"x1\",\"type\":\"uint256\"},{\"name\":\"x2\",\"type\":\"uint256\"},{\"name\":\"y1\",\"type\":\"uint256\"},{\"name\":\"y2\",\"type\":\"uint256\"}],\"name\":\"setPublicKey\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"payable\":true,\"stateMutability\":\"payable\",\"type\":\"fallback\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"queryId\",\"type\":\"uint256\"},{\"indexed\":false,\"name\":\"url\",\"type\":\"string\"},{\"indexed\":false,\"name\":\"timeout\",\"type\":\"uint256\"}],\"name\":\"LogUrl\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"query_type\",\"type\":\"string\"}],\"name\":\"LogNonSupportedType\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"from\",\"type\":\"address\"}],\"name\":\"LogNonContractCall\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"user_contract_addr\",\"type\":\"address\"},{\"indexed\":false,\"name\":\"result\",\"type\":\"bytes\"}],\"name\":\"LogCallbackTriggeredFor\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[],\"name\":\"LogQueryFromNonExistentUC\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[],\"name\":\"LogInvalidSignature\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[],\"name\":\"LogSuccPubKeySub\",\"type\":\"event\"}]"
+const DOSProxyABI = "[{\"constant\":true,\"inputs\":[],\"name\":\"getBootstrapIp\",\"outputs\":[{\"name\":\"\",\"type\":\"string\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"query_id\",\"type\":\"uint256\"},{\"name\":\"result\",\"type\":\"bytes\"},{\"name\":\"x\",\"type\":\"uint256\"},{\"name\":\"y\",\"type\":\"uint256\"}],\"name\":\"triggerCallback\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"from\",\"type\":\"address\"},{\"name\":\"block_number\",\"type\":\"uint256\"},{\"name\":\"timeout\",\"type\":\"uint256\"},{\"name\":\"query_type\",\"type\":\"string\"},{\"name\":\"query_path\",\"type\":\"string\"}],\"name\":\"query\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"group_id\",\"type\":\"uint256\"}],\"name\":\"getPublicKey\",\"outputs\":[{\"name\":\"\",\"type\":\"uint256\"},{\"name\":\"\",\"type\":\"uint256\"},{\"name\":\"\",\"type\":\"uint256\"},{\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"ip\",\"type\":\"string\"}],\"name\":\"setBootstrapIp\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[],\"name\":\"resetContract\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"group_id\",\"type\":\"uint256\"},{\"name\":\"x1\",\"type\":\"uint256\"},{\"name\":\"x2\",\"type\":\"uint256\"},{\"name\":\"y1\",\"type\":\"uint256\"},{\"name\":\"y2\",\"type\":\"uint256\"}],\"name\":\"setPublicKey\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"size\",\"type\":\"uint256\"}],\"name\":\"grouping\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"id\",\"type\":\"uint256\"}],\"name\":\"uploadNodeId\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"payable\":true,\"stateMutability\":\"payable\",\"type\":\"fallback\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"groupId\",\"type\":\"uint256\"},{\"indexed\":false,\"name\":\"queryId\",\"type\":\"uint256\"},{\"indexed\":false,\"name\":\"url\",\"type\":\"string\"},{\"indexed\":false,\"name\":\"timeout\",\"type\":\"uint256\"}],\"name\":\"LogUrl\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"query_type\",\"type\":\"string\"}],\"name\":\"LogNonSupportedType\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"from\",\"type\":\"address\"}],\"name\":\"LogNonContractCall\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"user_contract_addr\",\"type\":\"address\"},{\"indexed\":false,\"name\":\"result\",\"type\":\"bytes\"}],\"name\":\"LogCallbackTriggeredFor\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[],\"name\":\"LogQueryFromNonExistentUC\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[],\"name\":\"LogInvalidSignature\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[],\"name\":\"LogInsufficientGroupNumber\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"GroupId\",\"type\":\"uint256\"},{\"indexed\":false,\"name\":\"NodeId\",\"type\":\"uint256[]\"}],\"name\":\"LogGrouping\",\"type\":\"event\"}]"
 
 // DOSProxyBin is the compiled bytecode used for deploying new contracts.
-const DOSProxyBin = `0x6080604052607b60005534801561001557600080fd5b5061101f806100256000396000f3006080604052600436106100615763ffffffff7c010000000000000000000000000000000000000000000000000000000060003504166334ebda4d8114610063578063482edfaa146100ca57806375d2c1ce14610174578063c8a03ef2146101b2575b005b34801561006f57600080fd5b5060408051602060046024803582810135601f81018590048502860185019096528585526100619583359536956044949193909101919081908401838280828437509497505084359550505060209092013591506101d69050565b3480156100d657600080fd5b50604080516020601f60643560048181013592830184900484028501840190955281845261006194600160a060020a03813516946024803595604435953695608494930191819084018382808284375050604080516020601f89358b018035918201839004830284018301909452808352979a9998810197919650918201945092508291508401838280828437509497506104129650505050505050565b34801561018057600080fd5b5061018c600435610759565b604080519485526020850193909352838301919091526060830152519081900360800190f35b3480156101be57600080fd5b5061006160043560243560443560643560843561077f565b6101de610eda565b506040805180820182528381526020808201849052600087815260019091529190912054600160a060020a0316801515610240576040517f158bff16635ac24f3d1acce162f0626cc6751bd434047538d76421366edf590690600090a161040a565b61024b8686846108cb565b151561027f576040517ff0cda705e46caa68e5854fa85a2635f77f3f6b5c927bd409ee7d935e4bb0322c90600090a161040a565b7fcd714230b213422971bdd48f3fa7f63c52e50f9fa7356f6aa42a191c12f046d081866040518083600160a060020a0316600160a060020a0316815260200180602001828103825283818151815260200191508051906020019080838360005b838110156102f75781810151838201526020016102df565b50505050905090810190601f1680156103245780820380516001836020036101000a031916815260200191505b50935050505060405180910390a16040517f4a40f5f9000000000000000000000000000000000000000000000000000000008152602060048201818152875160248401528751600160a060020a03851693634a40f5f9938a939283926044019185019080838360005b838110156103a557818101518382015260200161038d565b50505050905090810190601f1680156103d25780820380516001836020036101000a031916815260200191505b5092505050600060405180830381600087803b1580156103f157600080fd5b505af1158015610405573d6000803e3d6000fd5b505050505b505050505050565b60008061041e87610a40565b11156107155785858585856040518086600160a060020a0316600160a060020a03166c0100000000000000000000000002815260140185815260200184815260200183805190602001908083835b6020831061048b5780518252601f19909201916020918201910161046c565b51815160209384036101000a600019018019909216911617905285519190930192850191508083835b602083106104d35780518252601f1990920191602091820191016104b4565b6001836020036101000a038019825116818451168082178552505050505050905001955050505050506040518091039020600190049050856001600083815260200190815260200160002060006101000a815481600160a060020a030219169083600160a060020a03160217905550610581836040805190810160405280600381526020017f4150490000000000000000000000000000000000000000000000000000000000815250610a44565b15610676576000805481526002602081815260408084208585526003909252909220906105b19082908490610ef1565b506105c460028281019084810190610ef1565b509050507f1ffecd36b725cf796f7f120ca1b5358f615bc225e48cd62f540ca656164e96938183866040518084815260200180602001838152602001828103825284818151815260200191508051906020019080838360005b8381101561063557818101518382015260200161061d565b50505050905090810190601f1680156106625780820380516001836020036101000a031916815260200191505b5094505050505060405180910390a1610710565b7f70714cf695ae953ee67221716a4b4dc9e944909fd2b66f07e790a49d9ac29b41836040518080602001828103825283818151815260200191508051906020019080838360005b838110156106d55781810151838201526020016106bd565b50505050905090810190601f1680156107025780820380516001836020036101000a031916815260200191505b509250505060405180910390a15b61040a565b60408051600160a060020a038816815290517f6cea43bb3db7220931a7c8ac633e65cbc8e7ba129f2ed84db2e71bc0adb73bb59181900360200190a1505050505050565b600090815260026020819052604090912080546001820154928201546003909201549093565b6040805160028082526060808301845292839291906020830190803883395050604080516002808252606082018352939550929150602083019080388339019050509050858260008151811015156107d357fe5b6020908102909101015281518590839060019081106107ee57fe5b60209081029091010152805184908290600090811061080957fe5b60209081029091010152805183908290600190811061082457fe5b602090810290910181019190915260408051608081018252808201898152606082018990528152815180830183528781528084018790528184015260008a81526002938490529190912081519192909161088091839190610f2c565b5060208201516108969060028084019190610f2c565b50506040517f177b87fce3312b55d596cd36d8830ac2e8609e954b3c09f5968b66ef8b64096d9150600090a150505050505050565b6040805160028082526060828101909352600092918291816020015b6108ef610eda565b8152602001906001900390816108e757505060408051600280825260608201909252919350602082015b610921610f5a565b8152602001906001900390816109195790505090508382600081518110151561094657fe5b6020908102909101015261095985610b13565b82600181518110151561096857fe5b6020908102909101015261097a610b98565b81600081518110151561098957fe5b602090810290910181019190915260008781526003909152604090819020815160808101835291829081018260028282826020028201915b8154815260200190600101908083116109c157505050918352505060408051808201918290526020909201919060028481019182845b8154815260200190600101908083116109f757505050505081525050816001815181101515610a2257fe5b60209081029091010152610a368282610c59565b9695505050505050565b3b90565b8051825160009184918491849114610a5f5760009350610b0a565b5060005b8251811015610b05578181815181101515610a7a57fe5b90602001015160f860020a900460f860020a027effffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff19168382815181101515610abd57fe5b60209101015160f860020a90819004027fff000000000000000000000000000000000000000000000000000000000000001614610afd5760009350610b0a565b600101610a63565b600193505b50505092915050565b610b1b610eda565b6000826040518082805190602001908083835b60208310610b4d5780518252601f199092019160209182019101610b2e565b6001836020036101000a0380198251168184511680821785525050505050509050019150506040518091039020600190049050610b91610b8b610e65565b82610e86565b9392505050565b610ba0610f5a565b50604080516080810182527f198e9393920d483a7260bfb731fb5d25f1aa493335a9e71297e485b7aef312c28183019081527f1800deef121f1e76426a00665e5c4479674322d4f75edadd46debd5cd992f6ed6060830152815281518083019092527f090689d0585ff075ec9e99ad690c3395bc4b313370b38ef355acdadcd122975b82527f12c85ea5db8c6deb4aab71808dcb408fe3d1e7690c43d37b4ce6cc0166fa7daa6020838101919091528101919091525b90565b600080600060606000610c6a610f80565b8651885160009114610c7b57600080fd5b8851955085600602945084604051908082528060200260200182016040528015610caf578160200160208202803883390190505b509350600092505b85831015610e24578883815181101515610ccd57fe5b60209081029091010151518451859060068602908110610ce957fe5b602090810290910101528851899084908110610d0157fe5b90602001906020020151602001518484600602600101815181101515610d2357fe5b602090810290910101528751889084908110610d3b57fe5b602090810291909101015151518451859060026006870201908110610d5c57fe5b602090810290910101528751889084908110610d7457fe5b6020908102919091018101515101518451859060036006870201908110610d9757fe5b602090810290910101528751889084908110610daf57fe5b6020908102919091018101510151518451859060046006870201908110610dd257fe5b602090810290910101528751889084908110610dea57fe5b60209081029190910181015181015101518451859060056006870201908110610e0f57fe5b60209081029091010152600190920191610cb7565b6020826020870260208701600060086107d05a03f19050808015610e4757610e49565bfe5b50801515610e5657600080fd5b50511515979650505050505050565b610e6d610eda565b5060408051808201909152600181526002602082015290565b610e8e610eda565b610e96610f9f565b83518152602080850151908201526040810183905260006060836080848460076107d05a03f19050808015610e475750801515610ed257600080fd5b505092915050565b604080518082019091526000808252602082015290565b8260028101928215610f1c579182015b82811115610f1c578254825591600101919060010190610f01565b50610f28929150610fbe565b5090565b8260028101928215610f1c579160200282015b82811115610f1c578251825591602001919060010190610f3f565b608060405190810160405280610f6e610fd8565b8152602001610f7b610fd8565b905290565b6020604051908101604052806001906020820280388339509192915050565b6060604051908101604052806003906020820280388339509192915050565b610c5691905b80821115610f285760008155600101610fc4565b604080518082018252906002908290803883395091929150505600a165627a7a72305820d926a03a52a7e108d3ec962d6092255a08989acb8987bfb1224ca74c5fc499930029`
+const DOSProxyBin = `0x60806040526000805534801561001457600080fd5b506114a1806100246000396000f3006080604052600436106100985763ffffffff7c01000000000000000000000000000000000000000000000000000000006000350416630322c2ad811461009a57806334ebda4d14610124578063482edfaa1461018b57806375d2c1ce14610235578063872e864014610273578063b181a8fc146102cc578063c8a03ef2146102e1578063eab14fe614610305578063f89a15f71461031d575b005b3480156100a657600080fd5b506100af610335565b6040805160208082528351818301528351919283929083019185019080838360005b838110156100e95781810151838201526020016100d1565b50505050905090810190601f1680156101165780820380516001836020036101000a031916815260200191505b509250505060405180910390f35b34801561013057600080fd5b5060408051602060046024803582810135601f81018590048502860185019096528585526100989583359536956044949193909101919081908401838280828437509497505084359550505060209092013591506103c99050565b34801561019757600080fd5b50604080516020601f60643560048181013592830184900484028501840190955281845261009894600160a060020a03813516946024803595604435953695608494930191819084018382808284375050604080516020601f89358b018035918201839004830284018301909452808352979a9998810197919650918201945092508291508401838280828437509497506106059650505050505050565b34801561024157600080fd5b5061024d600435610959565b604080519485526020850193909352838301919091526060830152519081900360800190f35b34801561027f57600080fd5b506040805160206004803580820135601f81018490048402850184019095528484526100989436949293602493928401919081908401838280828437509497506109819650505050505050565b3480156102d857600080fd5b50610098610998565b3480156102ed57600080fd5b506100986004356024356044356064356084356109ab565b34801561031157600080fd5b50610098600435610acd565b34801561032957600080fd5b50610098600435610c49565b60028054604080516020601f60001961010060018716150201909416859004938401819004810282018101909252828152606093909290918301828280156103be5780601f10610393576101008083540402835291602001916103be565b820191906000526020600020905b8154815290600101906020018083116103a157829003601f168201915b505050505090505b90565b6103d161128c565b506040805180820182528381526020808201849052600087815260059091529190912054600160a060020a0316801515610433576040517f158bff16635ac24f3d1acce162f0626cc6751bd434047538d76421366edf590690600090a16105fd565b61043e868684610c7e565b1515610472576040517ff0cda705e46caa68e5854fa85a2635f77f3f6b5c927bd409ee7d935e4bb0322c90600090a16105fd565b7fcd714230b213422971bdd48f3fa7f63c52e50f9fa7356f6aa42a191c12f046d081866040518083600160a060020a0316600160a060020a0316815260200180602001828103825283818151815260200191508051906020019080838360005b838110156104ea5781810151838201526020016104d2565b50505050905090810190601f1680156105175780820380516001836020036101000a031916815260200191505b50935050505060405180910390a16040517f4a40f5f9000000000000000000000000000000000000000000000000000000008152602060048201818152875160248401528751600160a060020a03851693634a40f5f9938a939283926044019185019080838360005b83811015610598578181015183820152602001610580565b50505050905090810190601f1680156105c55780820380516001836020036101000a031916815260200191505b5092505050600060405180830381600087803b1580156105e457600080fd5b505af11580156105f8573d6000803e3d6000fd5b505050505b505050505050565b600080600061061388610df3565b11156109135786868686866040518086600160a060020a0316600160a060020a03166c0100000000000000000000000002815260140185815260200184815260200183805190602001908083835b602083106106805780518252601f199092019160209182019101610661565b51815160209384036101000a600019018019909216911617905285519190930192850191508083835b602083106106c85780518252601f1990920191602091820191016106a9565b6001836020036101000a038019825116818451168082178552505050505050905001955050505050506040518091039020600190049150866005600084815260200190815260200160002060006101000a815481600160a060020a030219169083600160a060020a03160217905550610776846040805190810160405280600381526020017f4150490000000000000000000000000000000000000000000000000000000000815250610df7565b156108745750600154600081815260066020908152604080832085845260079092529091206107a7818360026112a3565b506107ba600282810190848101906112a3565b509050507fc24f120340e1beeac424b47e9e08f835661963ec3a5f7aa7edf537b71533b2ae818385886040518085815260200184815260200180602001838152602001828103825284818151815260200191508051906020019080838360005b8381101561083257818101518382015260200161081a565b50505050905090810190601f16801561085f5780820380516001836020036101000a031916815260200191505b509550505050505060405180910390a161090e565b7f70714cf695ae953ee67221716a4b4dc9e944909fd2b66f07e790a49d9ac29b41846040518080602001828103825283818151815260200191508051906020019080838360005b838110156108d35781810151838201526020016108bb565b50505050905090810190601f1680156109005780820380516001836020036101000a031916815260200191505b509250505060405180910390a15b610950565b60408051600160a060020a038916815290517f6cea43bb3db7220931a7c8ac633e65cbc8e7ba129f2ed84db2e71bc0adb73bb59181900360200190a15b50505050505050565b6000908152600660205260409020805460018201546002830154600390930154919390929190565b80516109949060029060208401906112de565b5050565b60008080556109a860038261134c565b50565b6040805160028082526060808301845292839291906020830190803883395050604080516002808252606082018352939550929150602083019080388339019050509050858260008151811015156109ff57fe5b602090810290910101528151859083906001908110610a1a57fe5b602090810290910101528051849082906000908110610a3557fe5b602090810290910101528051839082906001908110610a5057fe5b602090810290910181019190915260408051608081018252808201898152606082018990528152815180830183528781528084018790528184015260008a8152600690935291208151610aa69082906002611375565b506020820151610abc9060028084019190611375565b505050600196909655505050505050565b606060008083604051908082528060200260200182016040528015610afc578160200160208202803883390190505b50600354909350841115610b38576040517f08a70ba288e836bee6c9b4aea7482ee5ff8f63c5ad9d2533d9cf0ced64adc26290600090a1610c43565b600091505b83821015610b9957600380546000198101908110610b5757fe5b90600052602060002001548383815181101515610b7057fe5b602090810290910101526003805490610b8d90600019830161134c565b50600190910190610b3d565b506000805460018101825580825260046020908152604090922084519192610bc492908601906113a2565b507ffdb627147562eb968c80eba5de51c105b83bf375bf584d31caf63648087a0ed981846040518083815260200180602001828103825283818151815260200191508051906020019060200280838360005b83811015610c2e578181015183820152602001610c16565b50505050905001935050505060405180910390a15b50505050565b600380546001810182556000919091527fc2575a0e9e593c00f959f8c92f12db2869c3395a3b0502d05e2516446f71f85b0155565b6040805160028082526060828101909352600092918291816020015b610ca261128c565b815260200190600190039081610c9a57505060408051600280825260608201909252919350602082015b610cd46113dc565b815260200190600190039081610ccc57905050905083826000815181101515610cf957fe5b60209081029091010152610d0c85610ec6565b826001815181101515610d1b57fe5b60209081029091010152610d2d610f4b565b816000815181101515610d3c57fe5b602090810290910181019190915260008781526007909152604090819020815160808101835291829081018260028282826020028201915b815481526020019060010190808311610d7457505050918352505060408051808201918290526020909201919060028481019182845b815481526020019060010190808311610daa57505050505081525050816001815181101515610dd557fe5b60209081029091010152610de9828261100b565b9695505050505050565b3b90565b8051825160009184918491849114610e125760009350610ebd565b5060005b8251811015610eb8578181815181101515610e2d57fe5b90602001015160f860020a900460f860020a027effffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff19168382815181101515610e7057fe5b60209101015160f860020a90819004027fff000000000000000000000000000000000000000000000000000000000000001614610eb05760009350610ebd565b600101610e16565b600193505b50505092915050565b610ece61128c565b6000826040518082805190602001908083835b60208310610f005780518252601f199092019160209182019101610ee1565b6001836020036101000a0380198251168184511680821785525050505050509050019150506040518091039020600190049050610f44610f3e611217565b82611238565b9392505050565b610f536113dc565b50604080516080810182527f198e9393920d483a7260bfb731fb5d25f1aa493335a9e71297e485b7aef312c28183019081527f1800deef121f1e76426a00665e5c4479674322d4f75edadd46debd5cd992f6ed6060830152815281518083019092527f090689d0585ff075ec9e99ad690c3395bc4b313370b38ef355acdadcd122975b82527f12c85ea5db8c6deb4aab71808dcb408fe3d1e7690c43d37b4ce6cc0166fa7daa60208381019190915281019190915290565b60008060006060600061101c611402565b865188516000911461102d57600080fd5b8851955085600602945084604051908082528060200260200182016040528015611061578160200160208202803883390190505b509350600092505b858310156111d657888381518110151561107f57fe5b6020908102909101015151845185906006860290811061109b57fe5b6020908102909101015288518990849081106110b357fe5b906020019060200201516020015184846006026001018151811015156110d557fe5b6020908102909101015287518890849081106110ed57fe5b60209081029190910101515151845185906002600687020190811061110e57fe5b60209081029091010152875188908490811061112657fe5b602090810291909101810151510151845185906003600687020190811061114957fe5b60209081029091010152875188908490811061116157fe5b602090810291909101810151015151845185906004600687020190811061118457fe5b60209081029091010152875188908490811061119c57fe5b602090810291909101810151810151015184518590600560068702019081106111c157fe5b60209081029091010152600190920191611069565b6020826020870260208701600060086107d05a03f190508080156111f9576111fb565bfe5b5080151561120857600080fd5b50511515979650505050505050565b61121f61128c565b5060408051808201909152600181526002602082015290565b61124061128c565b611248611421565b83518152602080850151908201526040810183905260006060836080848460076107d05a03f190508080156111f9575080151561128457600080fd5b505092915050565b604080518082019091526000808252602082015290565b82600281019282156112ce579182015b828111156112ce5782548255916001019190600101906112b3565b506112da929150611440565b5090565b828054600181600116156101000203166002900490600052602060002090601f016020900481019282601f1061131f57805160ff19168380011785556112ce565b828001600101855582156112ce579182015b828111156112ce578251825591602001919060010190611331565b81548183558181111561137057600083815260209020611370918101908301611440565b505050565b82600281019282156112ce57916020028201828111156112ce578251825591602001919060010190611331565b8280548282559060005260206000209081019282156112ce57916020028201828111156112ce578251825591602001919060010190611331565b6080604051908101604052806113f061145a565b81526020016113fd61145a565b905290565b6020604051908101604052806001906020820280388339509192915050565b6060604051908101604052806003906020820280388339509192915050565b6103c691905b808211156112da5760008155600101611446565b604080518082018252906002908290803883395091929150505600a165627a7a723058200598aa936155f1e6638c32a7dc1c4a1bec356ef39da6960dd303474e099089f90029`
 
 // DeployDOSProxy deploys a new Ethereum contract, binding an instance of DOSProxy to it.
 func DeployDOSProxy(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *DOSProxy, error) {
@@ -176,6 +176,32 @@ func (_DOSProxy *DOSProxyTransactorRaw) Transact(opts *bind.TransactOpts, method
 	return _DOSProxy.Contract.contract.Transact(opts, method, params...)
 }
 
+// GetBootstrapIp is a free data retrieval call binding the contract method 0x0322c2ad.
+//
+// Solidity: function getBootstrapIp() constant returns(string)
+func (_DOSProxy *DOSProxyCaller) GetBootstrapIp(opts *bind.CallOpts) (string, error) {
+	var (
+		ret0 = new(string)
+	)
+	out := ret0
+	err := _DOSProxy.contract.Call(opts, out, "getBootstrapIp")
+	return *ret0, err
+}
+
+// GetBootstrapIp is a free data retrieval call binding the contract method 0x0322c2ad.
+//
+// Solidity: function getBootstrapIp() constant returns(string)
+func (_DOSProxy *DOSProxySession) GetBootstrapIp() (string, error) {
+	return _DOSProxy.Contract.GetBootstrapIp(&_DOSProxy.CallOpts)
+}
+
+// GetBootstrapIp is a free data retrieval call binding the contract method 0x0322c2ad.
+//
+// Solidity: function getBootstrapIp() constant returns(string)
+func (_DOSProxy *DOSProxyCallerSession) GetBootstrapIp() (string, error) {
+	return _DOSProxy.Contract.GetBootstrapIp(&_DOSProxy.CallOpts)
+}
+
 // GetPublicKey is a free data retrieval call binding the contract method 0x75d2c1ce.
 //
 // Solidity: function getPublicKey(group_id uint256) constant returns(uint256, uint256, uint256, uint256)
@@ -210,6 +236,27 @@ func (_DOSProxy *DOSProxyCallerSession) GetPublicKey(group_id *big.Int) (*big.In
 	return _DOSProxy.Contract.GetPublicKey(&_DOSProxy.CallOpts, group_id)
 }
 
+// Grouping is a paid mutator transaction binding the contract method 0xeab14fe6.
+//
+// Solidity: function grouping(size uint256) returns()
+func (_DOSProxy *DOSProxyTransactor) Grouping(opts *bind.TransactOpts, size *big.Int) (*types.Transaction, error) {
+	return _DOSProxy.contract.Transact(opts, "grouping", size)
+}
+
+// Grouping is a paid mutator transaction binding the contract method 0xeab14fe6.
+//
+// Solidity: function grouping(size uint256) returns()
+func (_DOSProxy *DOSProxySession) Grouping(size *big.Int) (*types.Transaction, error) {
+	return _DOSProxy.Contract.Grouping(&_DOSProxy.TransactOpts, size)
+}
+
+// Grouping is a paid mutator transaction binding the contract method 0xeab14fe6.
+//
+// Solidity: function grouping(size uint256) returns()
+func (_DOSProxy *DOSProxyTransactorSession) Grouping(size *big.Int) (*types.Transaction, error) {
+	return _DOSProxy.Contract.Grouping(&_DOSProxy.TransactOpts, size)
+}
+
 // Query is a paid mutator transaction binding the contract method 0x482edfaa.
 //
 // Solidity: function query(from address, block_number uint256, timeout uint256, query_type string, query_path string) returns()
@@ -229,6 +276,48 @@ func (_DOSProxy *DOSProxySession) Query(from common.Address, block_number *big.I
 // Solidity: function query(from address, block_number uint256, timeout uint256, query_type string, query_path string) returns()
 func (_DOSProxy *DOSProxyTransactorSession) Query(from common.Address, block_number *big.Int, timeout *big.Int, query_type string, query_path string) (*types.Transaction, error) {
 	return _DOSProxy.Contract.Query(&_DOSProxy.TransactOpts, from, block_number, timeout, query_type, query_path)
+}
+
+// ResetContract is a paid mutator transaction binding the contract method 0xb181a8fc.
+//
+// Solidity: function resetContract() returns()
+func (_DOSProxy *DOSProxyTransactor) ResetContract(opts *bind.TransactOpts) (*types.Transaction, error) {
+	return _DOSProxy.contract.Transact(opts, "resetContract")
+}
+
+// ResetContract is a paid mutator transaction binding the contract method 0xb181a8fc.
+//
+// Solidity: function resetContract() returns()
+func (_DOSProxy *DOSProxySession) ResetContract() (*types.Transaction, error) {
+	return _DOSProxy.Contract.ResetContract(&_DOSProxy.TransactOpts)
+}
+
+// ResetContract is a paid mutator transaction binding the contract method 0xb181a8fc.
+//
+// Solidity: function resetContract() returns()
+func (_DOSProxy *DOSProxyTransactorSession) ResetContract() (*types.Transaction, error) {
+	return _DOSProxy.Contract.ResetContract(&_DOSProxy.TransactOpts)
+}
+
+// SetBootstrapIp is a paid mutator transaction binding the contract method 0x872e8640.
+//
+// Solidity: function setBootstrapIp(ip string) returns()
+func (_DOSProxy *DOSProxyTransactor) SetBootstrapIp(opts *bind.TransactOpts, ip string) (*types.Transaction, error) {
+	return _DOSProxy.contract.Transact(opts, "setBootstrapIp", ip)
+}
+
+// SetBootstrapIp is a paid mutator transaction binding the contract method 0x872e8640.
+//
+// Solidity: function setBootstrapIp(ip string) returns()
+func (_DOSProxy *DOSProxySession) SetBootstrapIp(ip string) (*types.Transaction, error) {
+	return _DOSProxy.Contract.SetBootstrapIp(&_DOSProxy.TransactOpts, ip)
+}
+
+// SetBootstrapIp is a paid mutator transaction binding the contract method 0x872e8640.
+//
+// Solidity: function setBootstrapIp(ip string) returns()
+func (_DOSProxy *DOSProxyTransactorSession) SetBootstrapIp(ip string) (*types.Transaction, error) {
+	return _DOSProxy.Contract.SetBootstrapIp(&_DOSProxy.TransactOpts, ip)
 }
 
 // SetPublicKey is a paid mutator transaction binding the contract method 0xc8a03ef2.
@@ -271,6 +360,27 @@ func (_DOSProxy *DOSProxySession) TriggerCallback(query_id *big.Int, result []by
 // Solidity: function triggerCallback(query_id uint256, result bytes, x uint256, y uint256) returns()
 func (_DOSProxy *DOSProxyTransactorSession) TriggerCallback(query_id *big.Int, result []byte, x *big.Int, y *big.Int) (*types.Transaction, error) {
 	return _DOSProxy.Contract.TriggerCallback(&_DOSProxy.TransactOpts, query_id, result, x, y)
+}
+
+// UploadNodeId is a paid mutator transaction binding the contract method 0xf89a15f7.
+//
+// Solidity: function uploadNodeId(id uint256) returns()
+func (_DOSProxy *DOSProxyTransactor) UploadNodeId(opts *bind.TransactOpts, id *big.Int) (*types.Transaction, error) {
+	return _DOSProxy.contract.Transact(opts, "uploadNodeId", id)
+}
+
+// UploadNodeId is a paid mutator transaction binding the contract method 0xf89a15f7.
+//
+// Solidity: function uploadNodeId(id uint256) returns()
+func (_DOSProxy *DOSProxySession) UploadNodeId(id *big.Int) (*types.Transaction, error) {
+	return _DOSProxy.Contract.UploadNodeId(&_DOSProxy.TransactOpts, id)
+}
+
+// UploadNodeId is a paid mutator transaction binding the contract method 0xf89a15f7.
+//
+// Solidity: function uploadNodeId(id uint256) returns()
+func (_DOSProxy *DOSProxyTransactorSession) UploadNodeId(id *big.Int) (*types.Transaction, error) {
+	return _DOSProxy.Contract.UploadNodeId(&_DOSProxy.TransactOpts, id)
 }
 
 // DOSProxyLogCallbackTriggeredForIterator is returned from FilterLogCallbackTriggeredFor and is used to iterate over the raw logs and unpacked data for LogCallbackTriggeredFor events raised by the DOSProxy contract.
@@ -376,6 +486,250 @@ func (_DOSProxy *DOSProxyFilterer) WatchLogCallbackTriggeredFor(opts *bind.Watch
 				// New log arrived, parse the event and forward to the user
 				event := new(DOSProxyLogCallbackTriggeredFor)
 				if err := _DOSProxy.contract.UnpackLog(event, "LogCallbackTriggeredFor", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+// DOSProxyLogGroupingIterator is returned from FilterLogGrouping and is used to iterate over the raw logs and unpacked data for LogGrouping events raised by the DOSProxy contract.
+type DOSProxyLogGroupingIterator struct {
+	Event *DOSProxyLogGrouping // Event containing the contract specifics and raw log
+
+	contract *bind.BoundContract // Generic contract to use for unpacking event data
+	event    string              // Event name to use for unpacking event data
+
+	logs chan types.Log        // Log channel receiving the found contract events
+	sub  ethereum.Subscription // Subscription for errors, completion and termination
+	done bool                  // Whether the subscription completed delivering logs
+	fail error                 // Occurred error to stop iteration
+}
+
+// Next advances the iterator to the subsequent event, returning whether there
+// are any more events found. In case of a retrieval or parsing error, false is
+// returned and Error() can be queried for the exact failure.
+func (it *DOSProxyLogGroupingIterator) Next() bool {
+	// If the iterator failed, stop iterating
+	if it.fail != nil {
+		return false
+	}
+	// If the iterator completed, deliver directly whatever's available
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(DOSProxyLogGrouping)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+	// Iterator still in progress, wait for either a data or an error event
+	select {
+	case log := <-it.logs:
+		it.Event = new(DOSProxyLogGrouping)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+// Error returns any retrieval or parsing error occurred during filtering.
+func (it *DOSProxyLogGroupingIterator) Error() error {
+	return it.fail
+}
+
+// Close terminates the iteration process, releasing any pending underlying
+// resources.
+func (it *DOSProxyLogGroupingIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+// DOSProxyLogGrouping represents a LogGrouping event raised by the DOSProxy contract.
+type DOSProxyLogGrouping struct {
+	GroupId *big.Int
+	NodeId  []*big.Int
+	Raw     types.Log // Blockchain specific contextual infos
+}
+
+// FilterLogGrouping is a free log retrieval operation binding the contract event 0xfdb627147562eb968c80eba5de51c105b83bf375bf584d31caf63648087a0ed9.
+//
+// Solidity: e LogGrouping(GroupId uint256, NodeId uint256[])
+func (_DOSProxy *DOSProxyFilterer) FilterLogGrouping(opts *bind.FilterOpts) (*DOSProxyLogGroupingIterator, error) {
+
+	logs, sub, err := _DOSProxy.contract.FilterLogs(opts, "LogGrouping")
+	if err != nil {
+		return nil, err
+	}
+	return &DOSProxyLogGroupingIterator{contract: _DOSProxy.contract, event: "LogGrouping", logs: logs, sub: sub}, nil
+}
+
+// WatchLogGrouping is a free log subscription operation binding the contract event 0xfdb627147562eb968c80eba5de51c105b83bf375bf584d31caf63648087a0ed9.
+//
+// Solidity: e LogGrouping(GroupId uint256, NodeId uint256[])
+func (_DOSProxy *DOSProxyFilterer) WatchLogGrouping(opts *bind.WatchOpts, sink chan<- *DOSProxyLogGrouping) (event.Subscription, error) {
+
+	logs, sub, err := _DOSProxy.contract.WatchLogs(opts, "LogGrouping")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+				// New log arrived, parse the event and forward to the user
+				event := new(DOSProxyLogGrouping)
+				if err := _DOSProxy.contract.UnpackLog(event, "LogGrouping", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
+// DOSProxyLogInsufficientGroupNumberIterator is returned from FilterLogInsufficientGroupNumber and is used to iterate over the raw logs and unpacked data for LogInsufficientGroupNumber events raised by the DOSProxy contract.
+type DOSProxyLogInsufficientGroupNumberIterator struct {
+	Event *DOSProxyLogInsufficientGroupNumber // Event containing the contract specifics and raw log
+
+	contract *bind.BoundContract // Generic contract to use for unpacking event data
+	event    string              // Event name to use for unpacking event data
+
+	logs chan types.Log        // Log channel receiving the found contract events
+	sub  ethereum.Subscription // Subscription for errors, completion and termination
+	done bool                  // Whether the subscription completed delivering logs
+	fail error                 // Occurred error to stop iteration
+}
+
+// Next advances the iterator to the subsequent event, returning whether there
+// are any more events found. In case of a retrieval or parsing error, false is
+// returned and Error() can be queried for the exact failure.
+func (it *DOSProxyLogInsufficientGroupNumberIterator) Next() bool {
+	// If the iterator failed, stop iterating
+	if it.fail != nil {
+		return false
+	}
+	// If the iterator completed, deliver directly whatever's available
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(DOSProxyLogInsufficientGroupNumber)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+	// Iterator still in progress, wait for either a data or an error event
+	select {
+	case log := <-it.logs:
+		it.Event = new(DOSProxyLogInsufficientGroupNumber)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+// Error returns any retrieval or parsing error occurred during filtering.
+func (it *DOSProxyLogInsufficientGroupNumberIterator) Error() error {
+	return it.fail
+}
+
+// Close terminates the iteration process, releasing any pending underlying
+// resources.
+func (it *DOSProxyLogInsufficientGroupNumberIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+// DOSProxyLogInsufficientGroupNumber represents a LogInsufficientGroupNumber event raised by the DOSProxy contract.
+type DOSProxyLogInsufficientGroupNumber struct {
+	Raw types.Log // Blockchain specific contextual infos
+}
+
+// FilterLogInsufficientGroupNumber is a free log retrieval operation binding the contract event 0x08a70ba288e836bee6c9b4aea7482ee5ff8f63c5ad9d2533d9cf0ced64adc262.
+//
+// Solidity: e LogInsufficientGroupNumber()
+func (_DOSProxy *DOSProxyFilterer) FilterLogInsufficientGroupNumber(opts *bind.FilterOpts) (*DOSProxyLogInsufficientGroupNumberIterator, error) {
+
+	logs, sub, err := _DOSProxy.contract.FilterLogs(opts, "LogInsufficientGroupNumber")
+	if err != nil {
+		return nil, err
+	}
+	return &DOSProxyLogInsufficientGroupNumberIterator{contract: _DOSProxy.contract, event: "LogInsufficientGroupNumber", logs: logs, sub: sub}, nil
+}
+
+// WatchLogInsufficientGroupNumber is a free log subscription operation binding the contract event 0x08a70ba288e836bee6c9b4aea7482ee5ff8f63c5ad9d2533d9cf0ced64adc262.
+//
+// Solidity: e LogInsufficientGroupNumber()
+func (_DOSProxy *DOSProxyFilterer) WatchLogInsufficientGroupNumber(opts *bind.WatchOpts, sink chan<- *DOSProxyLogInsufficientGroupNumber) (event.Subscription, error) {
+
+	logs, sub, err := _DOSProxy.contract.WatchLogs(opts, "LogInsufficientGroupNumber")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+				// New log arrived, parse the event and forward to the user
+				event := new(DOSProxyLogInsufficientGroupNumber)
+				if err := _DOSProxy.contract.UnpackLog(event, "LogInsufficientGroupNumber", log); err != nil {
 					return err
 				}
 				event.Raw = log
@@ -882,127 +1236,6 @@ func (_DOSProxy *DOSProxyFilterer) WatchLogQueryFromNonExistentUC(opts *bind.Wat
 	}), nil
 }
 
-// DOSProxyLogSuccPubKeySubIterator is returned from FilterLogSuccPubKeySub and is used to iterate over the raw logs and unpacked data for LogSuccPubKeySub events raised by the DOSProxy contract.
-type DOSProxyLogSuccPubKeySubIterator struct {
-	Event *DOSProxyLogSuccPubKeySub // Event containing the contract specifics and raw log
-
-	contract *bind.BoundContract // Generic contract to use for unpacking event data
-	event    string              // Event name to use for unpacking event data
-
-	logs chan types.Log        // Log channel receiving the found contract events
-	sub  ethereum.Subscription // Subscription for errors, completion and termination
-	done bool                  // Whether the subscription completed delivering logs
-	fail error                 // Occurred error to stop iteration
-}
-
-// Next advances the iterator to the subsequent event, returning whether there
-// are any more events found. In case of a retrieval or parsing error, false is
-// returned and Error() can be queried for the exact failure.
-func (it *DOSProxyLogSuccPubKeySubIterator) Next() bool {
-	// If the iterator failed, stop iterating
-	if it.fail != nil {
-		return false
-	}
-	// If the iterator completed, deliver directly whatever's available
-	if it.done {
-		select {
-		case log := <-it.logs:
-			it.Event = new(DOSProxyLogSuccPubKeySub)
-			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-				it.fail = err
-				return false
-			}
-			it.Event.Raw = log
-			return true
-
-		default:
-			return false
-		}
-	}
-	// Iterator still in progress, wait for either a data or an error event
-	select {
-	case log := <-it.logs:
-		it.Event = new(DOSProxyLogSuccPubKeySub)
-		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-			it.fail = err
-			return false
-		}
-		it.Event.Raw = log
-		return true
-
-	case err := <-it.sub.Err():
-		it.done = true
-		it.fail = err
-		return it.Next()
-	}
-}
-
-// Error returns any retrieval or parsing error occurred during filtering.
-func (it *DOSProxyLogSuccPubKeySubIterator) Error() error {
-	return it.fail
-}
-
-// Close terminates the iteration process, releasing any pending underlying
-// resources.
-func (it *DOSProxyLogSuccPubKeySubIterator) Close() error {
-	it.sub.Unsubscribe()
-	return nil
-}
-
-// DOSProxyLogSuccPubKeySub represents a LogSuccPubKeySub event raised by the DOSProxy contract.
-type DOSProxyLogSuccPubKeySub struct {
-	Raw types.Log // Blockchain specific contextual infos
-}
-
-// FilterLogSuccPubKeySub is a free log retrieval operation binding the contract event 0x177b87fce3312b55d596cd36d8830ac2e8609e954b3c09f5968b66ef8b64096d.
-//
-// Solidity: e LogSuccPubKeySub()
-func (_DOSProxy *DOSProxyFilterer) FilterLogSuccPubKeySub(opts *bind.FilterOpts) (*DOSProxyLogSuccPubKeySubIterator, error) {
-
-	logs, sub, err := _DOSProxy.contract.FilterLogs(opts, "LogSuccPubKeySub")
-	if err != nil {
-		return nil, err
-	}
-	return &DOSProxyLogSuccPubKeySubIterator{contract: _DOSProxy.contract, event: "LogSuccPubKeySub", logs: logs, sub: sub}, nil
-}
-
-// WatchLogSuccPubKeySub is a free log subscription operation binding the contract event 0x177b87fce3312b55d596cd36d8830ac2e8609e954b3c09f5968b66ef8b64096d.
-//
-// Solidity: e LogSuccPubKeySub()
-func (_DOSProxy *DOSProxyFilterer) WatchLogSuccPubKeySub(opts *bind.WatchOpts, sink chan<- *DOSProxyLogSuccPubKeySub) (event.Subscription, error) {
-
-	logs, sub, err := _DOSProxy.contract.WatchLogs(opts, "LogSuccPubKeySub")
-	if err != nil {
-		return nil, err
-	}
-	return event.NewSubscription(func(quit <-chan struct{}) error {
-		defer sub.Unsubscribe()
-		for {
-			select {
-			case log := <-logs:
-				// New log arrived, parse the event and forward to the user
-				event := new(DOSProxyLogSuccPubKeySub)
-				if err := _DOSProxy.contract.UnpackLog(event, "LogSuccPubKeySub", log); err != nil {
-					return err
-				}
-				event.Raw = log
-
-				select {
-				case sink <- event:
-				case err := <-sub.Err():
-					return err
-				case <-quit:
-					return nil
-				}
-			case err := <-sub.Err():
-				return err
-			case <-quit:
-				return nil
-			}
-		}
-	}), nil
-}
-
 // DOSProxyLogUrlIterator is returned from FilterLogUrl and is used to iterate over the raw logs and unpacked data for LogUrl events raised by the DOSProxy contract.
 type DOSProxyLogUrlIterator struct {
 	Event *DOSProxyLogUrl // Event containing the contract specifics and raw log
@@ -1072,15 +1305,16 @@ func (it *DOSProxyLogUrlIterator) Close() error {
 
 // DOSProxyLogUrl represents a LogUrl event raised by the DOSProxy contract.
 type DOSProxyLogUrl struct {
+	GroupId *big.Int
 	QueryId *big.Int
 	Url     string
 	Timeout *big.Int
 	Raw     types.Log // Blockchain specific contextual infos
 }
 
-// FilterLogUrl is a free log retrieval operation binding the contract event 0x1ffecd36b725cf796f7f120ca1b5358f615bc225e48cd62f540ca656164e9693.
+// FilterLogUrl is a free log retrieval operation binding the contract event 0xc24f120340e1beeac424b47e9e08f835661963ec3a5f7aa7edf537b71533b2ae.
 //
-// Solidity: e LogUrl(queryId uint256, url string, timeout uint256)
+// Solidity: e LogUrl(groupId uint256, queryId uint256, url string, timeout uint256)
 func (_DOSProxy *DOSProxyFilterer) FilterLogUrl(opts *bind.FilterOpts) (*DOSProxyLogUrlIterator, error) {
 
 	logs, sub, err := _DOSProxy.contract.FilterLogs(opts, "LogUrl")
@@ -1090,9 +1324,9 @@ func (_DOSProxy *DOSProxyFilterer) FilterLogUrl(opts *bind.FilterOpts) (*DOSProx
 	return &DOSProxyLogUrlIterator{contract: _DOSProxy.contract, event: "LogUrl", logs: logs, sub: sub}, nil
 }
 
-// WatchLogUrl is a free log subscription operation binding the contract event 0x1ffecd36b725cf796f7f120ca1b5358f615bc225e48cd62f540ca656164e9693.
+// WatchLogUrl is a free log subscription operation binding the contract event 0xc24f120340e1beeac424b47e9e08f835661963ec3a5f7aa7edf537b71533b2ae.
 //
-// Solidity: e LogUrl(queryId uint256, url string, timeout uint256)
+// Solidity: e LogUrl(groupId uint256, queryId uint256, url string, timeout uint256)
 func (_DOSProxy *DOSProxyFilterer) WatchLogUrl(opts *bind.WatchOpts, sink chan<- *DOSProxyLogUrl) (event.Subscription, error) {
 
 	logs, sub, err := _DOSProxy.contract.WatchLogs(opts, "LogUrl")

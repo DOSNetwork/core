@@ -86,7 +86,7 @@ func server() {
 
 }
 
-func client()  {
+func client() {
 	time.Sleep(2 * time.Second)
 	address := externalAddress.String() + ":" + strconv.Itoa(externalPort)
 	fmt.Println("client dialing ", address)

@@ -10,7 +10,7 @@ import (
 
 var port = ":1200"
 
-func TcpServer()  {
+func TcpServer() {
 	tcpAddr, err := net.ResolveTCPAddr("tcp", port)
 	if err != nil {
 		log.Fatal(err)
@@ -32,7 +32,7 @@ func TcpServer()  {
 	}
 }
 
-func UdpServer()  {
+func UdpServer() {
 	udpAddr, err := net.ResolveUDPAddr("udp", port)
 	if err != nil {
 		log.Fatal(err)

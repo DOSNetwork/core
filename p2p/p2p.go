@@ -31,6 +31,7 @@ type P2P struct {
 	secKey       kyber.Scalar
 	pubKey       kyber.Point
 	routingTable *dht.RoutingTable
+
 }
 
 func (n *P2P) SetId(id []byte) {

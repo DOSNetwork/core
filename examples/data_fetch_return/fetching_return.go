@@ -95,25 +95,23 @@ func main() {
 		log.Fatal(err)
 	}
 
-	chainConn, err := blockchain.AdaptTo("ETH")
+	chainConn, err := blockchain.AdaptTo("ETH", false)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	fmt.Println("Start")
+	err = chainConn.UploadID()
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	chPubKey := make(chan interface{})
-	go func() {
-		chPubKey <- &eth.DOSProxyLogSuccPubKeySub{}
-	}()
-	chainConn.SubscribeEvent(chPubKey)
+	bootstrapIp, err := chainConn.GetBootstrapIp()
+	fmt.Println(bootstrapIp)
 
 	err = chainConn.UploadPubKey(groupId, x0, x1, y0, y1)
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	<-chPubKey
 
 	chUrl := make(chan interface{})
 	go func() {

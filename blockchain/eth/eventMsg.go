@@ -5,6 +5,9 @@ import (
 	"math/big"
 )
 
+//TODO: MAKE IT A UNIVERSAL INTERFACE FOR ALL KIND OF CHAINS IN FUTURE
+//TODO: NEED TO MOVE IT DIRECTLY INSIDE BLOCKCHAIN FOLDER
+
 type DOSProxyLogCallbackTriggeredFor struct {
 	UserContractAddr common.Address
 	Result           []byte
@@ -22,10 +25,15 @@ type DOSProxyLogNonSupportedType struct {
 
 type DOSProxyLogQueryFromNonExistentUC struct{}
 
-type DOSProxyLogSuccPubKeySub struct{}
-
 type DOSProxyLogUrl struct {
 	QueryId *big.Int
 	Url     string
 	Timeout *big.Int
 }
+
+type DOSProxyLogGrouping struct {
+	GroupId *big.Int
+	NodeId  []*big.Int
+}
+
+type DOSProxyLogInsufficientGroupNumber struct{}

@@ -8,17 +8,20 @@ import (
 )
 
 type ChainInterface interface {
-	Init() (err error)
+	Init(autoReplenish bool) (err error)
 	SubscribeEvent(ch chan interface{}) (err error)
+	UploadID() (err error)
 	UploadPubKey(groupId, x0, x1, y0, y1 *big.Int) (err error)
+	GetId() (id []byte)
+	GetBootstrapIp() (ip string, err error)
 	DataReturn(queryId *big.Int, data []byte, x, y *big.Int) (err error)
 }
 
-func AdaptTo(chainName string) (conn ChainInterface, err error) {
+func AdaptTo(chainName string, autoReplenish bool) (conn ChainInterface, err error) {
 	switch chainName {
 	case "ETH":
-		conn = &eth.EthConn{}
-		err = conn.Init()
+		conn = &eth.EthAdaptor{}
+		err = conn.Init(autoReplenish)
 	default:
 		err = fmt.Errorf("Chain %s not supported error\n", chainName)
 	}

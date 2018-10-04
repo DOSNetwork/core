@@ -19,7 +19,7 @@ type RandomNumberGenerator struct {
 	nbParticipants int
 
 	partPubs []kyber.Point
-	partSec []kyber.Scalar
+	partSec  []kyber.Scalar
 
 	dkgs []*dkg.DistKeyGenerator
 	dkss []*dkg.DistKeyShare
@@ -27,7 +27,7 @@ type RandomNumberGenerator struct {
 
 // InitialRandomNumberGenerator sets up one RandomNumberGenerator for a DKG group according to chosen suite
 // and participant count, It also runs DKG to generate group public key and private key shares for each group member
-func InitialRandomNumberGenerator(suite suites.Suite, nbParticipants int) (*RandomNumberGenerator, error){
+func InitialRandomNumberGenerator(suite suites.Suite, nbParticipants int) (*RandomNumberGenerator, error) {
 	partPubs := make([]kyber.Point, nbParticipants)
 	partSec := make([]kyber.Scalar, nbParticipants)
 	for i := 0; i < nbParticipants; i++ {
@@ -56,20 +56,20 @@ func InitialRandomNumberGenerator(suite suites.Suite, nbParticipants int) (*Rand
 	}
 
 	return &RandomNumberGenerator{
-		suite:suite,
-		nbParticipants:nbParticipants,
-		partPubs:partPubs,
-		partSec:partSec,
-		dkgs:dkgs,
-		dkss:dkss,
+		suite:          suite,
+		nbParticipants: nbParticipants,
+		partPubs:       partPubs,
+		partSec:        partSec,
+		dkgs:           dkgs,
+		dkss:           dkss,
 	}, nil
 }
 
-func (r *RandomNumberGenerator) GetPubKey() (*big.Int, *big.Int, *big.Int, *big.Int, error){
+func (r *RandomNumberGenerator) GetPubKey() (*big.Int, *big.Int, *big.Int, *big.Int, error) {
 	pubKey := share.NewPubPoly(r.suite, r.suite.Point().Base(), r.dkss[0].Commitments()).Commit()
 	pubKeyMar, err := pubKey.MarshalBinary()
 	if err != nil {
-		return nil,nil,nil,nil,err
+		return nil, nil, nil, nil, err
 	}
 
 	x0 := big.NewInt(0)
@@ -95,12 +95,12 @@ func (r *RandomNumberGenerator) generate(seed []byte) ([]byte, error) {
 	}
 }
 
-func (r *RandomNumberGenerator) TBlsSign(msg []byte) ([]byte, error)  {
+func (r *RandomNumberGenerator) TBlsSign(msg []byte) ([]byte, error) {
 	shares := make([]*share.PriShare, r.nbParticipants)
 	sigShares := make([][]byte, 0)
 	for i, dks := range r.dkss {
 		shares[i] = dks.Share
-		if i < (r.nbParticipants / 2 + 1) {
+		if i < (r.nbParticipants/2 + 1) {
 			sig, _ := tbls.Sign(r.suite, shares[i], msg)
 			sigShares = append(sigShares, sig)
 		}
@@ -116,7 +116,7 @@ func (r *RandomNumberGenerator) TBlsSign(msg []byte) ([]byte, error)  {
 	}
 }
 
-func fullExchange(dkgs []*dkg.DistKeyGenerator, nbParticipants int) error{
+func fullExchange(dkgs []*dkg.DistKeyGenerator, nbParticipants int) error {
 
 	// full secret sharing exchange
 

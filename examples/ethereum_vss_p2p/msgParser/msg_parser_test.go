@@ -15,10 +15,10 @@ func TestParser(t *testing.T) {
 	suite := suites.MustFind("bn256")
 
 	deal := &vss.EncryptedDeal{
-		DHKey:[]byte("DHKey"),
-		Signature:[]byte("Signature"),
-		Nonce:[]byte("Nonce"),
-		Cipher:[]byte("Cipher"),
+		DHKey:     []byte("DHKey"),
+		Signature: []byte("Signature"),
+		Nonce:     []byte("Nonce"),
+		Cipher:    []byte("Cipher"),
 	}
 
 	switch content := PackEncryptedDeal(deal).(type) {
@@ -28,7 +28,6 @@ func TestParser(t *testing.T) {
 	default:
 		log.Fatal("Type mismatch")
 	}
-
 
 	deals := []*vss.EncryptedDeal{deal, deal}
 
@@ -40,12 +39,11 @@ func TestParser(t *testing.T) {
 		log.Fatal("Type mismatch")
 	}
 
-
-	response := & vss.Response{
-		SessionID:[]byte("SessionID"),
-		Index:0,
-		Status:true,
-		Signature:[]byte("Signature"),
+	response := &vss.Response{
+		SessionID: []byte("SessionID"),
+		Index:     0,
+		Status:    true,
+		Signature: []byte("Signature"),
 	}
 
 	switch content := PackResponse(response).(type) {
@@ -55,7 +53,6 @@ func TestParser(t *testing.T) {
 	default:
 		log.Fatal("Type mismatch")
 	}
-
 
 	responses := make([]*vss.Response, 0)
 	responses = append(responses, response, response)
@@ -68,14 +65,13 @@ func TestParser(t *testing.T) {
 		log.Fatal("Type mismatch")
 	}
 
-
 	justification := &vss.Justification{
-		SessionID:[]byte("SessionID"),
-		Index:0,
-		Deal:&vss.Deal{
-			SessionID:[]byte("SessionID"),
+		SessionID: []byte("SessionID"),
+		Index:     0,
+		Deal: &vss.Deal{
+			SessionID: []byte("SessionID"),
 		},
-		Signature:[]byte("Signature"),
+		Signature: []byte("Signature"),
 	}
 
 	switch content := PackJustification(justification).(type) {
@@ -93,7 +89,7 @@ func TestParser(t *testing.T) {
 
 	switch content := PackSignature(index, queryId, sigContent, sig).(type) {
 	case *internalMsg.Signature:
-		recoverIndex, recoverId, recoverContent, recoverSig:= UnpackSignature(content)
+		recoverIndex, recoverId, recoverContent, recoverSig := UnpackSignature(content)
 		require.Equal(t, index, recoverIndex)
 		require.Equal(t, queryId, recoverId)
 		require.Equal(t, sigContent, recoverContent)
@@ -101,7 +97,6 @@ func TestParser(t *testing.T) {
 	default:
 		log.Fatal("Type mismatch")
 	}
-
 
 	publicKey := suite.G2().Point()
 
@@ -112,7 +107,6 @@ func TestParser(t *testing.T) {
 	default:
 		log.Fatal("Type mismatch")
 	}
-
 
 	publicKeys := []kyber.Point{suite.G2().Point(), suite.G2().Point()}
 

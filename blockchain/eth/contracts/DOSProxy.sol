@@ -16,7 +16,15 @@ contract DOSProxy {
         uint[2] y;
     }
 
-    uint currentGroup = 123;
+    uint nextGroupID = 0;
+
+    uint currentGroup;
+
+    string bootstrapIp;
+
+    uint[] nodeId;
+
+    mapping(uint => uint[]) groupMapping;
 
     // calling query_id => user contract
     mapping(uint => address) pending_queries;
@@ -27,13 +35,14 @@ contract DOSProxy {
     // query_id => public key
     mapping(uint => G2Point) queryKeyMapping;
 
-    event LogUrl(uint queryId, string url, uint timeout);
+    event LogUrl(uint groupId, uint queryId, string url, uint timeout);
     event LogNonSupportedType(string query_type);
     event LogNonContractCall(address from);
     event LogCallbackTriggeredFor(address user_contract_addr, bytes result);
     event LogQueryFromNonExistentUC();
     event LogInvalidSignature();
-    event LogSuccPubKeySub();
+    event LogInsufficientGroupNumber();
+    event LogGrouping(uint GroupId, uint[] NodeId);
 
     function () public payable {}
 
@@ -63,8 +72,9 @@ contract DOSProxy {
             pending_queries[query_id] = from;
             // Only supporting api/url for demos.
             if (strEqual(query_type, 'API')) {
-                queryKeyMapping[query_id] = groupKeyMapping[currentGroup];
-                LogUrl(query_id, query_path, timeout);
+                uint assignGroup = currentGroup;
+                queryKeyMapping[query_id] = groupKeyMapping[assignGroup];
+                LogUrl(assignGroup, query_id, query_path, timeout);
             } else {
                 LogNonSupportedType(query_type);
             }
@@ -193,10 +203,42 @@ contract DOSProxy {
         y[0] = y1;
         y[1] = y2;
         groupKeyMapping[group_id] = G2Point([x1,x2], [y1,y2]);
-        LogSuccPubKeySub();
+        currentGroup = group_id;
     }
 
-    function getPublicKey(uint group_id) public constant returns(uint, uint, uint, uint){
+    function getPublicKey(uint group_id) public constant returns(uint, uint, uint, uint) {
         return (groupKeyMapping[group_id].x[0], groupKeyMapping[group_id].x[1], groupKeyMapping[group_id].y[0], groupKeyMapping[group_id].y[1]);
+    }
+
+    function setBootstrapIp(string ip) {
+        bootstrapIp = ip;
+    }
+
+    function getBootstrapIp() public constant returns(string){
+        return bootstrapIp;
+    }
+
+    function uploadNodeId(uint id) {
+        nodeId.push(id);
+    }
+
+    function grouping(uint size) {
+        uint[] memory toBeGrouped = new uint[](size);
+        if (nodeId.length < size) {
+            LogInsufficientGroupNumber();
+            return;
+        }
+        for (uint i = 0; i < size; i++) {
+            toBeGrouped[i] = nodeId[nodeId.length - 1];
+            nodeId.length--;
+        }
+        uint groupId = nextGroupID++;
+        groupMapping[groupId] = toBeGrouped;
+        LogGrouping(groupId, toBeGrouped);
+    }
+
+    function resetContract() {
+        nextGroupID = 0;
+        nodeId.length = 0;
     }
 }

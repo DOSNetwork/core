@@ -24,10 +24,10 @@ func genPair() (kyber.Scalar, kyber.Point) {
 
 func CreateP2PNetwork(tunnel chan P2PMessage, port int) (P2PInterface, error) {
 	p := &P2P{
-		peers:			new(sync.Map),
-		messageChan:	tunnel,
-		suite:       	suite,
-		port:        	port,
+		peers:       new(sync.Map),
+		messageChan: tunnel,
+		suite:       suite,
+		port:        port,
 	}
 	return p, nil
 }

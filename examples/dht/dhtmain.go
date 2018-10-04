@@ -96,5 +96,5 @@ func main() {
 		fileRead.Close()
 	}
 
-	<- finish
+	<-finish
 }
