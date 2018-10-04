@@ -89,7 +89,7 @@ func main() {
 	//1)Build a p2p network
 	fmt.Println(*roleFlag)
 	tunnel := make(chan p2p.P2PMessage)
-	p, _ := p2p.CreateP2PNetwork(tunnel, 0)
+	p, _ := p2p.InitClient(tunnel, 0)
 	defer close(tunnel)
 	//2)Start to listen incoming connection
 	if err := p.Listen(); err != nil {
@@ -118,7 +118,7 @@ func main() {
 			pubKey: verifierPub,
 			priKey: verifierSec,
 		}
-		p.CreatePeer(dealerAddr, nil)
+		p.CreatePeer(dealerAddr)
 		msg := msgParser.PackPublicKey(verifierPub)
 		p.Broadcast(msg)
 	}

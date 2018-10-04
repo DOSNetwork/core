@@ -185,7 +185,7 @@ func main() {
 	//1)Build a p2p network
 	fmt.Println(*roleFlag)
 	tunnel := make(chan p2p.P2PMessage)
-	p, _ := p2p.CreateP2PNetwork(tunnel, port)
+	p, _ := p2p.InitClient(tunnel, port)
 	defer close(tunnel)
 	//2)Start to listen incoming connection
 	if err := p.Listen(); err != nil {
@@ -235,7 +235,7 @@ func main() {
 			priKey:  verifierSec,
 			network: &p,
 		}
-		p.CreatePeer(dealerAddr, nil)
+		p.CreatePeer(dealerAddr)
 		p.Broadcast(&verifierPub)
 	}
 	//
