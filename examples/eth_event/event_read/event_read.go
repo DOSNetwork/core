@@ -12,7 +12,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 
-        store "github.com/DOSNetwork/core/examples/eth_event/contracts" // for demo
+	store "github.com/DOSNetwork/core/examples/eth_event/contracts" // for demo
 )
 
 func main() {

@@ -17,7 +17,7 @@ func packMsg(msg []byte, server bool) []byte {
 func unpackMsg(msg []byte) []byte {
 	msgSize := binary.LittleEndian.Uint32(msg[:4])
 	fmt.Println("msgSize: ", msgSize)
-	receivedMsg := msg[4:msgSize + 4]
+	receivedMsg := msg[4 : msgSize+4]
 	fmt.Print("Msg: ", string(receivedMsg))
 	return receivedMsg
 }

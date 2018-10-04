@@ -26,16 +26,16 @@ import (
 )
 
 type PeerClient struct {
-	p2pnet      	*P2P
-	conn        	*net.Conn
-	rw          	*bufio.ReadWriter
-	messageChan 	chan P2PMessage
-	status      	int
-	identity		dht.ID
-	pubKey      	kyber.Point
-	wg          	sync.WaitGroup
-	RequestNonce 	uint64
-	Requests    	sync.Map
+	p2pnet       *P2P
+	conn         *net.Conn
+	rw           *bufio.ReadWriter
+	messageChan  chan P2PMessage
+	status       int
+	identity     dht.ID
+	pubKey       kyber.Point
+	wg           sync.WaitGroup
+	RequestNonce uint64
+	Requests     sync.Map
 }
 
 // RequestState represents a state of a request.
@@ -185,7 +185,7 @@ func (p *PeerClient) decodePackage(bytes []byte) (*internal.Package, *ptypes.Dyn
 	_ = pub.UnmarshalBinary(pa.GetPubkey())
 
 	if err := bls.Verify(p.p2pnet.suite, pub, pa.GetAnything().Value, pa.GetSignature()); err != nil {
-		return nil,nil, err
+		return nil, nil, err
 	}
 
 	var ptr ptypes.DynamicAny
@@ -198,9 +198,9 @@ func (p *PeerClient) decodePackage(bytes []byte) (*internal.Package, *ptypes.Dyn
 func (p *PeerClient) SayHi() {
 	fmt.Println(p.p2pnet.identity.Address, "say hi")
 	pa := &internal.Hi{
-		PublicKey:	p.p2pnet.identity.PublicKey,
-		Address:	p.p2pnet.identity.Address,
-		Id:     	p.p2pnet.identity.Id,
+		PublicKey: p.p2pnet.identity.PublicKey,
+		Address:   p.p2pnet.identity.Address,
+		Id:        p.p2pnet.identity.Id,
 	}
 
 	prepared, err := p.PrepareMessage(pa)
@@ -248,10 +248,10 @@ func (p *PeerClient) PrepareMessage(msg proto.Message) (*internal.Package, error
 	pub, _ := p.p2pnet.pubKey.MarshalBinary()
 
 	pa := &internal.Package{
-		Sender: 		&id,
-		Anything:		anything,
-		Pubkey:    		pub,
-		Signature: 		sig,
+		Sender:    &id,
+		Anything:  anything,
+		Pubkey:    pub,
+		Signature: sig,
 	}
 
 	return pa, nil

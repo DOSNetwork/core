@@ -8,11 +8,11 @@ https://rinkeby.etherscan.io/address/0x813b5999c6a80019cd2c0c76d2bd27c6c0fe1a93
 * DOSAddressBridge.sol:
 https://rinkeby.etherscan.io/address/0x593bce0faf2d3d0863324fffb1a1c988cd22d5e5
 * DOSProxy.sol (Updated):  
-https://rinkeby.etherscan.io/address/0xbD5784b224D40213df1F9eeb572961E2a859Cb80
+https://rinkeby.etherscan.io/address/0x6eD7fe957305070f2fB5f5476Eb2dce8f8285cC1
 
 
 #### Steps:
-1. Open `fetching-and-return.go`, copy content of keyStore json file to `key`, and corresponding passphrase to `passphrase`.
+1. Open `/credential`, copy content of key json file to `usrkey`, and corresponding passphrase to `/boot/passPhrase`.
 2. `$ go run fetching-and return.go`.
 3. Please wait until "Group set-up finished, start listening to query..." is printed.
 4. Go to [myetherwallet.com](https://www.myetherwallet.com/#contracts)

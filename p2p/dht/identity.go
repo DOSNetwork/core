@@ -9,7 +9,6 @@ import (
 	"golang.org/x/crypto/blake2b"
 
 	"github.com/DOSNetwork/core/p2p/internal"
-
 )
 
 // ID is an identity of nodes, using its public key hash and network address.

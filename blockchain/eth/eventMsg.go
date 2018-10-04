@@ -25,21 +25,15 @@ type DOSProxyLogNonSupportedType struct {
 
 type DOSProxyLogQueryFromNonExistentUC struct{}
 
-type DOSProxyLogSuccPubKeySub struct{}
-
 type DOSProxyLogUrl struct {
 	QueryId *big.Int
 	Url     string
 	Timeout *big.Int
 }
 
-type DOSProxyLogBootstrapIp struct {
-	ip	string
-}
-
 type DOSProxyLogGrouping struct {
 	GroupId *big.Int
-	NodeId	[]*big.Int
+	NodeId  []*big.Int
 }
 
-type DOSProxyLogInsufficientGroupNumber struct {}
+type DOSProxyLogInsufficientGroupNumber struct{}

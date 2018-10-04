@@ -20,7 +20,7 @@ func TestRandomNumberGenerator(t *testing.T) {
 
 	for i := 0; i < 10; i++ {
 		start := time.Now()
-		cur,err = randomNumberGenerator.generate(cur)
+		cur, err = randomNumberGenerator.generate(cur)
 		require.Nil(t, err)
 		fmt.Println(cur)
 		fmt.Println(time.Since(start))

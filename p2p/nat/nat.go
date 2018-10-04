@@ -45,10 +45,10 @@ type NAT interface {
 
 type natController struct {
 	natDevice NAT
-	c chan struct{}
+	c         chan struct{}
 }
 
-func SetMapping(protocol string, extport, intport int, name string)  (*natController, error) {
+func SetMapping(protocol string, extport, intport int, name string) (*natController, error) {
 	nat, err := DiscoverGateway()
 	if err != nil {
 		return nil, err
@@ -85,8 +85,8 @@ func SetMapping(protocol string, extport, intport int, name string)  (*natContro
 	}()
 
 	return &natController{
-		natDevice:nat,
-		c:c,
+		natDevice: nat,
+		c:         c,
 	}, nil
 }
 
@@ -106,7 +106,7 @@ func DiscoverGateway() (NAT, error) {
 
 func (natController *natController) CloseMapping() {
 	close(natController.c)
-	time.Sleep(2*time.Second)
+	time.Sleep(2 * time.Second)
 }
 
 func (natController *natController) GetDeviceAddress() (addr net.IP, err error) {
@@ -138,4 +138,3 @@ func RandomPort() int {
 	rand.Seed(time.Now().UnixNano())
 	return rand.Intn(math.MaxUint16-10000) + 10000
 }
-

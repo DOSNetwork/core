@@ -41,10 +41,8 @@ contract DOSProxy {
     event LogCallbackTriggeredFor(address user_contract_addr, bytes result);
     event LogQueryFromNonExistentUC();
     event LogInvalidSignature();
-    event LogSuccPubKeySub();
     event LogInsufficientGroupNumber();
     event LogGrouping(uint GroupId, uint[] NodeId);
-    event LogBootstrapIp(string ip);
 
     function () public payable {}
 
@@ -206,7 +204,6 @@ contract DOSProxy {
         y[1] = y2;
         groupKeyMapping[group_id] = G2Point([x1,x2], [y1,y2]);
         currentGroup = group_id;
-        LogSuccPubKeySub();
     }
 
     function getPublicKey(uint group_id) public constant returns(uint, uint, uint, uint) {
@@ -217,9 +214,12 @@ contract DOSProxy {
         bootstrapIp = ip;
     }
 
+    function getBootstrapIp() public constant returns(string){
+        return bootstrapIp;
+    }
+
     function uploadNodeId(uint id) {
         nodeId.push(id);
-        LogBootstrapIp(bootstrapIp);
     }
 
     function grouping(uint size) {

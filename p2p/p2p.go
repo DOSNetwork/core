@@ -21,16 +21,16 @@ import (
 )
 
 type P2P struct {
-	identity		dht.ID
+	identity dht.ID
 	//Map of connection addresses (string) <-> *p2p.PeerClient
-	peers 			*sync.Map
+	peers *sync.Map
 	// Channels are thread safe
-	messageChan	 	chan P2PMessage
-	suite       	suites.Suite
-	port        	int
-	secKey      	kyber.Scalar
-	pubKey			kyber.Point
-	routingTable	*dht.RoutingTable
+	messageChan  chan P2PMessage
+	suite        suites.Suite
+	port         int
+	secKey       kyber.Scalar
+	pubKey       kyber.Point
+	routingTable *dht.RoutingTable
 }
 
 func (n *P2P) GetId() dht.ID {
@@ -182,7 +182,7 @@ func (n *P2P) FindNodeById(id []byte) []dht.ID {
 }
 
 func (n *P2P) FindNode(targetID dht.ID, alpha int, disjointPaths int) (results []dht.ID) {
-	return n.findNode(targetID,alpha,disjointPaths)
+	return n.findNode(targetID, alpha, disjointPaths)
 }
 
 type lookupBucket struct {

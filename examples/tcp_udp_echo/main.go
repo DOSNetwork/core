@@ -6,7 +6,7 @@ import (
 
 func main() {
 
-	done:= make(chan bool)
+	done := make(chan bool)
 
 	if os.Args[1] == "tcp" {
 		if os.Args[2] == "server" {
@@ -22,5 +22,5 @@ func main() {
 		}
 	}
 
-	<- done
+	<-done
 }

@@ -11,7 +11,7 @@ import (
 
 var serverPort = ":1200"
 
-func TcpClient()  {
+func TcpClient() {
 
 	tcpAddr, err := net.ResolveTCPAddr("tcp", serverPort)
 	if err != nil {
@@ -31,7 +31,7 @@ func TcpClient()  {
 
 }
 
-func UdpClient()  {
+func UdpClient() {
 	udpAddr, err := net.ResolveUDPAddr("udp", serverPort)
 	if err != nil {
 		log.Fatal(err)
