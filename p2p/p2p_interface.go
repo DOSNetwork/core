@@ -22,14 +22,14 @@ func genPair() (kyber.Scalar, kyber.Point) {
 	return secret, public
 }
 
-func CreateP2PNetwork(tunnel chan P2PMessage, port int) (P2PInterface, error) {
-	p := &P2P{
-		peers:			new(sync.Map),
-		messageChan:	tunnel,
-		suite:       	suite,
-		port:        	port,
+func InitClient(tunnel chan P2PMessage, port int) (P2PInterface, error) {
+	c := &Client{
+		peers:       new(sync.Map),
+		messageChan: tunnel,
+		suite:       suite,
+		port:        port,
 	}
-	return p, nil
+	return c, nil
 }
 
 func getLocalIp() (string, error) {
@@ -59,7 +59,8 @@ type P2PInterface interface {
 	Listen() error
 	Broadcast(proto.Message)
 	SendMessageById([]byte, proto.Message)
-	CreatePeer(string, *net.Conn)
+	CreatePeer(string) error
+	AcceptConnectionFromPeer(*net.Conn)
 	GetTunnel() chan P2PMessage
 	FindNodeById(id []byte) []dht.ID
 	FindNode(targetID dht.ID, alpha int, disjointPaths int) (results []dht.ID)

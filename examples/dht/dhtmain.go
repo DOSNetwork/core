@@ -22,7 +22,7 @@ func main() {
 
 	//1)Build a p2p network
 	tunnel := make(chan p2p.P2PMessage)
-	p, _ := p2p.CreateP2PNetwork(tunnel, *port)
+	p, _ := p2p.InitClient(tunnel, *port)
 	defer close(tunnel)
 
 	//2)Start to listen incoming connection
@@ -33,7 +33,7 @@ func main() {
 
 	//3)Dial to peers to build peerClient
 	if *address != "" {
-		p.CreatePeer(*address, nil)
+		p.CreatePeer(*address)
 
 		results := p.FindNode(p.GetId(), dht.BucketSize, 8)
 		for _, result := range results {
@@ -96,5 +96,5 @@ func main() {
 		fileRead.Close()
 	}
 
-	<- finish
+	<-finish
 }

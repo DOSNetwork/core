@@ -21,7 +21,7 @@ func main() {
 	//1)Build a p2p network
 
 	tunnel := make(chan p2p.P2PMessage)
-	p, _ := p2p.CreateP2PNetwork(tunnel, 0)
+	p, _ := p2p.InitClient(tunnel, 0)
 	defer close(tunnel)
 	//2)Start to listen incoming connection
 	if err := p.Listen(); err != nil {
@@ -31,7 +31,7 @@ func main() {
 	//3)Dial to peers to build peerClient
 	if *connect != "" {
 		fmt.Println("Create peerclients")
-		p.CreatePeer(*connect, nil)
+		p.CreatePeer(*connect)
 		//p.SendMessageById(*connect, []byte("hello"))
 	}
 
