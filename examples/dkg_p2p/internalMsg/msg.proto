@@ -1,0 +1,13 @@
+syntax = "proto3";
+package internalMsg;
+
+message Cmd{
+    enum Type {
+        CHECKURL = 0;
+	GROUPING = 1;
+	STOPALL = 2;
+	RESET = 3;
+    }
+    Type Ctype = 1;
+    string Args = 2;
+}

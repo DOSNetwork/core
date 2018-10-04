@@ -45,22 +45,24 @@ func (d *DistKeyShare) Commitments() []kyber.Point {
 
 // Deal holds the Deal for one participant as well as the index of the issuing
 // Dealer.
+/*
 type Deal struct {
 	// Index of the Dealer in the list of participants
 	Index uint32
 	// Deal issued for another participant
 	Deal *vss.EncryptedDeal
 }
-
+*/
 // Response holds the Response from another participant as well as the index of
 // the target Dealer.
+/*
 type Response struct {
 	// Index of the Dealer for which this response is for
 	Index uint32
 	// Response issued from another participant
 	Response *vss.Response
 }
-
+*/
 // Justification holds the Justification from a Dealer as well as the index of
 // the Dealer in question.
 type Justification struct {
@@ -394,4 +396,17 @@ func findPub(list []kyber.Point, i uint32) (kyber.Point, bool) {
 		return nil, false
 	}
 	return list[i], true
+}
+
+// implement `Interface` in sort package.
+type Pubkeys []kyber.Point
+
+func (p Pubkeys) Len() int {
+	return len(p)
+}
+func (p Pubkeys) Swap(i, j int) {
+	p[i], p[j] = p[j], p[i]
+}
+func (p Pubkeys) Less(i, j int) bool {
+	return p[i].String() < p[j].String()
 }
