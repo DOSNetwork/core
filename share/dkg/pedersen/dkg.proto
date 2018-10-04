@@ -1,0 +1,12 @@
+syntax = "proto3";
+package dkg;
+import "github.com/DOSNetwork/core/share/vss/pedersen/vss.proto";
+message Deal {
+    uint32 index = 1;
+    vss.EncryptedDeal deal = 2;
+}
+
+message Response {
+    uint32 index = 1;
+    vss.Response response = 2;
+}

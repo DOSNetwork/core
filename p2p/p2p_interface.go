@@ -54,11 +54,11 @@ type P2PMessage struct {
 }
 
 type P2PInterface interface {
-	// Listen starts listening for peers on a port.
+	SetId([]byte)
 	GetId() dht.ID
 	Listen() error
 	Broadcast(proto.Message)
-	SendMessageById([]byte, proto.Message)
+	SendMessageById([]byte, proto.Message) error
 	CreatePeer(string, *net.Conn)
 	GetTunnel() chan P2PMessage
 	FindNodeById(id []byte) []dht.ID
