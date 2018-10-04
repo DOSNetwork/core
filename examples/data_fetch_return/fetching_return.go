@@ -32,7 +32,7 @@ func dataPrepare(signers *example.RandomNumberGenerator, url string) (data []byt
 	return
 }
 
-func dataFetch(url string) ([]byte, error) {
+func dataFetch(url string) ([]byte, error){
 	client := &http.Client{Timeout: 10 * time.Second}
 	r, err := client.Get(url)
 	if err != nil {
@@ -52,7 +52,7 @@ func dataFetch(url string) ([]byte, error) {
 
 }
 
-func dataSign(signers *example.RandomNumberGenerator, data []byte) ([]byte, error) {
+func dataSign(signers *example.RandomNumberGenerator, data []byte) ([]byte, error){
 
 	sig, err := signers.TBlsSign(data)
 	if err != nil {
@@ -61,33 +61,37 @@ func dataSign(signers *example.RandomNumberGenerator, data []byte) ([]byte, erro
 	return sig, nil
 }
 
+
 func negate(sig []byte) (*big.Int, *big.Int) {
 	x := big.NewInt(0)
 	y := big.NewInt(0)
 	x.SetBytes(sig[0:32])
 	y.SetBytes(sig[32:])
 
-	if x.Cmp(big.NewInt(0)) == 0 && y.Cmp(big.NewInt(0)) == 0 {
+	if x.Cmp(big.NewInt(0)) == 0 && y.Cmp(big.NewInt(0)) == 0{
 		return big.NewInt(0), big.NewInt(0)
 	}
 
-	return x, big.NewInt(0).Sub(bn256.P, big.NewInt(0).Mod(y, bn256.P))
+	return x, big.NewInt(0).Sub(bn256.P,big.NewInt(0).Mod(y, bn256.P))
 }
 
-func groupSetup(nbParticipants int) (*example.RandomNumberGenerator, *big.Int, *big.Int, *big.Int, *big.Int, error) {
+func groupSetup(nbParticipants int) (*example.RandomNumberGenerator, *big.Int, *big.Int, *big.Int, *big.Int, error){
 	suite := suites.MustFind("bn256")
 	signers, err := example.InitialRandomNumberGenerator(suite, nbParticipants)
 	if err != nil {
-		return nil, nil, nil, nil, nil, err
+		return nil,nil,nil,nil,nil,err
 	}
 
 	x0, x1, y0, y1, err := signers.GetPubKey()
 	if err != nil {
-		return nil, nil, nil, nil, nil, err
+		return nil,nil,nil,nil,nil,err
 	}
 
 	return signers, x0, x1, y0, y1, nil
 }
+
+
+
 
 func main() {
 	signers, x0, x1, y0, y1, err := groupSetup(7)
@@ -100,7 +104,11 @@ func main() {
 		log.Fatal(err)
 	}
 
-	fmt.Println("Start")
+	bootstrapIp, err := chainConn.UploadID()
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(bootstrapIp)
 
 	chPubKey := make(chan interface{})
 	go func() {
@@ -113,7 +121,27 @@ func main() {
 		log.Fatal(err)
 	}
 
-	<-chPubKey
+	<- chPubKey
+
+
+	grouping := make(chan interface{})
+	go func() {
+		grouping <- &eth.DOSProxyLogGrouping{}
+	}()
+	chainConn.SubscribeEvent(grouping)
+	go func() {
+		cmd := <- grouping
+		switch cmd.(type) {
+		case *eth.DOSProxyLogGrouping:
+			fmt.Println(cmd.(*eth.DOSProxyLogGrouping).GroupId)
+			nodeids := cmd.(*eth.DOSProxyLogGrouping).NodeId
+			for _, nodeid := range nodeids {
+				fmt.Println(nodeid)
+			}
+		default:
+			fmt.Println("type mismatch")
+		}
+	}()
 
 	chUrl := make(chan interface{})
 	go func() {

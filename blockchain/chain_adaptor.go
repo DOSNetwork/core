@@ -9,7 +9,9 @@ import (
 
 type ChainInterface interface {
 	Init() (err error)
+	GetId() (id *big.Int)
 	SubscribeEvent(ch chan interface{}) (err error)
+	UploadID() (bootstrapIp string, err error)
 	UploadPubKey(groupId, x0, x1, y0, y1 *big.Int) (err error)
 	DataReturn(queryId *big.Int, data []byte, x, y *big.Int) (err error)
 }
