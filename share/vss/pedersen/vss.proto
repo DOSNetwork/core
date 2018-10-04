@@ -26,6 +26,7 @@ message Responses {
 
 message PublicKey {
     bytes binary = 1;
+    bytes senderId = 2;
 }
 
 message PublicKeys {

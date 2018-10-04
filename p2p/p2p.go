@@ -21,16 +21,20 @@ import (
 )
 
 type P2P struct {
-	identity		dht.ID
+	identity dht.ID
 	//Map of connection addresses (string) <-> *p2p.PeerClient
-	peers 			*sync.Map
+	peers *sync.Map
 	// Channels are thread safe
-	messageChan	 	chan P2PMessage
-	suite       	suites.Suite
-	port        	int
-	secKey      	kyber.Scalar
-	pubKey			kyber.Point
-	routingTable	*dht.RoutingTable
+	messageChan  chan P2PMessage
+	suite        suites.Suite
+	port         int
+	secKey       kyber.Scalar
+	pubKey       kyber.Point
+	routingTable *dht.RoutingTable
+}
+
+func (n *P2P) SetId(id []byte) {
+	n.identity.Id = id
 }
 
 func (n *P2P) GetId() dht.ID {
@@ -85,7 +89,12 @@ func (n *P2P) Listen() error {
 		return err
 	}
 
-	n.identity = dht.CreateID(ip, pubKeyBytes)
+	if n.identity.Id == nil {
+		n.identity = dht.CreateID(ip, pubKeyBytes)
+	} else {
+		n.identity.Address = ip
+		n.identity.PublicKey = pubKeyBytes
+	}
 	n.routingTable = dht.CreateRoutingTable(n.identity)
 
 	fmt.Println("listen on: ", ip, " id: ", n.identity.Id)
@@ -124,13 +133,25 @@ func (n *P2P) Broadcast(m proto.Message) {
 			log.Fatal(err)
 		}
 
-		client.SendPackage(prepared)
+		return true
+	})
+}
+func (n *P2P) CheckPeers() {
+	n.peers.Range(func(key, value interface{}) bool {
+		client := value.(*PeerClient)
+		fmt.Println(client.identity.Address)
 		return true
 	})
 }
 
-func (n *P2P) SendMessageById(id []byte, m proto.Message) {
+func (n *P2P) SendMessageById(id []byte, m proto.Message) (err error) {
 	value, loaded := n.peers.Load(string(id))
+	if !loaded {
+		//TODO : This is a sync call.It should be optimized to async call
+		fmt.Println("Can't find node ", id)
+		n.FindNodeById(id)
+	}
+	value, loaded = n.peers.Load(string(id))
 	if loaded {
 		client := value.(*PeerClient)
 
@@ -143,7 +164,10 @@ func (n *P2P) SendMessageById(id []byte, m proto.Message) {
 		if err := client.SendPackage(prepared); err != nil {
 			log.Fatal(err)
 		}
+	} else {
+		err = fmt.Errorf("can't find node %s", string(id))
 	}
+	return
 }
 
 func (n *P2P) GetTunnel() chan P2PMessage {
@@ -161,6 +185,18 @@ func (n *P2P) CreatePeer(addr string, c *net.Conn) {
 		p2pnet: n,
 	}
 	if addr != "" {
+		existing := false
+		n.peers.Range(func(key, value interface{}) bool {
+			client := value.(*PeerClient)
+			if client.identity.Address == addr {
+				existing = true
+			}
+			return true
+		})
+		if existing {
+			return
+		}
+
 		peer.Dial(addr)
 	}
 	peer.rw = bufio.NewReadWriter(bufio.NewReader(*peer.conn), bufio.NewWriter(*peer.conn))
@@ -182,7 +218,7 @@ func (n *P2P) FindNodeById(id []byte) []dht.ID {
 }
 
 func (n *P2P) FindNode(targetID dht.ID, alpha int, disjointPaths int) (results []dht.ID) {
-	return n.findNode(targetID,alpha,disjointPaths)
+	return n.findNode(targetID, alpha, disjointPaths)
 }
 
 type lookupBucket struct {

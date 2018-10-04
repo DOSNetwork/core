@@ -9,7 +9,6 @@ import (
 	"log"
 	"net"
 	"sort"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -18,7 +17,6 @@ import (
 	"github.com/DOSNetwork/core/p2p/internal"
 	"github.com/DOSNetwork/core/sign/bls"
 
-	"github.com/golang/glog"
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes"
 
@@ -36,6 +34,7 @@ type PeerClient struct {
 	wg          	sync.WaitGroup
 	RequestNonce 	uint64
 	Requests    	sync.Map
+	mux          sync.Mutex
 }
 
 // RequestState represents a state of a request.
@@ -114,7 +113,6 @@ func (p *PeerClient) HandlePackages() {
 				p.p2pnet.routingTable.Update(peerID)
 			}
 
-			glog.Infof("bootstrapped w/ peer(s): %s.", strings.Join(p.p2pnet.routingTable.GetPeerAddresses(), ", "))
 		case *internal.LookupNodeRequest:
 			// Prepare response.
 			response := &internal.LookupNodeResponse{}
@@ -130,7 +128,6 @@ func (p *PeerClient) HandlePackages() {
 				log.Fatal(err)
 			}
 
-			glog.Infof("connected peers: %s.", strings.Join(p.p2pnet.routingTable.GetPeerAddresses(), ", "))
 		default:
 			msg := P2PMessage{Msg: *ptr, Sender: p.identity.Id}
 			p.messageChan <- msg
@@ -225,7 +222,8 @@ func (p *PeerClient) SendPackage(msg proto.Message) error {
 	// Serialize size.
 	prefix := make([]byte, 4)
 	binary.BigEndian.PutUint32(prefix, uint32(len(bytes)))
-
+	p.mux.Lock()
+	defer p.mux.Unlock()
 	bytes = append(prefix, bytes...)
 	if _, err := p.rw.Write(bytes); err != nil {
 		return err
