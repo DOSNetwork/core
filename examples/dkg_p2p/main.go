@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/DOSNetwork/core/examples/dkg-p2p/internalMsg"
+	"github.com/DOSNetwork/core/examples/dkg_p2p/internalMsg"
 	"github.com/DOSNetwork/core/p2p"
 	"github.com/DOSNetwork/core/p2p/dht"
 	"github.com/DOSNetwork/core/share"

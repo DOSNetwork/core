@@ -23,7 +23,7 @@ import (
 )
 
 const ethRemoteNode = "wss://rinkeby.infura.io/ws"
-const contractAddressHex = "g"
+const contractAddressHex = "0x6eD7fe957305070f2fB5f5476Eb2dce8f8285cC1"
 
 var contractAddress = common.HexToAddress(contractAddressHex)
 
@@ -190,6 +190,27 @@ func (e *EthAdaptor) GetId() (id []byte) {
 
 func (e *EthAdaptor) GetBootstrapIp() (ip string, err error) {
 	return e.proxy.GetBootstrapIp(&bind.CallOpts{})
+}
+
+func (e *EthAdaptor) SetBootstrapIp(ip string) (err error) {
+	fmt.Println("Starting submitting bootstrapIp...")
+	auth, err := e.getAuth()
+	if err != nil {
+		return
+	}
+
+	tx, err := e.proxy.SetBootstrapIp(auth, ip)
+	if err != nil {
+		return
+	}
+
+	fmt.Println("tx sent: ", tx.Hash().Hex())
+	fmt.Println("bootstrapIp ", ip, " submitted, waiting for confirmation...")
+
+	err = e.checkTransaction(tx)
+
+	return
+
 }
 
 func (e *EthAdaptor) UploadPubKey(groupId, x0, x1, y0, y1 *big.Int) (err error) {

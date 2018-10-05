@@ -14,6 +14,7 @@ type ChainInterface interface {
 	UploadPubKey(groupId, x0, x1, y0, y1 *big.Int) (err error)
 	GetId() (id []byte)
 	GetBootstrapIp() (ip string, err error)
+	SetBootstrapIp(ip string) (err error)
 	DataReturn(queryId *big.Int, data []byte, x, y *big.Int) (err error)
 }
 

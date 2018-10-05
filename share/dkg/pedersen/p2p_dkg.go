@@ -18,8 +18,8 @@ import (
 )
 
 type P2PDkgInterface interface {
-	SetGroupId(uint)
-	GetGroupId() uint
+	SetGroupId([]byte)
+	GetGroupId() []byte
 	SetGroupMembers([][]byte)
 	IsCetified() bool
 	RunDKG()
@@ -29,6 +29,7 @@ type P2PDkgInterface interface {
 	GetShareSecuirty() *share.PriShare
 	EventLoop()
 	Event(string)
+	SubscribeEvent(chan string)
 }
 
 func CreateP2PDkg(p p2p.P2PInterface, suite suites.Suite, peerEvent chan p2p.P2PMessage, nbParticipants int) (P2PDkgInterface, error) {
@@ -77,7 +78,7 @@ func CreateP2PDkg(p p2p.P2PInterface, suite suites.Suite, peerEvent chan p2p.P2P
 }
 
 type P2PDkg struct {
-	groupId uint
+	groupId []byte
 	suite   suites.Suite
 	//Data Buffer
 	publicKeys Pubkeys
@@ -96,21 +97,21 @@ type P2PDkg struct {
 	pubkeyIdMap map[string]string
 	//
 	nbParticipants int
-
-	FSM         *fsm.FSM
-	chFsmEvent  chan string
-	network     *p2p.P2PInterface
-	chPeerEvent chan p2p.P2PMessage
+	subscribeEvent chan string
+	FSM            *fsm.FSM
+	chFsmEvent     chan string
+	network        *p2p.P2PInterface
+	chPeerEvent    chan p2p.P2PMessage
 
 	groupingStart time.Time
 	checkURLStart time.Time
 }
 
-func (d *P2PDkg) SetGroupId(id uint) {
+func (d *P2PDkg) SetGroupId(id []byte) {
 	d.groupId = id
 }
 
-func (d *P2PDkg) GetGroupId() uint {
+func (d *P2PDkg) GetGroupId() []byte {
 	return d.groupId
 }
 func (d *P2PDkg) SetNbParticipants(n int) {
@@ -155,7 +156,9 @@ func (d *P2PDkg) GetShareSecuirty() *share.PriShare {
 	}
 	return nil
 }
-
+func (d *P2PDkg) SubscribeEvent(dkgEvent chan string) {
+	d.subscribeEvent = dkgEvent
+}
 func (d *P2PDkg) EventLoop() {
 	for {
 		select {
@@ -285,6 +288,9 @@ func (d *P2PDkg) enterVerified(e *fsm.Event) {
 	d.groupPubPoly = share.NewPubPoly(d.suite, d.suite.Point().Base(), d.partDks.Commitments())
 	fmt.Println("DistKeyShare SUCCESS ")
 	fmt.Println(time.Since(d.groupingStart))
+	if d.subscribeEvent != nil {
+		d.subscribeEvent <- "cetified"
+	}
 }
 
 func (d *P2PDkg) Event(event string) {

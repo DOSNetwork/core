@@ -24,17 +24,17 @@ import (
 )
 
 type PeerClient struct {
-	p2pnet      	*P2P
-	conn        	*net.Conn
-	rw          	*bufio.ReadWriter
-	messageChan 	chan P2PMessage
-	status      	int
-	identity		  dht.ID
-	pubKey      	kyber.Point
-	wg          	sync.WaitGroup
-	RequestNonce 	uint64
-	Requests    	sync.Map
-	mux           sync.Mutex
+	p2pnet       *P2P
+	conn         *net.Conn
+	rw           *bufio.ReadWriter
+	messageChan  chan P2PMessage
+	status       int
+	identity     dht.ID
+	pubKey       kyber.Point
+	wg           sync.WaitGroup
+	RequestNonce uint64
+	Requests     sync.Map
+	mux          sync.Mutex
 }
 
 // RequestState represents a state of a request.
