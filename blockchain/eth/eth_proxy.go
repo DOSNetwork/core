@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/DOSNetwork/core/group/bn256"
+	"github.com/dedis/kyber"
 	"io/ioutil"
 	"log"
 	"math"
@@ -23,7 +25,7 @@ import (
 )
 
 const ethRemoteNode = "wss://rinkeby.infura.io/ws"
-const contractAddressHex = "0x6eD7fe957305070f2fB5f5476Eb2dce8f8285cC1"
+const contractAddressHex = "0x88010652d6bd6fFe85832CFAca120415aA7CEA9F"
 
 var contractAddress = common.HexToAddress(contractAddressHex)
 
@@ -188,6 +190,16 @@ func (e *EthAdaptor) GetId() (id []byte) {
 	return e.id.Bytes()
 }
 
+func (e *EthAdaptor) GetCurrBlockHash() (hash common.Hash, err error) {
+	block, err := e.client.BlockByNumber(context.Background(), nil)
+	if err != nil {
+		return
+	}
+
+	hash = block.Hash()
+	return
+}
+
 func (e *EthAdaptor) GetBootstrapIp() (ip string, err error) {
 	return e.proxy.GetBootstrapIp(&bind.CallOpts{})
 }
@@ -213,9 +225,41 @@ func (e *EthAdaptor) SetBootstrapIp(ip string) (err error) {
 
 }
 
-func (e *EthAdaptor) UploadPubKey(groupId, x0, x1, y0, y1 *big.Int) (err error) {
+func (e *EthAdaptor) GetRandomNum() (num *big.Int, err error) {
+	return e.proxy.GetRandomNum(&bind.CallOpts{})
+}
+
+func (e *EthAdaptor) SetRandomNum(groupId, num *big.Int, sig []byte) (err error) {
+	fmt.Println("Starting submitting random number...")
+
+	auth, err := e.getAuth()
+	if err != nil {
+		return
+	}
+
+	x, y := decodeSig(sig)
+
+	tx, err := e.proxy.SetRandomNum(auth, groupId, num, x, y)
+	if err != nil {
+		return
+	}
+
+	fmt.Println("tx sent: ", tx.Hash().Hex())
+	fmt.Println("new random number submitted ", num, " waiting for confirmation...")
+
+	err = e.checkTransaction(tx)
+
+	return
+}
+
+func (e *EthAdaptor) UploadPubKey(groupId *big.Int, pubKey kyber.Point) (err error) {
 	fmt.Println("Starting submitting group public key...")
 	auth, err := e.getAuth()
+	if err != nil {
+		return
+	}
+
+	x0, x1, y0, y1, err := decodePubKey(pubKey)
 	if err != nil {
 		return
 	}
@@ -238,11 +282,30 @@ func (e *EthAdaptor) UploadPubKey(groupId, x0, x1, y0, y1 *big.Int) (err error) 
 	return
 }
 
-func (e *EthAdaptor) DataReturn(queryId *big.Int, data []byte, x, y *big.Int) (err error) {
+func decodePubKey(pubKey kyber.Point) (*big.Int, *big.Int, *big.Int, *big.Int, error) {
+	pubKeyMar, err := pubKey.MarshalBinary()
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+
+	x0 := new(big.Int)
+	x1 := new(big.Int)
+	y0 := new(big.Int)
+	y1 := new(big.Int)
+	x0.SetBytes(pubKeyMar[1:33])
+	x1.SetBytes(pubKeyMar[33:65])
+	y0.SetBytes(pubKeyMar[65:97])
+	y1.SetBytes(pubKeyMar[97:])
+	return x0, x1, y0, y1, nil
+}
+
+func (e *EthAdaptor) DataReturn(queryId *big.Int, data, sig []byte) (err error) {
 	auth, err := e.getAuth()
 	if err != nil {
 		return
 	}
+
+	x, y := decodeSig(sig)
 
 	tx, err := e.proxy.TriggerCallback(auth, queryId, data, x, y)
 	if err != nil {
@@ -253,6 +316,21 @@ func (e *EthAdaptor) DataReturn(queryId *big.Int, data []byte, x, y *big.Int) (e
 	fmt.Println("Query_ID request fulfilled ", queryId, " waiting for confirmation...")
 
 	err = e.checkTransaction(tx)
+
+	return
+}
+
+func decodeSig(sig []byte) (x, y *big.Int) {
+	x = new(big.Int)
+	y = new(big.Int)
+	x.SetBytes(sig[0:32])
+	y.SetBytes(sig[32:])
+
+	if x.Cmp(big.NewInt(0)) == 0 && y.Cmp(big.NewInt(0)) == 0 {
+		return big.NewInt(0), big.NewInt(0)
+	}
+
+	y = big.NewInt(0).Sub(bn256.P, big.NewInt(0).Mod(y, bn256.P))
 
 	return
 }

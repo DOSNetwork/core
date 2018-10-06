@@ -16,6 +16,8 @@ contract DOSProxy {
         uint[2] y;
     }
 
+    uint randomNum = block.number;
+
     uint nextGroupID = 0;
 
     uint currentGroup;
@@ -218,6 +220,38 @@ contract DOSProxy {
         return bootstrapIp;
     }
 
+    function getRandomNum() public constant returns(uint) {
+        return randomNum;
+    }
+
+    function setRandomNum(uint group_id, uint random, uint x, uint y) {
+        G1Point memory signature = G1Point(x, y);
+        bytes memory randomBytes = toBytes(random);
+        if (!verifyRandomNum(group_id, randomBytes, signature)) {
+            LogInvalidSignature();
+            return;
+        }
+        randomNum = random;
+    }
+
+    function toBytes(uint num) returns (bytes numBytes) {
+        numBytes = new bytes(32);
+        assembly { mstore(add(numBytes, 32), num) }
+    }
+
+    function verifyRandomNum(uint group_id, bytes randomBytes, G1Point signature) internal returns (bool) {
+        G1Point[] memory p1 = new G1Point[](2);
+        G2Point[] memory p2 = new G2Point[](2);
+        //The signature has already been applied neg() function offchainly to fit requirement of pairingCheck function
+        p1[0] = signature;
+        p1[1] = hashToG1(randomBytes);
+        p2[0] = P2();
+        p2[1] = groupKeyMapping[group_id];
+
+        return pairingCheck(p1, p2);
+
+    }
+
     function uploadNodeId(uint id) {
         nodeId.push(id);
     }
@@ -240,5 +274,6 @@ contract DOSProxy {
     function resetContract() {
         nextGroupID = 0;
         nodeId.length = 0;
+        bootstrapIp = "";
     }
 }

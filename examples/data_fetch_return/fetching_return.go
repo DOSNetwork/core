@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/dedis/kyber"
 	"io/ioutil"
 	"log"
 	"math/big"
@@ -11,24 +12,22 @@ import (
 	"github.com/DOSNetwork/core/blockchain"
 	"github.com/DOSNetwork/core/blockchain/eth"
 	"github.com/DOSNetwork/core/examples/random_number_generator"
-	"github.com/DOSNetwork/core/group/bn256"
 	"github.com/DOSNetwork/core/suites"
 )
 
 var groupId = big.NewInt(123)
 
-func dataPrepare(signers *example.RandomNumberGenerator, url string) (data []byte, x *big.Int, y *big.Int, err error) {
+func dataPrepare(signers *example.RandomNumberGenerator, url string) (data, sig []byte, err error) {
 	data, err = dataFetch(url)
 	if err != nil {
 		return
 	}
 
-	sig, err := dataSign(signers, data)
+	sig, err = dataSign(signers, data)
 	if err != nil {
 		return
 	}
 
-	x, y = negate(sig)
 	return
 }
 
@@ -61,36 +60,20 @@ func dataSign(signers *example.RandomNumberGenerator, data []byte) ([]byte, erro
 	return sig, nil
 }
 
-func negate(sig []byte) (*big.Int, *big.Int) {
-	x := big.NewInt(0)
-	y := big.NewInt(0)
-	x.SetBytes(sig[0:32])
-	y.SetBytes(sig[32:])
-
-	if x.Cmp(big.NewInt(0)) == 0 && y.Cmp(big.NewInt(0)) == 0 {
-		return big.NewInt(0), big.NewInt(0)
-	}
-
-	return x, big.NewInt(0).Sub(bn256.P, big.NewInt(0).Mod(y, bn256.P))
-}
-
-func groupSetup(nbParticipants int) (*example.RandomNumberGenerator, *big.Int, *big.Int, *big.Int, *big.Int, error) {
+func groupSetup(nbParticipants int) (signers *example.RandomNumberGenerator, pubKey kyber.Point, err error) {
 	suite := suites.MustFind("bn256")
-	signers, err := example.InitialRandomNumberGenerator(suite, nbParticipants)
+	signers, err = example.InitialRandomNumberGenerator(suite, nbParticipants)
 	if err != nil {
-		return nil, nil, nil, nil, nil, err
+		return nil, nil, err
 	}
 
-	x0, x1, y0, y1, err := signers.GetPubKey()
-	if err != nil {
-		return nil, nil, nil, nil, nil, err
-	}
+	pubKey = signers.GetPubKey()
 
-	return signers, x0, x1, y0, y1, nil
+	return
 }
 
 func main() {
-	signers, x0, x1, y0, y1, err := groupSetup(7)
+	signers, pubKey, err := groupSetup(7)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -108,7 +91,7 @@ func main() {
 	bootstrapIp, err := chainConn.GetBootstrapIp()
 	fmt.Println(bootstrapIp)
 
-	err = chainConn.UploadPubKey(groupId, x0, x1, y0, y1)
+	err = chainConn.UploadPubKey(groupId, pubKey)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -127,11 +110,11 @@ func main() {
 			case *eth.DOSProxyLogUrl:
 				fmt.Printf("Query-ID: %v \n", i.(*eth.DOSProxyLogUrl).QueryId)
 				fmt.Println("Query Url: ", i.(*eth.DOSProxyLogUrl).Url)
-				data, x, y, err := dataPrepare(signers, i.(*eth.DOSProxyLogUrl).Url)
+				data, sig, err := dataPrepare(signers, i.(*eth.DOSProxyLogUrl).Url)
 				if err != nil {
 					log.Fatal(err)
 				}
-				chainConn.DataReturn(i.(*eth.DOSProxyLogUrl).QueryId, data, x, y)
+				chainConn.DataReturn(i.(*eth.DOSProxyLogUrl).QueryId, data, sig)
 			default:
 				fmt.Println("type mismatch")
 			}

@@ -20,6 +20,7 @@ import (
 type P2PDkgInterface interface {
 	SetGroupId([]byte)
 	GetGroupId() []byte
+	GetDKGIndex() int
 	SetGroupMembers([][]byte)
 	IsCetified() bool
 	RunDKG()
@@ -105,6 +106,7 @@ type P2PDkg struct {
 
 	groupingStart time.Time
 	checkURLStart time.Time
+	dkgIndex      int
 }
 
 func (d *P2PDkg) SetGroupId(id []byte) {
@@ -113,6 +115,9 @@ func (d *P2PDkg) SetGroupId(id []byte) {
 
 func (d *P2PDkg) GetGroupId() []byte {
 	return d.groupId
+}
+func (d *P2PDkg) GetDKGIndex() int {
+	return d.dkgIndex
 }
 func (d *P2PDkg) SetNbParticipants(n int) {
 	if d.FSM.Current() == "Init" {
@@ -240,6 +245,8 @@ func (d *P2PDkg) enterNewDistKeyGenerator(e *fsm.Event) {
 	for i, pub := range d.publicKeys {
 		if !pub.Equal(d.partPub) {
 			(*d.network).SendMessageById([]byte(d.pubkeyIdMap[pub.String()]), deals[i])
+		} else {
+			d.dkgIndex = i
 		}
 	}
 	condition := d.nbParticipants - 1

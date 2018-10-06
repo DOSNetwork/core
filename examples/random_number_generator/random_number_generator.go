@@ -1,15 +1,13 @@
 package example
 
 import (
+	"crypto/sha256"
+	"errors"
 	"github.com/DOSNetwork/core/share"
 	"github.com/DOSNetwork/core/share/dkg/pedersen"
 	"github.com/DOSNetwork/core/sign/bls"
 	"github.com/DOSNetwork/core/sign/tbls"
 	"github.com/DOSNetwork/core/suites"
-	"math/big"
-
-	"crypto/sha256"
-	"errors"
 	"github.com/dedis/kyber"
 )
 
@@ -65,22 +63,8 @@ func InitialRandomNumberGenerator(suite suites.Suite, nbParticipants int) (*Rand
 	}, nil
 }
 
-func (r *RandomNumberGenerator) GetPubKey() (*big.Int, *big.Int, *big.Int, *big.Int, error) {
-	pubKey := share.NewPubPoly(r.suite, r.suite.Point().Base(), r.dkss[0].Commitments()).Commit()
-	pubKeyMar, err := pubKey.MarshalBinary()
-	if err != nil {
-		return nil, nil, nil, nil, err
-	}
-
-	x0 := big.NewInt(0)
-	x1 := big.NewInt(0)
-	y0 := big.NewInt(0)
-	y1 := big.NewInt(0)
-	x0.SetBytes(pubKeyMar[1:33])
-	x1.SetBytes(pubKeyMar[33:65])
-	y0.SetBytes(pubKeyMar[65:97])
-	y1.SetBytes(pubKeyMar[97:])
-	return x0, x1, y0, y1, nil
+func (r *RandomNumberGenerator) GetPubKey() kyber.Point {
+	return share.NewPubPoly(r.suite, r.suite.Point().Base(), r.dkss[0].Commitments()).Commit()
 }
 
 // generate takes a seed to generate random number by SHA256 using the tBLS signature to the seed

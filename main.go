@@ -1,19 +1,20 @@
 package main
 
 import (
+	"crypto/sha256"
 	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"math/big"
-	"time"
-
+	"math/rand"
 	"net/http"
 	_ "net/http/pprof"
+	"sync"
+	"time"
 
 	"github.com/DOSNetwork/core/blockchain"
 	"github.com/DOSNetwork/core/blockchain/eth"
-	"github.com/DOSNetwork/core/group/bn256"
 	"github.com/DOSNetwork/core/p2p"
 	"github.com/DOSNetwork/core/p2p/dht"
 	"github.com/DOSNetwork/core/share"
@@ -24,12 +25,17 @@ import (
 	"github.com/DOSNetwork/core/suites"
 )
 
+var mux sync.Mutex
+
 type dosNode struct {
-	suite          suites.Suite
-	chSignature    chan vss.Signature
-	chURL          chan string
-	signMap        map[string][][]byte
-	contentMap     map[string][]byte
+	suite       suites.Suite
+	chSignature chan vss.Signature
+	chURL       chan string
+	nodeEvent   chan string
+	//signMap        map[string][][]byte
+	//contentMap     map[string][]byte
+	signMap        *sync.Map
+	contentMap     *sync.Map
 	nbParticipants int
 	groupPubPoly   share.PubPoly
 	shareSec       share.PriShare
@@ -37,6 +43,7 @@ type dosNode struct {
 	p2pDkg         dkg.P2PDkgInterface
 	network        *p2p.P2PInterface
 	groupIds       [][]byte
+	randomNumber   *big.Int
 }
 
 func (d *dosNode) dataFetch(url string) ([]byte, error) {
@@ -60,27 +67,66 @@ func (d *dosNode) dataFetch(url string) ([]byte, error) {
 	return body, nil
 
 }
+
 func (d *dosNode) CheckURL(QueryId *big.Int, url string) {
 
 	result, err := d.dataFetch(url)
 	if err != nil {
 		fmt.Println(err)
 	}
+	d.signAndBroadcast(QueryId, result)
+}
+func (d *dosNode) GenerateRandomNumber() {
 
-	sig, _ := tbls.Sign(d.suite, d.p2pDkg.GetShareSecuirty(), result)
+	//var err error
+	//i, r  j = sign(last blockhash || ri-1, Gi, sk  j)
+	QueryId := new(big.Int)
+	QueryId.SetInt64(33)
+
+	d.randomNumber.SetInt64(int64(rand.Intn(100)))
+	//get last random number
+	//d.randomNumber, err = d.chainConn.GetRandomNum()
+	//if err != nil {
+	//	fmt.Println("GetRandomNum() error!!!!!!!!!!!!!", err)
+	//	d.randomNumber.SetInt64(1)
+	//}
+	//fmt.Println("GenerateRandomNumber!!", d.randomNumber.String())
+	//Todo:generate a seed by combine last blockhash and last random number
+	//get last blockhash
+	//lastHash := d.chainConn.GetCurrBlockHash().Bytes()
+	d.signAndBroadcast(QueryId, d.randomNumber.Bytes())
+}
+
+func (d *dosNode) signAndBroadcast(QueryId *big.Int, content []byte) {
+	sig, _ := tbls.Sign(d.suite, d.p2pDkg.GetShareSecuirty(), content)
 	sign := &vss.Signature{
 		Index:     uint32(0),
 		QueryId:   QueryId.String(),
-		Content:   result,
+		Content:   content,
 		Signature: sig,
 	}
-
-	var sigShares [][]byte
-	sigShares = d.signMap[sign.QueryId]
-	sigShares = append(sigShares, sig)
-	d.signMap[sign.QueryId] = sigShares
-	d.contentMap[sign.QueryId] = sign.Content
-
+	/*
+		var sigShares [][]byte
+		//sigShares = d.signMap[sign.QueryId]
+		value, ok := (*d.signMap).Load(sign.QueryId)
+		if ok {
+			fmt.Println("Found content.QueryId ", sign.QueryId)
+			sigShares, ok = value.([][]byte)
+			if !ok {
+				fmt.Println("cast failed ", sign.QueryId)
+			}
+		} else {
+			fmt.Println("Not found for key: ", sign.QueryId)
+			sigShares = make([][]byte, 0)
+		}
+		sigShares = append(sigShares, sig)
+		//d.signMap[sign.QueryId] = sigShares
+		//d.contentMap[sign.QueryId] = sign.Content
+		(*d.signMap).Store(sign.QueryId, sigShares)
+		(*d.contentMap).Store(sign.QueryId, sign.Content)
+	*/
+	d.chSignature <- *sign
+	go d.receiveSignature()
 	for _, member := range d.groupIds {
 		if string(member) != string((*d.network).GetId().Id) {
 			go (*d.network).SendMessageById(member, sign)
@@ -88,41 +134,94 @@ func (d *dosNode) CheckURL(QueryId *big.Int, url string) {
 	}
 }
 
-func (d *dosNode) negate(sig []byte) (*big.Int, *big.Int) {
-	x := big.NewInt(0)
-	y := big.NewInt(0)
-	x.SetBytes(sig[0:32])
-	y.SetBytes(sig[32:])
-
-	if x.Cmp(big.NewInt(0)) == 0 && y.Cmp(big.NewInt(0)) == 0 {
-		return big.NewInt(0), big.NewInt(0)
-	}
-
-	return x, big.NewInt(0).Sub(bn256.P, big.NewInt(0).Mod(y, bn256.P))
-}
 func (d *dosNode) receiveSignature() {
 	sign := <-d.chSignature
 	var sigShares [][]byte
-	sigShares = d.signMap[sign.QueryId]
-	sigShares = append(sigShares, sign.Signature)
-	d.signMap[sign.QueryId] = sigShares
-	d.contentMap[sign.QueryId] = sign.Content
 
-	if len(sigShares) == d.nbParticipants {
-		content := d.contentMap[sign.QueryId]
-		sig, _ := tbls.Recover(d.suite, d.p2pDkg.GetGroupPublicPoly(), content, sigShares, d.nbParticipants/2+1, d.nbParticipants)
-		err := bls.Verify(d.suite, d.p2pDkg.GetGroupPublicPoly().Commit(), content, sig)
-		if err == nil {
-			fmt.Println("checkURL result = ", string(content), " verify success")
-			x, y := d.negate(sig)
-			qID := big.NewInt(0)
-			qID.SetString(sign.QueryId, 10)
-			d.chainConn.DataReturn(qID, content, x, y)
-		} else {
-			fmt.Println("checkURL result = ", string(content), " verify failed ", err)
+	result, ok := (*d.signMap).Load(sign.QueryId)
+	if ok {
+		sigShares, ok = result.([][]byte)
+		if !ok {
+			fmt.Println("cast failed ", sign.QueryId)
 		}
-		d.contentMap[sign.QueryId] = nil
-		d.signMap[sign.QueryId] = nil
+	} else {
+		sigShares = make([][]byte, 0)
+	}
+	sigShares = append(sigShares, sign.Signature)
+	//d.signMap[sign.QueryId] = sigShares
+	//d.contentMap[sign.QueryId] = sign.Content
+	(*d.signMap).Store(sign.QueryId, sigShares)
+	(*d.contentMap).Store(sign.QueryId, sign.Content)
+	fmt.Println("receiveSignature id ", sign.QueryId, " len ", len(sigShares))
+	if len(sigShares) == d.nbParticipants {
+		//content := d.contentMap[sign.QueryId]
+		result, _ := (*d.contentMap).Load(sign.QueryId)
+		content, ok := result.([]byte)
+		if !ok {
+			fmt.Println("afterReceiveSignature value not found for sign.QueryId: ", sign.QueryId)
+		}
+		sig, _ := tbls.Recover(d.suite, d.p2pDkg.GetGroupPublicPoly(), content, sigShares, d.nbParticipants/2+1, d.nbParticipants)
+		//QueryId is 0 means that is for random number
+		if sign.QueryId == "33" {
+			//
+			hashSig := sha256.Sum256(sig)
+			randomNum := hashSig[:]
+			d.randomNumber.SetBytes(randomNum)
+			//sign this new random number  again
+			QueryId := new(big.Int)
+			QueryId.SetInt64(0)
+			d.signAndBroadcast(QueryId, randomNum)
+			(*d.contentMap).Delete(sign.QueryId)
+			(*d.signMap).Delete(sign.QueryId)
+		} else {
+
+			err := bls.Verify(d.suite, d.p2pDkg.GetGroupPublicPoly().Commit(), content, sig)
+			if err == nil {
+				y := big.NewInt(int64(d.nbParticipants))
+				z := big.NewInt(0)
+				z = z.Mod(d.randomNumber, y)
+				//Todo: Chose who should report to eth
+				repoter := 0
+				repoter = int(z.Int64())
+				fmt.Println("repoter = ", repoter)
+				repoter = 0
+				if sign.QueryId != "0" {
+					d.GenerateRandomNumber()
+				}
+				if d.p2pDkg.GetDKGIndex() == repoter {
+					if sign.QueryId == "0" {
+						randomN := new(big.Int)
+						randomN.SetBytes(content)
+						if d.p2pDkg.GetDKGIndex() == repoter {
+
+							groupId := new(big.Int)
+							groupId.SetBytes(d.p2pDkg.GetGroupId())
+							mux.Lock()
+							fmt.Println("Random Number result = ", randomN, " verify success")
+							err = d.chainConn.SetRandomNum(groupId, d.randomNumber, sig)
+							if err != nil {
+								fmt.Println("SetRandomNum err ", err)
+							}
+							mux.Unlock()
+
+						}
+					} else {
+						mux.Lock()
+						fmt.Println("checkURL result = ", string(content), " verify success")
+						qID := big.NewInt(0)
+						qID.SetString(sign.QueryId, 10)
+						//Todo:Need to have a way to detemie who should send back the result
+						d.chainConn.DataReturn(qID, content, sig)
+						mux.Unlock()
+					}
+				}
+			} else {
+				fmt.Println("checkURL result = ", string(content), " verify failed ", err)
+			}
+
+			(*d.contentMap).Delete(sign.QueryId)
+			(*d.signMap).Delete(sign.QueryId)
+		}
 	}
 }
 
@@ -200,16 +299,21 @@ func main() {
 	p2pDkg.SubscribeEvent(dkgEvent)
 	defer close(dkgEvent)
 
+	nodeEvent := make(chan string, 100)
+	defer close(nodeEvent)
+
 	d := &dosNode{
 		suite:          suite,
-		signMap:        make(map[string][][]byte),
-		contentMap:     make(map[string][]byte),
+		signMap:        new(sync.Map),
+		contentMap:     new(sync.Map),
 		chSignature:    make(chan vss.Signature, 100),
 		chURL:          make(chan string, 100),
 		nbParticipants: nbParticipants,
 		network:        &p,
 		chainConn:      chainConn,
 		p2pDkg:         p2pDkg,
+		randomNumber:   new(big.Int),
+		nodeEvent:      nodeEvent,
 	}
 
 	for {
@@ -238,24 +342,20 @@ func main() {
 			default:
 				fmt.Println("type mismatch")
 			}
+		case msg := <-d.nodeEvent:
+			fmt.Println("nodeEvent", msg)
+			//if msg == "random" {
+			//d.GenerateRandomNumber()
+			//}
 		case msg := <-dkgEvent:
 			if msg == "cetified" {
-				pubKeyMar, err := d.p2pDkg.GetGroupPublicPoly().Commit().MarshalBinary()
-				if err != nil {
-					fmt.Println(err)
+				if d.p2pDkg.GetDKGIndex() == 0 {
+					gId := new(big.Int)
+					gId.SetBytes(d.p2pDkg.GetGroupId())
+					d.chainConn.UploadPubKey(gId, d.p2pDkg.GetGroupPublicPoly().Commit())
 				}
-				x0 := new(big.Int)
-				x1 := new(big.Int)
-				y0 := new(big.Int)
-				y1 := new(big.Int)
-				x0.SetBytes(pubKeyMar[1:33])
-				x1.SetBytes(pubKeyMar[33:65])
-				y0.SetBytes(pubKeyMar[65:97])
-				y1.SetBytes(pubKeyMar[97:])
-				gId := new(big.Int)
-				gId.SetBytes(d.p2pDkg.GetGroupId())
-				d.chainConn.UploadPubKey(gId, x0, x1, y0, y1)
 			}
+
 		case msg := <-chGroup:
 			switch content := msg.(type) {
 			case *eth.DOSProxyLogGrouping:
