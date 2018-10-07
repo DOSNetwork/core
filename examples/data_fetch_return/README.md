@@ -8,7 +8,7 @@ https://rinkeby.etherscan.io/address/0x813b5999c6a80019cd2c0c76d2bd27c6c0fe1a93
 * DOSAddressBridge.sol:
 https://rinkeby.etherscan.io/address/0x593bce0faf2d3d0863324fffb1a1c988cd22d5e5
 * DOSProxy.sol (Updated):  
-https://rinkeby.etherscan.io/address/0x6eD7fe957305070f2fB5f5476Eb2dce8f8285cC1
+https://rinkeby.etherscan.io/address/0x1C374455b7Dd08AF1c82FBe732E5c8CF8c028d90
 
 
 #### Steps:

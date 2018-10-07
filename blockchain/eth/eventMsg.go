@@ -36,4 +36,10 @@ type DOSProxyLogGrouping struct {
 	NodeId  []*big.Int
 }
 
+type DOSProxyLogUpdateRandom struct {
+	randomId 		*big.Int
+	groupId  		*big.Int
+	preRandomNumber *big.Int
+}
+
 type DOSProxyLogInsufficientGroupNumber struct{}

@@ -26,7 +26,7 @@ import (
 )
 
 const ethRemoteNode = "wss://rinkeby.infura.io/ws"
-const contractAddressHex = "0x88010652d6bd6fFe85832CFAca120415aA7CEA9F"
+const contractAddressHex = "0x1C374455b7Dd08AF1c82FBe732E5c8CF8c028d90"
 
 var contractAddress = common.HexToAddress(contractAddressHex)
 
@@ -162,6 +162,30 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 				}
 			}
 		}
+	case *DOSProxyLogUpdateRandom:
+		fmt.Println("subscribing DOSProxyLogUpdateRandom event...")
+		transitChan := make(chan *dosproxy.DOSProxyLogUpdateRandom)
+		sub, err := e.proxy.DOSProxyFilterer.WatchLogUpdateRandom(opt, transitChan)
+		if err != nil {
+			fmt.Println(err)
+			fmt.Println("Network fail, will retry shortly")
+			return
+		}
+		fmt.Println("DOSProxyLogUpdateRandom event subscribed")
+
+		done <- true
+		for {
+			select {
+			case err := <-sub.Err():
+				log.Fatal(err)
+			case i := <-transitChan:
+				ch <- &DOSProxyLogUpdateRandom{
+					randomId: 		 i.RandomId,
+					groupId:  		 i.GroupId,
+					preRandomNumber: i.PreRandomNumber,
+				}
+			}
+		}
 	case *DOSProxyLogCallbackTriggeredFor:
 	case *DOSProxyLogInvalidSignature:
 	case *DOSProxyLogNonContractCall:
@@ -234,7 +258,7 @@ func (e *EthAdaptor) GetRandomNum() (num *big.Int, err error) {
 	return e.proxy.GetRandomNum(&bind.CallOpts{})
 }
 
-func (e *EthAdaptor) SetRandomNum(groupId, num *big.Int, sig []byte) (err error) {
+func (e *EthAdaptor) SetRandomNum(randomId, groupId *big.Int, sig []byte) (err error) {
 	fmt.Println("Starting submitting random number...")
 
 	auth, err := e.getAuth()
@@ -244,13 +268,13 @@ func (e *EthAdaptor) SetRandomNum(groupId, num *big.Int, sig []byte) (err error)
 
 	x, y := decodeSig(sig)
 
-	tx, err := e.proxy.SetRandomNum(auth, groupId, num, x, y)
+	tx, err := e.proxy.SetRandomNum(auth, randomId, groupId, x, y)
 	if err != nil {
 		return
 	}
 
 	fmt.Println("tx sent: ", tx.Hash().Hex())
-	fmt.Println("new random number submitted ", num, " waiting for confirmation...")
+	fmt.Println("new random number submitted ", randomId, " waiting for confirmation...")
 
 	err = e.checkTransaction(tx)
 

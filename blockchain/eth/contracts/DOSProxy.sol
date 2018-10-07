@@ -16,7 +16,7 @@ contract DOSProxy {
         uint[2] y;
     }
 
-    uint randomNum = block.number;
+    uint randomNum = uint(keccak256(block.number, block.number));
 
     uint nextGroupID = 0;
 
@@ -37,6 +37,9 @@ contract DOSProxy {
     // query_id => public key
     mapping(uint => G2Point) queryKeyMapping;
 
+    // randomNumber_id => randomNumber
+    mapping(uint => uint) randomNumberMapping;
+
     event LogUrl(uint groupId, uint queryId, string url, uint timeout);
     event LogNonSupportedType(string query_type);
     event LogNonContractCall(address from);
@@ -45,6 +48,7 @@ contract DOSProxy {
     event LogInvalidSignature();
     event LogInsufficientGroupNumber();
     event LogGrouping(uint GroupId, uint[] NodeId);
+    event LogUpdateRandom(uint randomId, uint groupId, uint preRandomNumber);
 
     function () public payable {}
 
@@ -224,14 +228,20 @@ contract DOSProxy {
         return randomNum;
     }
 
-    function setRandomNum(uint group_id, uint random, uint x, uint y) {
+    function setRandomNum(uint randomId, uint group_id, uint x, uint y) {
         G1Point memory signature = G1Point(x, y);
-        bytes memory randomBytes = toBytes(random);
+        bytes memory randomBytes = toBytes(randomNumberMapping[randomId]);
         if (!verifyRandomNum(group_id, randomBytes, signature)) {
             LogInvalidSignature();
             return;
         }
-        randomNum = random;
+        randomNum = uint(keccak256(x, y, block.number));
+    }
+
+    function genRandomNum() {
+        uint randomId = block.number;
+        randomNumberMapping[randomId] = randomNum;
+        LogUpdateRandom(randomId, currentGroup, randomNum);
     }
 
     function toBytes(uint num) returns (bytes numBytes) {
