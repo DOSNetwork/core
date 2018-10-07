@@ -1,11 +1,11 @@
-pragma solidity ^0.4.14;
+pragma solidity ^0.4.24;
 
-contract UserContractInterface {
-    function __callback__(bytes) external;
+interface UserContractInterface {
+    function __callback__(uint, bytes) external;
 }
 
 contract DOSProxy {
-
+    // TODO(jonny): Convert to library.
     struct G1Point {
         uint x;
         uint y;
@@ -17,21 +17,14 @@ contract DOSProxy {
     }
 
     uint nextGroupID = 0;
-
     uint currentGroup;
-
     string bootstrapIp;
-
     uint[] nodeId;
-
     mapping(uint => uint[]) groupMapping;
-
     // calling query_id => user contract
     mapping(uint => address) pending_queries;
-
     // group_id (random number generator) => public key
     mapping(uint => G2Point) groupKeyMapping;
-
     // query_id => public key
     mapping(uint => G2Point) queryKeyMapping;
 
@@ -46,13 +39,13 @@ contract DOSProxy {
 
     function () public payable {}
 
-    function getCodeSize(address addr) constant internal returns (uint size) {
+    function getCodeSize(address addr) internal constant returns (uint size) {
         assembly {
             size := extcodesize(addr)
         }
     }
 
-    function strEqual(string a, string b) constant internal returns (bool) {
+    function strEqual(string a, string b) internal pure returns (bool) {
         bytes memory a_bytes = bytes(a);
         bytes memory b_bytes = bytes(b);
         if (a_bytes.length != b_bytes.length) {
@@ -66,39 +59,44 @@ contract DOSProxy {
         return true;
     }
 
-    function query(address from, uint block_number, uint timeout, string query_type, string query_path) {
+    // @return query id.
+    function query(address from, uint blk_num, uint timeout, string query_type, string query_path) external returns (uint) {
         if (getCodeSize(from) > 0) {
-            uint query_id = uint(keccak256(from, block_number, timeout, query_type, query_path));
+            uint query_id = uint(keccak256(
+                abi.encodePacked(from, blk_num, timeout, query_type, query_path)));
             pending_queries[query_id] = from;
-            // Only supporting api/url for demos.
+            // Only supporting api/url for alpha release.
             if (strEqual(query_type, 'API')) {
                 uint assignGroup = currentGroup;
                 queryKeyMapping[query_id] = groupKeyMapping[assignGroup];
-                LogUrl(assignGroup, query_id, query_path, timeout);
+                emit LogUrl(assignGroup, query_id, query_path, timeout);
+                return query_id;
             } else {
-                LogNonSupportedType(query_type);
+                emit LogNonSupportedType(query_type);
+                return 0x0;
             }
         } else {
             // Skip if @from is not contract address.
-            LogNonContractCall(from);
+            emit LogNonContractCall(from);
+            return 0x0;
         }
     }
 
-    function triggerCallback(uint query_id, bytes result, uint x, uint y) {
+    function triggerCallback(uint query_id, bytes result, uint x, uint y) external {
         G1Point memory signature = G1Point(x, y);
         address uc_addr = pending_queries[query_id];
         if (uc_addr == 0x0) {
-            LogQueryFromNonExistentUC();
+            emit LogQueryFromNonExistentUC();
             return;
         }
         if (!verifyBLSTest(query_id, result, signature)) {
-            LogInvalidSignature();
+            emit LogInvalidSignature();
             return;
         }
-        LogCallbackTriggeredFor(uc_addr, result);
+        emit LogCallbackTriggeredFor(uc_addr, result);
 
-        UserContractInterface(uc_addr).__callback__(result);
-        // delete pending_queries[query_id];
+        UserContractInterface(uc_addr).__callback__(query_id, result);
+        delete pending_queries[query_id];
     }
 
 
@@ -112,7 +110,6 @@ contract DOSProxy {
         p2[1] = queryKeyMapping[query_id];
 
         return pairingCheck(p1, p2);
-
     }
 
     /// @return the result of computing the pairing check
@@ -145,13 +142,11 @@ contract DOSProxy {
         return out[0] != 0;
     }
 
-
     function P1() internal returns (G1Point) {
         return G1Point(1, 2);
     }
 
-
-    function P2() internal returns (G2Point) {
+    function P2() internal pure returns (G2Point) {
         return G2Point(
             [11559732032986387107991004021392285783925812861821192530917403151452391805634,
             10857046999023057135944570762232829481370756359578518086990519993285655852781],
@@ -163,10 +158,10 @@ contract DOSProxy {
 
     function hashToG1(bytes message) internal returns (G1Point) {
         uint256 h = uint256(keccak256(message));
-        return mul(P1(), h);
+        return scalarMul(P1(), h);
     }
 
-    function add(G1Point p1, G1Point p2) internal returns (G1Point r) {
+    function pointAdd(G1Point p1, G1Point p2) internal returns (G1Point r) {
         uint[4] memory input;
         input[0] = p1.x;
         input[1] = p1.y;
@@ -181,7 +176,7 @@ contract DOSProxy {
         require(success);
     }
 
-    function mul(G1Point p, uint s) internal returns (G1Point r) {
+    function scalarMul(G1Point p, uint s) internal returns (G1Point r) {
         uint[3] memory input;
         input[0] = p.x;
         input[1] = p.y;
@@ -195,6 +190,7 @@ contract DOSProxy {
         require(success);
     }
 
+    // TODO(jonny): fix all function ACLs below.
     function setPublicKey(uint group_id, uint x1, uint x2, uint y1, uint y2) {
         uint[] memory x = new uint[](2);
         uint[] memory y = new uint[](2);

@@ -1,16 +1,19 @@
-pragma solidity ^0.4.14;
+pragma solidity ^0.4.24;
 
-import "Ownable.sol";
+import "github.com/OpenZeppelin/zeppelin-solidity/contracts/ownership/Ownable.sol";
 
 contract DOSAddressBridge is Ownable {
-    // Deployed DOSProxy contract address.
-    address public proxy_address;
+  // Deployed DOSProxy contract address.
+  address private _proxy_address;
 
-    function getProxyAddress() returns (address) {
-        return proxy_address;
-    }
+  event ProxyAddressUpdated(address previous_proxy, address new_proxy);
 
-    function setProxyAddress(address new_addr) onlyOwner {
-        proxy_address = new_addr;
-    }
-}    
+  function getProxyAddress() external view returns (address) {
+    return _proxy_address;
+  }
+
+  function setProxyAddress(address new_addr) public onlyOwner {
+    emit ProxyAddressUpdated(_proxy_address, new_addr);
+    _proxy_address = new_addr;
+  }
+}
