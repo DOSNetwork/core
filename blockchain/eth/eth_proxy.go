@@ -4,8 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/DOSNetwork/core/group/bn256"
-	"github.com/dedis/kyber"
 	"io/ioutil"
 	"log"
 	"math"
@@ -13,6 +11,9 @@ import (
 	"os"
 	"sync"
 	"time"
+
+	"github.com/DOSNetwork/core/group/bn256"
+	"github.com/dedis/kyber"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -83,25 +84,29 @@ func (e *EthAdaptor) SubscribeEvent(ch chan interface{}) (err error) {
 		case <-done:
 			fmt.Println("subscribing done.")
 			return
-		case <-time.After(3 * time.Second):
-			fmt.Println("retry...")
-			e.lock.Lock()
-			e.client, err = ethclient.Dial(ethRemoteNode)
-			for err != nil {
-				fmt.Println(err)
-				fmt.Println("Cannot connect to the network, retrying...")
+			//Todo:This will cause multiple event from eth
+		case <-time.After(60 * time.Second):
+			os.Exit(1)
+			/*
+				fmt.Println("retry...")
+				e.lock.Lock()
 				e.client, err = ethclient.Dial(ethRemoteNode)
-			}
+				for err != nil {
+					fmt.Println(err)
+					fmt.Println("Cannot connect to the network, retrying...")
+					e.client, err = ethclient.Dial(ethRemoteNode)
+				}
 
-			e.proxy, err = dosproxy.NewDOSProxy(contractAddress, e.client)
-			for err != nil {
-				fmt.Println(err)
-				fmt.Println("Connot Create new proxy, retrying...")
 				e.proxy, err = dosproxy.NewDOSProxy(contractAddress, e.client)
-			}
+				for err != nil {
+					fmt.Println(err)
+					fmt.Println("Connot Create new proxy, retrying...")
+					e.proxy, err = dosproxy.NewDOSProxy(contractAddress, e.client)
+				}
 
-			e.lock.Unlock()
-			go e.subscribeEventAttempt(ch, opt, identity, done)
+				e.lock.Unlock()
+				go e.subscribeEventAttempt(ch, opt, identity, done)
+			*/
 		}
 	}
 	return nil
