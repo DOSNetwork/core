@@ -169,7 +169,7 @@ contract DOSProxy {
         input[3] = p2.y;
         bool success;
         assembly {
-            success := call(sub(gas, 2000), 6, 0, input, 0xc0, r, 0x60)
+            success := call(sub(gas, 2000), 6, 0, input, 0x80, r, 0x40)
         // Use "invalid" to make gas estimation work
             switch success case 0 {invalid}
         }
@@ -183,7 +183,7 @@ contract DOSProxy {
         input[2] = s;
         bool success;
         assembly {
-            success := call(sub(gas, 2000), 7, 0, input, 0x80, r, 0x60)
+            success := call(sub(gas, 2000), 7, 0, input, 0x60, r, 0x40)
         // Use "invalid" to make gas estimation work
             switch success case 0 {invalid}
         }
