@@ -26,7 +26,7 @@ import (
 )
 
 const ethRemoteNode = "wss://rinkeby.infura.io/ws"
-const contractAddressHex = "0x1C374455b7Dd08AF1c82FBe732E5c8CF8c028d90"
+const contractAddressHex = "0x0Aa21a5061f6E4c74d1162DCd314f8b9CE1c1C1F"
 
 var contractAddress = common.HexToAddress(contractAddressHex)
 
@@ -85,28 +85,28 @@ func (e *EthAdaptor) SubscribeEvent(ch chan interface{}) (err error) {
 			fmt.Println("subscribing done.")
 			return
 			//Todo:This will cause multiple event from eth
-		case <-time.After(60 * time.Second):
-			os.Exit(1)
-			/*
-				fmt.Println("retry...")
-				e.lock.Lock()
+		case <-time.After(10 * time.Second):
+			//os.Exit(1)
+
+			fmt.Println("retry...")
+			e.lock.Lock()
+			e.client, err = ethclient.Dial(ethRemoteNode)
+			for err != nil {
+				fmt.Println(err)
+				fmt.Println("Cannot connect to the network, retrying...")
 				e.client, err = ethclient.Dial(ethRemoteNode)
-				for err != nil {
-					fmt.Println(err)
-					fmt.Println("Cannot connect to the network, retrying...")
-					e.client, err = ethclient.Dial(ethRemoteNode)
-				}
+			}
 
+			e.proxy, err = dosproxy.NewDOSProxy(contractAddress, e.client)
+			for err != nil {
+				fmt.Println(err)
+				fmt.Println("Connot Create new proxy, retrying...")
 				e.proxy, err = dosproxy.NewDOSProxy(contractAddress, e.client)
-				for err != nil {
-					fmt.Println(err)
-					fmt.Println("Connot Create new proxy, retrying...")
-					e.proxy, err = dosproxy.NewDOSProxy(contractAddress, e.client)
-				}
+			}
 
-				e.lock.Unlock()
-				go e.subscribeEventAttempt(ch, opt, identity, done)
-			*/
+			e.lock.Unlock()
+			go e.subscribeEventAttempt(ch, opt, identity, done)
+
 		}
 	}
 	return nil
@@ -180,9 +180,9 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 				log.Fatal(err)
 			case i := <-transitChan:
 				ch <- &DOSProxyLogUpdateRandom{
-					randomId: 		 i.RandomId,
-					groupId:  		 i.GroupId,
-					preRandomNumber: i.PreRandomNumber,
+					RandomId:        i.RandomId,
+					GroupId:         i.GroupId,
+					PreRandomNumber: i.PreRandomNumber,
 				}
 			}
 		}

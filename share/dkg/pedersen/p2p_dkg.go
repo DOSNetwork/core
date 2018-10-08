@@ -105,7 +105,6 @@ type P2PDkg struct {
 	chPeerEvent    chan p2p.P2PMessage
 
 	groupingStart time.Time
-	checkURLStart time.Time
 	dkgIndex      int
 }
 
@@ -206,6 +205,7 @@ func (d *P2PDkg) enterInit(e *fsm.Event) {
 }
 
 func (d *P2PDkg) enterExchangePubKey(e *fsm.Event) {
+	d.groupingStart = time.Now()
 	id := (*d.network).GetId().Id
 	d.pubkeyIdMap[d.partPub.String()] = string(id)
 	d.publicKeys = append(d.publicKeys, d.partPub)

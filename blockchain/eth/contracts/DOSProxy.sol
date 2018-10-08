@@ -16,7 +16,7 @@ contract DOSProxy {
         uint[2] y;
     }
 
-    uint randomNum = uint(keccak256(block.number, block.number));
+    uint randomNum = uint(keccak256(block.number, block.number, block.number));
 
     uint nextGroupID = 0;
 
@@ -236,6 +236,7 @@ contract DOSProxy {
             return;
         }
         randomNum = uint(keccak256(x, y, block.number));
+        genRandomNum();
     }
 
     function genRandomNum() {
