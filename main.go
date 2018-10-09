@@ -142,16 +142,15 @@ func (d *dosNode) receiveSignature() {
 	}
 }
 
-func (d *dosNode) getReporter(seed []byte) int {
-	/*
-		randomNumber, err := d.chainConn.GetRandomNum()
-		if err != nil {
-			fmt.Println("getReporter err ", err)
-		}*/
-	randomN := new(big.Int)
-	randomN.SetBytes(seed)
-	x := int(randomN.Int64())
-	y := d.nbParticipants
+func (d *dosNode) getReporter() int {
+
+	randomNumber, err := d.chainConn.GetRandomNum()
+	if err != nil {
+		fmt.Println("getReporter err ", err)
+	}
+
+	x := int(randomNumber.Uint64())
+	y := int(d.nbParticipants)
 	reporter := x % y
 	return reporter
 }
@@ -180,7 +179,8 @@ func (d *dosNode) sendToOnchain() {
 		if err != nil {
 			fmt.Println("Recover failed ", err)
 		}
-		repoter := d.getReporter(sig)
+		repoter := d.getReporter()
+		fmt.Println("reporter ", repoter)
 		(*d.contentMap).Delete(queryId)
 		(*d.signMap).Delete(queryId)
 		(*d.signTypeMap).Delete(queryId)
@@ -361,7 +361,12 @@ func main() {
 			switch content := msg.(type) {
 			case *eth.DOSProxyLogUpdateRandom:
 				//if d.p2pDkg.GetGroupId() == content.GroupId {
-				d.GenerateRandomNumber(content.RandomId, content.PreRandomNumber)
+				//To avoid the err: SetRandomNum err  nonce too low
+				timer := time.NewTimer(30 * time.Second)
+				go func() {
+					<-timer.C
+					d.GenerateRandomNumber(content.RandomId, content.PreRandomNumber)
+				}()
 				//}
 			default:
 				fmt.Println("type mismatch")

@@ -199,7 +199,7 @@ func (n *P2P) CreatePeer(addr string, c *net.Conn) {
 
 		peer.Dial(addr)
 	}
-	if *peer.conn != nil {
+	if (*peer.conn) != nil {
 		peer.rw = bufio.NewReadWriter(bufio.NewReader(*peer.conn), bufio.NewWriter(*peer.conn))
 		//n.peers.LoadOrStore(peer.id, peer)
 		peer.messageChan = n.messageChan
