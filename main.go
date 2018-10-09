@@ -150,6 +150,9 @@ func (d *dosNode) getReporter() int {
 	}
 
 	x := int(randomNumber.Uint64())
+	if x < 0 {
+		x = 0 - x
+	}
 	y := int(d.nbParticipants)
 	reporter := x % y
 	return reporter
