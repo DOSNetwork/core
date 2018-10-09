@@ -44,13 +44,29 @@ type RequestState struct {
 }
 
 func (p *PeerClient) Dial(addr string) {
-
+	var conn net.Conn
+	var err error
+	retryCount := 0
 	fmt.Println(p.p2pnet.identity.Address, "Dial", addr)
-	conn, err := net.Dial("tcp", addr)
+	conn, err = net.Dial("tcp", addr)
 	if err != nil {
-		return
+		fmt.Println("Dial err : ", err, " will retry shortly")
+		ticker := time.NewTicker(1 * time.Second)
+		for _ = range ticker.C {
+			retryCount++
+			conn, err = net.Dial("tcp", addr)
+			if err == nil {
+				break
+			}
+			if retryCount == 3 {
+				ticker.Stop()
+				p.conn = nil
+				return
+			}
+		}
 	}
 	p.conn = &conn
+	return
 }
 
 func (p *PeerClient) HandlePackages() {
