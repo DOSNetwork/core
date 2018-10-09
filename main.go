@@ -142,12 +142,15 @@ func (d *dosNode) receiveSignature() {
 	}
 }
 
-func (d *dosNode) getReporter() int {
-	randomNumber, err := d.chainConn.GetRandomNum()
-	if err != nil {
-		fmt.Println("getReporter err ", err)
-	}
-	x := int(randomNumber.Int64())
+func (d *dosNode) getReporter(seed []byte) int {
+	/*
+		randomNumber, err := d.chainConn.GetRandomNum()
+		if err != nil {
+			fmt.Println("getReporter err ", err)
+		}*/
+	randomN := new(big.Int)
+	randomN.SetBytes(seed)
+	x := int(randomN.Int64())
 	y := d.nbParticipants
 	reporter := x % y
 	return reporter
@@ -172,11 +175,12 @@ func (d *dosNode) sendToOnchain() {
 		if !ok {
 			fmt.Println("sendToOnchain value signType notfound for sign.QueryId: ", queryId)
 		}
-		repoter := d.getReporter()
+
 		sig, err := tbls.Recover(d.suite, d.p2pDkg.GetGroupPublicPoly(), content, sigShares, d.nbParticipants/2+1, d.nbParticipants)
 		if err != nil {
 			fmt.Println("Recover failed ", err)
 		}
+		repoter := d.getReporter(sig)
 		(*d.contentMap).Delete(queryId)
 		(*d.signMap).Delete(queryId)
 		(*d.signTypeMap).Delete(queryId)
