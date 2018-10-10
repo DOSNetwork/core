@@ -34,11 +34,8 @@ contract DOSProxy {
     G2Point[] groupPubKeys;
     // group_identifier => is_existed
     mapping(bytes32 => bool) groups;
-    // blocknumber => random_number
-    // random_number <- sha3(random_bytes)
-    mapping(uint => bytes32) public randomness;
     // Note: Update to randomness metadata must be made atomic.
-	  // last block number within contains the last updated randomness.
+    // last block number within contains the last updated randomness.
     uint public last_updated_blk;
     bytes32 public last_randomness;
     G2Point last_handled_group;
