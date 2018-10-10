@@ -2,17 +2,18 @@ package main
 
 import (
 	"bufio"
+	"crypto/sha256"
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"math/big"
 	"net/http"
 	_ "net/http/pprof"
 	"os"
 	"strings"
-	"sync"
 	"time"
 
-	"github.com/DOSNetwork/core/examples/dkg-p2p/internalMsg"
+	"github.com/DOSNetwork/core/examples/dkg_p2p/internalMsg"
 	"github.com/DOSNetwork/core/p2p"
 	"github.com/DOSNetwork/core/p2p/dht"
 	"github.com/DOSNetwork/core/share"
@@ -29,13 +30,15 @@ type dosNode struct {
 	suite          suites.Suite
 	chSignature    chan vss.Signature
 	chURL          chan string
-	signMap        *sync.Map
-	contentMap     *sync.Map
+	signMap        map[string][][]byte
+	contentMap     map[string][]byte
 	nbParticipants int
 	groupPubPoly   share.PubPoly
 	shareSec       share.PriShare
+	p2pDkg         dkg.P2PDkgInterface
 	network        *p2p.P2PInterface
 	groupIds       [][]byte
+	ticker         *time.Ticker
 }
 
 func (d *dosNode) dataFetch(url string) ([]byte, error) {
@@ -65,30 +68,36 @@ func (d *dosNode) CheckURL() {
 	if err != nil {
 		fmt.Println(err)
 	}
+	QueryId := new(big.Int)
+	QueryId.SetInt64(36)
+	d.signAndBroadcast(QueryId, result)
+}
+func (d *dosNode) GenerateRandomNumber() {
+	var seed []byte
+	//i, r  j = sign(last blockhash || ri-1, Gi, sk  j)
+	QueryId := new(big.Int)
+	QueryId.SetInt64(-1)
+	//get last blockhash
+	//get last random number
+	//generate a seed by combine last blockhash and last random number
+	seed = []byte("test")
+	d.signAndBroadcast(QueryId, seed)
+}
 
-	sig, _ := tbls.Sign(d.suite, &d.shareSec, result)
+func (d *dosNode) signAndBroadcast(QueryId *big.Int, content []byte) {
+	sig, _ := tbls.Sign(d.suite, d.p2pDkg.GetShareSecuirty(), content)
 	sign := &vss.Signature{
 		Index:     uint32(0),
-		QueryId:   url,
-		Content:   result,
+		QueryId:   QueryId.String(),
+		Content:   content,
 		Signature: sig,
 	}
 
 	var sigShares [][]byte
-	value, ok := (*d.signMap).Load(sign.QueryId)
-	if ok {
-		fmt.Println("Found content.QueryId ", sign.QueryId)
-		sigShares, ok = value.([][]byte)
-		if !ok {
-			fmt.Println("cast failed ", sign.QueryId)
-		}
-	} else {
-		fmt.Println("Not found for key: ", sign.QueryId)
-		sigShares = make([][]byte, 0)
-	}
+	sigShares = d.signMap[sign.QueryId]
 	sigShares = append(sigShares, sig)
-	(*d.signMap).Store(sign.QueryId, sigShares)
-	(*d.contentMap).Store(sign.QueryId, sign.Content)
+	d.signMap[sign.QueryId] = sigShares
+	d.contentMap[sign.QueryId] = sign.Content
 
 	for _, member := range d.groupIds {
 		if string(member) != string((*d.network).GetId().Id) {
@@ -101,45 +110,60 @@ func (d *dosNode) receiveSignature() {
 	sign := <-d.chSignature
 	fmt.Println("receiveSignature !!!!!")
 	var sigShares [][]byte
-	result, ok := (*d.signMap).Load(sign.QueryId)
-	if ok {
-		sigShares, ok = result.([][]byte)
-		if !ok {
-			fmt.Println("cast failed ", sign.QueryId)
-		}
-	} else {
-		sigShares = make([][]byte, 0)
-	}
+	sigShares = d.signMap[sign.QueryId]
 	sigShares = append(sigShares, sign.Signature)
-	(*d.signMap).Store(sign.QueryId, sigShares)
-	(*d.contentMap).Store(sign.QueryId, sign.Content)
+	d.signMap[sign.QueryId] = sigShares
+	d.contentMap[sign.QueryId] = sign.Content
 
 	fmt.Println("Event afterReceiveSignature ", len(sigShares))
 	if len(sigShares) == d.nbParticipants {
-		result, _ := (*d.contentMap).Load(sign.QueryId)
-		content, ok := result.([]byte)
-		if !ok {
-			fmt.Println("afterReceiveSignature value not found for sign.QueryId: ", sign.QueryId)
-		}
-
-		sig, _ := tbls.Recover(d.suite, &d.groupPubPoly, content, sigShares, d.nbParticipants/2+1, d.nbParticipants)
-		err := bls.Verify(d.suite, d.groupPubPoly.Commit(), content, sig)
-		if err == nil {
-			fmt.Println("checkURL result = ", string(content), " verify success")
-			//fmt.Println(time.Since(d.checkURLStart))
+		content := d.contentMap[sign.QueryId]
+		sig, _ := tbls.Recover(d.suite, d.p2pDkg.GetGroupPublicPoly(), content, sigShares, d.nbParticipants/2+1, d.nbParticipants)
+		//QueryId is 0 means that is for random number
+		if sign.QueryId == "-1" {
+			//
+			hashSig := sha256.Sum256(sig)
+			randomNum := hashSig[:]
+			//sign this new random number  again
+			QueryId := new(big.Int)
+			QueryId.SetInt64(0)
+			randomN := new(big.Int)
+			randomN.SetBytes(randomNum)
+			fmt.Println("For random number", randomN)
+			d.signAndBroadcast(QueryId, randomNum)
 		} else {
-			fmt.Println("checkURL result = ", string(content), " verify failed ", err)
+			err := bls.Verify(d.suite, d.p2pDkg.GetGroupPublicPoly().Commit(), content, sig)
+			if err == nil {
+				if sign.QueryId == "0" {
+					randomN := new(big.Int)
+					randomN.SetBytes(content)
+					x := new(big.Int)
+					x.SetString(sign.QueryId, 10)
+					y := big.NewInt(int64(d.nbParticipants))
+					z := big.NewInt(0)
+					z = z.Mod(x, y)
+					if d.p2pDkg.GetDKGIndex() == int(z.Int64()) {
+						fmt.Println("Random Number result = ", randomN, " verify success")
+					}
+				} else {
+					fmt.Println("checkURL result = ", string(content), " verify success")
+				}
+
+			} else {
+				fmt.Println("checkURL result = ", string(content), " verify failed ", err)
+			}
+
 		}
-		(*d.contentMap).Delete(sign.QueryId)
-		(*d.signMap).Delete(sign.QueryId)
+		d.contentMap[sign.QueryId] = nil
+		d.signMap[sign.QueryId] = nil
 	}
 }
 
 // main
 func main() {
 	seedFlag := flag.String("seedAddr", "", "seed address")
-	nbParticipantsFlag := flag.Int("nbVerifiers", 20, "Number of Participants")
-	portFlag := flag.Int("port", 0, "port number")
+	nbParticipantsFlag := flag.Int("nbVerifiers", 3, "Number of Participants")
+	portFlag := flag.Int("port", 44460, "port number")
 	idFlag := flag.String("id", "nodeHost", "id")
 
 	flag.Parse()
@@ -181,18 +205,20 @@ func main() {
 
 	node := &dosNode{
 		suite:          suite,
-		signMap:        new(sync.Map),
-		contentMap:     new(sync.Map),
+		signMap:        make(map[string][][]byte),
+		contentMap:     make(map[string][]byte),
 		chSignature:    make(chan vss.Signature, 100),
 		chURL:          make(chan string, 100),
 		nbParticipants: nbParticipants,
 		network:        &p,
+		p2pDkg:         dosDkg,
 	}
-
+	//node.ticker = time.NewTicker(30 * time.Second)
 	go func() {
 		groupIds := [][]byte{}
 		for {
 			select {
+
 			//event from peer
 			case msg := <-peerEvent:
 				switch content := msg.Msg.Message.(type) {
@@ -205,7 +231,6 @@ func main() {
 				case *vss.Signature:
 					node.chSignature <- *content
 					node.receiveSignature()
-
 				case *internalMsg.Cmd:
 					fmt.Println("!!!!!!!!!!!!receive cmd ", content)
 					if content.Ctype == internalMsg.Cmd_GROUPING {
@@ -221,7 +246,8 @@ func main() {
 							groupIds = append(groupIds, hashId[:])
 						}
 						if isMember {
-
+							node.nbParticipants = len(groupIds)
+							node.p2pDkg.SetNbParticipants(len(groupIds))
 							node.groupIds = groupIds
 							dosDkg.SetGroupMembers(groupIds)
 							dosDkg.RunDKG()
@@ -236,6 +262,7 @@ func main() {
 							node.shareSec = *dosDkg.GetShareSecuirty()
 							node.groupPubPoly = *dosDkg.GetGroupPublicPoly()
 							node.CheckURL()
+							node.GenerateRandomNumber()
 						}
 					}
 					if content.Ctype == internalMsg.Cmd_STOPALL {
@@ -256,7 +283,7 @@ func main() {
 	//Generate node member IDs
 	members := [][]byte{}
 	s := []string{}
-	for i := 1; i <= node.nbParticipants; i++ {
+	for i := 1; i <= nbParticipants; i++ {
 		output := fmt.Sprintf("node%d", i)
 		hashId := blake2b.Sum256([]byte(output))
 		members = append(members, hashId[:])
@@ -280,7 +307,7 @@ func main() {
 		if strings.TrimRight(input, "\n") == "grouping" {
 			members = [][]byte{}
 			s = []string{}
-			for i := 1; i <= node.nbParticipants; i++ {
+			for i := 1; i <= nbParticipants; i++ {
 				output := fmt.Sprintf("node%d", i)
 				hashId := blake2b.Sum256([]byte(output))
 				members = append(members, hashId[:])
@@ -330,17 +357,9 @@ func main() {
 			}
 			pb := proto.Message(cmd)
 			for _, member := range members {
-				go p.SendMessageById(member, pb)
-			}
-
-			cmd = &internalMsg.Cmd{
-				Ctype: internalMsg.Cmd_CHECKURL,
-				Args:  "https://api.weather.gov/",
-			}
-			pb = proto.Message(cmd)
-			for _, member := range members {
 				p.SendMessageById(member, pb)
 			}
+
 			continue
 		}
 		if strings.TrimRight(input, "\n") == "stopall" {

@@ -1,471 +1,56 @@
 package main
 
 import (
-	"bufio"
-	"context"
 	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"math/big"
 	"net/http"
-	"os"
-	"strings"
+	_ "net/http/pprof"
 	"sync"
 	"time"
 
-	"github.com/DOSNetwork/core/blockchain/eth/contracts"
-	"github.com/DOSNetwork/core/group/bn256"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/ethclient"
-
-	"github.com/DOSNetwork/core/examples/ethereum_vss_p2p/internalMsg"
-	"github.com/DOSNetwork/core/examples/ethereum_vss_p2p/msgParser"
+	"github.com/DOSNetwork/core/blockchain"
+	"github.com/DOSNetwork/core/blockchain/eth"
 	"github.com/DOSNetwork/core/p2p"
+	"github.com/DOSNetwork/core/p2p/dht"
 	"github.com/DOSNetwork/core/share"
+	"github.com/DOSNetwork/core/share/dkg/pedersen"
 	"github.com/DOSNetwork/core/share/vss/pedersen"
 	"github.com/DOSNetwork/core/sign/bls"
 	"github.com/DOSNetwork/core/sign/tbls"
 	"github.com/DOSNetwork/core/suites"
-	"github.com/dedis/kyber"
-	"github.com/golang/protobuf/proto"
 )
 
-const key = ``
-const passphrase = ``
+var mux sync.Mutex
 
-var ethReomteNode = "wss://rinkeby.infura.io/ws"
-var contractAddressHex = "0xbD5784b224D40213df1F9eeb572961E2a859Cb80"
-var groupId = big.NewInt(123)
-var suite = suites.MustFind("bn256")
-var mutex = &sync.Mutex{}
+const (
+	ForRandomNumber = uint32(0)
+	ForCheckURL     = uint32(1)
+)
 
-func genPair() (kyber.Scalar, kyber.Point) {
-
-	secret := suite.Scalar().Pick(suite.RandomStream())
-	public := suite.Point().Mul(secret, nil)
-	return secret, public
+type dosNode struct {
+	suite          suites.Suite
+	chSignature    chan vss.Signature
+	chURL          chan string
+	toOnChainQueue chan string
+	signMap        *sync.Map
+	contentMap     *sync.Map
+	signTypeMap    *sync.Map
+	nbParticipants int
+	groupPubPoly   share.PubPoly
+	shareSec       share.PriShare
+	chainConn      blockchain.ChainInterface
+	p2pDkg         dkg.P2PDkgInterface
+	network        *p2p.P2PInterface
+	groupIds       [][]byte
+	randomNumber   *big.Int
 }
 
-type dataFeed struct {
-	data []byte
-	sig  [][]byte
-}
-
-type Dealer struct {
-	secret          kyber.Scalar
-	pubKey          kyber.Point
-	priKey          kyber.Scalar
-	responses       []*vss.Response
-	sigShares       map[string]*dataFeed
-	verifiersPub    []kyber.Point
-	nbVerifiers     int
-	vssThreshold    int
-	currentVerifier int
-	vssDealer       *vss.Dealer
-	pubPoly         *share.PubPoly
-	mux             sync.Mutex
-}
-type Verifier struct {
-	dealerPubKey kyber.Point
-	pubKey       kyber.Point
-	priKey       kyber.Scalar
-	verifiersPub []kyber.Point
-	vssVerifier  *vss.Verifier
-}
-
-// main
-func main() {
-	dealerFlag := flag.String("dealerAddr", "", "dealer address")
-	roleFlag := flag.String("role", "dealer", "")
-	nbVerifiersFlag := flag.Int("nbVerifiers", 3, "Number of verifiers")
-	flag.Parse()
-	dealerAddr := *dealerFlag
-	role := *roleFlag
-	nbVerifiers := *nbVerifiersFlag
-	fmt.Println("role: ", role)
-
-	//1)Build a p2p network
-	fmt.Println(*roleFlag)
-	tunnel := make(chan p2p.P2PMessage)
-	p, _ := p2p.CreateP2PNetwork(tunnel, 0)
-	defer close(tunnel)
-	//2)Start to listen incoming connection
-	if err := p.Listen(); err != nil {
-		log.Fatal(err)
-	}
-
-	//3)
-	var verifier *Verifier
-	var dealer *Dealer
-	if strings.TrimRight(role, "\n") == "dealer" {
-		dealerSec, dealerPub := genPair()
-		dealer = &Dealer{
-			secret:          suite.Scalar().Pick(suite.RandomStream()),
-			pubKey:          dealerPub,
-			priKey:          dealerSec,
-			verifiersPub:    make([]kyber.Point, nbVerifiers),
-			responses:       make([]*vss.Response, nbVerifiers),
-			sigShares:       make(map[string]*dataFeed),
-			nbVerifiers:     nbVerifiers,
-			vssThreshold:    (nbVerifiers + 1) / 2,
-			currentVerifier: 0,
-		}
-	} else {
-		verifierSec, verifierPub := genPair()
-		verifier = &Verifier{
-			pubKey: verifierPub,
-			priKey: verifierSec,
-		}
-		p.CreatePeer(dealerAddr, nil)
-		msg := msgParser.PackPublicKey(verifierPub)
-		p.Broadcast(msg)
-	}
-
-	//3.5) Connect to ethereum
-	client, err := ethclient.Dial(ethReomteNode)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	contractAddress := common.HexToAddress(contractAddressHex)
-	proxy, err := dosproxy.NewDOSProxy(contractAddress, client)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	//4)Handle message from peer
-	go func() {
-		var packedMessage proto.Message
-		for {
-			select {
-			//event from peer
-			case msg := <-tunnel:
-				switch content := msg.Msg.Message.(type) {
-				case *internalMsg.PublicKey:
-					if dealer != nil {
-						if dealer.currentVerifier < dealer.nbVerifiers {
-							dealer.verifiersPub[dealer.currentVerifier] = *msgParser.UnpackPublicKey(suite, content)
-							dealer.currentVerifier++
-							//Wait for all verifiers
-							if dealer.currentVerifier == dealer.nbVerifiers {
-								//Send dealer public key to all verifiers
-								packedMessage := msgParser.PackPublicKey(dealer.pubKey)
-								p.Broadcast(packedMessage)
-								//Send all of verifier's pubkey to all verifiers
-								packedMessage = msgParser.PackPublicKeys(dealer.verifiersPub)
-								p.Broadcast(packedMessage)
-								//Build a new dealer
-								dealer.vssDealer, _ = vss.NewDealer(suite, dealer.priKey, dealer.secret, dealer.verifiersPub, dealer.vssThreshold)
-
-								// 1. dispatch encrypted deals to all verifiers
-								encDeals, _ := dealer.vssDealer.EncryptedDeals()
-								packedMessage = msgParser.PackEncryptedDeals(encDeals)
-								p.Broadcast(packedMessage)
-								dealer.currentVerifier = 0
-							}
-						}
-					} else {
-						if verifier != nil {
-							verifier.dealerPubKey = *msgParser.UnpackPublicKey(suite, content)
-						}
-					}
-					//fmt.Println("receive PublicKey", unpackPublicKey(content).String())
-				case *internalMsg.PublicKeys:
-					if verifier != nil {
-						verifiersPub := msgParser.UnpackPublicKeys(suite, content)
-						verifier.vssVerifier, _ = vss.NewVerifier(suite, verifier.priKey, verifier.dealerPubKey, *verifiersPub)
-					}
-				case *internalMsg.EncryptedDeals:
-					deals := msgParser.UnpackEncryptedDeals(content)
-					for _, deal := range deals {
-						res, err := verifier.vssVerifier.ProcessEncryptedDeal(deal)
-						if err != nil {
-							fmt.Println("ProcessEncryptedDeal err ", err)
-						} else {
-							packedMessage = msgParser.PackResponse(res)
-							p.Broadcast(packedMessage)
-						}
-					}
-				case *internalMsg.Response:
-					resp := msgParser.UnpackResponse(content)
-					dealer.responses[resp.Index] = resp
-					_, err := dealer.vssDealer.ProcessResponse(resp)
-					if err != nil {
-						fmt.Println("dealer ProcessResponse err ", err)
-					}
-					if dealer.vssDealer.EnoughApprovals() || dealer.vssDealer.DealCertified() {
-						fmt.Println("dealer EnoughApprovals ", dealer.vssDealer.EnoughApprovals(), " DealCertified ", dealer.vssDealer.DealCertified())
-						dealer.pubPoly = share.NewPubPoly(suite, suite.Point().Base(), dealer.vssDealer.Commits())
-					}
-					dealer.currentVerifier++
-					fmt.Println(dealer.currentVerifier, "  ", dealer.nbVerifiers, "........")
-					if dealer.currentVerifier == dealer.nbVerifiers {
-						fmt.Println("Start")
-
-						chPubKey := make(chan *dosproxy.DOSProxyLogSuccPubKeySub)
-						done := make(chan bool)
-						go subscribePubKey(proxy, chPubKey, done)
-
-						<-done
-						x0, x1, y0, y1, err := getPubKey(dealer.pubPoly)
-						if err != nil {
-							log.Fatal(err)
-						}
-
-						err = uploadPubKey(client, proxy, groupId, x0, x1, y0, y1)
-						if err != nil {
-							log.Fatal(err)
-						}
-
-						<-done
-						fmt.Println("Group set-up finished, start listening to query...")
-
-						packedMessage = msgParser.PackResponses(dealer.responses)
-						p.Broadcast(packedMessage)
-					}
-
-				case *internalMsg.Responses:
-					resps := msgParser.UnpackResponses(content)
-					for _, r := range resps {
-						verifier.vssVerifier.ProcessResponse(r)
-					}
-					fmt.Println("vssVerifier ", verifier.vssVerifier.Index(), "dealCetified ", verifier.vssVerifier.DealCertified())
-
-					chUrl := make(chan *dosproxy.DOSProxyLogUrl)
-					go subscribeEvent(p, verifier, proxy, chUrl)
-
-				case *internalMsg.Signature:
-					dealer.mux.Lock()
-					if _, ok := dealer.sigShares[content.GetQueryId()]; !ok {
-						newDataFeed := &dataFeed{
-							data: content.GetContent(),
-							sig:  make([][]byte, 0),
-						}
-						newDataFeed.sig = append(newDataFeed.sig, content.GetSignature())
-						dealer.sigShares[content.GetQueryId()] = newDataFeed
-					} else {
-						dealer.sigShares[content.GetQueryId()].sig = append(dealer.sigShares[content.GetQueryId()].sig, content.GetSignature())
-					}
-					dealer.mux.Unlock()
-
-					fmt.Println("len sigShares ", len(dealer.sigShares[content.GetQueryId()].sig))
-					if len(dealer.sigShares[content.GetQueryId()].sig) == dealer.nbVerifiers {
-						fmt.Println("dealer EnoughApprovals ", dealer.vssDealer.EnoughApprovals(), " DealCertified ", dealer.vssDealer.DealCertified())
-						sig, _ := tbls.Recover(suite, dealer.pubPoly, dealer.sigShares[content.GetQueryId()].data, dealer.sigShares[content.GetQueryId()].sig, nbVerifiers/2+1, nbVerifiers)
-						err := bls.Verify(suite, dealer.pubPoly.Commit(), dealer.sigShares[content.GetQueryId()].data, sig)
-						if err == nil {
-							fmt.Println("Dealer bls.Verify success ")
-						}
-
-						x, y := negate(sig)
-
-						queryId := new(big.Int)
-						queryId, ok := queryId.SetString(content.GetQueryId(), 10)
-						if !ok {
-							log.Fatal("SetString: error")
-						}
-
-						err = dataReturn(client, proxy, queryId, dealer.sigShares[content.GetQueryId()].data, x, y)
-						if err != nil {
-							log.Fatal(err)
-						}
-					}
-				default:
-					fmt.Println("unknown")
-				}
-			}
-		}
-	}()
-
-	//5)Broadcast message to peers
-	reader := bufio.NewReader(os.Stdin)
-	for {
-		input, _ := reader.ReadString('\n')
-
-		// skip blank lines
-		if len(strings.TrimSpace(input)) == 0 {
-			continue
-		}
-		if strings.TrimRight(input, "\n") == "end" {
-			fmt.Println("Stop()")
-			break
-		}
-	}
-	fmt.Println("finish)")
-}
-
-func getPubKey(pubPoly *share.PubPoly) (*big.Int, *big.Int, *big.Int, *big.Int, error) {
-	pubKey := pubPoly.Commit()
-	pubKeyMar, err := pubKey.MarshalBinary()
-	if err != nil {
-		return nil, nil, nil, nil, err
-	}
-
-	x0 := big.NewInt(0)
-	x1 := big.NewInt(0)
-	y0 := big.NewInt(0)
-	y1 := big.NewInt(0)
-	x0.SetBytes(pubKeyMar[1:33])
-	x1.SetBytes(pubKeyMar[33:65])
-	y0.SetBytes(pubKeyMar[65:97])
-	y1.SetBytes(pubKeyMar[97:])
-	return x0, x1, y0, y1, nil
-}
-
-func subscribePubKey(proxy *dosproxy.DOSProxy, ch chan *dosproxy.DOSProxyLogSuccPubKeySub, done chan bool) {
-	fmt.Println("Establishing listen channel to group public key...")
-
-	connected := false
-
-	retried := false
-
-	go func() {
-		time.Sleep(3 * time.Second)
-		if !connected {
-			retried = true
-			fmt.Println("retry")
-
-			client, err := ethclient.Dial(ethReomteNode)
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			contractAddress := common.HexToAddress(contractAddressHex)
-			proxy, err = dosproxy.NewDOSProxy(contractAddress, client)
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			go subscribePubKey(proxy, ch, done)
-		}
-	}()
-
-	opt := &bind.WatchOpts{}
-	sub, err := proxy.DOSProxyFilterer.WatchLogSuccPubKeySub(opt, ch)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	if retried {
-		return
-	}
-
-	connected = true
-
-	done <- true
-
-	fmt.Println("Channel established.")
-
-	for range ch {
-		fmt.Println("Group public key submitted event Caught.")
-		done <- true
-		break
-	}
-	sub.Unsubscribe()
-	close(ch)
-}
-
-func uploadPubKey(client *ethclient.Client, proxy *dosproxy.DOSProxy, groupId, x0, x1, y0, y1 *big.Int) error {
-	fmt.Println("Starting submitting group public key...")
-
-	gasPrice, err := client.SuggestGasPrice(context.Background())
-	if err != nil {
-		return err
-	}
-
-	auth, err := bind.NewTransactor(strings.NewReader(key), passphrase)
-	if err != nil {
-		return err
-	}
-
-	auth.GasLimit = uint64(300000) // in units
-	auth.GasPrice = gasPrice
-
-	tx, err := proxy.SetPublicKey(auth, groupId, x0, x1, y0, y1)
-
-	if err != nil {
-		return err
-	}
-
-	fmt.Println("tx sent: ", tx.Hash().Hex())
-	fmt.Println("groupId: ", groupId)
-	fmt.Println("x0: ", x0)
-	fmt.Println("x1: ", x1)
-	fmt.Println("y0: ", y0)
-	fmt.Println("y1: ", y1)
-	fmt.Println("Group public key submitted, waiting for confirmation...")
-
-	return nil
-}
-
-func subscribeEvent(p p2p.P2PInterface, verifier *Verifier, proxy *dosproxy.DOSProxy, ch chan *dosproxy.DOSProxyLogUrl) {
-
-	connected := false
-
-	retried := false
-
-	go func() {
-		time.Sleep(3 * time.Second)
-		if !connected {
-			retried = true
-			fmt.Println("retry")
-
-			client, err := ethclient.Dial(ethReomteNode)
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			contractAddress := common.HexToAddress(contractAddressHex)
-			proxy, err = dosproxy.NewDOSProxy(contractAddress, client)
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			go subscribeEvent(p, verifier, proxy, ch)
-		}
-	}()
-
-	opt := &bind.WatchOpts{}
-	sub, err := proxy.DOSProxyFilterer.WatchLogUrl(opt, ch)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	if retried {
-		return
-	}
-
-	connected = true
-
-	fmt.Println("Group set-up finished, start listening to query...")
-	for i := range ch {
-		fmt.Printf("Query-ID: %v \n", i.QueryId)
-		fmt.Println("Query Url: ", i.Url)
-		go queryFulfill(p, verifier, i.QueryId, i.Url)
-	}
-	sub.Unsubscribe()
-	close(ch)
-}
-
-func queryFulfill(p p2p.P2PInterface, verifier *Verifier, queryId *big.Int, url string) {
-	data, err := dataFetch(url)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	sig, err := dataSign(verifier, data)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	packedMessage := msgParser.PackSignature(uint32(verifier.vssVerifier.Index()), queryId.String(), data, sig)
-	p.Broadcast(packedMessage)
-}
-
-func dataFetch(url string) ([]byte, error) {
-	client := &http.Client{Timeout: 10 * time.Second}
+func (d *dosNode) dataFetch(url string) ([]byte, error) {
+	sTime := time.Now()
+	client := &http.Client{Timeout: 60 * time.Second}
 	r, err := client.Get(url)
 	if err != nil {
 		return nil, err
@@ -478,56 +63,341 @@ func dataFetch(url string) ([]byte, error) {
 
 	r.Body.Close()
 
-	fmt.Println("Detched data: ", string(body))
+	fmt.Println("fetched data: ", string(body))
+	fmt.Println("dataFetch End:	took", time.Now().Sub(sTime))
 
 	return body, nil
 
 }
 
-func dataSign(verifier *Verifier, data []byte) ([]byte, error) {
-	s := verifier.vssVerifier.Deal().SecShare
-	sig, err := tbls.Sign(suite, s, data)
-	if err != nil {
-		return nil, err
+func (d *dosNode) CheckURL(QueryId *big.Int, url string) {
+	//To avoid duplicate query
+	_, ok := (*d.signMap).Load(QueryId.String())
+	if !ok {
+		fmt.Println("CheckURL!!", QueryId)
+		result, err := d.dataFetch(url)
+		if err != nil {
+			fmt.Println(err)
+		}
+		d.signAndBroadcast(ForCheckURL, QueryId, result)
 	}
-
-	return sig, nil
+}
+func (d *dosNode) GenerateRandomNumber(preRendomum *big.Int) {
+	//To avoid duplicate query
+	_, ok := (*d.signMap).Load(preRendomum.String())
+	if !ok {
+		fmt.Println("GenerateRandomNumber!!", preRendomum.String())
+		d.signAndBroadcast(ForRandomNumber, preRendomum, preRendomum.Bytes())
+	}
 }
 
-func negate(sig []byte) (*big.Int, *big.Int) {
-	x := big.NewInt(0)
-	y := big.NewInt(0)
-	x.SetBytes(sig[0:32])
-	y.SetBytes(sig[32:])
-
-	if x.Cmp(big.NewInt(0)) == 0 && y.Cmp(big.NewInt(0)) == 0 {
-		return big.NewInt(0), big.NewInt(0)
+func (d *dosNode) signAndBroadcast(index uint32, QueryId *big.Int, content []byte) {
+	sig, _ := tbls.Sign(d.suite, d.p2pDkg.GetShareSecuirty(), content)
+	sign := &vss.Signature{
+		Index:     uint32(index),
+		QueryId:   QueryId.String(),
+		Content:   content,
+		Signature: sig,
 	}
-
-	return x, big.NewInt(0).Sub(bn256.P, big.NewInt(0).Mod(y, bn256.P))
+	//d.chSignature <- *sign
+	sigShares := make([][]byte, 0)
+	sigShares = append(sigShares, sig)
+	(*d.signMap).Store(sign.QueryId, sigShares)
+	(*d.contentMap).Store(sign.QueryId, sign.Content)
+	(*d.signTypeMap).Store(sign.QueryId, sign.Index)
+	for _, member := range d.groupIds {
+		if string(member) != string((*d.network).GetId().Id) {
+			//Todo:Need to check to see if it is thread safe
+			(*d.network).SendMessageById(member, sign)
+		}
+	}
 }
 
-func dataReturn(client *ethclient.Client, proxy *dosproxy.DOSProxy, queryId *big.Int, data []byte, x, y *big.Int) error {
-	gasPrice, err := client.SuggestGasPrice(context.Background())
+//receiveSignature is thread safe.
+func (d *dosNode) receiveSignature() {
+	for sign := range d.chSignature {
+
+		var sigShares [][]byte
+
+		result, ok := (*d.signMap).Load(sign.QueryId)
+		if ok {
+			sigShares, ok = result.([][]byte)
+			if !ok {
+				fmt.Println("cast failed ", sign.QueryId)
+			}
+			sigShares = append(sigShares, sign.Signature)
+			(*d.signMap).Store(sign.QueryId, sigShares)
+			(*d.contentMap).Store(sign.QueryId, sign.Content)
+			(*d.signTypeMap).Store(sign.QueryId, sign.Index)
+			fmt.Println("receiveSignature id ", sign.QueryId, " len ", len(sigShares), " nbParticipants ", d.nbParticipants)
+
+			if len(sigShares) == d.nbParticipants {
+				d.toOnChainQueue <- sign.QueryId
+			}
+		} else {
+			//Other nodes has received eth event and send signature to other nodes
+			//Node put back these signatures until it received eth event.
+			d.chSignature <- sign
+		}
+	}
+}
+
+func (d *dosNode) getReporter() int {
+
+	randomNumber, err := d.chainConn.GetRandomNum()
 	if err != nil {
-		return err
+		fmt.Println("getReporter err ", err)
 	}
 
-	auth, err := bind.NewTransactor(strings.NewReader(key), passphrase)
+	x := int(randomNumber.Uint64())
+	if x < 0 {
+		x = 0 - x
+	}
+	y := int(d.nbParticipants)
+	reporter := x % y
+	return reporter
+}
+func (d *dosNode) sendToOnchain() {
+	for queryId := range d.toOnChainQueue {
+		var content []byte
+		var sigShares [][]byte
+		var signType uint32
+		result, _ := (*d.contentMap).Load(queryId)
+		content, ok := result.([]byte)
+		if !ok {
+			fmt.Println("sendToOnchain content not found for sign.QueryId: ", queryId)
+		}
+		result, ok = (*d.signMap).Load(queryId)
+		sigShares, ok = result.([][]byte)
+		if !ok {
+			fmt.Println("sendToOnchain value sigShares not found for sign.QueryId: ", queryId)
+		}
+		result, ok = (*d.signTypeMap).Load(queryId)
+		signType, ok = result.(uint32)
+		if !ok {
+			fmt.Println("sendToOnchain value signType notfound for sign.QueryId: ", queryId)
+		}
+
+		sig, err := tbls.Recover(d.suite, d.p2pDkg.GetGroupPublicPoly(), content, sigShares, d.nbParticipants/2+1, d.nbParticipants)
+		if err != nil {
+			fmt.Println("Recover failed ", err)
+		}
+		repoter := d.getReporter()
+		fmt.Println("reporter ", repoter)
+		(*d.contentMap).Delete(queryId)
+		(*d.signMap).Delete(queryId)
+		(*d.signTypeMap).Delete(queryId)
+		//QueryId is 0 means that is for random number
+		switch signType {
+		case ForRandomNumber:
+			err := bls.Verify(d.suite, d.p2pDkg.GetGroupPublicPoly().Commit(), content, sig)
+			if err != nil {
+				fmt.Println("!!!!!  Verify failed", err, " queryID ", queryId)
+			}
+			randomN := new(big.Int)
+			randomN.SetBytes(content)
+			if d.p2pDkg.GetDKGIndex() == repoter {
+				groupId := new(big.Int)
+				groupId.SetBytes(d.p2pDkg.GetGroupId())
+				fmt.Println("Random Number result = ", randomN, " verify success")
+				err = d.chainConn.SetRandomNum(groupId, sig)
+				if err != nil {
+					fmt.Println("SetRandomNum err ", err)
+					err = d.chainConn.SetRandomNum(groupId, sig)
+				}
+			}
+		default:
+			err := bls.Verify(d.suite, d.p2pDkg.GetGroupPublicPoly().Commit(), content, sig)
+			if err != nil {
+				fmt.Println("!!!!!  Verify failed", err, " queryID ", queryId)
+			}
+			fmt.Println("checkURL result = ", string(content), " verify success")
+			qID := big.NewInt(0)
+			qID.SetString(queryId, 10)
+			if d.p2pDkg.GetDKGIndex() == repoter {
+				//Todo:Need to have a way to detemie who should send back the result
+				err = d.chainConn.DataReturn(qID, content, sig)
+				if err != nil {
+					fmt.Println("DataReturn err ", err)
+					err = d.chainConn.DataReturn(qID, content, sig)
+				}
+			}
+		}
+	}
+}
+
+// main
+func main() {
+	seedFlag := flag.String("seedAddr", "", "seed address")
+	nbParticipantsFlag := flag.Int("nbVerifiers", 21, "Number of Participants")
+	portFlag := flag.Int("port", 0, "port number")
+
+	flag.Parse()
+	seedAddr := *seedFlag
+	_ = seedAddr
+	nbParticipants := *nbParticipantsFlag
+	port := *portFlag
+
+	//1)Connect to Eth and Set node ID
+	chainConn, err := blockchain.AdaptTo("ETH", true)
 	if err != nil {
-		return err
+		log.Fatal(err)
 	}
 
-	auth.GasLimit = uint64(500000) // in units
-	auth.GasPrice = gasPrice
-
-	tx, err := proxy.TriggerCallback(auth, queryId, data, x, y)
+	err = chainConn.UploadID()
 	if err != nil {
-		return err
+		log.Fatal(err)
 	}
 
-	fmt.Println("tx sent: ", tx.Hash().Hex())
-	fmt.Printf("Query_ID %v request fulfilled \n", queryId)
+	bootstrapIp, err := chainConn.GetBootstrapIp()
+	if err != nil {
+		log.Fatal(err)
+	}
+	chUrl := make(chan interface{})
+	go func() {
+		chUrl <- &eth.DOSProxyLogUrl{}
+	}()
+	defer close(chUrl)
 
-	return nil
+	chGroup := make(chan interface{})
+	go func() {
+		chGroup <- &eth.DOSProxyLogGrouping{}
+	}()
+	defer close(chGroup)
+	chRandom := make(chan interface{})
+	go func() {
+		chRandom <- &eth.DOSProxyLogUpdateRandom{}
+	}()
+	defer close(chGroup)
+	chainConn.SubscribeEvent(chUrl)
+	chainConn.SubscribeEvent(chGroup)
+	chainConn.SubscribeEvent(chRandom)
+
+	//1)Build a p2p network
+	peerEvent := make(chan p2p.P2PMessage, 100)
+	defer close(peerEvent)
+	p, _ := p2p.CreateP2PNetwork(peerEvent, port)
+	p.SetId(chainConn.GetId())
+	p.Listen()
+
+	//3)Dial to peers to build peerClient
+	if bootstrapIp != "" {
+		fmt.Println(bootstrapIp)
+		p.CreatePeer(bootstrapIp, nil)
+		results := p.FindNode(p.GetId(), dht.BucketSize, 20)
+		for _, result := range results {
+			p.GetRoutingTable().Update(result)
+			fmt.Println(p.GetId().Address, "Update peer: ", result.Address)
+		}
+	} else {
+		err = chainConn.SetBootstrapIp(p.GetId().Address)
+		if err != nil {
+			fmt.Println(err)
+		}
+	}
+
+	suite := suites.MustFind("bn256")
+	peerEventForDKG := make(chan p2p.P2PMessage, 100)
+	defer close(peerEventForDKG)
+	p2pDkg, _ := dkg.CreateP2PDkg(p, suite, peerEventForDKG, nbParticipants)
+	go p2pDkg.EventLoop()
+	dkgEvent := make(chan string, 100)
+	p2pDkg.SubscribeEvent(dkgEvent)
+	defer close(dkgEvent)
+
+	toOnChainQueue := make(chan string, 100)
+	defer close(toOnChainQueue)
+
+	d := &dosNode{
+		suite:          suite,
+		signMap:        new(sync.Map),
+		signTypeMap:    new(sync.Map),
+		contentMap:     new(sync.Map),
+		chSignature:    make(chan vss.Signature, 100),
+		chURL:          make(chan string, 100),
+		nbParticipants: nbParticipants,
+		network:        &p,
+		chainConn:      chainConn,
+		p2pDkg:         p2pDkg,
+		//randomNumber:   new(big.Int),
+		toOnChainQueue: toOnChainQueue,
+	}
+	go d.sendToOnchain()
+	go d.receiveSignature()
+	for {
+		select {
+		//event from peer
+		case msg := <-peerEvent:
+			switch content := msg.Msg.Message.(type) {
+			case *vss.PublicKey:
+				peerEventForDKG <- msg
+			case *dkg.Deal:
+				peerEventForDKG <- msg
+			case *dkg.Response:
+				peerEventForDKG <- msg
+			case *vss.Signature:
+				d.chSignature <- *content
+				fmt.Println("signature form peer")
+			default:
+				fmt.Println("unknown", content)
+			}
+		case msg := <-dkgEvent:
+			if msg == "cetified" {
+				if d.p2pDkg.GetDKGIndex() == 0 {
+					gId := new(big.Int)
+					gId.SetBytes(d.p2pDkg.GetGroupId())
+					d.chainConn.UploadPubKey(gId, d.p2pDkg.GetGroupPublicPoly().Commit())
+				}
+			}
+		case msg := <-chUrl:
+			switch content := msg.(type) {
+			case *eth.DOSProxyLogUrl:
+				fmt.Printf("Query-ID: %v \n", content.QueryId)
+				fmt.Println("Query Url: ", content.Url)
+				d.CheckURL(content.QueryId, content.Url)
+			default:
+				fmt.Println("type mismatch")
+			}
+		case msg := <-chRandom:
+			switch content := msg.(type) {
+			case *eth.DOSProxyLogUpdateRandom:
+				//if d.p2pDkg.GetGroupId() == content.GroupId {
+				//To avoid the err: SetRandomNum err  nonce too low
+				timer := time.NewTimer(30 * time.Second)
+				go func() {
+					<-timer.C
+					d.GenerateRandomNumber(content.PreRandomNumber)
+				}()
+				//}
+			default:
+				fmt.Println("type mismatch")
+			}
+		case msg := <-chGroup:
+			switch content := msg.(type) {
+			case *eth.DOSProxyLogGrouping:
+
+				isMember := false
+				groupIds := [][]byte{}
+				for i, node := range content.NodeId {
+					id := node.Bytes()
+					if string(id) == string(p.GetId().Id) {
+						isMember = true
+					}
+					fmt.Println("DOSProxyLogGrouping member i= ", i, " id ", id, " ", isMember)
+					groupIds = append(groupIds, id)
+				}
+				d.nbParticipants = len(groupIds)
+				d.p2pDkg.SetNbParticipants(d.nbParticipants)
+				if isMember {
+					d.groupIds = groupIds
+					d.p2pDkg.SetGroupId(content.GroupId.Bytes())
+					d.p2pDkg.SetGroupMembers(groupIds)
+					d.p2pDkg.RunDKG()
+				}
+
+			default:
+				fmt.Println("type mismatch")
+			}
+		}
+	}
 }
