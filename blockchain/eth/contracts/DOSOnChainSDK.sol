@@ -1,29 +1,35 @@
-pragma solidity ^0.4.14;
+pragma solidity ^0.4.24;
 
 interface DOSProxyInterface {
-    function query(address, uint, uint, string, string) ;
+  function query(address, uint, uint, string, string) external returns (uint);
 }
 
 interface DOSAddressBridgeInterface {
-    function getProxyAddress() returns (address);
+  function getProxyAddress() external view returns (address);
 }
 
 contract DOSOnChainSDK {
-    DOSProxyInterface dos_proxy;
-    DOSAddressBridgeInterface dos_addr_bridge = DOSAddressBridgeInterface(0x593bce0faf2d3d0863324fffb1a1c988cd22d5e5);
-    event LogQueriedDOS();
+  DOSProxyInterface dos_proxy;
+  DOSAddressBridgeInterface dos_addr_bridge =
+    DOSAddressBridgeInterface(0x593Bce0faF2D3D0863324Fffb1a1C988cD22d5E5);
 
-    modifier resolveAddress {
-        dos_proxy = DOSProxyInterface(dos_addr_bridge.getProxyAddress());
-        _;
-    }
+  modifier resolveAddress {
+      dos_proxy = DOSProxyInterface(dos_addr_bridge.getProxyAddress());
+      _;
+  }
 
-    function fromDOSProxyContract() internal returns (address) {
-        return dos_addr_bridge.getProxyAddress();
-    }
+  function fromDOSProxyContract() internal view returns (address) {
+      return dos_addr_bridge.getProxyAddress();
+  }
 
-    function queryDOS(uint timeout, string query_type, string query_string) resolveAddress internal {
-        LogQueriedDOS();
-        dos_proxy.query(this, block.number, timeout, query_type, query_string);
+  // TODO: Working on response parser.
+  // @return a unique query_id for parallel requests. A zeroed (0x0) query_id
+  // represents error.
+  function DOSQuery(uint timeout, string query_type, string query_string)
+    resolveAddress
+    internal
+    returns (uint)
+    {
+      return dos_proxy.query(this, block.number, timeout, query_type, query_string);
     }
 }
