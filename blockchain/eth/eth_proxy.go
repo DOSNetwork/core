@@ -30,8 +30,6 @@ const ethRemoteNode = "wss://rinkeby.infura.io/ws"
 
 const contractAddressHex = "0x9d1A50BB01639552Cdea3cDb2c1c0c17543A5ee0"
 
-//const contractAddressHex = "0x644ec75f0fbc55b5a840a5387c45432b7cc78631"
-
 var contractAddress = common.HexToAddress(contractAddressHex)
 
 type EthAdaptor struct {
@@ -90,27 +88,25 @@ func (e *EthAdaptor) SubscribeEvent(ch chan interface{}) (err error) {
 			return
 			//Todo:This will cause multiple event from eth
 		case <-time.After(60 * time.Second):
-			os.Exit(1)
-			/*
-				fmt.Println("retry...")
-				e.lock.Lock()
+			fmt.Println("retry...")
+			e.lock.Lock()
+			e.client, err = ethclient.Dial(ethRemoteNode)
+			for err != nil {
+				fmt.Println(err)
+				fmt.Println("Cannot connect to the network, retrying...")
 				e.client, err = ethclient.Dial(ethRemoteNode)
-				for err != nil {
-					fmt.Println(err)
-					fmt.Println("Cannot connect to the network, retrying...")
-					e.client, err = ethclient.Dial(ethRemoteNode)
-				}
+			}
 
+			e.proxy, err = dosproxy.NewDOSProxy(contractAddress, e.client)
+			for err != nil {
+				fmt.Println(err)
+				fmt.Println("Connot Create new proxy, retrying...")
 				e.proxy, err = dosproxy.NewDOSProxy(contractAddress, e.client)
-				for err != nil {
-					fmt.Println(err)
-					fmt.Println("Connot Create new proxy, retrying...")
-					e.proxy, err = dosproxy.NewDOSProxy(contractAddress, e.client)
-				}
+			}
 
-				e.lock.Unlock()
-				go e.subscribeEventAttempt(ch, opt, identity, done)
-			*/
+			e.lock.Unlock()
+			go e.subscribeEventAttempt(ch, opt, identity, done)
+
 		}
 	}
 	return nil
@@ -160,9 +156,10 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 				log.Fatal(err)
 			case i := <-transitChan:
 				ch <- &DOSProxyLogUrl{
-					QueryId: i.QueryId,
-					Url:     i.Url,
-					Timeout: i.Timeout,
+					QueryId:         i.QueryId,
+					Url:             i.Url,
+					Timeout:         i.Timeout,
+					DispatchedGroup: i.DispatchedGroup,
 				}
 			}
 		}
@@ -184,17 +181,12 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 				log.Fatal(err)
 			case i := <-transitChan:
 				ch <- &DOSProxyLogUpdateRandom{
-					GroupId:         i.GroupId,
-					PreRandomNumber: i.PreRandomNumber,
+					LastRandomness:  i.LastRandomness,
+					LastBlknum:      i.LastBlknum,
+					DispatchedGroup: i.DispatchedGroup,
 				}
 			}
 		}
-	case *DOSProxyLogCallbackTriggeredFor:
-	case *DOSProxyLogInvalidSignature:
-	case *DOSProxyLogNonContractCall:
-	case *DOSProxyLogNonSupportedType:
-	case *DOSProxyLogQueryFromNonExistentUC:
-	case *DOSProxyLogInsufficientGroupNumber:
 	}
 }
 
@@ -232,35 +224,6 @@ func (e *EthAdaptor) GetCurrBlockHash() (hash common.Hash, err error) {
 	return
 }
 
-func (e *EthAdaptor) GetBootstrapIp() (ip string, err error) {
-	return e.proxy.GetBootstrapIp(&bind.CallOpts{})
-}
-
-func (e *EthAdaptor) SetBootstrapIp(ip string) (err error) {
-	fmt.Println("Starting submitting bootstrapIp...")
-	auth, err := e.getAuth()
-	if err != nil {
-		return
-	}
-
-	tx, err := e.proxy.SetBootstrapIp(auth, ip)
-	if err != nil {
-		return
-	}
-
-	fmt.Println("tx sent: ", tx.Hash().Hex())
-	fmt.Println("bootstrapIp ", ip, " submitted, waiting for confirmation...")
-
-	err = e.checkTransaction(tx)
-
-	return
-
-}
-
-func (e *EthAdaptor) GetRandomNum() (num *big.Int, err error) {
-	return e.proxy.GetRandomNum(&bind.CallOpts{})
-}
-
 func (e *EthAdaptor) SetRandomNum(groupId *big.Int, sig []byte) (err error) {
 	fmt.Println("Starting submitting random number...")
 
@@ -271,7 +234,7 @@ func (e *EthAdaptor) SetRandomNum(groupId *big.Int, sig []byte) (err error) {
 
 	x, y := decodeSig(sig)
 
-	tx, err := e.proxy.SetRandomNum(auth, groupId, x, y)
+	tx, err := e.proxy.UpdateRandomness(auth, [2]*big.Int{x, y})
 	if err != nil {
 		return
 	}
@@ -296,7 +259,7 @@ func (e *EthAdaptor) UploadPubKey(groupId *big.Int, pubKey kyber.Point) (err err
 		return
 	}
 
-	tx, err := e.proxy.SetPublicKey(auth, groupId, x0, x1, y0, y1)
+	tx, err := e.proxy.SetPublicKey(auth, x0, x1, y0, y1)
 	if err != nil {
 		return
 	}
@@ -339,7 +302,7 @@ func (e *EthAdaptor) DataReturn(queryId *big.Int, data, sig []byte) (err error) 
 
 	x, y := decodeSig(sig)
 
-	tx, err := e.proxy.TriggerCallback(auth, queryId, data, x, y)
+	tx, err := e.proxy.TriggerCallback(auth, queryId, data, [2]*big.Int{x, y})
 	if err != nil {
 		return
 	}
@@ -523,7 +486,6 @@ func (e *EthAdaptor) checkTransaction(tx *types.Transaction) (err error) {
 	} else {
 		err = errors.New("transaction failed")
 	}
-	//time.Sleep(1 * time.Second)
 
 	return
 }
