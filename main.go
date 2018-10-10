@@ -82,12 +82,12 @@ func (d *dosNode) CheckURL(QueryId *big.Int, url string) {
 		d.signAndBroadcast(ForCheckURL, QueryId, result)
 	}
 }
-func (d *dosNode) GenerateRandomNumber(QueryId *big.Int, preRendomum *big.Int) {
+func (d *dosNode) GenerateRandomNumber(preRendomum *big.Int) {
 	//To avoid duplicate query
-	_, ok := (*d.signMap).Load(QueryId.String())
+	_, ok := (*d.signMap).Load(preRendomum.String())
 	if !ok {
-		fmt.Println("GenerateRandomNumber!!", QueryId)
-		d.signAndBroadcast(ForRandomNumber, QueryId, preRendomum.Bytes())
+		fmt.Println("GenerateRandomNumber!!", preRendomum.String())
+		d.signAndBroadcast(ForRandomNumber, preRendomum, preRendomum.Bytes())
 	}
 }
 
@@ -200,12 +200,10 @@ func (d *dosNode) sendToOnchain() {
 				groupId := new(big.Int)
 				groupId.SetBytes(d.p2pDkg.GetGroupId())
 				fmt.Println("Random Number result = ", randomN, " verify success")
-				qID := big.NewInt(0)
-				qID.SetString(queryId, 10)
-				err = d.chainConn.SetRandomNum(qID, groupId, sig)
+				err = d.chainConn.SetRandomNum(groupId, sig)
 				if err != nil {
 					fmt.Println("SetRandomNum err ", err)
-					err = d.chainConn.SetRandomNum(qID, groupId, sig)
+					err = d.chainConn.SetRandomNum(groupId, sig)
 				}
 			}
 		default:
@@ -368,7 +366,7 @@ func main() {
 				timer := time.NewTimer(30 * time.Second)
 				go func() {
 					<-timer.C
-					d.GenerateRandomNumber(content.RandomId, content.PreRandomNumber)
+					d.GenerateRandomNumber(content.PreRandomNumber)
 				}()
 				//}
 			default:

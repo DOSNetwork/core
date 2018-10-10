@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/ethereum/go-ethereum"
 	"io/ioutil"
 	"log"
 	"math"
@@ -12,6 +11,8 @@ import (
 	"os"
 	"sync"
 	"time"
+
+	"github.com/ethereum/go-ethereum"
 
 	"github.com/DOSNetwork/core/group/bn256"
 	"github.com/dedis/kyber"
@@ -183,8 +184,8 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 				log.Fatal(err)
 			case i := <-transitChan:
 				ch <- &DOSProxyLogUpdateRandom{
-					groupId:         i.GroupId,
-					preRandomNumber: i.PreRandomNumber,
+					GroupId:         i.GroupId,
+					PreRandomNumber: i.PreRandomNumber,
 				}
 			}
 		}
