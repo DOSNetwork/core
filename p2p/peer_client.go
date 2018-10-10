@@ -24,17 +24,17 @@ import (
 )
 
 type PeerClient struct {
-	p2pnet       *P2P
-	conn         *net.Conn
-	rw           *bufio.ReadWriter
-	messageChan  chan P2PMessage
-	status       int
-	identity     dht.ID
-	pubKey       kyber.Point
-	wg           sync.WaitGroup
-	RequestNonce uint64
-	Requests     sync.Map
-	mux          sync.Mutex
+	p2pnet      	*P2P
+	conn        	*net.Conn
+	rw          	*bufio.ReadWriter
+	messageChan 	chan P2PMessage
+	status      	int
+	identity		  dht.ID
+	pubKey      	kyber.Point
+	wg          	sync.WaitGroup
+	RequestNonce 	uint64
+	Requests    	sync.Map
+	mux           sync.Mutex
 }
 
 // RequestState represents a state of a request.
@@ -43,15 +43,14 @@ type RequestState struct {
 	closeSignal chan struct{}
 }
 
-func (p *PeerClient) Dial(addr string) (err error) {
-	var conn net.Conn
+func (p *PeerClient) Dial(addr string) {
+
 	fmt.Println(p.p2pnet.identity.Address, "Dial", addr)
-	conn, err = net.Dial("tcp", addr)
+	conn, err := net.Dial("tcp", addr)
 	if err != nil {
-		fmt.Println("Dial err ", err)
+		return
 	}
 	p.conn = &conn
-	return
 }
 
 func (p *PeerClient) HandlePackages() {
