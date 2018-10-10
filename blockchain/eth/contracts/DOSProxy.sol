@@ -26,7 +26,6 @@ contract DOSProxy {
     }
 
     uint nextGroupID = 0;
-    string bootstrapIp;
     uint[] nodeId;
     mapping(uint => uint[]) groupMapping;
     // calling query_id => PendingQuery metadata
@@ -38,7 +37,8 @@ contract DOSProxy {
     // blocknumber => random_number
     // random_number <- sha3(random_bytes)
     mapping(uint => bytes32) public randomness;
-    // last block number within contains the last updated randomness.
+    // Note: Update to randomness metadata must be made atomic.
+	  // last block number within contains the last updated randomness.
     uint public last_updated_blk;
     bytes32 public last_randomness;
     G2Point last_handled_group;
