@@ -13,10 +13,6 @@ import (
 	"time"
 
 	"github.com/ethereum/go-ethereum"
-
-	"github.com/DOSNetwork/core/group/bn256"
-	"github.com/dedis/kyber"
-
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
@@ -27,10 +23,7 @@ import (
 )
 
 const ethRemoteNode = "wss://rinkeby.infura.io/ws"
-
-const contractAddressHex = "0x9d1A50BB01639552Cdea3cDb2c1c0c17543A5ee0"
-
-//const contractAddressHex = "0x644ec75f0fbc55b5a840a5387c45432b7cc78631"
+const contractAddressHex = "g"
 
 var contractAddress = common.HexToAddress(contractAddressHex)
 
@@ -88,29 +81,25 @@ func (e *EthAdaptor) SubscribeEvent(ch chan interface{}) (err error) {
 		case <-done:
 			fmt.Println("subscribing done.")
 			return
-			//Todo:This will cause multiple event from eth
-		case <-time.After(60 * time.Second):
-			os.Exit(1)
-			/*
-				fmt.Println("retry...")
-				e.lock.Lock()
+		case <-time.After(3 * time.Second):
+			fmt.Println("retry...")
+			e.lock.Lock()
+			e.client, err = ethclient.Dial(ethRemoteNode)
+			for err != nil {
+				fmt.Println(err)
+				fmt.Println("Cannot connect to the network, retrying...")
 				e.client, err = ethclient.Dial(ethRemoteNode)
-				for err != nil {
-					fmt.Println(err)
-					fmt.Println("Cannot connect to the network, retrying...")
-					e.client, err = ethclient.Dial(ethRemoteNode)
-				}
+			}
 
+			e.proxy, err = dosproxy.NewDOSProxy(contractAddress, e.client)
+			for err != nil {
+				fmt.Println(err)
+				fmt.Println("Connot Create new proxy, retrying...")
 				e.proxy, err = dosproxy.NewDOSProxy(contractAddress, e.client)
-				for err != nil {
-					fmt.Println(err)
-					fmt.Println("Connot Create new proxy, retrying...")
-					e.proxy, err = dosproxy.NewDOSProxy(contractAddress, e.client)
-				}
+			}
 
-				e.lock.Unlock()
-				go e.subscribeEventAttempt(ch, opt, identity, done)
-			*/
+			e.lock.Unlock()
+			go e.subscribeEventAttempt(ch, opt, identity, done)
 		}
 	}
 	return nil
@@ -166,29 +155,6 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 				}
 			}
 		}
-	case *DOSProxyLogUpdateRandom:
-		fmt.Println("subscribing DOSProxyLogUpdateRandom event...")
-		transitChan := make(chan *dosproxy.DOSProxyLogUpdateRandom)
-		sub, err := e.proxy.DOSProxyFilterer.WatchLogUpdateRandom(opt, transitChan)
-		if err != nil {
-			fmt.Println(err)
-			fmt.Println("Network fail, will retry shortly")
-			return
-		}
-		fmt.Println("DOSProxyLogUpdateRandom event subscribed")
-
-		done <- true
-		for {
-			select {
-			case err := <-sub.Err():
-				log.Fatal(err)
-			case i := <-transitChan:
-				ch <- &DOSProxyLogUpdateRandom{
-					GroupId:         i.GroupId,
-					PreRandomNumber: i.PreRandomNumber,
-				}
-			}
-		}
 	case *DOSProxyLogCallbackTriggeredFor:
 	case *DOSProxyLogInvalidSignature:
 	case *DOSProxyLogNonContractCall:
@@ -222,76 +188,13 @@ func (e *EthAdaptor) GetId() (id []byte) {
 	return e.id.Bytes()
 }
 
-func (e *EthAdaptor) GetCurrBlockHash() (hash common.Hash, err error) {
-	block, err := e.client.BlockByNumber(context.Background(), nil)
-	if err != nil {
-		return
-	}
-
-	hash = block.Hash()
-	return
-}
-
 func (e *EthAdaptor) GetBootstrapIp() (ip string, err error) {
 	return e.proxy.GetBootstrapIp(&bind.CallOpts{})
 }
 
-func (e *EthAdaptor) SetBootstrapIp(ip string) (err error) {
-	fmt.Println("Starting submitting bootstrapIp...")
-	auth, err := e.getAuth()
-	if err != nil {
-		return
-	}
-
-	tx, err := e.proxy.SetBootstrapIp(auth, ip)
-	if err != nil {
-		return
-	}
-
-	fmt.Println("tx sent: ", tx.Hash().Hex())
-	fmt.Println("bootstrapIp ", ip, " submitted, waiting for confirmation...")
-
-	err = e.checkTransaction(tx)
-
-	return
-
-}
-
-func (e *EthAdaptor) GetRandomNum() (num *big.Int, err error) {
-	return e.proxy.GetRandomNum(&bind.CallOpts{})
-}
-
-func (e *EthAdaptor) SetRandomNum(groupId *big.Int, sig []byte) (err error) {
-	fmt.Println("Starting submitting random number...")
-
-	auth, err := e.getAuth()
-	if err != nil {
-		return
-	}
-
-	x, y := decodeSig(sig)
-
-	tx, err := e.proxy.SetRandomNum(auth, groupId, x, y)
-	if err != nil {
-		return
-	}
-
-	fmt.Println("tx sent: ", tx.Hash().Hex())
-	fmt.Println("new random number submitted, waiting for confirmation...")
-
-	err = e.checkTransaction(tx)
-
-	return
-}
-
-func (e *EthAdaptor) UploadPubKey(groupId *big.Int, pubKey kyber.Point) (err error) {
+func (e *EthAdaptor) UploadPubKey(groupId, x0, x1, y0, y1 *big.Int) (err error) {
 	fmt.Println("Starting submitting group public key...")
 	auth, err := e.getAuth()
-	if err != nil {
-		return
-	}
-
-	x0, x1, y0, y1, err := decodePubKey(pubKey)
 	if err != nil {
 		return
 	}
@@ -314,30 +217,11 @@ func (e *EthAdaptor) UploadPubKey(groupId *big.Int, pubKey kyber.Point) (err err
 	return
 }
 
-func decodePubKey(pubKey kyber.Point) (*big.Int, *big.Int, *big.Int, *big.Int, error) {
-	pubKeyMar, err := pubKey.MarshalBinary()
-	if err != nil {
-		return nil, nil, nil, nil, err
-	}
-
-	x0 := new(big.Int)
-	x1 := new(big.Int)
-	y0 := new(big.Int)
-	y1 := new(big.Int)
-	x0.SetBytes(pubKeyMar[1:33])
-	x1.SetBytes(pubKeyMar[33:65])
-	y0.SetBytes(pubKeyMar[65:97])
-	y1.SetBytes(pubKeyMar[97:])
-	return x0, x1, y0, y1, nil
-}
-
-func (e *EthAdaptor) DataReturn(queryId *big.Int, data, sig []byte) (err error) {
+func (e *EthAdaptor) DataReturn(queryId *big.Int, data []byte, x, y *big.Int) (err error) {
 	auth, err := e.getAuth()
 	if err != nil {
 		return
 	}
-
-	x, y := decodeSig(sig)
 
 	tx, err := e.proxy.TriggerCallback(auth, queryId, data, x, y)
 	if err != nil {
@@ -348,21 +232,6 @@ func (e *EthAdaptor) DataReturn(queryId *big.Int, data, sig []byte) (err error) 
 	fmt.Println("Query_ID request fulfilled ", queryId, " waiting for confirmation...")
 
 	err = e.checkTransaction(tx)
-
-	return
-}
-
-func decodeSig(sig []byte) (x, y *big.Int) {
-	x = new(big.Int)
-	y = new(big.Int)
-	x.SetBytes(sig[0:32])
-	y.SetBytes(sig[32:])
-
-	if x.Cmp(big.NewInt(0)) == 0 && y.Cmp(big.NewInt(0)) == 0 {
-		return big.NewInt(0), big.NewInt(0)
-	}
-
-	y = big.NewInt(0).Sub(bn256.P, big.NewInt(0).Mod(y, bn256.P))
 
 	return
 }
@@ -506,10 +375,6 @@ func (e *EthAdaptor) transferEth(from, to *keystore.Key) (err error) {
 
 func (e *EthAdaptor) checkTransaction(tx *types.Transaction) (err error) {
 	receipt, err := e.client.TransactionReceipt(context.Background(), tx.Hash())
-	if err != nil {
-		fmt.Println(err)
-	}
-	fmt.Println()
 	for err == ethereum.NotFound {
 		time.Sleep(1 * time.Second)
 		receipt, err = e.client.TransactionReceipt(context.Background(), tx.Hash())
@@ -523,7 +388,6 @@ func (e *EthAdaptor) checkTransaction(tx *types.Transaction) (err error) {
 	} else {
 		err = errors.New("transaction failed")
 	}
-	//time.Sleep(1 * time.Second)
 
 	return
 }

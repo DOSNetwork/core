@@ -254,53 +254,6 @@ func (_DOSProxy *DOSProxyCallerSession) LastUpdatedBlk() (*big.Int, error) {
 	return _DOSProxy.Contract.LastUpdatedBlk(&_DOSProxy.CallOpts)
 }
 
-// GetRandomNum is a free data retrieval call binding the contract method 0x25b814f4.
-//
-// Solidity: function getRandomNum() constant returns(uint256)
-func (_DOSProxy *DOSProxyCaller) GetRandomNum(opts *bind.CallOpts) (*big.Int, error) {
-	var (
-		ret0 = new(*big.Int)
-	)
-	out := ret0
-	err := _DOSProxy.contract.Call(opts, out, "getRandomNum")
-	return *ret0, err
-}
-
-// GetRandomNum is a free data retrieval call binding the contract method 0x25b814f4.
-//
-// Solidity: function getRandomNum() constant returns(uint256)
-func (_DOSProxy *DOSProxySession) GetRandomNum() (*big.Int, error) {
-	return _DOSProxy.Contract.GetRandomNum(&_DOSProxy.CallOpts)
-}
-
-// GetRandomNum is a free data retrieval call binding the contract method 0x25b814f4.
-//
-// Solidity: function getRandomNum() constant returns(uint256)
-func (_DOSProxy *DOSProxyCallerSession) GetRandomNum() (*big.Int, error) {
-	return _DOSProxy.Contract.GetRandomNum(&_DOSProxy.CallOpts)
-}
-
-// GenRandomNum is a paid mutator transaction binding the contract method 0xc752a5b9.
-//
-// Solidity: function genRandomNum() returns()
-func (_DOSProxy *DOSProxyTransactor) GenRandomNum(opts *bind.TransactOpts) (*types.Transaction, error) {
-	return _DOSProxy.contract.Transact(opts, "genRandomNum")
-}
-
-// GenRandomNum is a paid mutator transaction binding the contract method 0xc752a5b9.
-//
-// Solidity: function genRandomNum() returns()
-func (_DOSProxy *DOSProxySession) GenRandomNum() (*types.Transaction, error) {
-	return _DOSProxy.Contract.GenRandomNum(&_DOSProxy.TransactOpts)
-}
-
-// GenRandomNum is a paid mutator transaction binding the contract method 0xc752a5b9.
-//
-// Solidity: function genRandomNum() returns()
-func (_DOSProxy *DOSProxyTransactorSession) GenRandomNum() (*types.Transaction, error) {
-	return _DOSProxy.Contract.GenRandomNum(&_DOSProxy.TransactOpts)
-}
-
 // Grouping is a paid mutator transaction binding the contract method 0xeab14fe6.
 //
 // Solidity: function grouping(size uint256) returns()

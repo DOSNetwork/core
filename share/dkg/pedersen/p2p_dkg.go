@@ -18,9 +18,8 @@ import (
 )
 
 type P2PDkgInterface interface {
-	SetGroupId([]byte)
-	GetGroupId() []byte
-	GetDKGIndex() int
+	SetGroupId(uint)
+	GetGroupId() uint
 	SetGroupMembers([][]byte)
 	IsCetified() bool
 	RunDKG()
@@ -30,7 +29,6 @@ type P2PDkgInterface interface {
 	GetShareSecuirty() *share.PriShare
 	EventLoop()
 	Event(string)
-	SubscribeEvent(chan string)
 }
 
 func CreateP2PDkg(p p2p.P2PInterface, suite suites.Suite, peerEvent chan p2p.P2PMessage, nbParticipants int) (P2PDkgInterface, error) {
@@ -79,7 +77,7 @@ func CreateP2PDkg(p p2p.P2PInterface, suite suites.Suite, peerEvent chan p2p.P2P
 }
 
 type P2PDkg struct {
-	groupId []byte
+	groupId uint
 	suite   suites.Suite
 	//Data Buffer
 	publicKeys Pubkeys
@@ -98,25 +96,22 @@ type P2PDkg struct {
 	pubkeyIdMap map[string]string
 	//
 	nbParticipants int
-	subscribeEvent chan string
-	FSM            *fsm.FSM
-	chFsmEvent     chan string
-	network        *p2p.P2PInterface
-	chPeerEvent    chan p2p.P2PMessage
+
+	FSM         *fsm.FSM
+	chFsmEvent  chan string
+	network     *p2p.P2PInterface
+	chPeerEvent chan p2p.P2PMessage
 
 	groupingStart time.Time
-	dkgIndex      int
+	checkURLStart time.Time
 }
 
-func (d *P2PDkg) SetGroupId(id []byte) {
+func (d *P2PDkg) SetGroupId(id uint) {
 	d.groupId = id
 }
 
-func (d *P2PDkg) GetGroupId() []byte {
+func (d *P2PDkg) GetGroupId() uint {
 	return d.groupId
-}
-func (d *P2PDkg) GetDKGIndex() int {
-	return d.dkgIndex
 }
 func (d *P2PDkg) SetNbParticipants(n int) {
 	if d.FSM.Current() == "Init" {
@@ -160,9 +155,7 @@ func (d *P2PDkg) GetShareSecuirty() *share.PriShare {
 	}
 	return nil
 }
-func (d *P2PDkg) SubscribeEvent(dkgEvent chan string) {
-	d.subscribeEvent = dkgEvent
-}
+
 func (d *P2PDkg) EventLoop() {
 	for {
 		select {
@@ -205,7 +198,6 @@ func (d *P2PDkg) enterInit(e *fsm.Event) {
 }
 
 func (d *P2PDkg) enterExchangePubKey(e *fsm.Event) {
-	d.groupingStart = time.Now()
 	id := (*d.network).GetId().Id
 	d.pubkeyIdMap[d.partPub.String()] = string(id)
 	d.publicKeys = append(d.publicKeys, d.partPub)
@@ -245,8 +237,6 @@ func (d *P2PDkg) enterNewDistKeyGenerator(e *fsm.Event) {
 	for i, pub := range d.publicKeys {
 		if !pub.Equal(d.partPub) {
 			(*d.network).SendMessageById([]byte(d.pubkeyIdMap[pub.String()]), deals[i])
-		} else {
-			d.dkgIndex = i
 		}
 	}
 	condition := d.nbParticipants - 1
@@ -295,9 +285,6 @@ func (d *P2PDkg) enterVerified(e *fsm.Event) {
 	d.groupPubPoly = share.NewPubPoly(d.suite, d.suite.Point().Base(), d.partDks.Commitments())
 	fmt.Println("DistKeyShare SUCCESS ")
 	fmt.Println(time.Since(d.groupingStart))
-	if d.subscribeEvent != nil {
-		d.subscribeEvent <- "cetified"
-	}
 }
 
 func (d *P2PDkg) Event(event string) {
