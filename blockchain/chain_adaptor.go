@@ -19,7 +19,7 @@ type ChainInterface interface {
 	GetBootstrapIp() (ip string, err error)
 	SetBootstrapIp(ip string) (err error)
 	GetRandomNum() (num *big.Int, err error)
-	SetRandomNum(groupId, num *big.Int, sig []byte) (err error)
+	SetRandomNum(num *big.Int, sig []byte) (err error)
 	DataReturn(queryId *big.Int, data, sig []byte) (err error)
 }
 

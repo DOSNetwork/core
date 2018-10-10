@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/ethereum/go-ethereum"
 	"io/ioutil"
 	"log"
 	"math"
@@ -15,7 +16,6 @@ import (
 	"github.com/DOSNetwork/core/group/bn256"
 	"github.com/dedis/kyber"
 
-	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
@@ -27,8 +27,9 @@ import (
 
 const ethRemoteNode = "wss://rinkeby.infura.io/ws"
 
-//const contractAddressHex = "0x0Aa21a5061f6E4c74d1162DCd314f8b9CE1c1C1F"
-const contractAddressHex = "0xBbE67aC11F3D1a89093aa2da8075bc3797C861bb"
+const contractAddressHex = "0x9d1A50BB01639552Cdea3cDb2c1c0c17543A5ee0"
+
+//const contractAddressHex = "0x644ec75f0fbc55b5a840a5387c45432b7cc78631"
 
 var contractAddress = common.HexToAddress(contractAddressHex)
 
@@ -87,28 +88,28 @@ func (e *EthAdaptor) SubscribeEvent(ch chan interface{}) (err error) {
 			fmt.Println("subscribing done.")
 			return
 			//Todo:This will cause multiple event from eth
-		case <-time.After(10 * time.Second):
-			//os.Exit(1)
-
-			fmt.Println("retry...")
-			e.lock.Lock()
-			e.client, err = ethclient.Dial(ethRemoteNode)
-			for err != nil {
-				fmt.Println(err)
-				fmt.Println("Cannot connect to the network, retrying...")
+		case <-time.After(60 * time.Second):
+			os.Exit(1)
+			/*
+				fmt.Println("retry...")
+				e.lock.Lock()
 				e.client, err = ethclient.Dial(ethRemoteNode)
-			}
+				for err != nil {
+					fmt.Println(err)
+					fmt.Println("Cannot connect to the network, retrying...")
+					e.client, err = ethclient.Dial(ethRemoteNode)
+				}
 
-			e.proxy, err = dosproxy.NewDOSProxy(contractAddress, e.client)
-			for err != nil {
-				fmt.Println(err)
-				fmt.Println("Connot Create new proxy, retrying...")
 				e.proxy, err = dosproxy.NewDOSProxy(contractAddress, e.client)
-			}
+				for err != nil {
+					fmt.Println(err)
+					fmt.Println("Connot Create new proxy, retrying...")
+					e.proxy, err = dosproxy.NewDOSProxy(contractAddress, e.client)
+				}
 
-			e.lock.Unlock()
-			go e.subscribeEventAttempt(ch, opt, identity, done)
-
+				e.lock.Unlock()
+				go e.subscribeEventAttempt(ch, opt, identity, done)
+			*/
 		}
 	}
 	return nil
@@ -182,9 +183,8 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 				log.Fatal(err)
 			case i := <-transitChan:
 				ch <- &DOSProxyLogUpdateRandom{
-					RandomId:        i.RandomId,
-					GroupId:         i.GroupId,
-					PreRandomNumber: i.PreRandomNumber,
+					groupId:         i.GroupId,
+					preRandomNumber: i.PreRandomNumber,
 				}
 			}
 		}
@@ -260,7 +260,7 @@ func (e *EthAdaptor) GetRandomNum() (num *big.Int, err error) {
 	return e.proxy.GetRandomNum(&bind.CallOpts{})
 }
 
-func (e *EthAdaptor) SetRandomNum(randomId, groupId *big.Int, sig []byte) (err error) {
+func (e *EthAdaptor) SetRandomNum(groupId *big.Int, sig []byte) (err error) {
 	fmt.Println("Starting submitting random number...")
 
 	auth, err := e.getAuth()
@@ -270,13 +270,13 @@ func (e *EthAdaptor) SetRandomNum(randomId, groupId *big.Int, sig []byte) (err e
 
 	x, y := decodeSig(sig)
 
-	tx, err := e.proxy.SetRandomNum(auth, randomId, groupId, x, y)
+	tx, err := e.proxy.SetRandomNum(auth, groupId, x, y)
 	if err != nil {
 		return
 	}
 
 	fmt.Println("tx sent: ", tx.Hash().Hex())
-	fmt.Println("new random number submitted ", randomId, " waiting for confirmation...")
+	fmt.Println("new random number submitted, waiting for confirmation...")
 
 	err = e.checkTransaction(tx)
 
@@ -505,6 +505,10 @@ func (e *EthAdaptor) transferEth(from, to *keystore.Key) (err error) {
 
 func (e *EthAdaptor) checkTransaction(tx *types.Transaction) (err error) {
 	receipt, err := e.client.TransactionReceipt(context.Background(), tx.Hash())
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println()
 	for err == ethereum.NotFound {
 		time.Sleep(1 * time.Second)
 		receipt, err = e.client.TransactionReceipt(context.Background(), tx.Hash())
@@ -518,6 +522,7 @@ func (e *EthAdaptor) checkTransaction(tx *types.Transaction) (err error) {
 	} else {
 		err = errors.New("transaction failed")
 	}
+	//time.Sleep(1 * time.Second)
 
 	return
 }

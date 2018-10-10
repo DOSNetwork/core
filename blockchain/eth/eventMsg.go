@@ -1,9 +1,8 @@
 package eth
 
 import (
-	"math/big"
-
 	"github.com/ethereum/go-ethereum/common"
+	"math/big"
 )
 
 //TODO: MAKE IT A UNIVERSAL INTERFACE FOR ALL KIND OF CHAINS IN FUTURE
@@ -38,9 +37,8 @@ type DOSProxyLogGrouping struct {
 }
 
 type DOSProxyLogUpdateRandom struct {
-	RandomId        *big.Int
-	GroupId         *big.Int
-	PreRandomNumber *big.Int
+	groupId         *big.Int
+	preRandomNumber *big.Int
 }
 
 type DOSProxyLogInsufficientGroupNumber struct{}
