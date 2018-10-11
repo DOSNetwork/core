@@ -37,7 +37,7 @@ contract DOSProxy {
     // Note: Update to randomness metadata must be made atomic.
     // last block number within contains the last updated randomness.
     uint public last_updated_blk;
-    bytes32 public last_randomness;
+    uint public last_randomness;
     G2Point last_handled_group;
 
     // Log struct is an experimental feature, use with care.
@@ -47,7 +47,7 @@ contract DOSProxy {
     event LogNonContractCall(address from);
     event LogCallbackTriggeredFor(address callback_addr, bytes result);
     event LogQueryFromNonExistentUC();
-    event LogUpdateRandom(bytes32 last_randomness, uint last_blknum, uint[4] dispatched_group);
+    event LogUpdateRandom(uint last_randomness, uint last_blknum, uint[4] dispatched_group);
     event LogInvalidSignature();
     event LogInsufficientGroupNumber();
     event LogGrouping(uint GroupId, uint[] NodeId);
@@ -82,8 +82,8 @@ contract DOSProxy {
             // Only supporting api/url for alpha release.
             if (strEqual(query_type, 'API')) {
                 uint query_id = uint(keccak256(abi.encodePacked(
-                    from, blk_num, timeout, query_type, query_path)));
-                uint idx = uint(last_randomness) % groupPubKeys.length;
+                        from, blk_num, timeout, query_type, query_path)));
+                uint idx = last_randomness % groupPubKeys.length;
                 pending_queries[query_id] = PendingQuery(query_id, groupPubKeys[idx], from);
                 emit LogUrl(query_id, query_path, timeout, getGroupPubKey(idx));
                 return query_id;
@@ -108,7 +108,7 @@ contract DOSProxy {
         G1Point memory signature = G1Point(sig[0], sig[1]);
         // TODO: change to sha3(result) after off-chain clients signs on sha3(result)
         if (!verifyGroupSignature(result, signature,
-                                  pending_queries[query_id].handled_group)) {
+            pending_queries[query_id].handled_group)) {
             emit LogInvalidSignature();
             return;
         }
@@ -132,20 +132,23 @@ contract DOSProxy {
         // and reused in triggerCallback().
 
         // TODO: The message off-chain clients signed: (last_blockhash || last_randomness)
-        bytes memory message = abi.encodePacked(
-            blockhash(last_updated_blk), last_randomness);
         G1Point memory signature = G1Point(sig[0], sig[1]);
-        if (!verifyGroupSignature(message, signature, last_handled_group)) {
+        if (!verifyGroupSignature(toBytes(last_randomness), signature, last_handled_group)) {
             emit LogInvalidSignature();
             return;
         }
         // Update new randomness = sha3(group signature)
-        last_randomness = keccak256(abi.encodePacked(signature.x, signature.y));
+        last_randomness = uint(keccak256(abi.encodePacked(signature.x, signature.y, blockhash(last_updated_blk))));
         last_updated_blk = block.number;
-        uint idx = uint(last_randomness) % groupPubKeys.length;
+        uint idx = last_randomness % groupPubKeys.length;
         last_handled_group = groupPubKeys[idx];
         // Signal off-chain clients
         emit LogUpdateRandom(last_randomness, last_updated_blk, getGroupPubKey(idx));
+    }
+
+    function toBytes(uint num) internal returns (bytes numBytes) {
+        numBytes = new bytes(32);
+        assembly { mstore(add(numBytes, 32), num) }
     }
 
     // TODO: change to bytes32 in future.
@@ -188,7 +191,7 @@ contract DOSProxy {
 
         assembly {
             success := call(sub(gas, 2000), 8, 0, add(input, 0x20), mul(inputSize, 0x20), out, 0x20)
-            // Use "invalid" to make gas estimation work
+        // Use "invalid" to make gas estimation work
             switch success case 0 {invalid}
         }
         require(success);
@@ -223,7 +226,7 @@ contract DOSProxy {
         bool success;
         assembly {
             success := call(sub(gas, 2000), 6, 0, input, 0x80, r, 0x40)
-            // Use "invalid" to make gas estimation work
+        // Use "invalid" to make gas estimation work
             switch success case 0 {invalid}
         }
         require(success);
@@ -237,7 +240,7 @@ contract DOSProxy {
         bool success;
         assembly {
             success := call(sub(gas, 2000), 7, 0, input, 0x60, r, 0x40)
-            // Use "invalid" to make gas estimation work
+        // Use "invalid" to make gas estimation work
             switch success case 0 {invalid}
         }
         require(success);
@@ -256,8 +259,8 @@ contract DOSProxy {
         require(idx < groupPubKeys.length, "group index out of range");
 
         return [
-            groupPubKeys[idx].x[0], groupPubKeys[idx].x[1],
-            groupPubKeys[idx].y[0], groupPubKeys[idx].y[1]
+        groupPubKeys[idx].x[0], groupPubKeys[idx].x[1],
+        groupPubKeys[idx].y[0], groupPubKeys[idx].y[1]
         ];
     }
 
@@ -268,7 +271,7 @@ contract DOSProxy {
     function grouping(uint size) {
         uint[] memory toBeGrouped = new uint[](size);
         if (nodeId.length < size) {
-            LogInsufficientGroupNumber();
+            emit LogInsufficientGroupNumber();
             return;
         }
         for (uint i = 0; i < size; i++) {
@@ -277,7 +280,7 @@ contract DOSProxy {
         }
         uint groupId = nextGroupID++;
         groupMapping[groupId] = toBeGrouped;
-        LogGrouping(groupId, toBeGrouped);
+        emit LogGrouping(groupId, toBeGrouped);
     }
 
     function resetContract() {

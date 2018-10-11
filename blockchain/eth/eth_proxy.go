@@ -28,7 +28,7 @@ import (
 
 const ethRemoteNode = "wss://rinkeby.infura.io/ws"
 
-const contractAddressHex = "0x9d1A50BB01639552Cdea3cDb2c1c0c17543A5ee0"
+const contractAddressHex = "0x3cC64423B1CfB5343efac6B8f630bcb1Af809130"
 
 var contractAddress = common.HexToAddress(contractAddressHex)
 
@@ -469,10 +469,6 @@ func (e *EthAdaptor) transferEth(from, to *keystore.Key) (err error) {
 
 func (e *EthAdaptor) checkTransaction(tx *types.Transaction) (err error) {
 	receipt, err := e.client.TransactionReceipt(context.Background(), tx.Hash())
-	if err != nil {
-		fmt.Println(err)
-	}
-	fmt.Println()
 	for err == ethereum.NotFound {
 		time.Sleep(1 * time.Second)
 		receipt, err = e.client.TransactionReceipt(context.Background(), tx.Hash())
