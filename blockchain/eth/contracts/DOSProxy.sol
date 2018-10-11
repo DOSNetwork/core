@@ -36,8 +36,8 @@ contract DOSProxy {
     mapping(bytes32 => bool) groups;
     // Note: Update to randomness metadata must be made atomic.
     // last block number within contains the last updated randomness.
-    uint public last_updated_blk;
-    uint public last_randomness;
+    uint public last_updated_blk = block.number;
+    uint public last_randomness = uint(keccak256(abi.encodePacked(blockhash(last_updated_blk), blockhash(last_updated_blk), blockhash(last_updated_blk))));
     G2Point last_handled_group;
 
     // Log struct is an experimental feature, use with care.
