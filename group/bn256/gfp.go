@@ -1,6 +1,12 @@
 package bn256
 
-import "fmt"
+import (
+	"fmt"
+
+	"golang.org/x/sys/cpu"
+)
+
+var hasBMI2 = cpu.X86.HasBMI2
 
 type gfP [4]uint64
 
