@@ -224,7 +224,7 @@ func (e *EthAdaptor) GetCurrBlockHash() (hash common.Hash, err error) {
 	return
 }
 
-func (e *EthAdaptor) SetRandomNum(groupId *big.Int, sig []byte) (err error) {
+func (e *EthAdaptor) SetRandomNum(sig []byte) (err error) {
 	fmt.Println("Starting submitting random number...")
 
 	auth, err := e.getAuth()

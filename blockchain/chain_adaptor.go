@@ -16,7 +16,7 @@ type ChainInterface interface {
 	UploadPubKey(groupId *big.Int, pubKey kyber.Point) (err error)
 	GetId() (id []byte)
 	GetCurrBlockHash() (hash common.Hash, err error)
-	SetRandomNum(num *big.Int, sig []byte) (err error)
+	SetRandomNum(sig []byte) (err error)
 	DataReturn(queryId *big.Int, data, sig []byte) (err error)
 }
 
