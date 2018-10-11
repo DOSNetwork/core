@@ -28,7 +28,7 @@ import (
 
 const ethRemoteNode = "wss://rinkeby.infura.io/ws"
 
-const contractAddressHex = "0xb75D8A0877E611d57912f187F98C3eFCB7b6985b"
+const contractAddressHex = "0x7b58837B408eDD6c77A600A1Ef8f58D9e9101d42"
 
 var contractAddress = common.HexToAddress(contractAddressHex)
 
@@ -181,7 +181,6 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 			case i := <-transitChan:
 				ch <- &DOSProxyLogUpdateRandom{
 					LastRandomness:  i.LastRandomness,
-					LastBlknum:      i.LastBlknum,
 					DispatchedGroup: i.DispatchedGroup,
 				}
 			}
