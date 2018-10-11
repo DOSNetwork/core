@@ -14,7 +14,8 @@ type DOSProxyLogUrl struct {
 }
 
 type DOSProxyLogUpdateRandom struct {
-	LastRandomness  *big.Int
+	LastRandomness  [32]byte
+	LastBlknum      *big.Int
 	DispatchedGroup [4]*big.Int
 }
 

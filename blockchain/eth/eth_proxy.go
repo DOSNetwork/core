@@ -28,6 +28,7 @@ import (
 
 const ethRemoteNode = "wss://rinkeby.infura.io/ws"
 
+// TODO: Instead of hardcode, read from DOSAddressBridge.go
 const contractAddressHex = "0xda5AED5537cd3A2b6EFd07813819859CafD59aaB"
 
 var contractAddress = common.HexToAddress(contractAddressHex)
@@ -181,6 +182,7 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 			case i := <-transitChan:
 				ch <- &DOSProxyLogUpdateRandom{
 					LastRandomness:  i.LastRandomness,
+					LastBlknum:      i.LastBlknum,
 					DispatchedGroup: i.DispatchedGroup,
 				}
 			}
