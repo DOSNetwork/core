@@ -34,8 +34,7 @@ contract DOSProxy {
     mapping(bytes32 => bool) groups;
     // Note: Update to randomness metadata must be made atomic.
     // last block number within contains the last updated randomness.
-    uint public last_updated_blk = block.number;
-    uint public last_randomness = uint(keccak256(abi.encodePacked(blockhash(last_updated_blk), blockhash(last_updated_blk), blockhash(last_updated_blk))));
+    uint public last_randomness = uint(keccak256(abi.encodePacked(blockhash(block.number), blockhash(block.number), blockhash(block.number))));
     G2Point last_handled_group;
 
     // Log struct is an experimental feature, use with care.
@@ -45,7 +44,7 @@ contract DOSProxy {
     event LogNonContractCall(address from);
     event LogCallbackTriggeredFor(address callback_addr, bytes result);
     event LogQueryFromNonExistentUC();
-    event LogUpdateRandom(uint last_randomness, uint last_blknum, uint[4] dispatched_group);
+    event LogUpdateRandom(uint last_randomness, uint[4] dispatched_group);
     event LogInvalidSignature();
     event LogInsufficientGroupNumber();
     event LogGrouping(uint[] NodeId);
@@ -136,12 +135,15 @@ contract DOSProxy {
             return;
         }
         // Update new randomness = sha3(group signature)
-        last_randomness = uint(keccak256(abi.encodePacked(signature.x, signature.y, blockhash(last_updated_blk))));
-        last_updated_blk = block.number;
+        last_randomness = uint(keccak256(abi.encodePacked(signature.x, signature.y, blockhash(block.number))));
+        fireRandom();
+    }
+
+    function fireRandom() {
         uint idx = last_randomness % groupPubKeys.length;
         last_handled_group = groupPubKeys[idx];
         // Signal off-chain clients
-        emit LogUpdateRandom(last_randomness, last_updated_blk, getGroupPubKey(idx));
+        emit LogUpdateRandom(last_randomness, getGroupPubKey(idx));
     }
 
     function toBytes(uint num) internal returns (bytes numBytes) {
