@@ -1,6 +1,7 @@
 package tbls
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/DOSNetwork/core/share"
@@ -21,11 +22,19 @@ func TestTBLS(test *testing.T) {
 	priPoly := share.NewPriPoly(suite, t, secret, suite.RandomStream())
 	pubPoly := priPoly.Commit(suite.Point().Base())
 	sigShares := make([][]byte, 0)
-	for _, x := range priPoly.Shares(n) {
+	for i, x := range priPoly.Shares(n) {
 		sig, err := Sign(suite, x, msg)
 		require.Nil(test, err)
 		sigShares = append(sigShares, sig)
+		//To simulate wrong signatures case
+		if i <= 3 {
+			sig[0] ^= 0x01
+		}
+		//To simulate duplicate signatures case
+		sigShares = append(sigShares, sig)
+		sigShares = append(sigShares, sig)
 	}
+	fmt.Println(len(sigShares))
 	sig, err := Recover(suite, pubPoly, msg, sigShares, t, n)
 	require.Nil(test, err)
 	err = bls.Verify(suite, pubPoly.Commit(), msg, sig)

@@ -13,6 +13,8 @@ package tbls
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
+
 	"github.com/DOSNetwork/core/share"
 	"github.com/DOSNetwork/core/sign/bls"
 	"github.com/DOSNetwork/core/suites"
@@ -71,6 +73,20 @@ func Verify(suite Suite, public *share.PubPoly, msg, sig []byte) error {
 	return bls.Verify(suite, public.Eval(i).V, msg, s.Value())
 }
 
+func SliceUniqMap(s [][]byte) [][]byte {
+	seen := make(map[string]struct{}, len(s))
+	j := 0
+	for _, v := range s {
+		if _, ok := seen[string(v)]; ok {
+			continue
+		}
+		seen[string(v)] = struct{}{}
+		s[j] = v
+		j++
+	}
+	return s[:j]
+}
+
 // Recover reconstructs the full BLS signature S = x * H(m) from a threshold t
 // of signature shares Si using Lagrange interpolation. The full signature S
 // can be verified through the regular BLS verification routine using the
@@ -78,15 +94,19 @@ func Verify(suite Suite, public *share.PubPoly, msg, sig []byte) error {
 // public sharing polynomial at index 0.
 func Recover(suite Suite, public *share.PubPoly, msg []byte, sigs [][]byte, t, n int) ([]byte, error) {
 	pubShares := make([]*share.PubShare, 0)
+	fmt.Println("Recover len ", len(sigs))
+	sigs = SliceUniqMap(sigs)
 	for _, sig := range sigs {
 		s := SigShare(sig)
 		i, err := s.Index()
+
 		if err != nil {
 			return nil, err
 		}
 		if err = bls.Verify(suite, public.Eval(i).V, msg, s.Value()); err != nil {
-			return nil, err
+			continue
 		}
+		fmt.Println("Recover index ", i)
 		point := suite.G1().Point()
 		if err := point.UnmarshalBinary(s.Value()); err != nil {
 			return nil, err

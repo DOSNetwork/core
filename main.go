@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -35,10 +36,14 @@ type dosNode struct {
 	chSignature    chan vss.Signature
 	chURL          chan string
 	toOnChainQueue chan string
+	ticker         *time.Ticker
+	quit           chan struct{}
 	signMap        *sync.Map
 	contentMap     *sync.Map
 	signTypeMap    *sync.Map
+	finishMap      *sync.Map
 	nbParticipants int
+	nbThreshold    int
 	groupPubPoly   share.PubPoly
 	shareSec       share.PriShare
 	chainConn      blockchain.ChainInterface
@@ -105,9 +110,10 @@ func (d *dosNode) signAndBroadcast(index uint32, QueryId *big.Int, content []byt
 	(*d.signMap).Store(sign.QueryId, sigShares)
 	(*d.contentMap).Store(sign.QueryId, sign.Content)
 	(*d.signTypeMap).Store(sign.QueryId, sign.Index)
-	for _, member := range d.groupIds {
+	for i, member := range d.groupIds {
 		if string(member) != string((*d.network).GetId().Id) {
 			//Todo:Need to check to see if it is thread safe
+			fmt.Println(i, " : send to ", member)
 			(*d.network).SendMessageById(member, sign)
 		}
 	}
@@ -125,37 +131,45 @@ func (d *dosNode) receiveSignature() {
 			if !ok {
 				fmt.Println("cast failed ", sign.QueryId)
 			}
-			sigShares = append(sigShares, sign.Signature)
-			(*d.signMap).Store(sign.QueryId, sigShares)
-			(*d.contentMap).Store(sign.QueryId, sign.Content)
-			(*d.signTypeMap).Store(sign.QueryId, sign.Index)
-			fmt.Println("receiveSignature id ", sign.QueryId, " len ", len(sigShares), " nbParticipants ", d.nbParticipants)
-
-			if len(sigShares) == d.nbParticipants {
-				d.toOnChainQueue <- sign.QueryId
+			if len(sigShares) < d.nbParticipants {
+				sigShares = append(sigShares, sign.Signature)
+				(*d.signMap).Store(sign.QueryId, sigShares)
+				(*d.contentMap).Store(sign.QueryId, sign.Content)
+				(*d.signTypeMap).Store(sign.QueryId, sign.Index)
+				fmt.Println("receiveSignature id ", sign.QueryId, " len ", len(sigShares), " nbParticipants ", d.nbParticipants)
+				if len(sigShares) >= d.nbThreshold {
+					d.toOnChainQueue <- sign.QueryId
+				}
+			} else {
+				fmt.Println("Extra signature !!!!")
 			}
 		} else {
-			//Other nodes has received eth event and send signature to other nodes
-			//Node put back these signatures until it received eth event.
-			d.chSignature <- sign
+			//Todo:Need to ignore those finished signature
+			_, ok := (*d.finishMap).Load(sign.QueryId)
+			if !ok {
+				//Other nodes has received eth event and send signature to other nodes
+				//Node put back these signatures until it received eth event.
+				d.chSignature <- sign
+			}
 		}
 	}
 }
 
 func (d *dosNode) getReporter() int {
+	/*
+		randomNumber, err := d.chainConn.GetRandomNum()
+		if err != nil {
+			fmt.Println("getReporter err ", err)
+		}
 
-	randomNumber, err := d.chainConn.GetRandomNum()
-	if err != nil {
-		fmt.Println("getReporter err ", err)
-	}
-
-	x := int(randomNumber.Uint64())
-	if x < 0 {
-		x = 0 - x
-	}
-	y := int(d.nbParticipants)
-	reporter := x % y
-	return reporter
+		x := int(randomNumber.Uint64())
+		if x < 0 {
+			x = 0 - x
+		}
+		y := int(d.nbParticipants)
+		reporter := x % y
+	*/
+	return 0
 }
 func (d *dosNode) sendToOnchain() {
 	for queryId := range d.toOnChainQueue {
@@ -178,39 +192,36 @@ func (d *dosNode) sendToOnchain() {
 			fmt.Println("sendToOnchain value signType notfound for sign.QueryId: ", queryId)
 		}
 
-		sig, err := tbls.Recover(d.suite, d.p2pDkg.GetGroupPublicPoly(), content, sigShares, d.nbParticipants/2+1, d.nbParticipants)
+		sig, err := tbls.Recover(d.suite, d.p2pDkg.GetGroupPublicPoly(), content, sigShares, d.nbThreshold, d.nbParticipants)
 		if err != nil {
 			fmt.Println("Recover failed ", err)
+		}
+		err = bls.Verify(d.suite, d.p2pDkg.GetGroupPublicPoly().Commit(), content, sig)
+		if err != nil {
+			fmt.Println("!!!!!  Verify failed", err, " queryID ", queryId)
+			continue
 		}
 		repoter := d.getReporter()
 		fmt.Println("reporter ", repoter)
 		(*d.contentMap).Delete(queryId)
 		(*d.signMap).Delete(queryId)
 		(*d.signTypeMap).Delete(queryId)
+		(*d.finishMap).Store(queryId, time.Now())
 		//QueryId is 0 means that is for random number
 		switch signType {
 		case ForRandomNumber:
-			err := bls.Verify(d.suite, d.p2pDkg.GetGroupPublicPoly().Commit(), content, sig)
-			if err != nil {
-				fmt.Println("!!!!!  Verify failed", err, " queryID ", queryId)
-			}
 			randomN := new(big.Int)
 			randomN.SetBytes(content)
+			fmt.Println("Random Number result = ", randomN, " verify success")
 			if d.p2pDkg.GetDKGIndex() == repoter {
-				groupId := new(big.Int)
-				groupId.SetBytes(d.p2pDkg.GetGroupId())
 				fmt.Println("Random Number result = ", randomN, " verify success")
-				err = d.chainConn.SetRandomNum(groupId, sig)
+				err = d.chainConn.SetRandomNum(sig)
 				if err != nil {
 					fmt.Println("SetRandomNum err ", err)
-					err = d.chainConn.SetRandomNum(groupId, sig)
+					err = d.chainConn.SetRandomNum(sig)
 				}
 			}
 		default:
-			err := bls.Verify(d.suite, d.p2pDkg.GetGroupPublicPoly().Commit(), content, sig)
-			if err != nil {
-				fmt.Println("!!!!!  Verify failed", err, " queryID ", queryId)
-			}
 			fmt.Println("checkURL result = ", string(content), " verify success")
 			qID := big.NewInt(0)
 			qID.SetString(queryId, 10)
@@ -225,19 +236,57 @@ func (d *dosNode) sendToOnchain() {
 		}
 	}
 }
+func (d *dosNode) isMember(dispatchedGroup [4]*big.Int) bool {
+	//temp := append(dispatchedGroup[2].Bytes(), dispatchedGroup[3].Bytes()...)
+	//temp = append(dispatchedGroup[1].Bytes(), temp...)
+	//temp = append(dispatchedGroup[0].Bytes(), temp...)
+	//temp = append([]byte{0x01}, temp...)
+	temp := []byte{0x01}
+	fmt.Println("isMember : ", temp)
+	groupPub, err := d.p2pDkg.GetGroupPublicPoly().Commit().MarshalBinary()
+	fmt.Println("isMember : ", groupPub)
+	if err != nil {
+		fmt.Println(err)
+		return false
+	}
+	r := bytes.Compare(groupPub, temp)
+	if r == 0 {
+		return true
+	}
+	return false
+}
+func (d *dosNode) cleanFinishMap() {
+	for {
+		select {
+		case <-d.ticker.C:
+			d.finishMap.Range(func(key, value interface{}) bool {
+				record := value.(time.Time)
+				dur := time.Since(record)
+				if dur.Minutes() >= 10 {
+					fmt.Println("clean querID ", key, " time ", record)
+					d.finishMap.Delete(key)
+				}
+				return true
+			})
+		case <-d.quit:
+			d.ticker.Stop()
+			return
+		}
+	}
+}
 
 // main
 func main() {
-	seedFlag := flag.String("seedAddr", "", "seed address")
-	nbParticipantsFlag := flag.Int("nbVerifiers", 21, "Number of Participants")
+	roleFlag := flag.String("role", "", "BootstrapNode or not")
+	nbParticipantsFlag := flag.Int("nbVerifiers", 3, "Number of Participants")
 	portFlag := flag.Int("port", 0, "port number")
+	bootstrapIpFlag := flag.String("bootstrapIp", "67.207.98.117:42745", "bootstrapIp")
 
 	flag.Parse()
-	seedAddr := *seedFlag
-	_ = seedAddr
+	role := *roleFlag
 	nbParticipants := *nbParticipantsFlag
 	port := *portFlag
-
+	bootstrapIp := *bootstrapIpFlag
 	//1)Connect to Eth and Set node ID
 	chainConn, err := blockchain.AdaptTo("ETH", true)
 	if err != nil {
@@ -249,10 +298,6 @@ func main() {
 		log.Fatal(err)
 	}
 
-	bootstrapIp, err := chainConn.GetBootstrapIp()
-	if err != nil {
-		log.Fatal(err)
-	}
 	chUrl := make(chan interface{})
 	go func() {
 		chUrl <- &eth.DOSProxyLogUrl{}
@@ -281,18 +326,13 @@ func main() {
 	p.Listen()
 
 	//3)Dial to peers to build peerClient
-	if bootstrapIp != "" {
+	if role == "" {
 		fmt.Println(bootstrapIp)
 		p.CreatePeer(bootstrapIp, nil)
 		results := p.FindNode(p.GetId(), dht.BucketSize, 20)
 		for _, result := range results {
 			p.GetRoutingTable().Update(result)
 			fmt.Println(p.GetId().Address, "Update peer: ", result.Address)
-		}
-	} else {
-		err = chainConn.SetBootstrapIp(p.GetId().Address)
-		if err != nil {
-			fmt.Println(err)
 		}
 	}
 
@@ -313,9 +353,13 @@ func main() {
 		signMap:        new(sync.Map),
 		signTypeMap:    new(sync.Map),
 		contentMap:     new(sync.Map),
+		finishMap:      new(sync.Map),
 		chSignature:    make(chan vss.Signature, 100),
 		chURL:          make(chan string, 100),
+		ticker:         time.NewTicker(10 * time.Minute),
+		quit:           make(chan struct{}),
 		nbParticipants: nbParticipants,
+		nbThreshold:    nbParticipants/2 + 1,
 		network:        &p,
 		chainConn:      chainConn,
 		p2pDkg:         p2pDkg,
@@ -324,6 +368,7 @@ func main() {
 	}
 	go d.sendToOnchain()
 	go d.receiveSignature()
+	go d.cleanFinishMap()
 	for {
 		select {
 		//event from peer
@@ -346,29 +391,33 @@ func main() {
 				if d.p2pDkg.GetDKGIndex() == 0 {
 					gId := new(big.Int)
 					gId.SetBytes(d.p2pDkg.GetGroupId())
-					d.chainConn.UploadPubKey(gId, d.p2pDkg.GetGroupPublicPoly().Commit())
+					d.chainConn.UploadPubKey(d.p2pDkg.GetGroupPublicPoly().Commit())
 				}
 			}
 		case msg := <-chUrl:
 			switch content := msg.(type) {
 			case *eth.DOSProxyLogUrl:
-				fmt.Printf("Query-ID: %v \n", content.QueryId)
-				fmt.Println("Query Url: ", content.Url)
-				d.CheckURL(content.QueryId, content.Url)
+				if d.isMember(content.DispatchedGroup) {
+					d.CheckURL(content.QueryId, content.Url)
+				}
 			default:
 				fmt.Println("type mismatch")
 			}
 		case msg := <-chRandom:
 			switch content := msg.(type) {
 			case *eth.DOSProxyLogUpdateRandom:
-				//if d.p2pDkg.GetGroupId() == content.GroupId {
-				//To avoid the err: SetRandomNum err  nonce too low
-				timer := time.NewTimer(30 * time.Second)
-				go func() {
-					<-timer.C
-					d.GenerateRandomNumber(content.PreRandomNumber)
-				}()
-				//}
+				fmt.Println("event log ", len(content.DispatchedGroup))
+				fmt.Println("event log ", content.DispatchedGroup[0])
+				fmt.Println("event log ", content.DispatchedGroup[1])
+				fmt.Println("event log ", content.DispatchedGroup[2])
+				if d.isMember(content.DispatchedGroup) {
+					//To avoid the err: SetRandomNum err  nonce too low
+					timer := time.NewTimer(30 * time.Second)
+					go func() {
+						<-timer.C
+						d.GenerateRandomNumber(content.LastRandomness)
+					}()
+				}
 			default:
 				fmt.Println("type mismatch")
 			}
@@ -387,10 +436,10 @@ func main() {
 					groupIds = append(groupIds, id)
 				}
 				d.nbParticipants = len(groupIds)
+				d.nbThreshold = d.nbParticipants/2 + 1
 				d.p2pDkg.SetNbParticipants(d.nbParticipants)
 				if isMember {
 					d.groupIds = groupIds
-					d.p2pDkg.SetGroupId(content.GroupId.Bytes())
 					d.p2pDkg.SetGroupMembers(groupIds)
 					d.p2pDkg.RunDKG()
 				}
