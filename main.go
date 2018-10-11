@@ -90,22 +90,19 @@ func (d *dosNode) CheckURL(QueryId *big.Int, url string) {
 
 // TODO: error handling and logging
 // Note: Signed messages keep synced with on-chain contracts
-// message = concat(lastUpdatedBlockhash, lastRandomness)
-func (d *dosNode) GenerateRandomNumber(preRandom [32]byte, preBlock *big.Int) {
-	key := new(big.Int)
-	key.SetBytes(preRandom[:])
+func (d *dosNode) GenerateRandomNumber(preRandom *big.Int, preBlock *big.Int) {
 	//To avoid duplicate query
-	_, ok := (*d.signMap).Load(key.String())
+	_, ok := (*d.signMap).Load(preRandom.String())
 	if !ok {
 		hash, err := d.chainConn.GetBlockHashByNumber(preBlock)
 		if err != nil {
 			fmt.Printf("GetBlockHashByNumber #%v fails\n", preBlock)
 			return
 		}
-		msg := append(hash[:], preRandom[:]...)
-
+		// message = concat(lastUpdatedBlockhash, lastRandomness)
+		msg := append(hash[:], preRandom.Bytes()...)
 		fmt.Printf("GenerateRandomNumber msg = %x\n", msg)
-		d.signAndBroadcast(ForRandomNumber, key, msg)
+		d.signAndBroadcast(ForRandomNumber, preRandom, msg)
 	}
 }
 

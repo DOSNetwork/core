@@ -35,7 +35,7 @@ contract DOSProxy {
     // Note: Update to randomness metadata must be made atomic.
     // last block number within contains the last updated randomness.
     uint public lastUpdatedBlock;
-    bytes32 public lastRandomness;
+    uint public lastRandomness;
     G2Point lastHandledGroup;
 
     /* Log struct is an experimental feature, use with care.
@@ -57,7 +57,7 @@ contract DOSProxy {
     event LogCallbackTriggeredFor(address callbackAddr, bytes result);
     event LogQueryFromNonExistentUC();
     event LogUpdateRandom(
-        bytes32 lastRandomness,
+        uint lastRandomness,
         uint lastUpdatedBlock,
         uint[4] dispatchedGroup
     );
@@ -102,7 +102,7 @@ contract DOSProxy {
             if (strEqual(queryType, 'API')) {
                 uint queryId = uint(keccak256(abi.encodePacked(
                     from, blkNum, timeout, queryType, queryPath)));
-                uint idx = uint(lastRandomness) % groupPubKeys.length;
+                uint idx = lastRandomness % groupPubKeys.length;
                 pendingQueries[queryId] =
                     PendingQuery(queryId, groupPubKeys[idx], from);
                 emit LogUrl(queryId, queryPath, timeout, getGroupPubKey(idx));
@@ -162,16 +162,17 @@ contract DOSProxy {
 
         // TODO: The message off-chain clients signed: concat(lastBlockhash, lastRandomness)
         bytes memory message =
-            toBytes([blockhash(lastUpdatedBlock), lastRandomness]);
+            toBytes([blockhash(lastUpdatedBlock), bytes32(lastRandomness)]);
         G1Point memory signature = G1Point(sig[0], sig[1]);
         if (!verifyGroupSignature(message, signature, lastHandledGroup)) {
             emit LogInvalidSignature("Randomness");
             return;
         }
         // Update new randomness = sha3(group signature)
-        lastRandomness = keccak256(abi.encodePacked(signature.x, signature.y));
+        lastRandomness =
+            uint(keccak256(abi.encodePacked(signature.x, signature.y)));
         lastUpdatedBlock = block.number;
-        uint idx = uint(lastRandomness) % groupPubKeys.length;
+        uint idx = lastRandomness % groupPubKeys.length;
         lastHandledGroup = groupPubKeys[idx];
         // Signal off-chain clients
         emit LogUpdateRandom(lastRandomness, lastUpdatedBlock, getGroupPubKey(idx));
