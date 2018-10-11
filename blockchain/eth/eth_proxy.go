@@ -28,7 +28,7 @@ import (
 
 const ethRemoteNode = "wss://rinkeby.infura.io/ws"
 
-const contractAddressHex = "0x295fA460d273be7aCD3703BbAaC5c6da0269505B"
+const contractAddressHex = "0xb75D8A0877E611d57912f187F98C3eFCB7b6985b"
 
 var contractAddress = common.HexToAddress(contractAddressHex)
 
@@ -133,8 +133,7 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 				log.Fatal(err)
 			case i := <-transitChan:
 				ch <- &DOSProxyLogGrouping{
-					GroupId: i.GroupId,
-					NodeId:  i.NodeId,
+					NodeId: i.NodeId,
 				}
 			}
 		}
@@ -247,7 +246,7 @@ func (e *EthAdaptor) SetRandomNum(sig []byte) (err error) {
 	return
 }
 
-func (e *EthAdaptor) UploadPubKey(groupId *big.Int, pubKey kyber.Point) (err error) {
+func (e *EthAdaptor) UploadPubKey(pubKey kyber.Point) (err error) {
 	fmt.Println("Starting submitting group public key...")
 	auth, err := e.getAuth()
 	if err != nil {
@@ -265,7 +264,6 @@ func (e *EthAdaptor) UploadPubKey(groupId *big.Int, pubKey kyber.Point) (err err
 	}
 
 	fmt.Println("tx sent: ", tx.Hash().Hex())
-	fmt.Println("groupId: ", groupId)
 	fmt.Println("x0: ", x0)
 	fmt.Println("x1: ", x1)
 	fmt.Println("y0: ", y0)

@@ -25,9 +25,7 @@ contract DOSProxy {
         address callback_addr;
     }
 
-    uint nextGroupID = 0;
     uint[] nodeId;
-    mapping(uint => uint[]) groupMapping;
     // calling query_id => PendingQuery metadata
     mapping(uint => PendingQuery) pending_queries;
     // Note: Update to groupPubKeys and groups must be made together and atomic.
@@ -50,7 +48,7 @@ contract DOSProxy {
     event LogUpdateRandom(uint last_randomness, uint last_blknum, uint[4] dispatched_group);
     event LogInvalidSignature();
     event LogInsufficientGroupNumber();
-    event LogGrouping(uint GroupId, uint[] NodeId);
+    event LogGrouping(uint[] NodeId);
 
     function getCodeSize(address addr) internal constant returns (uint size) {
         assembly {
@@ -278,13 +276,10 @@ contract DOSProxy {
             toBeGrouped[i] = nodeId[nodeId.length - 1];
             nodeId.length--;
         }
-        uint groupId = nextGroupID++;
-        groupMapping[groupId] = toBeGrouped;
-        emit LogGrouping(groupId, toBeGrouped);
+        emit LogGrouping(toBeGrouped);
     }
 
     function resetContract() {
-        nextGroupID = 0;
         nodeId.length = 0;
     }
 }
