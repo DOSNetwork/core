@@ -28,7 +28,7 @@ import (
 
 const ethRemoteNode = "wss://rinkeby.infura.io/ws"
 
-const contractAddressHex = "0x3cC64423B1CfB5343efac6B8f630bcb1Af809130"
+const contractAddressHex = "0x295fA460d273be7aCD3703BbAaC5c6da0269505B"
 
 var contractAddress = common.HexToAddress(contractAddressHex)
 
