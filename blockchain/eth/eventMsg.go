@@ -20,6 +20,5 @@ type DOSProxyLogUpdateRandom struct {
 }
 
 type DOSProxyLogGrouping struct {
-	GroupId *big.Int
-	NodeId  []*big.Int
+	NodeId []*big.Int
 }

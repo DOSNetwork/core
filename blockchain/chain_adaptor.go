@@ -13,7 +13,7 @@ type ChainInterface interface {
 	Init(autoReplenish bool) (err error)
 	SubscribeEvent(ch chan interface{}) (err error)
 	UploadID() (err error)
-	UploadPubKey(groupId *big.Int, pubKey kyber.Point) (err error)
+	UploadPubKey(pubKey kyber.Point) (err error)
 	GetId() (id []byte)
 	GetCurrBlockHash() (hash common.Hash, err error)
 	SetRandomNum(sig []byte) (err error)
