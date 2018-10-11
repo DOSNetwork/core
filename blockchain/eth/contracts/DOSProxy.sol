@@ -178,6 +178,17 @@ contract DOSProxy {
         emit LogUpdateRandom(lastRandomness, lastUpdatedBlock, getGroupPubKey(idx));
     }
 
+    // For test. To trigger first random number after first grouping has done
+    function fireRandom() {
+        lastRandomness =
+            uint(keccak256(abi.encodePacked(blockhash(block.number), blockhash(block.number), blockhash(block.number))));
+        lastUpdatedBlock = block.number;
+        uint idx = lastRandomness % groupPubKeys.length;
+        lastHandledGroup = groupPubKeys[idx];
+        // Signal off-chain clients
+        emit LogUpdateRandom(lastRandomness, lastUpdatedBlock, getGroupPubKey(idx));
+    }
+
     // TODO: change to bytes32 in future.
     function verifyGroupSignature(
         bytes message,
@@ -314,5 +325,6 @@ contract DOSProxy {
 
     function resetContract() {
         nodeId.length = 0;
+        groupPubKeys.length = 0;
     }
 }
