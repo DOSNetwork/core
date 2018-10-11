@@ -87,12 +87,22 @@ func (d *dosNode) CheckURL(QueryId *big.Int, url string) {
 		d.signAndBroadcast(ForCheckURL, QueryId, result)
 	}
 }
-func (d *dosNode) GenerateRandomNumber(preRendomum *big.Int) {
+
+// TODO: error handling and logging
+// Note: Signed messages keep synced with on-chain contracts
+func (d *dosNode) GenerateRandomNumber(preRandom *big.Int, preBlock *big.Int) {
 	//To avoid duplicate query
-	_, ok := (*d.signMap).Load(preRendomum.String())
+	_, ok := (*d.signMap).Load(preRandom.String())
 	if !ok {
-		fmt.Println("GenerateRandomNumber!!", preRendomum.String())
-		d.signAndBroadcast(ForRandomNumber, preRendomum, preRendomum.Bytes())
+		hash, err := d.chainConn.GetBlockHashByNumber(preBlock)
+		if err != nil {
+			fmt.Printf("GetBlockHashByNumber #%v fails\n", preBlock)
+			return
+		}
+		// message = concat(lastUpdatedBlockhash, lastRandomness)
+		msg := append(hash[:], preRandom.Bytes()...)
+		fmt.Printf("GenerateRandomNumber msg = %x\n", msg)
+		d.signAndBroadcast(ForRandomNumber, preRandom, msg)
 	}
 }
 
@@ -415,7 +425,7 @@ func main() {
 					timer := time.NewTimer(30 * time.Second)
 					go func() {
 						<-timer.C
-						d.GenerateRandomNumber(content.LastRandomness)
+						d.GenerateRandomNumber(content.LastRandomness, content.LastUpdatedBlock)
 					}()
 				}
 			default:

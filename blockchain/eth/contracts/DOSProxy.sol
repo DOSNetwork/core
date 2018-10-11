@@ -34,18 +34,34 @@ contract DOSProxy {
     mapping(bytes32 => bool) groups;
     // Note: Update to randomness metadata must be made atomic.
     // last block number within contains the last updated randomness.
-    uint public lastRandomness = uint(keccak256(abi.encodePacked(blockhash(block.number), blockhash(block.number), blockhash(block.number))));
+    uint public lastUpdatedBlock;
+    uint public lastRandomness;
     G2Point lastHandledGroup;
 
-    // Log struct is an experimental feature, use with care.
-    // event LogUrl(uint queryId, string url, uint timeout, G2Point dispatchedGroup);
-    event LogUrl(uint queryId, string url, uint timeout, uint[4] dispatchedGroup);
+    /* Log struct is an experimental feature, use with care.
+    event LogUrl(
+        uint queryId,
+        string url,
+        uint timeout,
+        G2Point dispatchedGroup
+    );
+    */
+    event LogUrl(
+        uint queryId,
+        string url,
+        uint timeout,
+        uint[4] dispatchedGroup
+    );
     event LogNonSupportedType(string queryType);
     event LogNonContractCall(address from);
     event LogCallbackTriggeredFor(address callbackAddr, bytes result);
     event LogQueryFromNonExistentUC();
-    event LogUpdateRandom(uint lastRandomness, uint[4] dispatchedGroup);
-    event LogInvalidSignature();
+    event LogUpdateRandom(
+        uint lastRandomness,
+        uint lastUpdatedBlock,
+        uint[4] dispatchedGroup
+    );
+    event LogInvalidSignature(string err);
     event LogInsufficientGroupNumber();
     event LogGrouping(uint[] NodeId);
 
@@ -71,17 +87,24 @@ contract DOSProxy {
 
     // @return query id.
     // TODO: restrict query from subscribed/paid calling contract address.
-    function query(address from, uint blkNum, uint timeout, string queryType, string queryPath)
-    external
-    returns (uint)
+    function query(
+        address from,
+        uint blkNum,
+        uint timeout,
+        string queryType,
+        string queryPath
+    )
+        external
+        returns (uint)
     {
         if (getCodeSize(from) > 0) {
             // Only supporting api/url for alpha release.
             if (strEqual(queryType, 'API')) {
                 uint queryId = uint(keccak256(abi.encodePacked(
-                        from, blkNum, timeout, queryType, queryPath)));
+                    from, blkNum, timeout, queryType, queryPath)));
                 uint idx = lastRandomness % groupPubKeys.length;
-                pendingQueries[queryId] = PendingQuery(queryId, groupPubKeys[idx], from);
+                pendingQueries[queryId] =
+                    PendingQuery(queryId, groupPubKeys[idx], from);
                 emit LogUrl(queryId, queryPath, timeout, getGroupPubKey(idx));
                 return queryId;
             } else {
@@ -104,9 +127,9 @@ contract DOSProxy {
         // and reused in updateRandomness().
         G1Point memory signature = G1Point(sig[0], sig[1]);
         // TODO: change to sha3(result) after off-chain clients signs on sha3(result)
-        if (!verifyGroupSignature(result, signature,
-            pendingQueries[queryId].handledGroup)) {
-            emit LogInvalidSignature();
+        if (!verifyGroupSignature(
+                result, signature, pendingQueries[queryId].handledGroup)) {
+            emit LogInvalidSignature("Callback");
             return;
         }
         address ucAddr = pendingQueries[queryId].callbackAddr;
@@ -120,6 +143,15 @@ contract DOSProxy {
         delete pendingQueries[queryId];
     }
 
+    function toBytes(bytes32[2] data) internal pure returns (bytes) {
+        bytes memory result = new bytes(32 * 2);
+        assembly {
+            mstore(add(result, 0x20), mload(data))
+            mstore(add(result, 0x40), mload(add(data, 0x20)))
+        }
+        return result;
+    }
+
     function updateRandomness(uint[2] sig) external {
         // TODO
         // 1. Check msg.sender from registered and staked node operator. (post alpha)
@@ -128,33 +160,32 @@ contract DOSProxy {
         // Only 3) is implemented below, 1 & 2 & 3 can be implemented in modifier
         // and reused in triggerCallback().
 
-        // TODO: The message off-chain clients signed: (lastBlockhash || lastRandomness)
+        // TODO: The message off-chain clients signed: concat(lastBlockhash, lastRandomness)
+        bytes memory message =
+            toBytes([blockhash(lastUpdatedBlock), bytes32(lastRandomness)]);
         G1Point memory signature = G1Point(sig[0], sig[1]);
-        if (!verifyGroupSignature(toBytes(lastRandomness), signature, lastHandledGroup)) {
-            emit LogInvalidSignature();
+        if (!verifyGroupSignature(message, signature, lastHandledGroup)) {
+            emit LogInvalidSignature("Randomness");
             return;
         }
         // Update new randomness = sha3(group signature)
-        lastRandomness = uint(keccak256(abi.encodePacked(signature.x, signature.y, blockhash(block.number))));
-        fireRandom();
-    }
-
-    function fireRandom() {
+        lastRandomness =
+            uint(keccak256(abi.encodePacked(signature.x, signature.y)));
+        lastUpdatedBlock = block.number;
         uint idx = lastRandomness % groupPubKeys.length;
         lastHandledGroup = groupPubKeys[idx];
         // Signal off-chain clients
-        emit LogUpdateRandom(lastRandomness, getGroupPubKey(idx));
-    }
-
-    function toBytes(uint num) internal returns (bytes numBytes) {
-        numBytes = new bytes(32);
-        assembly { mstore(add(numBytes, 32), num) }
+        emit LogUpdateRandom(lastRandomness, lastUpdatedBlock, getGroupPubKey(idx));
     }
 
     // TODO: change to bytes32 in future.
-    function verifyGroupSignature(bytes message, G1Point signature, G2Point grpPubKey)
-    internal
-    returns (bool)
+    function verifyGroupSignature(
+        bytes message,
+        G1Point signature,
+        G2Point grpPubKey
+    )
+        internal
+        returns (bool)
     {
         G1Point[] memory p1 = new G1Point[](2);
         G2Point[] memory p2 = new G2Point[](2);
@@ -191,7 +222,7 @@ contract DOSProxy {
 
         assembly {
             success := call(sub(gas, 2000), 8, 0, add(input, 0x20), mul(inputSize, 0x20), out, 0x20)
-        // Use "invalid" to make gas estimation work
+            // Use "invalid" to make gas estimation work
             switch success case 0 {invalid}
         }
         require(success);
@@ -226,7 +257,7 @@ contract DOSProxy {
         bool success;
         assembly {
             success := call(sub(gas, 2000), 6, 0, input, 0x80, r, 0x40)
-        // Use "invalid" to make gas estimation work
+            // Use "invalid" to make gas estimation work
             switch success case 0 {invalid}
         }
         require(success);
@@ -240,7 +271,7 @@ contract DOSProxy {
         bool success;
         assembly {
             success := call(sub(gas, 2000), 7, 0, input, 0x60, r, 0x40)
-        // Use "invalid" to make gas estimation work
+            // Use "invalid" to make gas estimation work
             switch success case 0 {invalid}
         }
         require(success);
@@ -259,8 +290,8 @@ contract DOSProxy {
         require(idx < groupPubKeys.length, "group index out of range");
 
         return [
-        groupPubKeys[idx].x[0], groupPubKeys[idx].x[1],
-        groupPubKeys[idx].y[0], groupPubKeys[idx].y[1]
+            groupPubKeys[idx].x[0], groupPubKeys[idx].x[1],
+            groupPubKeys[idx].y[0], groupPubKeys[idx].y[1]
         ];
     }
 
