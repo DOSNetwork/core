@@ -26,10 +26,14 @@ import (
 	"github.com/DOSNetwork/core/blockchain/eth/contracts"
 )
 
-const ethRemoteNode = "wss://rinkeby.infura.io/ws"
+//const ethRemoteNode = "wss://rinkeby.infura.io/ws"
+
+const ethRemoteNode = "ws://67.207.98.117:8546"
 
 // TODO: Instead of hardcode, read from DOSAddressBridge.go
-const contractAddressHex = "0xda5AED5537cd3A2b6EFd07813819859CafD59aaB"
+//const contractAddressHex = "0x108842339238f41CFc433AB52db6E791F68CC0Bd"
+
+const contractAddressHex = "0xf59c7469b3668d0676DEDDb06B46E799ec2109ce"
 
 var contractAddress = common.HexToAddress(contractAddressHex)
 
@@ -275,7 +279,20 @@ func (e *EthAdaptor) UploadPubKey(pubKey kyber.Point) (err error) {
 
 	return
 }
+func (e *EthAdaptor) ResetNodeIDs() {
+	fmt.Println("Starting ResetNodeIDs...")
+	auth, err := e.getAuth()
+	if err != nil {
+		return
+	}
 
+	tx, err := e.proxy.ResetContract(auth)
+	if err != nil {
+		return
+	}
+
+	err = e.checkTransaction(tx)
+}
 func decodePubKey(pubKey kyber.Point) (*big.Int, *big.Int, *big.Int, *big.Int, error) {
 	pubKeyMar, err := pubKey.MarshalBinary()
 	if err != nil {
@@ -340,7 +357,7 @@ func (e *EthAdaptor) getAuth() (auth *bind.TransactOpts, err error) {
 		return
 	}
 
-	auth.GasLimit = uint64(5000000) // in units
+	auth.GasLimit = uint64(4000000) // in units
 	auth.GasPrice = gasPrice
 
 	return
@@ -442,7 +459,7 @@ func (e *EthAdaptor) transferEth(from, to *keystore.Key) (err error) {
 	}
 
 	value := big.NewInt(1000000000000000000)
-	gasLimit := uint64(5000000)
+	gasLimit := uint64(4000000)
 	tx := types.NewTransaction(nonce, to.Address, value, gasLimit, gasPrice, nil)
 
 	chainId, err := e.client.NetworkID(context.Background())
