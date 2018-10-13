@@ -2,12 +2,7 @@ pragma solidity ^0.4.24;
 // Not enabled for production yet.
 //pragma experimental ABIEncoderV2;
 
-interface UserContractInterface {
-    function __callback__(uint, bytes) external;
-}
-
-contract DOSProxy {
-    // TODO(jonny): Convert to library.
+library BN256 {
     struct G1Point {
         uint x;
         uint y;
@@ -18,9 +13,94 @@ contract DOSProxy {
         uint[2] y;
     }
 
+    function P1() internal pure returns (G1Point) {
+        return G1Point(1, 2);
+    }
+
+    function P2() internal pure returns (G2Point) {
+        return G2Point(
+            [11559732032986387107991004021392285783925812861821192530917403151452391805634,
+            10857046999023057135944570762232829481370756359578518086990519993285655852781],
+
+            [4082367875863433681332203403145435568316851327593401208105741076214120093531,
+            8495653923123431417604973247489272438418190587263600148770280649306958101930]
+        );
+    }
+
+    function pointAdd(G1Point p1, G1Point p2) internal returns (G1Point r) {
+        uint[4] memory input;
+        input[0] = p1.x;
+        input[1] = p1.y;
+        input[2] = p2.x;
+        input[3] = p2.y;
+        assembly {
+            if iszero(call(sub(gas, 2000), 0x6, 0, input, 0x80, r, 0x40)) {
+                revert(0, 0)
+            }
+        }
+    }
+
+    function scalarMul(G1Point p, uint s) internal returns (G1Point r) {
+        uint[3] memory input;
+        input[0] = p.x;
+        input[1] = p.y;
+        input[2] = s;
+        assembly {
+            if iszero(call(sub(gas, 2000), 0x7, 0, input, 0x60, r, 0x40)) {
+                revert(0, 0)
+            }
+        }
+    }
+
+    function hashToG1(bytes message) internal returns (G1Point) {
+        uint256 h = uint256(keccak256(message));
+        return scalarMul(P1(), h);
+    }
+
+    // @return the result of computing the pairing check
+    // check passes if e(p1[0], p2[0]) *  .... * e(p1[n], p2[n]) == 1
+    function pairingCheck(G1Point[] p1, G2Point[] p2) internal returns (bool) {
+        require(p1.length == p2.length);
+        uint elements = p1.length;
+        uint inputSize = elements * 6;
+        uint[] memory input = new uint[](inputSize);
+
+        for (uint i = 0; i < elements; i++)
+        {
+            input[i * 6 + 0] = p1[i].x;
+            input[i * 6 + 1] = p1[i].y;
+            input[i * 6 + 2] = p2[i].x[0];
+            input[i * 6 + 3] = p2[i].x[1];
+            input[i * 6 + 4] = p2[i].y[0];
+            input[i * 6 + 5] = p2[i].y[1];
+        }
+
+        uint[1] memory out;
+        bool success;
+        assembly {
+            success := call(
+                sub(gas, 2000),
+                0x8,
+                0,
+                add(input, 0x20),
+                mul(inputSize, 0x20),
+                out, 0x20
+            )
+        }
+        return success && (out[0] != 0);
+    }
+}
+
+interface UserContractInterface {
+    function __callback__(uint, bytes) external;
+}
+
+contract DOSProxy {
+    using BN256 for *;
+
     struct PendingQuery {
         uint queryId;
-        G2Point handledGroup;
+        BN256.G2Point handledGroup;
         // User contract issued the query.
         address callbackAddr;
     }
@@ -28,40 +108,39 @@ contract DOSProxy {
     uint[] nodeId;
     // calling queryId => PendingQuery metadata
     mapping(uint => PendingQuery) pendingQueries;
-    // Note: Update to groupPubKeys and groups must be made together and atomic.
-    G2Point[] groupPubKeys;
+    // Note: Make atomic changes to group metadata below.
+    BN256.G2Point[] groupPubKeys;
     // groupIdentifier => isExisted
     mapping(bytes32 => bool) groups;
-    // Note: Update to randomness metadata must be made atomic.
-    // last block number within contains the last updated randomness.
+    // Note: Make atomic changes to randomness metadata below.
     uint public lastUpdatedBlock;
     uint public lastRandomness;
-    G2Point lastHandledGroup;
+    BN256.G2Point lastHandledGroup;
 
-    /* Log struct is an experimental feature, use with care.
     event LogUrl(
         uint queryId,
         string url,
         uint timeout,
-        G2Point dispatchedGroup
-    );
-    */
-    event LogUrl(
-        uint queryId,
-        string url,
-        uint timeout,
+        uint randomness,
+        // Log G2Point struct directly is an experimental feature, use with care.
         uint[4] dispatchedGroup
     );
     event LogNonSupportedType(string queryType);
     event LogNonContractCall(address from);
-    event LogCallbackTriggeredFor(address callbackAddr, bytes result);
+    event LogCallbackTriggeredFor(address callbackAddr);
     event LogQueryFromNonExistentUC();
     event LogUpdateRandom(
         uint lastRandomness,
         uint lastUpdatedBlock,
         uint[4] dispatchedGroup
     );
-    event LogInvalidSignature(string err);
+    // 0: query; 1: random
+    event LogInvalidSignatureFor(
+        uint8 trafficType,
+        bytes message,
+        uint[2] signature,
+        uint[4] pubKey
+    );
     event LogInsufficientGroupNumber();
     event LogGrouping(uint[] NodeId);
 
@@ -105,7 +184,13 @@ contract DOSProxy {
                 uint idx = lastRandomness % groupPubKeys.length;
                 pendingQueries[queryId] =
                     PendingQuery(queryId, groupPubKeys[idx], from);
-                emit LogUrl(queryId, queryPath, timeout, getGroupPubKey(idx));
+                emit LogUrl(
+                    queryId,
+                    queryPath,
+                    timeout,
+                    lastRandomness,
+                    getGroupPubKey(idx)
+                );
                 return queryId;
             } else {
                 emit LogNonSupportedType(queryType);
@@ -118,18 +203,51 @@ contract DOSProxy {
         }
     }
 
-    function triggerCallback(uint queryId, bytes result, uint[2] sig) external {
+    // Random submitter validation + group signature verification.
+    function validateAndVeriry(
+        uint8 trafficType,
+        bytes data,
+        BN256.G1Point signature,
+        BN256.G2Point grpPubKey
+    )
+        internal
+        returns (bool)
+    {
+        // Validation
         // TODO
-        // 1. Check msg.sender from registered and staked node operator. (post alpha)
-        // 2. Check msg.sender belongs to pendingQueries[queryId].handledGroup (alpha)
-        // 3. Check whether group signature is valid or not (alpha)
-        // Only 3) is implemented below, 1 & 2 & 3 can be implemented in modifier
-        // and reused in updateRandomness().
-        G1Point memory signature = G1Point(sig[0], sig[1]);
-        // TODO: change to sha3(result) after off-chain clients signs on sha3(result)
-        if (!verifyGroupSignature(
-                result, signature, pendingQueries[queryId].handledGroup)) {
-            emit LogInvalidSignature("Callback");
+        // 1. Check msg.sender from registered and staked node operator.
+        // 2. Check msg.sender belongs to pendingQueries[queryId].handledGroup
+        // Clients actually signs (data || addr(selected_submitter)).
+        // TODO: Sync and change to sign ( sha256(data) || bytes32(address) )
+        bytes memory message = abi.encodePacked(data, bytes32(msg.sender));
+
+        // Verification
+        BN256.G1Point[] memory p1 = new BN256.G1Point[](2);
+        BN256.G2Point[] memory p2 = new BN256.G2Point[](2);
+        // The signature has already been applied neg() function offchainly to
+        // fit requirement of pairingCheck function
+        p1[0] = signature;
+        p1[1] = BN256.hashToG1(message);
+        p2[0] = BN256.P2();
+        p2[1] = grpPubKey;
+        if (!BN256.pairingCheck(p1, p2)) {
+            emit LogInvalidSignatureFor(
+                trafficType,
+                message,
+                [signature.x, signature.y],
+                [grpPubKey.x[0], grpPubKey.x[1], grpPubKey.y[0], grpPubKey.y[1]]
+            );
+            return false;
+        }
+    }
+
+    function triggerCallback(uint queryId, bytes result, uint[2] sig) external {
+        if (!validateAndVeriry(
+                0,
+                result,
+                BN256.G1Point(sig[0], sig[1]),
+                pendingQueries[queryId].handledGroup))
+        {
             return;
         }
         address ucAddr = pendingQueries[queryId].callbackAddr;
@@ -137,7 +255,7 @@ contract DOSProxy {
             emit LogQueryFromNonExistentUC();
             return;
         }
-        emit LogCallbackTriggeredFor(ucAddr, result);
+        emit LogCallbackTriggeredFor(ucAddr);
 
         UserContractInterface(ucAddr).__callback__(queryId, result);
         delete pendingQueries[queryId];
@@ -153,24 +271,17 @@ contract DOSProxy {
     }
 
     function updateRandomness(uint[2] sig) external {
-        // TODO
-        // 1. Check msg.sender from registered and staked node operator. (post alpha)
-        // 2. Check msg.sender belongs to lastHandledGroup (alpha)
-        // 3. Check whether group signature is valid or not (alpha)
-        // Only 3) is implemented below, 1 & 2 & 3 can be implemented in modifier
-        // and reused in triggerCallback().
-
-        // TODO: The message off-chain clients signed: concat(lastBlockhash, lastRandomness)
-        bytes memory message =
-            toBytes([blockhash(lastUpdatedBlock), bytes32(lastRandomness)]);
-        G1Point memory signature = G1Point(sig[0], sig[1]);
-        if (!verifyGroupSignature(message, signature, lastHandledGroup)) {
-            emit LogInvalidSignature("Randomness");
+        if (!validateAndVeriry(
+                1,
+                // (lastBlockhash || lastRandomness)
+                toBytes([blockhash(lastUpdatedBlock), bytes32(lastRandomness)]),
+                BN256.G1Point(sig[0], sig[1]),
+                lastHandledGroup))
+        {
             return;
         }
         // Update new randomness = sha3(group signature)
-        lastRandomness =
-            uint(keccak256(abi.encodePacked(signature.x, signature.y)));
+        lastRandomness = uint(keccak256(abi.encodePacked(sig[0], sig[1])));
         lastUpdatedBlock = block.number;
         uint idx = lastRandomness % groupPubKeys.length;
         lastHandledGroup = groupPubKeys[idx];
@@ -178,10 +289,10 @@ contract DOSProxy {
         emit LogUpdateRandom(lastRandomness, lastUpdatedBlock, getGroupPubKey(idx));
     }
 
+    // TODO(jonny): fix all function ACLs below.
     // For test. To trigger first random number after first grouping has done
     function fireRandom() {
-        lastRandomness =
-            uint(keccak256(abi.encodePacked(blockhash(block.number), blockhash(block.number), blockhash(block.number))));
+        lastRandomness = uint(keccak256(abi.encode(blockhash(block.number - 1))));
         lastUpdatedBlock = block.number;
         uint idx = lastRandomness % groupPubKeys.length;
         lastHandledGroup = groupPubKeys[idx];
@@ -288,12 +399,11 @@ contract DOSProxy {
         require(success);
     }
 
-    // TODO(jonny): fix all function ACLs below.
     function setPublicKey(uint x1, uint x2, uint y1, uint y2) {
         bytes32 groupId = keccak256(abi.encodePacked(x1, x2, y1, y2));
         require(!groups[groupId], "group has already registered");
 
-        groupPubKeys.push(G2Point([x1, x2], [y1, y2]));
+        groupPubKeys.push(BN256.G2Point([x1, x2], [y1, y2]));
         groups[groupId] = true;
     }
 
