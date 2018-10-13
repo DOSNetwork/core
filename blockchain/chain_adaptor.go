@@ -2,9 +2,10 @@ package blockchain
 
 import (
 	"fmt"
+	"math/big"
+
 	"github.com/dedis/kyber"
 	"github.com/ethereum/go-ethereum/common"
-	"math/big"
 
 	"github.com/DOSNetwork/core/blockchain/eth"
 )
@@ -18,6 +19,8 @@ type ChainInterface interface {
 	GetBlockHashByNumber(blknum *big.Int) (hash common.Hash, err error)
 	SetRandomNum(sig []byte) (err error)
 	DataReturn(queryId *big.Int, data, sig []byte) (err error)
+	//For test
+	ResetNodeIDs()
 }
 
 func AdaptTo(chainName string, autoReplenish bool) (conn ChainInterface, err error) {
