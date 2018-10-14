@@ -799,7 +799,7 @@ func (e *EthAdaptor) SubscribeToAll() (err error) {
 	msgChan := make(chan interface{})
 	defer close(msgChan)
 
-	for i := 0; i < 9; i++ {
+	for i := 0; i < 10; i++ {
 		err = e.SubscribeEvent(msgChan, i)
 	}
 
