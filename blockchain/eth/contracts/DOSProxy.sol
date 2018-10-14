@@ -32,7 +32,7 @@ contract DOSProxy {
         string url,
         uint timeout,
         uint randomness,
-    // Log G2Point struct directly is an experimental feature, use with care.
+        // Log G2Point struct directly is an experimental feature, use with care.
         uint[4] dispatchedGroup
     );
     event LogNonSupportedType(string queryType);
@@ -92,11 +92,9 @@ contract DOSProxy {
         if (getCodeSize(from) > 0) {
             // Only supporting api/url for alpha release.
             if (strEqual(queryType, 'API')) {
-                uint queryId = uint(keccak256(abi.encodePacked(
-                        from, blkNum, timeout, queryType, queryPath)));
+                uint queryId = uint(keccak256(abi.encodePacked(from, blkNum, timeout, queryType, queryPath)));
                 uint idx = lastRandomness % groupPubKeys.length;
-                pendingQueries[queryId] =
-                PendingQuery(queryId, groupPubKeys[idx], from);
+                pendingQueries[queryId] = PendingQuery(queryId, groupPubKeys[idx], from);
                 emit LogUrl(
                     queryId,
                     queryPath,
@@ -127,6 +125,14 @@ contract DOSProxy {
     internal
     returns (bool)
     {
+        // Validation
+        // TODO
+        // 1. Check msg.sender from registered and staked node operator.
+        // 2. Check msg.sender belongs to pendingQueries[queryId].handledGroup
+        // Clients actually signs (data || addr(selected_submitter)).
+        // TODO: Sync and change to sign ( sha256(data) || bytes32(address) )
+        // Xinrui: since address is removed, these TODO might be delete probably.
+
         // Verification
         BN256.G1Point[] memory p1 = new BN256.G1Point[](2);
         BN256.G2Point[] memory p2 = new BN256.G2Point[](2);
@@ -136,27 +142,17 @@ contract DOSProxy {
         p1[1] = BN256.hashToG1(data);
         p2[0] = BN256.P2();
         p2[1] = grpPubKey;
-        if (!BN256.pairingCheck(p1, p2)) {
-            emit LogValidationResult(
+        bool passVerify = BN256.pairingCheck(p1, p2);
+        emit LogValidationResult(
                 trafficType,
                 trafficId,
                 data,
                 [signature.x, signature.y],
-                [grpPubKey.x[0], grpPubKey.x[1], grpPubKey.y[0], grpPubKey.y[1]],
-                false
-            );
-            return false;
-        } else {
-            emit LogValidationResult(
-                trafficType,
-                trafficId,
-                data,
-                [signature.x, signature.y],
-                [grpPubKey.x[0], grpPubKey.x[1], grpPubKey.y[0], grpPubKey.y[1]],
-                true
-            );
-            return true;
-        }
+                [grpPubKey.x[0], grpPubKey.x[1],
+                grpPubKey.y[0], grpPubKey.y[1]],
+                passVerify
+        );
+        return passVerify;
     }
 
     function triggerCallback(uint queryId, bytes result, uint[2] sig) external {
@@ -167,11 +163,11 @@ contract DOSProxy {
         }
 
         if (!validateAndVeriry(
-            0,
-            queryId,
-            result,
-            BN256.G1Point(sig[0], sig[1]),
-            pendingQueries[queryId].handledGroup))
+                0,
+                queryId,
+                result,
+                BN256.G1Point(sig[0], sig[1]),
+                pendingQueries[queryId].handledGroup))
         {
             return;
         }
@@ -192,12 +188,12 @@ contract DOSProxy {
 
     function updateRandomness(uint[2] sig) external {
         if (!validateAndVeriry(
-            1,
-            lastRandomness,
-        // (lastBlockhash || lastRandomness)
-            toBytes([blockhash(lastUpdatedBlock), bytes32(lastRandomness)]),
-            BN256.G1Point(sig[0], sig[1]),
-            lastHandledGroup))
+                1,
+                lastRandomness,
+                // (lastBlockhash || lastRandomness)
+                toBytes([blockhash(lastUpdatedBlock), bytes32(lastRandomness)]),
+                BN256.G1Point(sig[0], sig[1]),
+                lastHandledGroup))
         {
             return;
         }
