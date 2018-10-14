@@ -115,7 +115,7 @@ contract DOSProxy {
     }
 
     // Random submitter validation + group signature verification.
-    function validateAndVeriry(
+    function validateAndVerify(
         uint8 trafficType,
         uint trafficId,
         bytes data,
@@ -162,7 +162,7 @@ contract DOSProxy {
             return;
         }
 
-        if (!validateAndVeriry(
+        if (!validateAndVerify(
                 0,
                 queryId,
                 result,
@@ -187,7 +187,7 @@ contract DOSProxy {
     }
 
     function updateRandomness(uint[2] sig) external {
-        if (!validateAndVeriry(
+        if (!validateAndVerify(
                 1,
                 lastRandomness,
                 // (lastBlockhash || lastRandomness)
