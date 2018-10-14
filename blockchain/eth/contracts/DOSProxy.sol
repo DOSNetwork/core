@@ -12,6 +12,7 @@ contract DOSProxy {
         address callbackAddr;
     }
 
+    uint groupSize;
     uint[] nodeId;
     // calling queryId => PendingQuery metadata
     mapping(uint => PendingQuery) pendingQueries;
@@ -19,6 +20,8 @@ contract DOSProxy {
     BN256.G2Point[] groupPubKeys;
     // groupIdentifier => isExisted
     mapping(bytes32 => bool) groups;
+    //publicKey => publicKey appearance
+    mapping(bytes32 => uint) pubKeyCounter;
     // Note: Make atomic changes to randomness metadata below.
     uint public lastUpdatedBlock;
     uint public lastRandomness;
@@ -29,7 +32,7 @@ contract DOSProxy {
         string url,
         uint timeout,
         uint randomness,
-    // Log G2Point struct directly is an experimental feature, use with care.
+        // Log G2Point struct directly is an experimental feature, use with care.
         uint[4] dispatchedGroup
     );
     event LogNonSupportedType(string queryType);
@@ -45,13 +48,14 @@ contract DOSProxy {
     event LogValidationResult(
         uint8 trafficType,
         uint trafficId,
-        bytes message,
+        bytes data,
         uint[2] signature,
         uint[4] pubKey,
         bool pass
     );
     event LogInsufficientGroupNumber();
     event LogGrouping(uint[] NodeId);
+    event LogPublicKeyAccepted(uint x1, uint x2, uint y1, uint y2);
 
     function getCodeSize(address addr) internal constant returns (uint size) {
         assembly {
@@ -88,11 +92,9 @@ contract DOSProxy {
         if (getCodeSize(from) > 0) {
             // Only supporting api/url for alpha release.
             if (strEqual(queryType, 'API')) {
-                uint queryId = uint(keccak256(abi.encodePacked(
-                        from, blkNum, timeout, queryType, queryPath)));
+                uint queryId = uint(keccak256(abi.encodePacked(from, blkNum, timeout, queryType, queryPath)));
                 uint idx = lastRandomness % groupPubKeys.length;
-                pendingQueries[queryId] =
-                PendingQuery(queryId, groupPubKeys[idx], from);
+                pendingQueries[queryId] = PendingQuery(queryId, groupPubKeys[idx], from);
                 emit LogUrl(
                     queryId,
                     queryPath,
@@ -129,7 +131,7 @@ contract DOSProxy {
         // 2. Check msg.sender belongs to pendingQueries[queryId].handledGroup
         // Clients actually signs (data || addr(selected_submitter)).
         // TODO: Sync and change to sign ( sha256(data) || bytes32(address) )
-        bytes memory message = abi.encodePacked(data, bytes32(msg.sender));
+        // Xinrui: since address is removed, these TODO might be delete probably.
 
         // Verification
         BN256.G1Point[] memory p1 = new BN256.G1Point[](2);
@@ -137,30 +139,20 @@ contract DOSProxy {
         // The signature has already been applied neg() function offchainly to
         // fit requirement of pairingCheck function
         p1[0] = signature;
-        p1[1] = BN256.hashToG1(message);
+        p1[1] = BN256.hashToG1(data);
         p2[0] = BN256.P2();
         p2[1] = grpPubKey;
-        if (!BN256.pairingCheck(p1, p2)) {
-            emit LogValidationResult(
+        bool passVerify = BN256.pairingCheck(p1, p2);
+        emit LogValidationResult(
                 trafficType,
                 trafficId,
-                message,
+                data,
                 [signature.x, signature.y],
-                [grpPubKey.x[0], grpPubKey.x[1], grpPubKey.y[0], grpPubKey.y[1]],
-                false
-            );
-            return false;
-        } else {
-            emit LogValidationResult(
-                trafficType,
-                trafficId,
-                message,
-                [signature.x, signature.y],
-                [grpPubKey.x[0], grpPubKey.x[1], grpPubKey.y[0], grpPubKey.y[1]],
-                true
-            );
-            return true;
-        }
+                [grpPubKey.x[0], grpPubKey.x[1],
+                grpPubKey.y[0], grpPubKey.y[1]],
+                passVerify
+        );
+        return passVerify;
     }
 
     function triggerCallback(uint queryId, bytes result, uint[2] sig) external {
@@ -171,11 +163,11 @@ contract DOSProxy {
         }
 
         if (!validateAndVeriry(
-            0,
-            queryId,
-            result,
-            BN256.G1Point(sig[0], sig[1]),
-            pendingQueries[queryId].handledGroup))
+                0,
+                queryId,
+                result,
+                BN256.G1Point(sig[0], sig[1]),
+                pendingQueries[queryId].handledGroup))
         {
             return;
         }
@@ -196,12 +188,12 @@ contract DOSProxy {
 
     function updateRandomness(uint[2] sig) external {
         if (!validateAndVeriry(
-            1,
-            lastRandomness,
-        // (lastBlockhash || lastRandomness)
-            toBytes([blockhash(lastUpdatedBlock), bytes32(lastRandomness)]),
-            BN256.G1Point(sig[0], sig[1]),
-            lastHandledGroup))
+                1,
+                lastRandomness,
+                // (lastBlockhash || lastRandomness)
+                toBytes([blockhash(lastUpdatedBlock), bytes32(lastRandomness)]),
+                BN256.G1Point(sig[0], sig[1]),
+                lastHandledGroup))
         {
             return;
         }
@@ -229,8 +221,13 @@ contract DOSProxy {
         bytes32 groupId = keccak256(abi.encodePacked(x1, x2, y1, y2));
         require(!groups[groupId], "group has already registered");
 
-        groupPubKeys.push(BN256.G2Point([x1, x2], [y1, y2]));
-        groups[groupId] = true;
+        pubKeyCounter[groupId] = pubKeyCounter[groupId] + 1;
+        if (pubKeyCounter[groupId] > groupSize / 2) {
+            groupPubKeys.push(BN256.G2Point([x1, x2], [y1, y2]));
+            groups[groupId] = true;
+            delete(pubKeyCounter[groupId]);
+            emit LogPublicKeyAccepted(x1, x2, y1, y2);
+        }
     }
 
     function getGroupPubKey(uint idx) public constant returns (uint[4]) {
@@ -247,6 +244,7 @@ contract DOSProxy {
     }
 
     function grouping(uint size) {
+        groupSize = size;
         uint[] memory toBeGrouped = new uint[](size);
         if (nodeId.length < size) {
             emit LogInsufficientGroupNumber();
@@ -315,8 +313,8 @@ library BN256 {
         }
     }
 
-    function hashToG1(bytes message) internal returns (G1Point) {
-        uint256 h = uint256(keccak256(message));
+    function hashToG1(bytes data) internal returns (G1Point) {
+        uint256 h = uint256(keccak256(data));
         return scalarMul(P1(), h);
     }
 
