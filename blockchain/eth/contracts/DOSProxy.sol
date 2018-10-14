@@ -32,7 +32,7 @@ contract DOSProxy {
         string url,
         uint timeout,
         uint randomness,
-    // Log G2Point struct directly is an experimental feature, use with care.
+        // Log G2Point struct directly is an experimental feature, use with care.
         uint[4] dispatchedGroup
     );
     event LogNonSupportedType(string queryType);
@@ -144,13 +144,13 @@ contract DOSProxy {
         p2[1] = grpPubKey;
         bool passVerify = BN256.pairingCheck(p1, p2);
         emit LogValidationResult(
-            trafficType,
-            trafficId,
-            data,
-            [signature.x, signature.y],
-            [grpPubKey.x[0], grpPubKey.x[1],
-            grpPubKey.y[0], grpPubKey.y[1]],
-            passVerify
+                trafficType,
+                trafficId,
+                data,
+                [signature.x, signature.y],
+                [grpPubKey.x[0], grpPubKey.x[1],
+                grpPubKey.y[0], grpPubKey.y[1]],
+                passVerify
         );
         return passVerify;
     }
@@ -163,11 +163,11 @@ contract DOSProxy {
         }
 
         if (!validateAndVerify(
-            0,
-            queryId,
-            result,
-            BN256.G1Point(sig[0], sig[1]),
-            pendingQueries[queryId].handledGroup))
+                0,
+                queryId,
+                result,
+                BN256.G1Point(sig[0], sig[1]),
+                pendingQueries[queryId].handledGroup))
         {
             return;
         }
@@ -188,12 +188,12 @@ contract DOSProxy {
 
     function updateRandomness(uint[2] sig) external {
         if (!validateAndVerify(
-            1,
-            lastRandomness,
-        // (lastBlockhash || lastRandomness)
-            toBytes([blockhash(lastUpdatedBlock), bytes32(lastRandomness)]),
-            BN256.G1Point(sig[0], sig[1]),
-            lastHandledGroup))
+                1,
+                lastRandomness,
+                // (lastBlockhash || lastRandomness)
+                toBytes([blockhash(lastUpdatedBlock), bytes32(lastRandomness)]),
+                BN256.G1Point(sig[0], sig[1]),
+                lastHandledGroup))
         {
             return;
         }
