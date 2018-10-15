@@ -52,8 +52,8 @@ library BN256 {
         }
     }
 
-    function hashToG1(bytes message) internal returns (G1Point) {
-        uint256 h = uint256(keccak256(message));
+    function hashToG1(bytes data) internal returns (G1Point) {
+        uint256 h = uint256(keccak256(data));
         return scalarMul(P1(), h);
     }
 
@@ -105,6 +105,7 @@ contract DOSProxy {
         address callbackAddr;
     }
 
+    uint groupSize;
     uint[] nodeId;
     // calling queryId => PendingQuery metadata
     mapping(uint => PendingQuery) pendingQueries;
@@ -112,6 +113,8 @@ contract DOSProxy {
     BN256.G2Point[] groupPubKeys;
     // groupIdentifier => isExisted
     mapping(bytes32 => bool) groups;
+    //publicKey => publicKey appearance
+    mapping(bytes32 => uint) pubKeyCounter;
     // Note: Make atomic changes to randomness metadata below.
     uint public lastUpdatedBlock;
     uint public lastRandomness;
@@ -143,6 +146,44 @@ contract DOSProxy {
     );
     event LogInsufficientGroupNumber();
     event LogGrouping(uint[] NodeId);
+    event LogPublicKeyAccepted(uint x1, uint x2, uint y1, uint y2);
+    
+    // whitelist state variables used only for alpha release.
+    // Index starting from 1.
+    address[22] whitelists;
+    // whitelisted address => index in whitelists.
+    mapping(address => uint) is_whitelisted;
+    bool whitelist_inited = false;
+
+    modifier onlyWhitelisted {
+        uint idx = is_whitelisted[msg.sender];
+        require(idx != 0 && whitelists[idx] == msg.sender, "Not whitelisted!");
+        _;
+    }
+
+    function initWhitelist(address[21] addresses) public {
+        require(!whitelist_inited, "Whitelist already initialized!");
+        
+        for (uint idx = 0; idx < 21; idx++) {
+            whitelists[idx+1] = addresses[idx];
+            is_whitelisted[addresses[idx]] = idx+1;
+        }
+        whitelist_inited = true;
+    }
+
+    function getWhitelistAddess(uint idx) public view returns (address) {
+        require(idx > 0 && idx <= 21, "Index out of range");
+        return whitelists[idx];
+    }
+
+    function resetWhitelistAddress(address new_whitelisted_addr)
+        public
+        onlyWhitelisted
+    {
+        require(new_whitelisted_addr != 0x0 && new_whitelisted_addr != msg.sender);
+        whitelists[is_whitelisted[msg.sender]] = new_whitelisted_addr;
+    }
+    
 
     function getCodeSize(address addr) internal constant returns (uint size) {
         assembly {
@@ -204,13 +245,14 @@ contract DOSProxy {
     }
 
     // Random submitter validation + group signature verification.
-    function validateAndVeriry(
+    function validateAndVerify(
         uint8 trafficType,
         bytes data,
         BN256.G1Point signature,
         BN256.G2Point grpPubKey
     )
         internal
+        onlyWhitelisted
         returns (bool)
     {
         // Validation
@@ -239,10 +281,11 @@ contract DOSProxy {
             );
             return false;
         }
+		return true;
     }
 
     function triggerCallback(uint queryId, bytes result, uint[2] sig) external {
-        if (!validateAndVeriry(
+        if (!validateAndVerify(
                 0,
                 result,
                 BN256.G1Point(sig[0], sig[1]),
@@ -250,13 +293,14 @@ contract DOSProxy {
         {
             return;
         }
+        
         address ucAddr = pendingQueries[queryId].callbackAddr;
         if (ucAddr == 0x0) {
             emit LogQueryFromNonExistentUC();
             return;
         }
-        emit LogCallbackTriggeredFor(ucAddr);
 
+        emit LogCallbackTriggeredFor(ucAddr);
         UserContractInterface(ucAddr).__callback__(queryId, result);
         delete pendingQueries[queryId];
     }
@@ -271,7 +315,7 @@ contract DOSProxy {
     }
 
     function updateRandomness(uint[2] sig) external {
-        if (!validateAndVeriry(
+        if (!validateAndVerify(
                 1,
                 // (lastBlockhash || lastRandomness)
                 toBytes([blockhash(lastUpdatedBlock), bytes32(lastRandomness)]),
@@ -289,9 +333,8 @@ contract DOSProxy {
         emit LogUpdateRandom(lastRandomness, lastUpdatedBlock, getGroupPubKey(idx));
     }
 
-    // TODO(jonny): fix all function ACLs below.
     // For test. To trigger first random number after first grouping has done
-    function fireRandom() {
+    function fireRandom() public onlyWhitelisted {
         lastRandomness = uint(keccak256(abi.encode(blockhash(block.number - 1))));
         lastUpdatedBlock = block.number;
         uint idx = lastRandomness % groupPubKeys.length;
@@ -300,12 +343,20 @@ contract DOSProxy {
         emit LogUpdateRandom(lastRandomness, lastUpdatedBlock, getGroupPubKey(idx));
     }
 
-    function setPublicKey(uint x1, uint x2, uint y1, uint y2) {
+    function setPublicKey(uint x1, uint x2, uint y1, uint y2)
+        public
+        onlyWhitelisted
+    {
         bytes32 groupId = keccak256(abi.encodePacked(x1, x2, y1, y2));
         require(!groups[groupId], "group has already registered");
 
-        groupPubKeys.push(BN256.G2Point([x1, x2], [y1, y2]));
-        groups[groupId] = true;
+        pubKeyCounter[groupId] = pubKeyCounter[groupId] + 1;
+        if (pubKeyCounter[groupId] > groupSize / 2) {
+            groupPubKeys.push(BN256.G2Point([x1, x2], [y1, y2]));
+            groups[groupId] = true;
+            delete(pubKeyCounter[groupId]);
+            emit LogPublicKeyAccepted(x1, x2, y1, y2);
+        }
     }
 
     function getGroupPubKey(uint idx) public constant returns (uint[4]) {
@@ -317,11 +368,12 @@ contract DOSProxy {
         ];
     }
 
-    function uploadNodeId(uint id) {
+    function uploadNodeId(uint id) public onlyWhitelisted {
         nodeId.push(id);
     }
 
-    function grouping(uint size) {
+    function grouping(uint size) public onlyWhitelisted {
+        groupSize = size;
         uint[] memory toBeGrouped = new uint[](size);
         if (nodeId.length < size) {
             emit LogInsufficientGroupNumber();
@@ -334,7 +386,7 @@ contract DOSProxy {
         emit LogGrouping(toBeGrouped);
     }
 
-    function resetContract() {
+    function resetContract() public onlyWhitelisted {
         nodeId.length = 0;
         groupPubKeys.length = 0;
     }
