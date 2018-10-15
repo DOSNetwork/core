@@ -138,16 +138,18 @@ contract DOSProxy {
         uint[4] dispatchedGroup
     );
     // 0: query; 1: random
-    event LogInvalidSignatureFor(
+    event LogValidationResult(
         uint8 trafficType,
+        uint trafficId,
         bytes message,
         uint[2] signature,
-        uint[4] pubKey
+        uint[4] pubKey,
+        bool pass
     );
     event LogInsufficientGroupNumber();
     event LogGrouping(uint[] NodeId);
     event LogPublicKeyAccepted(uint x1, uint x2, uint y1, uint y2);
-    
+
     // whitelist state variables used only for alpha release.
     // Index starting from 1.
     address[22] whitelists;
@@ -164,7 +166,7 @@ contract DOSProxy {
 
     function initWhitelist(address[21] addresses) public {
         require(!whitelist_inited, "Whitelist already initialized!");
-        
+
         for (uint idx = 0; idx < 21; idx++) {
             whitelists[idx+1] = addresses[idx];
             is_whitelisted[addresses[idx]] = idx+1;
@@ -186,7 +188,7 @@ contract DOSProxy {
         emit WhitelistAddressReset(msg.sender, new_whitelisted_addr);
         whitelists[is_whitelisted[msg.sender]] = new_whitelisted_addr;
     }
-    
+
 
     function getCodeSize(address addr) internal constant returns (uint size) {
         assembly {
@@ -250,6 +252,7 @@ contract DOSProxy {
     // Random submitter validation + group signature verification.
     function validateAndVerify(
         uint8 trafficType,
+        uint trafficId,
         bytes data,
         BN256.G1Point signature,
         BN256.G2Point grpPubKey
@@ -275,28 +278,30 @@ contract DOSProxy {
         p1[1] = BN256.hashToG1(message);
         p2[0] = BN256.P2();
         p2[1] = grpPubKey;
-        if (!BN256.pairingCheck(p1, p2)) {
-            emit LogInvalidSignatureFor(
-                trafficType,
-                message,
-                [signature.x, signature.y],
-                [grpPubKey.x[0], grpPubKey.x[1], grpPubKey.y[0], grpPubKey.y[1]]
-            );
-            return false;
-        }
-		return true;
+        bool passVerify = BN256.pairingCheck(p1, p2);
+        emit LogValidationResult(
+            trafficType,
+            trafficId,
+            message,
+            [signature.x, signature.y],
+            [grpPubKey.x[0], grpPubKey.x[1], grpPubKey.y[0], grpPubKey.y[1]],
+            passVerify
+        );
+        return passVerify;
+
     }
 
     function triggerCallback(uint queryId, bytes result, uint[2] sig) external {
         if (!validateAndVerify(
                 0,
+                queryId,
                 result,
                 BN256.G1Point(sig[0], sig[1]),
                 pendingQueries[queryId].handledGroup))
         {
             return;
         }
-        
+
         address ucAddr = pendingQueries[queryId].callbackAddr;
         if (ucAddr == 0x0) {
             emit LogQueryFromNonExistentUC();
@@ -320,6 +325,7 @@ contract DOSProxy {
     function updateRandomness(uint[2] sig) external {
         if (!validateAndVerify(
                 1,
+                lastRandomness,
                 // (lastBlockhash || lastRandomness)
                 toBytes([blockhash(lastUpdatedBlock), bytes32(lastRandomness)]),
                 BN256.G1Point(sig[0], sig[1]),
@@ -344,6 +350,13 @@ contract DOSProxy {
         lastHandledGroup = groupPubKeys[idx];
         // Signal off-chain clients
         emit LogUpdateRandom(lastRandomness, lastUpdatedBlock, getGroupPubKey(idx));
+    }
+
+    function handleTimeout() public onlyWhitelisted {
+        uint currentBlockNumber = block.number;
+        if (currentBlockNumber - lastUpdatedBlock > 4) {
+            fireRandom();
+        }
     }
 
     function setPublicKey(uint x1, uint x2, uint y1, uint y2)
