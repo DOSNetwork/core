@@ -237,7 +237,7 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 				ch <- &DOSProxyLogValidationResult{
 					TrafficType: i.TrafficType,
 					TrafficId:   i.TrafficId,
-					data:        i.Data,
+					Message:     i.Message,
 					Signature:   i.Signature,
 					PubKey:      i.PubKey,
 					Pass:        i.Pass,
@@ -828,7 +828,7 @@ func (e *EthAdaptor) SubscribeToAll() (err error) {
 				fmt.Println("got DOSProxyLogInvalidSignature event...")
 				fmt.Println("TrafficType: ", content.TrafficType)
 				fmt.Println("TrafficId: ", content.TrafficId)
-				fmt.Println("Message: ", content.data)
+				fmt.Println("Message: ", content.Message)
 				fmt.Println("Signature: ", content.Signature)
 				fmt.Println("PubKey: ", content.PubKey)
 				fmt.Println("Pass: ", content.Pass)
