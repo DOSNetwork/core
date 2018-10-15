@@ -153,7 +153,8 @@ contract DOSProxy {
     address[22] whitelists;
     // whitelisted address => index in whitelists.
     mapping(address => uint) is_whitelisted;
-    bool whitelist_inited = false;
+    bool public whitelist_inited = false;
+    event WhitelistAddressReset(address previous, address curr);
 
     modifier onlyWhitelisted {
         uint idx = is_whitelisted[msg.sender];
@@ -181,6 +182,8 @@ contract DOSProxy {
         onlyWhitelisted
     {
         require(new_whitelisted_addr != 0x0 && new_whitelisted_addr != msg.sender);
+
+        emit WhitelistAddressReset(msg.sender, new_whitelisted_addr);
         whitelists[is_whitelisted[msg.sender]] = new_whitelisted_addr;
     }
     
