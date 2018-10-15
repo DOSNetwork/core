@@ -38,7 +38,7 @@ type DOSProxyLogUpdateRandom struct {
 type DOSProxyLogValidationResult struct {
 	TrafficType uint8
 	TrafficId   *big.Int
-	data        []byte
+	Message     []byte
 	Signature   [2]*big.Int
 	PubKey      [4]*big.Int
 	Pass        bool
