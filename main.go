@@ -91,6 +91,7 @@ func (d *dosNode) CheckURL(QueryId *big.Int, url string) {
 // TODO: error handling and logging
 // Note: Signed messages keep synced with on-chain contracts
 func (d *dosNode) GenerateRandomNumber(preRandom *big.Int, preBlock *big.Int) {
+	fmt.Printf("GenerateRandomNumber #%v \n", preRandom)
 	//To avoid duplicate query
 	_, ok := (*d.signMap).Load(preRandom.String())
 	if !ok {
@@ -194,21 +195,20 @@ func (d *dosNode) sendToOnchain() {
 		result, ok = (*d.signMap).Load(queryId)
 		sigShares, ok = result.([][]byte)
 		if !ok {
-			fmt.Println("sendToOnchain value sigShares not found for sign.QueryId: ", queryId)
+			continue
 		}
 		result, ok = (*d.signTypeMap).Load(queryId)
 		signType, ok = result.(uint32)
 		if !ok {
-			fmt.Println("sendToOnchain value signType notfound for sign.QueryId: ", queryId)
+			continue
 		}
 
 		sig, err := tbls.Recover(d.suite, d.p2pDkg.GetGroupPublicPoly(), content, sigShares, d.nbThreshold, d.nbParticipants)
 		if err != nil {
-			fmt.Println("Recover failed ", err)
+			continue
 		}
 		err = bls.Verify(d.suite, d.p2pDkg.GetGroupPublicPoly().Commit(), content, sig)
 		if err != nil {
-			fmt.Println("!!!!!  Verify failed", err, " queryID ", queryId)
 			continue
 		}
 		repoter := d.getReporter()
@@ -247,21 +247,22 @@ func (d *dosNode) sendToOnchain() {
 	}
 }
 func (d *dosNode) isMember(dispatchedGroup [4]*big.Int) bool {
-	//temp := append(dispatchedGroup[2].Bytes(), dispatchedGroup[3].Bytes()...)
-	//temp = append(dispatchedGroup[1].Bytes(), temp...)
-	//temp = append(dispatchedGroup[0].Bytes(), temp...)
-	//temp = append([]byte{0x01}, temp...)
-	temp := []byte{0x01}
-	fmt.Println("isMember : ", temp)
-	groupPub, err := d.p2pDkg.GetGroupPublicPoly().Commit().MarshalBinary()
-	fmt.Println("isMember : ", groupPub)
-	if err != nil {
-		fmt.Println(err)
-		return false
-	}
-	r := bytes.Compare(groupPub, temp)
-	if r == 0 {
-		return true
+	if d.p2pDkg.IsCetified() {
+		temp := append(dispatchedGroup[2].Bytes(), dispatchedGroup[3].Bytes()...)
+		temp = append(dispatchedGroup[1].Bytes(), temp...)
+		temp = append(dispatchedGroup[0].Bytes(), temp...)
+		temp = append([]byte{0x01}, temp...)
+		fmt.Println("isMember from eth : ", temp)
+		groupPub, err := d.p2pDkg.GetGroupPublicPoly().Commit().MarshalBinary()
+		fmt.Println("isMember : ", groupPub)
+		if err != nil {
+			fmt.Println(err)
+			return false
+		}
+		r := bytes.Compare(groupPub, temp)
+		if r == 0 {
+			return true
+		}
 	}
 	return false
 }
@@ -301,6 +302,9 @@ func main() {
 	chainConn, err := blockchain.AdaptTo("ETH", true)
 	if err != nil {
 		log.Fatal(err)
+	}
+	if role == "bootstrape" {
+		chainConn.ResetNodeIDs()
 	}
 
 	err = chainConn.UploadID()
@@ -416,13 +420,10 @@ func main() {
 		case msg := <-chRandom:
 			switch content := msg.(type) {
 			case *eth.DOSProxyLogUpdateRandom:
-				fmt.Println("event log ", len(content.DispatchedGroup))
-				fmt.Println("event log ", content.DispatchedGroup[0])
-				fmt.Println("event log ", content.DispatchedGroup[1])
-				fmt.Println("event log ", content.DispatchedGroup[2])
+				fmt.Println("event DOSProxyLogUpdateRandom", d.isMember(content.DispatchedGroup))
 				if d.isMember(content.DispatchedGroup) {
 					//To avoid the err: SetRandomNum err  nonce too low
-					timer := time.NewTimer(30 * time.Second)
+					timer := time.NewTimer(1 * time.Second)
 					go func() {
 						<-timer.C
 						d.GenerateRandomNumber(content.LastRandomness, content.LastUpdatedBlock)
