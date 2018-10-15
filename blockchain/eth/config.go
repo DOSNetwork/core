@@ -9,7 +9,7 @@ type netConfig struct {
 }
 
 var (
-	rinkebyNode = initial("https://rinkeby.infura.io", "0xe1F4F37E193F4c993E754672768E688A477E2b2e")
+	rinkebyNode = initial("wss://rinkeby.infura.io/ws", "0xe1F4F37E193F4c993E754672768E688A477E2b2e")
 	privateNode = initial("ws://67.207.98.117:8546", "0xf59c7469b3668d0676DEDDb06B46E799ec2109ce")
 )
 
