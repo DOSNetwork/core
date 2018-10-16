@@ -160,7 +160,9 @@ contract DOSProxy {
 
     modifier onlyWhitelisted {
         uint idx = is_whitelisted[msg.sender];
-        require(idx != 0 && whitelists[idx] == msg.sender, "Not whitelisted!");
+        //require(idx != 0 && whitelists[idx] == msg.sender, "Not whitelisted!");
+        //Only for test
+        require(0 == 0, "Not whitelisted!");
         _;
     }
 
@@ -335,7 +337,7 @@ contract DOSProxy {
         }
         // Update new randomness = sha3(group signature)
         lastRandomness = uint(keccak256(abi.encodePacked(sig[0], sig[1])));
-        lastUpdatedBlock = block.number;
+        lastUpdatedBlock = block.number - 1;
         uint idx = lastRandomness % groupPubKeys.length;
         lastHandledGroup = groupPubKeys[idx];
         // Signal off-chain clients
@@ -345,7 +347,7 @@ contract DOSProxy {
     // For test. To trigger first random number after first grouping has done
     function fireRandom() public onlyWhitelisted {
         lastRandomness = uint(keccak256(abi.encode(blockhash(block.number - 1))));
-        lastUpdatedBlock = block.number;
+        lastUpdatedBlock = block.number - 1;
         uint idx = lastRandomness % groupPubKeys.length;
         lastHandledGroup = groupPubKeys[idx];
         // Signal off-chain clients
@@ -353,7 +355,7 @@ contract DOSProxy {
     }
 
     function handleTimeout() public onlyWhitelisted {
-        uint currentBlockNumber = block.number;
+        uint currentBlockNumber = block.number - 1;
         if (currentBlockNumber - lastUpdatedBlock > 4) {
             fireRandom();
         }

@@ -78,7 +78,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	chainConn, err := blockchain.AdaptTo("ETH", false)
+	chainConn, err := blockchain.AdaptTo(blockchain.ETH, true, eth.Private)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -88,19 +88,13 @@ func main() {
 		log.Fatal(err)
 	}
 
-	bootstrapIp, err := chainConn.GetBootstrapIp()
-	fmt.Println(bootstrapIp)
-
-	err = chainConn.UploadPubKey(groupId, pubKey)
+	err = chainConn.UploadPubKey(pubKey)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	chUrl := make(chan interface{})
-	go func() {
-		chUrl <- &eth.DOSProxyLogUrl{}
-	}()
-	chainConn.SubscribeEvent(chUrl)
+	chainConn.SubscribeEvent(chUrl, eth.SubscribeDOSProxyLogUrl)
 
 	fmt.Println("Group set-up finished, start listening to query...")
 

@@ -16,6 +16,7 @@ import (
 	"github.com/dedis/kyber"
 
 	"github.com/DOSNetwork/core/blockchain/eth/contracts"
+	"github.com/DOSNetwork/core/blockchain/eth/contracts/userContract"
 	"github.com/DOSNetwork/core/group/bn256"
 
 	"github.com/ethereum/go-ethereum"
@@ -704,7 +705,7 @@ func (e *EthAdaptor) DeployContract(contractName int) (address common.Address, e
 	switch contractName {
 	case AskMeAnyThing:
 		fmt.Println("Starting deploy AskMeAnyThing.sol...")
-		address, tx, _, err = dosproxy.DeployAskMeAnything(auth, e.client)
+		address, tx, _, err = userContract.DeployAskMeAnything(auth, e.client)
 	case DOSAddressBridge:
 		fmt.Println("Starting deploy DOSAddressBridge.sol...")
 		address, tx, _, err = dosproxy.DeployDOSAddressBridge(auth, e.client)
