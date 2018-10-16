@@ -1,7 +1,7 @@
 pragma solidity ^0.4.24;
 
 import "github.com/OpenZeppelin/zeppelin-solidity/contracts/ownership/Ownable.sol";
-import "./DOSOnChainSDK.sol";
+import "../DOSOnChainSDK.sol";
 
 // A user contract asks anything from off-chain world through a url.
 contract AskMeAnything is Ownable, DOSOnChainSDK {
