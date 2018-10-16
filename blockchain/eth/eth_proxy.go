@@ -30,6 +30,7 @@ import (
 
 const (
 	Rinkeby = iota
+	RinkebyPrivate
 	Private
 )
 
@@ -76,6 +77,8 @@ func (e *EthAdaptor) Init(autoReplenish bool, netType int) (err error) {
 	switch netType {
 	case Rinkeby:
 		ethRemoteNode = rinkebyNode
+	case RinkebyPrivate:
+		ethRemoteNode = rinkebyPrivateNode
 	case Private:
 		ethRemoteNode = privateNode
 	}
