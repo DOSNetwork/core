@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/DOSNetwork/core/blockchain/eth/contracts"
+	"github.com/DOSNetwork/core/blockchain/eth/contracts/userContract"
 	"io/ioutil"
 	"log"
 	"math"
@@ -15,7 +17,6 @@ import (
 
 	"github.com/dedis/kyber"
 
-	"github.com/DOSNetwork/core/blockchain/eth/contracts"
 	"github.com/DOSNetwork/core/group/bn256"
 
 	"github.com/ethereum/go-ethereum"
@@ -701,7 +702,7 @@ func (e *EthAdaptor) DeployContract(contractName int) (address common.Address, e
 	switch contractName {
 	case AskMeAnyThing:
 		fmt.Println("Starting deploy AskMeAnyThing.sol...")
-		address, tx, _, err = dosproxy.DeployAskMeAnything(auth, e.client)
+		address, tx, _, err = userContract.DeployAskMeAnything(auth, e.client)
 	case DOSAddressBridge:
 		fmt.Println("Starting deploy DOSAddressBridge.sol...")
 		address, tx, _, err = dosproxy.DeployDOSAddressBridge(auth, e.client)
@@ -797,13 +798,13 @@ func (e *EthAdaptor) updateBridge(bridgeAddress, proxyAddress common.Address) (e
 
 func (e *EthAdaptor) SubscribeToAll() (err error) {
 	msgChan := make(chan interface{})
-	defer close(msgChan)
 
 	for i := 0; i < 10; i++ {
 		err = e.SubscribeEvent(msgChan, i)
 	}
 
 	go func() {
+		defer close(msgChan)
 		for msg := range msgChan {
 			switch content := msg.(type) {
 			case *DOSProxyLogGrouping:
