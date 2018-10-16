@@ -797,13 +797,13 @@ func (e *EthAdaptor) updateBridge(bridgeAddress, proxyAddress common.Address) (e
 
 func (e *EthAdaptor) SubscribeToAll() (err error) {
 	msgChan := make(chan interface{})
-	defer close(msgChan)
 
 	for i := 0; i < 10; i++ {
 		err = e.SubscribeEvent(msgChan, i)
 	}
 
 	go func() {
+		defer close(msgChan)
 		for msg := range msgChan {
 			switch content := msg.(type) {
 			case *DOSProxyLogGrouping:
