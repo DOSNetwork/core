@@ -603,8 +603,7 @@ func (e *EthAdaptor) setAccount(autoReplenish bool) (err error) {
 
 	e.key = usrKey
 	e.id = new(big.Int)
-	idBytes := append(new([12]byte)[:], e.key.Address.Bytes()...)
-	e.id.SetBytes(idBytes)
+	e.id.SetBytes([]byte(e.key.Id.String()))
 
 	if autoReplenish {
 		var rootKeyPath string
