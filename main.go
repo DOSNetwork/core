@@ -9,7 +9,6 @@ import (
 	"math/big"
 	"net/http"
 	_ "net/http/pprof"
-	"os"
 	"sync"
 	"time"
 
@@ -132,6 +131,7 @@ func (d *dosNode) PipeCheckURL(chLogUrl <-chan interface{}) <-chan Report {
 						if err != nil {
 							fmt.Println(err)
 						}
+						msg = []byte{184, 194}
 						msg = append(msg[:], new([12]byte)[:]...)
 						msg = append(msg[:], submitter...)
 						//combine result with submitter
@@ -295,11 +295,20 @@ func (d *dosNode) PipeRecoverAndVerify(cSignatureFromPeer chan vss.Signature, fr
 							continue
 						}
 						fmt.Println("6) Verify success")
+						fmt.Println("6) signature", sig)
 						report.signGroup = sig
 						report.timeStamp = time.Now()
-						if string(d.chainConn.GetId()) == string(report.submitter) {
+						r := bytes.Compare(d.chainConn.GetId(), report.submitter)
+						if r == 0 {
+							fmt.Println("I'm submitter !!!!!!!!!!!!!!!!!!!")
+							fmt.Println("I'm submitter !!!!!!!!!!!!!!!!!!!", d.chainConn.GetId())
+							fmt.Println("I'm submitter !!!!!!!!!!!!!!!!!!!", report.submitter)
+
 							outForSubmit <- report
 						}
+						//if string(d.chainConn.GetId()) == string(report.submitter) {
+						//	outForSubmit <- report
+						//}
 						outForValidate <- report
 						reportMap.Store(sign.QueryId, report)
 					}
@@ -340,7 +349,7 @@ func (d *dosNode) PipeSendToOnchain(chReport <-chan Report) {
 				case ForRandomNumber:
 					fmt.Println("PipeSendToOnchain = ", report.signGroup)
 					//Test Case 1
-					os.Exit(0)
+					//os.Exit(0)
 					//Test Case 2
 					//report.signGroup[10] ^= 0x01
 					err := d.chainConn.SetRandomNum(report.signGroup)
@@ -348,11 +357,16 @@ func (d *dosNode) PipeSendToOnchain(chReport <-chan Report) {
 						fmt.Println("SetRandomNum err ", err)
 					}
 				default:
-					fmt.Println("PipeSendToOnchain checkURL result = ", string(report.selfSign.Content))
+					fmt.Println("PipeSendToOnchain checkURL result = ", report.selfSign.Content)
 					fmt.Println("PipeSendToOnchain checkURL result = ", report.signGroup)
 					qID := big.NewInt(0)
 					qID.SetString(report.selfSign.QueryId, 10)
-					err := d.chainConn.DataReturn(qID, report.selfSign.Content, report.signGroup)
+					fmt.Println("content", report.selfSign.Content)
+					t := len(report.selfSign.Content) - 32
+					fmt.Println("len ", t, "   len", len(report.selfSign.Content))
+					fmt.Println("content", report.selfSign.Content)
+					fmt.Println("content", report.selfSign.Content[:t])
+					err := d.chainConn.DataReturn(qID, report.selfSign.Content[:t], report.signGroup)
 					if err != nil {
 						fmt.Println("DataReturn err ", err)
 					}
@@ -378,6 +392,12 @@ func (d *dosNode) PipeCleanFinishMap(chUrl chan interface{}, chValidation <-chan
 			case msg := <-chValidation:
 				switch content := msg.(type) {
 				case *eth.DOSProxyLogValidationResult:
+					fmt.Println("event DOSProxyLogValidationResult========================")
+					fmt.Println("DOSProxyLogValidationResult pass ", content.Pass)
+					fmt.Println("DOSProxyLogValidationResult TrafficType ", content.TrafficType)
+					fmt.Println("DOSProxyLogValidationResult TrafficId ", content.TrafficId)
+					fmt.Println("DOSProxyLogValidationResult Signature ", content.Signature)
+					fmt.Println("DOSProxyLogValidationResult Message ", content.Message)
 					if !content.Pass {
 						switch uint32(content.TrafficType) {
 						case ForRandomNumber:
@@ -409,7 +429,7 @@ func (d *dosNode) PipeCleanFinishMap(chUrl chan interface{}, chValidation <-chan
 					dur := time.Since(lastValidatedRandom)
 					if dur.Minutes() >= 5 {
 						fmt.Println("WatchDog Random tiemout.........")
-						d.chainConn.RandomNumberTimeOut()
+						//d.chainConn.RandomNumberTimeOut()
 					}
 				}
 				validateMap.Range(func(key, value interface{}) bool {
