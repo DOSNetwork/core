@@ -37,12 +37,12 @@ contract AskMeAnything is Ownable, DOSOnChainSDK {
   }
 
   // User-defined callback function to take and process response.
-  function __callback__(uint query_id, string result) external {
+  function __callback__(uint query_id, bytes result) external {
     require(msg.sender == fromDOSProxyContract(), "Unauthenticated response from non-DOS.");
     require(_valid[query_id], "Response with invalid query id!");
 
     emit CallbackReady(query_id);
-    response = result;
+    response = string(result);
     delete _valid[query_id];
 
     if (repeated_call) {

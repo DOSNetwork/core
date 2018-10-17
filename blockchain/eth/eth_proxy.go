@@ -847,7 +847,7 @@ func (e *EthAdaptor) SubscribeToAll() (err error) {
 				fmt.Println("----------------------------------------------")
 			case *DOSProxyLogCallbackTriggeredFor:
 				fmt.Println("got DOSProxyLogCallbackTriggeredFor event...")
-				fmt.Println("CallbackAddr: ", content.CallbackAddr)
+				fmt.Println("CallbackAddr: ", content.CallbackAddr.Hex())
 				fmt.Println("----------------------------------------------")
 			case *DOSProxyLogQueryFromNonExistentUC:
 				fmt.Println("got DOSProxyLogQueryFromNonExistentUC event...")
