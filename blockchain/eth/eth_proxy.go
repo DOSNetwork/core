@@ -92,11 +92,11 @@ func (e *EthAdaptor) Init(autoReplenish bool, netType int) (err error) {
 		e.client, err = ethclient.Dial(ethRemoteNode.remoteNodeAddress)
 	}
 
-	e.proxy, err = dosproxy.NewDOSProxy(ethRemoteNode.contractAddress, e.client)
+	e.proxy, err = dosproxy.NewDOSProxy(ethRemoteNode.proxyContractAddress, e.client)
 	for err != nil {
 		fmt.Println(err)
 		fmt.Println("Connot Create new proxy, retrying...")
-		e.proxy, err = dosproxy.NewDOSProxy(ethRemoteNode.contractAddress, e.client)
+		e.proxy, err = dosproxy.NewDOSProxy(ethRemoteNode.proxyContractAddress, e.client)
 	}
 	e.lock.Unlock()
 
@@ -131,11 +131,11 @@ func (e *EthAdaptor) SubscribeEvent(ch chan interface{}, subscribeType int) (err
 				e.client, err = ethclient.Dial(ethRemoteNode.remoteNodeAddress)
 			}
 
-			e.proxy, err = dosproxy.NewDOSProxy(ethRemoteNode.contractAddress, e.client)
+			e.proxy, err = dosproxy.NewDOSProxy(ethRemoteNode.proxyContractAddress, e.client)
 			for err != nil {
 				fmt.Println(err)
 				fmt.Println("Connot Create new proxy, retrying...")
-				e.proxy, err = dosproxy.NewDOSProxy(ethRemoteNode.contractAddress, e.client)
+				e.proxy, err = dosproxy.NewDOSProxy(ethRemoteNode.proxyContractAddress, e.client)
 			}
 
 			e.lock.Unlock()

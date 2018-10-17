@@ -56,3 +56,17 @@ type DOSProxyLogPublicKeyAccepted struct {
 	Y1 *big.Int
 	Y2 *big.Int
 }
+
+type DOSAddressBridgeProxyAddressUpdated struct {
+	PreviousProxy common.Address
+	NewProxy      common.Address
+}
+
+type AskMeAnythingSetTimeout struct {
+	PreviousTimeout *big.Int
+	NewTimeout      *big.Int
+}
+
+type AskMeAnythingCallbackReady struct {
+	QueryId *big.Int
+}
