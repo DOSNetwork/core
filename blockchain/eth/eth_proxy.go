@@ -485,6 +485,22 @@ func (e *EthAdaptor) ResetNodeIDs() (err error) {
 	return
 }
 
+func (e *EthAdaptor) RandomNumberTimeOut() (err error) {
+	fmt.Println("Starting RandomNumberTimeOut...")
+	auth, err := e.getAuth()
+	if err != nil {
+		return
+	}
+
+	tx, err := e.proxy.HandleTimeout(auth)
+	if err != nil {
+		return
+	}
+
+	err = e.checkTransaction(tx)
+	return
+}
+
 func decodePubKey(pubKey kyber.Point) (*big.Int, *big.Int, *big.Int, *big.Int, error) {
 	pubKeyMar, err := pubKey.MarshalBinary()
 	if err != nil {

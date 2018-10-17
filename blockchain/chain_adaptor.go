@@ -28,6 +28,7 @@ type ChainInterface interface {
 	SubscribeToAll() (err error)
 	//For test
 	ResetNodeIDs() (err error)
+	RandomNumberTimeOut() (err error)
 }
 
 func AdaptTo(chainName int, autoReplenish bool, netType int) (conn ChainInterface, err error) {
