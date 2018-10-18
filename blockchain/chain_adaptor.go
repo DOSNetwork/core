@@ -25,7 +25,7 @@ type ChainInterface interface {
 	DataReturn(queryId *big.Int, data, sig []byte) (err error)
 	DeployContract(contractName int) (address common.Address, err error)
 	DeployAll() (proxyAddress, bridgeAddress, askAddress common.Address, err error)
-	SubscribeToAll() (err error)
+	SubscribeToAll(msgChan chan interface{}) (err error)
 	//For test
 	ResetNodeIDs() (err error)
 	RandomNumberTimeOut() (err error)

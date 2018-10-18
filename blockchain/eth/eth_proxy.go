@@ -58,11 +58,12 @@ var ethRemoteNode = new(netConfig)
 var workingDir string
 
 type EthAdaptor struct {
-	id     *big.Int
-	key    *keystore.Key
-	client *ethclient.Client
-	proxy  *dosproxy.DOSProxy
-	lock   *sync.Mutex
+	id        *big.Int
+	key       *keystore.Key
+	client    *ethclient.Client
+	proxy     *dosproxy.DOSProxy
+	lock      *sync.Mutex
+	logFilter *sync.Map
 }
 
 func (e *EthAdaptor) Init(autoReplenish bool, netType int) (err error) {
@@ -72,6 +73,10 @@ func (e *EthAdaptor) Init(autoReplenish bool, netType int) (err error) {
 	}
 
 	fmt.Println("start initial onChainConn...")
+
+	e.logFilter = new(sync.Map)
+	go e.logMapTimeout()
+
 	e.lock = new(sync.Mutex)
 	e.lock.Lock()
 
@@ -166,8 +171,10 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 			case err := <-sub.Err():
 				log.Fatal(err)
 			case i := <-transitChan:
-				ch <- &DOSProxyLogGrouping{
-					NodeId: i.NodeId,
+				if !e.filterLog(i.Raw.Data) {
+					ch <- &DOSProxyLogGrouping{
+						NodeId: i.NodeId,
+					}
 				}
 			}
 		}
@@ -188,12 +195,14 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 			case err := <-sub.Err():
 				log.Fatal(err)
 			case i := <-transitChan:
-				ch <- &DOSProxyLogUrl{
-					QueryId:         i.QueryId,
-					Url:             i.Url,
-					Timeout:         i.Timeout,
-					Randomness:      i.Randomness,
-					DispatchedGroup: i.DispatchedGroup,
+				if !e.filterLog(i.Raw.Data) {
+					ch <- &DOSProxyLogUrl{
+						QueryId:         i.QueryId,
+						Url:             i.Url,
+						Timeout:         i.Timeout,
+						Randomness:      i.Randomness,
+						DispatchedGroup: i.DispatchedGroup,
+					}
 				}
 			}
 		}
@@ -214,10 +223,12 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 			case err := <-sub.Err():
 				log.Fatal(err)
 			case i := <-transitChan:
-				ch <- &DOSProxyLogUpdateRandom{
-					LastRandomness:   i.LastRandomness,
-					LastUpdatedBlock: i.LastUpdatedBlock,
-					DispatchedGroup:  i.DispatchedGroup,
+				if !e.filterLog(i.Raw.Data) {
+					ch <- &DOSProxyLogUpdateRandom{
+						LastRandomness:   i.LastRandomness,
+						LastUpdatedBlock: i.LastUpdatedBlock,
+						DispatchedGroup:  i.DispatchedGroup,
+					}
 				}
 			}
 		}
@@ -238,13 +249,15 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 			case err := <-sub.Err():
 				log.Fatal(err)
 			case i := <-transitChan:
-				ch <- &DOSProxyLogValidationResult{
-					TrafficType: i.TrafficType,
-					TrafficId:   i.TrafficId,
-					Message:     i.Message,
-					Signature:   i.Signature,
-					PubKey:      i.PubKey,
-					Pass:        i.Pass,
+				if !e.filterLog(i.Raw.Data) {
+					ch <- &DOSProxyLogValidationResult{
+						TrafficType: i.TrafficType,
+						TrafficId:   i.TrafficId,
+						Message:     i.Message,
+						Signature:   i.Signature,
+						PubKey:      i.PubKey,
+						Pass:        i.Pass,
+					}
 				}
 			}
 		}
@@ -265,8 +278,10 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 			case err := <-sub.Err():
 				log.Fatal(err)
 			case i := <-transitChan:
-				ch <- &DOSProxyLogNonSupportedType{
-					QueryType: i.QueryType,
+				if !e.filterLog(i.Raw.Data) {
+					ch <- &DOSProxyLogNonSupportedType{
+						QueryType: i.QueryType,
+					}
 				}
 			}
 		}
@@ -287,8 +302,10 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 			case err := <-sub.Err():
 				log.Fatal(err)
 			case i := <-transitChan:
-				ch <- &DOSProxyLogNonContractCall{
-					From: i.From,
+				if !e.filterLog(i.Raw.Data) {
+					ch <- &DOSProxyLogNonContractCall{
+						From: i.From,
+					}
 				}
 			}
 		}
@@ -309,8 +326,10 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 			case err := <-sub.Err():
 				log.Fatal(err)
 			case i := <-transitChan:
-				ch <- &DOSProxyLogCallbackTriggeredFor{
-					CallbackAddr: i.CallbackAddr,
+				if !e.filterLog(i.Raw.Data) {
+					ch <- &DOSProxyLogCallbackTriggeredFor{
+						CallbackAddr: i.CallbackAddr,
+					}
 				}
 			}
 		}
@@ -330,8 +349,10 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 			select {
 			case err := <-sub.Err():
 				log.Fatal(err)
-			case _ = <-transitChan:
-				ch <- &DOSProxyLogQueryFromNonExistentUC{}
+			case i := <-transitChan:
+				if !e.filterLog(i.Raw.Data) {
+					ch <- &DOSProxyLogQueryFromNonExistentUC{}
+				}
 			}
 		}
 	case SubscribeDOSProxyLogInsufficientGroupNumber:
@@ -350,8 +371,10 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 			select {
 			case err := <-sub.Err():
 				log.Fatal(err)
-			case _ = <-transitChan:
-				ch <- &DOSProxyLogInsufficientGroupNumber{}
+			case i := <-transitChan:
+				if !e.filterLog(i.Raw.Data) {
+					ch <- &DOSProxyLogInsufficientGroupNumber{}
+				}
 			}
 		}
 	case SubscribeDOSProxyLogPublicKeyAccepted:
@@ -371,11 +394,13 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 			case err := <-sub.Err():
 				log.Fatal(err)
 			case i := <-transitChan:
-				ch <- &DOSProxyLogPublicKeyAccepted{
-					X1: i.X1,
-					X2: i.X2,
-					Y1: i.Y1,
-					Y2: i.Y2,
+				if !e.filterLog(i.Raw.Data) {
+					ch <- &DOSProxyLogPublicKeyAccepted{
+						X1: i.X1,
+						X2: i.X2,
+						Y1: i.Y1,
+						Y2: i.Y2,
+					}
 				}
 			}
 		}
@@ -815,9 +840,7 @@ func (e *EthAdaptor) updateBridge(bridgeAddress, proxyAddress common.Address) (e
 	return
 }
 
-func (e *EthAdaptor) SubscribeToAll() (err error) {
-	msgChan := make(chan interface{})
-
+func (e *EthAdaptor) SubscribeToAll(msgChan chan interface{}) (err error) {
 	for i := 0; i < 10; i++ {
 		err = e.SubscribeEvent(msgChan, i)
 	}
@@ -863,7 +886,7 @@ func (e *EthAdaptor) SubscribeToAll() (err error) {
 				fmt.Println("----------------------------------------------")
 			case *DOSProxyLogCallbackTriggeredFor:
 				fmt.Println("got DOSProxyLogCallbackTriggeredFor event...")
-				fmt.Println("CallbackAddr: ", content.CallbackAddr)
+				fmt.Println("CallbackAddr: ", content.CallbackAddr.Hex())
 				fmt.Println("----------------------------------------------")
 			case *DOSProxyLogQueryFromNonExistentUC:
 				fmt.Println("got DOSProxyLogQueryFromNonExistentUC event...")
@@ -880,5 +903,29 @@ func (e *EthAdaptor) SubscribeToAll() (err error) {
 			}
 		}
 	}()
+
 	return
+}
+
+func (e *EthAdaptor) filterLog(data []byte) (duplicates bool) {
+	_, duplicates = e.logFilter.LoadOrStore(data, time.Now())
+	return
+}
+
+func (e *EthAdaptor) logMapTimeout() {
+	ticker := time.NewTicker(10 * time.Minute)
+	for range ticker.C {
+		e.logFilter.Range(e.checkTime)
+	}
+
+}
+
+func (e *EthAdaptor) checkTime(log, deliverTime interface{}) (okToDelete bool) {
+	switch t := deliverTime.(type) {
+	case time.Time:
+		if time.Now().Sub(t).Seconds() > 60*10 {
+			e.logFilter.Delete(log)
+		}
+	}
+	return true
 }

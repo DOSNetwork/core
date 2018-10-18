@@ -10,7 +10,7 @@ type netConfig struct {
 var (
 	rinkebyNode        = initial("wss://rinkeby.infura.io/ws", "0xAd67eE265945fe895aEA482d09762011C9D67442")
 	rinkebyPrivateNode = initial("ws://13.56.31.73:8546", "0xAd67eE265945fe895aEA482d09762011C9D67442")
-	privateNode        = initial("ws://13.52.16.14:8546", "0x19002E8b5D11076cC27bA26670f239B41443E60d")
+	privateNode        = initial("ws://13.52.16.14:8546", "0xA5a1A5F848B13Aa64ba3bdF5777fF787e4105424")
 )
 
 func initial(remoteNodeAddress, proxyContractAddressHex string) (node *netConfig) {
