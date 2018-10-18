@@ -2,6 +2,7 @@ package eth
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -148,7 +149,6 @@ func (e *EthAdaptor) SubscribeEvent(ch chan interface{}, subscribeType int) (err
 
 		}
 	}
-	return nil
 }
 
 func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchOpts, subscribeType int, done chan bool) {
@@ -574,8 +574,8 @@ func (e *EthAdaptor) getAuth() (auth *bind.TransactOpts, err error) {
 		return
 	}
 
-	auth.GasLimit = uint64(4000000) // in units
-	auth.GasPrice = gasPrice
+	auth.GasLimit = uint64(7000000) // in units
+	auth.GasPrice = gasPrice.Mul(gasPrice, big.NewInt(100))
 
 	return
 }
@@ -676,8 +676,8 @@ func (e *EthAdaptor) transferEth(from, to *keystore.Key) (err error) {
 	}
 
 	value := big.NewInt(1000000000000000000)
-	gasLimit := uint64(4000000)
-	tx := types.NewTransaction(nonce, to.Address, value, gasLimit, gasPrice, nil)
+	gasLimit := uint64(7000000)
+	tx := types.NewTransaction(nonce, to.Address, value, gasLimit, gasPrice.Mul(gasPrice, big.NewInt(100)), nil)
 
 	chainId, err := e.client.NetworkID(context.Background())
 	if err != nil {
@@ -828,75 +828,25 @@ func (e *EthAdaptor) SubscribeToAll(msgChan chan interface{}) (err error) {
 	for i := 0; i < 10; i++ {
 		err = e.SubscribeEvent(msgChan, i)
 	}
-
-	go func() {
-		defer close(msgChan)
-		for msg := range msgChan {
-			switch content := msg.(type) {
-			case *DOSProxyLogGrouping:
-				fmt.Println("got DOSProxyLogGrouping event...")
-				fmt.Println("NodeId: ", content.NodeId)
-				fmt.Println("----------------------------------------------")
-			case *DOSProxyLogUrl:
-				fmt.Println("got DOSProxyLogUrl event...")
-				fmt.Println("QueryId: ", content.QueryId)
-				fmt.Println("Url: ", content.Url)
-				fmt.Println("Timeout: ", content.Timeout)
-				fmt.Println("Randomness: ", content.Randomness)
-				fmt.Println("DispatchedGroup: ", content.DispatchedGroup)
-				fmt.Println("----------------------------------------------")
-			case *DOSProxyLogUpdateRandom:
-				fmt.Println("got DOSProxyLogUpdateRandom event...")
-				fmt.Println("LastRandomness: ", content.LastRandomness)
-				fmt.Println("LastUpdatedBlock: ", content.LastUpdatedBlock)
-				fmt.Println("DispatchedGroup: ", content.DispatchedGroup)
-				fmt.Println("----------------------------------------------")
-			case *DOSProxyLogValidationResult:
-				fmt.Println("got DOSProxyLogInvalidSignature event...")
-				fmt.Println("TrafficType: ", content.TrafficType)
-				fmt.Println("TrafficId: ", content.TrafficId)
-				fmt.Println("Message: ", content.Message)
-				fmt.Println("Signature: ", content.Signature)
-				fmt.Println("PubKey: ", content.PubKey)
-				fmt.Println("Pass: ", content.Pass)
-				fmt.Println("----------------------------------------------")
-			case *DOSProxyLogNonSupportedType:
-				fmt.Println("got DOSProxyLogNonSupportedType event...")
-				fmt.Println("QueryType: ", content.QueryType)
-				fmt.Println("----------------------------------------------")
-			case *DOSProxyLogNonContractCall:
-				fmt.Println("got DOSProxyLogNonContractCall event...")
-				fmt.Println("From: ", content.From)
-				fmt.Println("----------------------------------------------")
-			case *DOSProxyLogCallbackTriggeredFor:
-				fmt.Println("got DOSProxyLogCallbackTriggeredFor event...")
-				fmt.Println("CallbackAddr: ", content.CallbackAddr.Hex())
-				fmt.Println("----------------------------------------------")
-			case *DOSProxyLogQueryFromNonExistentUC:
-				fmt.Println("got DOSProxyLogQueryFromNonExistentUC event...")
-				fmt.Println("----------------------------------------------")
-			case *DOSProxyLogInsufficientGroupNumber:
-				fmt.Println("got DOSProxyLogInsufficientGroupNumber event...")
-				fmt.Println("----------------------------------------------")
-			case *DOSProxyLogPublicKeyAccepted:
-				fmt.Println("got DOSProxyLogPublicKeyAccepted event...")
-				fmt.Println("X1: ", content.X1)
-				fmt.Println("X2: ", content.X2)
-				fmt.Println("Y1: ", content.Y1)
-				fmt.Println("Y2: ", content.Y2)
-			}
-		}
-	}()
-
 	return
 }
 
 func (e *EthAdaptor) filterLog(raw types.Log) (duplicates bool) {
-	logBytes, err := raw.MarshalJSON()
-	if err != nil {
-		return false
+	var blockNumBytes []byte
+	binary.LittleEndian.PutUint64(blockNumBytes, raw.BlockNumber)
+
+	identityBytes := append(raw.Address.Bytes(), raw.Topics[0].Bytes()...)
+	identityBytes = append(identityBytes, raw.Data...)
+	identityBytes = append(identityBytes, blockNumBytes...)
+	identityBytes = append(identityBytes, raw.TxHash.Bytes()...)
+
+	identity := new(big.Int)
+	identity.SetBytes(identityBytes)
+
+	_, duplicates = e.logFilter.LoadOrStore(identity, time.Now())
+	if duplicates {
+		fmt.Println("duplicates!!!!!!!!!")
 	}
-	_, duplicates = e.logFilter.LoadOrStore(string(logBytes), time.Now())
 	return
 }
 
