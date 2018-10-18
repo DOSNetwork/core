@@ -450,7 +450,7 @@ func (e *EthAdaptor) SetRandomNum(sig []byte) (err error) {
 		return
 	}
 
-	x, y := decodeSig(sig)
+	x, y := DecodeSig(sig)
 
 	tx, err := e.proxy.UpdateRandomness(auth, [2]*big.Int{x, y})
 	if err != nil {
@@ -472,7 +472,7 @@ func (e *EthAdaptor) UploadPubKey(pubKey kyber.Point) (err error) {
 		return
 	}
 
-	x0, x1, y0, y1, err := decodePubKey(pubKey)
+	x0, x1, y0, y1, err := DecodePubKey(pubKey)
 	if err != nil {
 		return
 	}
@@ -510,7 +510,23 @@ func (e *EthAdaptor) ResetNodeIDs() (err error) {
 	return
 }
 
-func decodePubKey(pubKey kyber.Point) (*big.Int, *big.Int, *big.Int, *big.Int, error) {
+func (e *EthAdaptor) RandomNumberTimeOut() (err error) {
+	fmt.Println("Starting RandomNumberTimeOut...")
+	auth, err := e.getAuth()
+	if err != nil {
+		return
+	}
+
+	tx, err := e.proxy.HandleTimeout(auth)
+	if err != nil {
+		return
+	}
+
+	err = e.checkTransaction(tx)
+	return
+}
+
+func DecodePubKey(pubKey kyber.Point) (*big.Int, *big.Int, *big.Int, *big.Int, error) {
 	pubKeyMar, err := pubKey.MarshalBinary()
 	if err != nil {
 		return nil, nil, nil, nil, err
@@ -533,7 +549,7 @@ func (e *EthAdaptor) DataReturn(queryId *big.Int, data, sig []byte) (err error) 
 		return
 	}
 
-	x, y := decodeSig(sig)
+	x, y := DecodeSig(sig)
 
 	tx, err := e.proxy.TriggerCallback(auth, queryId, data, [2]*big.Int{x, y})
 	if err != nil {
@@ -548,7 +564,7 @@ func (e *EthAdaptor) DataReturn(queryId *big.Int, data, sig []byte) (err error) 
 	return
 }
 
-func decodeSig(sig []byte) (x, y *big.Int) {
+func DecodeSig(sig []byte) (x, y *big.Int) {
 	x = new(big.Int)
 	y = new(big.Int)
 	x.SetBytes(sig[0:32])
@@ -845,7 +861,7 @@ func (e *EthAdaptor) filterLog(raw types.Log) (duplicates bool) {
 
 	_, duplicates = e.logFilter.LoadOrStore(identity, time.Now())
 	if duplicates {
-		fmt.Println("duplicates!!!!!!!!!")
+		fmt.Println("got duplicate event")
 	}
 	return
 }

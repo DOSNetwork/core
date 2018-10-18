@@ -13,7 +13,6 @@ package tbls
 import (
 	"bytes"
 	"encoding/binary"
-	"fmt"
 
 	"github.com/DOSNetwork/core/share"
 	"github.com/DOSNetwork/core/sign/bls"
@@ -94,7 +93,6 @@ func SliceUniqMap(s [][]byte) [][]byte {
 // public sharing polynomial at index 0.
 func Recover(suite Suite, public *share.PubPoly, msg []byte, sigs [][]byte, t, n int) ([]byte, error) {
 	pubShares := make([]*share.PubShare, 0)
-	fmt.Println("Recover len ", len(sigs))
 	sigs = SliceUniqMap(sigs)
 	for _, sig := range sigs {
 		s := SigShare(sig)
@@ -106,7 +104,6 @@ func Recover(suite Suite, public *share.PubPoly, msg []byte, sigs [][]byte, t, n
 		if err = bls.Verify(suite, public.Eval(i).V, msg, s.Value()); err != nil {
 			continue
 		}
-		fmt.Println("Recover index ", i)
 		point := suite.G1().Point()
 		if err := point.UnmarshalBinary(s.Value()); err != nil {
 			return nil, err
