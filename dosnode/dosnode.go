@@ -34,6 +34,7 @@ type DosNodeInterface interface {
 
 const WATCHDOGTIMEOUT = 10
 const VALIDATIONTIMEOUT = 3
+const RANDOMNUMBERSIZE = 32
 
 func CreateDosNode(suite suites.Suite, nbParticipants int, p p2p.P2PInterface, chainConn blockchain.ChainInterface, p2pDkg dkg.P2PDkgInterface) (DosNodeInterface, error) {
 	d := &DosNode{
@@ -220,6 +221,19 @@ func (d *DosNode) PipeCheckURL(chLogUrl <-chan interface{}) <-chan Report {
 	return out
 }
 
+func padOrTrim(bb []byte, size int) []byte {
+	l := len(bb)
+	if l == size {
+		return bb
+	}
+	if l > size {
+		return bb[l-size:]
+	}
+	tmp := make([]byte, size)
+	copy(tmp[size-l:], bb)
+	return tmp
+}
+
 // TODO: error handling and logging
 // Note: Signed messages keep synced with on-chain contracts
 func (d *DosNode) PipeGenerateRandomNumber(chRandom <-chan interface{}) <-chan Report {
@@ -236,7 +250,7 @@ func (d *DosNode) PipeGenerateRandomNumber(chRandom <-chan interface{}) <-chan R
 						preBlock := content.LastUpdatedBlock
 						fmt.Printf("0 ) DOSProxyLogUpdateRandom preBlock #%v \n", preBlock)
 						fmt.Printf("1 ) GenerateRandomNumber preRandom #%v \n", preRandom)
-						fmt.Println("1 ) GenerateRandomNumber preRandom ", preRandom.Bytes())
+						fmt.Println("1 ) GenerateRandomNumber preRandom ", preRandom)
 						//To avoid duplicate query
 						//_, ok := (*d.reportMap).Load(preRandom.String())
 						//if !ok {
@@ -247,7 +261,8 @@ func (d *DosNode) PipeGenerateRandomNumber(chRandom <-chan interface{}) <-chan R
 							return
 						}
 						// message = concat(lastUpdatedBlockhash, lastRandomness, submitter)
-						msg := append(hash[:], preRandom.Bytes()...)
+						random := padOrTrim(preRandom.Bytes(), RANDOMNUMBERSIZE)
+						msg := append(hash[:], random...)
 						msg = append(msg[:], new([12]byte)[:]...)
 						msg = append(msg[:], submitter...)
 						fmt.Println("GenerateRandomNumber content = ", msg)
@@ -480,7 +495,6 @@ func (d *DosNode) PipeCleanFinishMap(chValidation <-chan interface{}, forValidat
 						switch uint32(content.TrafficType) {
 						case ForRandomNumber:
 							fmt.Println("Invalide Signature.........")
-							d.chainConn.RandomNumberTimeOut()
 						default:
 							result, ok := validateMap.Load(content.TrafficId.String())
 							if ok {
