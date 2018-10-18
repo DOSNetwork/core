@@ -236,6 +236,7 @@ func (d *DosNode) PipeGenerateRandomNumber(chRandom <-chan interface{}) <-chan R
 						preBlock := content.LastUpdatedBlock
 						fmt.Printf("0 ) DOSProxyLogUpdateRandom preBlock #%v \n", preBlock)
 						fmt.Printf("1 ) GenerateRandomNumber preRandom #%v \n", preRandom)
+						fmt.Println("1 ) GenerateRandomNumber preRandom ", preRandom.Bytes())
 						//To avoid duplicate query
 						//_, ok := (*d.reportMap).Load(preRandom.String())
 						//if !ok {
@@ -479,6 +480,7 @@ func (d *DosNode) PipeCleanFinishMap(chValidation <-chan interface{}, forValidat
 						switch uint32(content.TrafficType) {
 						case ForRandomNumber:
 							fmt.Println("Invalide Signature.........")
+							d.chainConn.RandomNumberTimeOut()
 						default:
 							result, ok := validateMap.Load(content.TrafficId.String())
 							if ok {
