@@ -31,7 +31,7 @@ func main() {
 	bootstrapIp := *bootstrapIpFlag
 
 	//1)Connect to Eth and Set node ID
-	chainConn, err := blockchain.AdaptTo(blockchain.ETH, true, eth.Rinkeby)
+	chainConn, err := blockchain.AdaptTo(blockchain.ETH, true, eth.Private)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -110,7 +110,6 @@ func main() {
 				peerEventForDKG <- msg
 			case *vss.Signature:
 				cSignatureFromPeer <- *content
-				fmt.Println("signature form peer")
 			default:
 				fmt.Println("unknown", content)
 			}
