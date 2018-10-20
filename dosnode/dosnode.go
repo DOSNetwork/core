@@ -194,8 +194,8 @@ func (d *DosNode) PipeCheckURL(chLogUrl <-chan interface{}) <-chan Report {
 						if err != nil {
 							fmt.Println(err)
 						}
-						msg = append(msg[:], new([12]byte)[:]...)
-						msg = append(msg[:], submitter...)
+						msg = append(msg, make([]byte, 12)...)
+						msg = append(msg, submitter...)
 						//combine result with submitter
 						sign := &vss.Signature{
 							Index:   uint32(ForCheckURL),
@@ -241,21 +241,21 @@ func (d *DosNode) PipeGenerateRandomNumber(chRandom <-chan interface{}) <-chan R
 						//_, ok := (*d.reportMap).Load(preRandom.String())
 						//if !ok {
 						submitter := d.choseSubmitter(preRandom)
-						hash, err := d.chainConn.GetBlockHashByNumber(preBlock)
-						if err != nil {
-							fmt.Printf("GetBlockHashByNumber #%v fails\n", preBlock)
-							return
-						}
+						//hash, err := d.chainConn.GetBlockHashByNumber(preBlock)
+						//if err != nil {
+						//	fmt.Printf("GetBlockHashByNumber #%v fails\n", preBlock)
+						//	return
+						//}
 						// message = concat(lastUpdatedBlockhash, lastRandomness, submitter)
-						msg := append(hash[:], preRandom.Bytes()...)
-						msg = append(msg[:], new([12]byte)[:]...)
-						msg = append(msg[:], submitter...)
-						fmt.Println("GenerateRandomNumber content = ", msg)
+						//random := padOrTrim(preRandom.Bytes(), RANDOMNUMBERSIZE)
+						randomNum := append(preRandom.Bytes(), make([]byte, 12)...)
+						randomNum = append(randomNum, submitter...)
+						fmt.Println("GenerateRandomNumber content = ", randomNum)
 
 						sign := &vss.Signature{
 							Index:   uint32(ForRandomNumber),
 							QueryId: preRandom.String(),
-							Content: msg,
+							Content: randomNum,
 						}
 						report := &Report{}
 						report.selfSign = *sign
@@ -416,7 +416,8 @@ func (d *DosNode) PipeSendToOnchain(chReport <-chan Report) {
 					//os.Exit(0)
 					//Test Case 2
 					//report.signGroup[10] ^= 0x01
-					err := d.chainConn.SetRandomNum(report.signGroup)
+					newLen := len(report.selfSign.Content) - 32
+					err := d.chainConn.SetRandomNum(report.selfSign.Content[:newLen], report.signGroup)
 					if err != nil {
 						fmt.Println("SetRandomNum err ", err)
 					}

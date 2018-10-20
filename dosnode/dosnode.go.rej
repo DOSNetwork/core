@@ -1,0 +1,25 @@
+diff a/dosnode/dosnode.go b/dosnode/dosnode.go	(rejected hunks)
+@@ -260,17 +260,17 @@ func (d *DosNode) PipeGenerateRandomNumber(chRandom <-chan interface{}) <-chan R
+ 							fmt.Printf("GetBlockHashByNumber #%v fails\n", preBlock)
+ 							return
+ 						}
++						_ = hash
+ 						// message = concat(lastUpdatedBlockhash, lastRandomness, submitter)
+-						random := padOrTrim(preRandom.Bytes(), RANDOMNUMBERSIZE)
+-						msg := append(hash[:], random...)
+-						msg = append(msg[:], new([12]byte)[:]...)
+-						msg = append(msg[:], submitter...)
+-						fmt.Println("GenerateRandomNumber content = ", msg)
++						//random := padOrTrim(preRandom.Bytes(), RANDOMNUMBERSIZE)
++						randomNum := append(preRandom.Bytes(), make([]byte, 12)...)
++						randomNum = append(randomNum, submitter...)
++						fmt.Println("GenerateRandomNumber content = ", randomNum)
+ 
+ 						sign := &vss.Signature{
+ 							Index:   uint32(ForRandomNumber),
+ 							QueryId: preRandom.String(),
+-							Content: msg,
++							Content: randomNum,
+ 						}
+ 						report := &Report{}
+ 						report.selfSign = *sign
