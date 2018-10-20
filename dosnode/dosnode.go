@@ -32,6 +32,8 @@ type DosNodeInterface interface {
 	SetParticipants(int)
 }
 
+var m sync.Mutex
+
 const WATCHDOGTIMEOUT = 10
 const VALIDATIONTIMEOUT = 3
 const RANDOMNUMBERSIZE = 32
@@ -195,8 +197,8 @@ func (d *DosNode) PipeCheckURL(chLogUrl <-chan interface{}) <-chan Report {
 						if err != nil {
 							fmt.Println(err)
 						}
-						msg = append(msg[:], new([12]byte)[:]...)
-						msg = append(msg[:], submitter...)
+						msg = append(msg, make([]byte, 12)...)
+						msg = append(msg, submitter...)
 						//combine result with submitter
 						sign := &vss.Signature{
 							Index:   uint32(ForCheckURL),
@@ -255,22 +257,21 @@ func (d *DosNode) PipeGenerateRandomNumber(chRandom <-chan interface{}) <-chan R
 						//_, ok := (*d.reportMap).Load(preRandom.String())
 						//if !ok {
 						submitter := d.choseSubmitter(preRandom)
-						hash, err := d.chainConn.GetBlockHashByNumber(preBlock)
-						if err != nil {
-							fmt.Printf("GetBlockHashByNumber #%v fails\n", preBlock)
-							return
-						}
+						//hash, err := d.chainConn.GetBlockHashByNumber(preBlock)
+						//if err != nil {
+						//	fmt.Printf("GetBlockHashByNumber #%v fails\n", preBlock)
+						//	return
+						//}
 						// message = concat(lastUpdatedBlockhash, lastRandomness, submitter)
-						random := padOrTrim(preRandom.Bytes(), RANDOMNUMBERSIZE)
-						msg := append(hash[:], random...)
-						msg = append(msg[:], new([12]byte)[:]...)
-						msg = append(msg[:], submitter...)
-						fmt.Println("GenerateRandomNumber content = ", msg)
+						//random := padOrTrim(preRandom.Bytes(), RANDOMNUMBERSIZE)
+						randomNum := append(preRandom.Bytes(), make([]byte, 12)...)
+						randomNum = append(randomNum, submitter...)
+						fmt.Println("GenerateRandomNumber content = ", randomNum)
 
 						sign := &vss.Signature{
 							Index:   uint32(ForRandomNumber),
 							QueryId: preRandom.String(),
-							Content: msg,
+							Content: randomNum,
 						}
 						report := &Report{}
 						report.selfSign = *sign
@@ -431,10 +432,13 @@ func (d *DosNode) PipeSendToOnchain(chReport <-chan Report) {
 					//os.Exit(0)
 					//Test Case 2
 					//report.signGroup[10] ^= 0x01
-					err := d.chainConn.SetRandomNum(report.signGroup)
+					m.Lock()
+					newLen := len(report.selfSign.Content) - 32
+					err := d.chainConn.SetRandomNum(report.selfSign.Content[:newLen], report.signGroup)
 					if err != nil {
 						fmt.Println("SetRandomNum err ", err)
 					}
+					m.Unlock()
 				default:
 					fmt.Println("PipeSendToOnchain checkURL result = ", report.selfSign.Content)
 					//fmt.Println("PipeSendToOnchain checkURL result = ", report.signGroup)
@@ -455,10 +459,14 @@ func (d *DosNode) PipeSendToOnchain(chReport <-chan Report) {
 						queryResult[0] ^= 0x01
 					}
 					*/
+					//TODO:chainCoo should use a sendToOnChain(protobuf message) instead of DataReturn with mutex
+					//sendToOnChain receive a message from channel then call the corresponding function
+					m.Lock()
 					err := d.chainConn.DataReturn(qID, queryResult, report.signGroup)
 					if err != nil {
 						fmt.Println("DataReturn err ", err)
 					}
+					m.Unlock()
 				}
 			case <-d.quit:
 				break
@@ -534,7 +542,9 @@ func (d *DosNode) PipeCleanFinishMap(chValidation <-chan interface{}, forValidat
 					dur := time.Since(lastValidatedRandom)
 					if dur.Minutes() >= WATCHDOGTIMEOUT {
 						fmt.Println("WatchDog Random tiemout.........")
+						m.Lock()
 						d.chainConn.RandomNumberTimeOut()
+						m.Unlock()
 					}
 				}
 				validateMap.Range(func(key, value interface{}) bool {

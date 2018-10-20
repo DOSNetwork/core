@@ -324,12 +324,12 @@ contract DOSProxy {
         return result;
     }
 
-    function updateRandomness(uint[2] sig) external {
+    function updateRandomness(bytes content, uint[2] sig) external {
         if (!validateAndVerify(
                 1,
                 lastRandomness,
                 // (lastBlockhash || lastRandomness)
-                toBytes([blockhash(lastUpdatedBlock), bytes32(lastRandomness)]),
+                content,
                 BN256.G1Point(sig[0], sig[1]),
                 lastHandledGroup))
         {

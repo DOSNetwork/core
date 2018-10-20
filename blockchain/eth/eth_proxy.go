@@ -2,7 +2,6 @@ package eth
 
 import (
 	"context"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -65,6 +64,7 @@ type EthAdaptor struct {
 	proxy     *dosproxy.DOSProxy
 	lock      *sync.Mutex
 	logFilter *sync.Map
+	ethNonce  uint64
 }
 
 func (e *EthAdaptor) Init(autoReplenish bool, netType int) (err error) {
@@ -442,7 +442,7 @@ func (e *EthAdaptor) GetBlockHashByNumber(blknum *big.Int) (hash common.Hash, er
 	return
 }
 
-func (e *EthAdaptor) SetRandomNum(sig []byte) (err error) {
+func (e *EthAdaptor) SetRandomNum(content, sig []byte) (err error) {
 	fmt.Println("Starting submitting random number...")
 
 	auth, err := e.getAuth()
@@ -452,7 +452,7 @@ func (e *EthAdaptor) SetRandomNum(sig []byte) (err error) {
 
 	x, y := DecodeSig(sig)
 
-	tx, err := e.proxy.UpdateRandomness(auth, [2]*big.Int{x, y})
+	tx, err := e.proxy.UpdateRandomness(auth, content, [2]*big.Int{x, y})
 	if err != nil {
 		return
 	}
@@ -590,8 +590,18 @@ func (e *EthAdaptor) getAuth() (auth *bind.TransactOpts, err error) {
 		return
 	}
 
-	auth.GasLimit = uint64(7000000) // in units
-	auth.GasPrice = gasPrice.Mul(gasPrice, big.NewInt(100))
+	e.ethNonce++
+	auth.Nonce = big.NewInt(int64(e.ethNonce))
+
+	//for test only
+	onChainNonce, err := e.client.PendingNonceAt(context.Background(), e.key.Address)
+	if err != nil {
+		return
+	}
+	fmt.Print("localNonce:", auth.Nonce, "onChain nonce:", onChainNonce)
+
+	auth.GasLimit = uint64(6000000) // in units
+	auth.GasPrice = gasPrice.Mul(gasPrice, big.NewInt(2))
 
 	return
 }
@@ -629,6 +639,12 @@ func (e *EthAdaptor) setAccount(autoReplenish bool) (err error) {
 	e.key = usrKey
 	e.id = new(big.Int)
 	e.id.SetBytes(e.key.Address.Bytes())
+	e.ethNonce, err = e.client.PendingNonceAt(context.Background(), e.key.Address)
+	if err != nil {
+		return
+	}
+	//for correctness of the first call of getAuth, because getAuth always ++,
+	e.ethNonce--
 
 	if autoReplenish {
 		var rootKeyPath string
@@ -658,7 +674,7 @@ func (e *EthAdaptor) balanceMaintain(usrKey, rootKey *keystore.Key) (err error) 
 		return
 	}
 
-	if usrKeyBalance.Cmp(big.NewFloat(0.2)) == -1 {
+	if usrKeyBalance.Cmp(big.NewFloat(0.7)) == -1 {
 		fmt.Println("userKey account replenishing...")
 		if err = e.transferEth(rootKey, usrKey); err == nil {
 			fmt.Println("userKey account replenished.")
@@ -691,9 +707,9 @@ func (e *EthAdaptor) transferEth(from, to *keystore.Key) (err error) {
 		return
 	}
 
-	value := big.NewInt(1000000000000000000)
-	gasLimit := uint64(7000000)
-	tx := types.NewTransaction(nonce, to.Address, value, gasLimit, gasPrice.Mul(gasPrice, big.NewInt(100)), nil)
+	value := big.NewInt(800000000000000000) //0.8 Eth
+	gasLimit := uint64(6000000)
+	tx := types.NewTransaction(nonce, to.Address, value, gasLimit, gasPrice.Mul(gasPrice, big.NewInt(2)), nil)
 
 	chainId, err := e.client.NetworkID(context.Background())
 	if err != nil {
@@ -847,22 +863,23 @@ func (e *EthAdaptor) SubscribeToAll(msgChan chan interface{}) (err error) {
 	return
 }
 
-func (e *EthAdaptor) filterLog(raw types.Log) (duplicates bool) {
-	var blockNumBytes []byte
-	binary.LittleEndian.PutUint64(blockNumBytes, raw.BlockNumber)
+type logRecord struct {
+	content       types.Log
+	currTimeStamp time.Time
+}
 
+func (e *EthAdaptor) filterLog(raw types.Log) (duplicates bool) {
+	fmt.Println("check duplicates")
 	identityBytes := append(raw.Address.Bytes(), raw.Topics[0].Bytes()...)
 	identityBytes = append(identityBytes, raw.Data...)
-	identityBytes = append(identityBytes, blockNumBytes...)
-	identityBytes = append(identityBytes, raw.TxHash.Bytes()...)
+	identity := new(big.Int).SetBytes(identityBytes).String()
+	fmt.Println("identity: ", identity)
 
-	identity := new(big.Int)
-	identity.SetBytes(identityBytes)
-
-	_, duplicates = e.logFilter.LoadOrStore(identity, time.Now())
-	if duplicates {
-		fmt.Println("got duplicate event")
+	if record, loaded := e.logFilter.Load(identity); loaded {
+		fmt.Println("got duplicate event", record, "\n", raw)
 	}
+	_, duplicates = e.logFilter.LoadOrStore(identity, logRecord{raw, time.Now()})
+
 	return
 }
 
@@ -876,8 +893,8 @@ func (e *EthAdaptor) logMapTimeout() {
 
 func (e *EthAdaptor) checkTime(log, deliverTime interface{}) (okToDelete bool) {
 	switch t := deliverTime.(type) {
-	case time.Time:
-		if time.Now().Sub(t).Seconds() > 60*10 {
+	case logRecord:
+		if time.Now().Sub(t.currTimeStamp).Seconds() > 60*10 {
 			e.logFilter.Delete(log)
 		}
 	}
