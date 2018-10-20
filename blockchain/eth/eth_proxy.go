@@ -592,6 +592,14 @@ func (e *EthAdaptor) getAuth() (auth *bind.TransactOpts, err error) {
 
 	e.ethNonce++
 	auth.Nonce = big.NewInt(int64(e.ethNonce))
+
+	//for test only
+	onChainNonce, err := e.client.PendingNonceAt(context.Background(), e.key.Address)
+	if err != nil {
+		return
+	}
+	fmt.Print("localNonce:", auth.Nonce, "onChain nonce:", onChainNonce)
+
 	auth.GasLimit = uint64(6000000) // in units
 	auth.GasPrice = gasPrice.Mul(gasPrice, big.NewInt(2))
 
