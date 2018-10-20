@@ -32,8 +32,11 @@ type DosNodeInterface interface {
 	SetParticipants(int)
 }
 
+var m sync.Mutex
+
 const WATCHDOGTIMEOUT = 10
 const VALIDATIONTIMEOUT = 3
+const RANDOMNUMBERSIZE = 32
 
 func CreateDosNode(suite suites.Suite, nbParticipants int, p p2p.P2PInterface, chainConn blockchain.ChainInterface, p2pDkg dkg.P2PDkgInterface) (DosNodeInterface, error) {
 	d := &DosNode{
@@ -416,11 +419,13 @@ func (d *DosNode) PipeSendToOnchain(chReport <-chan Report) {
 					//os.Exit(0)
 					//Test Case 2
 					//report.signGroup[10] ^= 0x01
+					m.Lock()
 					newLen := len(report.selfSign.Content) - 32
 					err := d.chainConn.SetRandomNum(report.selfSign.Content[:newLen], report.signGroup)
 					if err != nil {
 						fmt.Println("SetRandomNum err ", err)
 					}
+					m.Unlock()
 				default:
 					fmt.Println("PipeSendToOnchain checkURL result = ", report.selfSign.Content)
 					//fmt.Println("PipeSendToOnchain checkURL result = ", report.signGroup)
@@ -441,10 +446,14 @@ func (d *DosNode) PipeSendToOnchain(chReport <-chan Report) {
 						queryResult[0] ^= 0x01
 					}
 					*/
+					//TODO:chainCoo should use a sendToOnChain(protobuf message) instead of DataReturn with mutex
+					//sendToOnChain receive a message from channel then call the corresponding function
+					m.Lock()
 					err := d.chainConn.DataReturn(qID, queryResult, report.signGroup)
 					if err != nil {
 						fmt.Println("DataReturn err ", err)
 					}
+					m.Unlock()
 				}
 			case <-d.quit:
 				break
@@ -521,7 +530,9 @@ func (d *DosNode) PipeCleanFinishMap(chValidation <-chan interface{}, forValidat
 					dur := time.Since(lastValidatedRandom)
 					if dur.Minutes() >= WATCHDOGTIMEOUT {
 						fmt.Println("WatchDog Random tiemout.........")
+						m.Lock()
 						d.chainConn.RandomNumberTimeOut()
+						m.Unlock()
 					}
 				}
 				validateMap.Range(func(key, value interface{}) bool {
