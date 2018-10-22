@@ -8,8 +8,8 @@ type netConfig struct {
 }
 
 var (
-	rinkebyNode        = initial("wss://rinkeby.infura.io/ws", "0x8B510350D6cC2E067dfAd3f1E7F5E36863ac36a8")
-	rinkebyPrivateNode = initial("ws://13.56.31.73:8546", "0x8B510350D6cC2E067dfAd3f1E7F5E36863ac36a8")
+	rinkebyNode        = initial("wss://rinkeby.infura.io/ws", "0x9b8e711560dB0c60Fe6104C4A46Fa528eFc22b03")
+	rinkebyPrivateNode = initial("ws://13.56.31.73:8546", "0x9b8e711560dB0c60Fe6104C4A46Fa528eFc22b03")
 	privateNode        = initial("ws://13.52.16.14:8546", "0xA5a1A5F848B13Aa64ba3bdF5777fF787e4105424")
 )
 

@@ -36,6 +36,7 @@ var m sync.Mutex
 
 const WATCHDOGTIMEOUT = 10
 const VALIDATIONTIMEOUT = 3
+const LOGEXPIRED = 10
 const RANDOMNUMBERSIZE = 32
 
 func CreateDosNode(suite suites.Suite, nbParticipants int, p p2p.P2PInterface, chainConn blockchain.ChainInterface, p2pDkg dkg.P2PDkgInterface) (DosNodeInterface, error) {
@@ -249,8 +250,6 @@ func (d *DosNode) PipeGenerateRandomNumber(chRandom <-chan interface{}) <-chan R
 				case *eth.DOSProxyLogUpdateRandom:
 					if d.isMember(content.DispatchedGroup) {
 						preRandom := content.LastRandomness
-						preBlock := content.LastUpdatedBlock
-						fmt.Printf("0 ) DOSProxyLogUpdateRandom preBlock #%v \n", preBlock)
 						fmt.Printf("1 ) GenerateRandomNumber preRandom #%v \n", preRandom)
 						fmt.Println("1 ) GenerateRandomNumber preRandom ", preRandom)
 						//To avoid duplicate query
@@ -263,8 +262,8 @@ func (d *DosNode) PipeGenerateRandomNumber(chRandom <-chan interface{}) <-chan R
 						//	return
 						//}
 						// message = concat(lastUpdatedBlockhash, lastRandomness, submitter)
-						//random := padOrTrim(preRandom.Bytes(), RANDOMNUMBERSIZE)
-						randomNum := append(preRandom.Bytes(), make([]byte, 12)...)
+						preRandomBytes := padOrTrim(preRandom.Bytes(), RANDOMNUMBERSIZE)
+						randomNum := append(preRandomBytes, make([]byte, 12)...)
 						randomNum = append(randomNum, submitter...)
 						fmt.Println("GenerateRandomNumber content = ", randomNum)
 
@@ -400,7 +399,7 @@ func (d *DosNode) PipeRecoverAndVerify(cSignatureFromPeer chan vss.Signature, fr
 				}
 			case <-ticker.C:
 				reportMap.Range(func(key, value interface{}) bool {
-					//fmt.Println("Tiem to clean .........")
+					//fmt.Println("time to clean .........")
 					report := value.(Report)
 					dur := time.Since(report.timeStamp)
 					if dur.Minutes() >= 10 {
@@ -433,8 +432,7 @@ func (d *DosNode) PipeSendToOnchain(chReport <-chan Report) {
 					//Test Case 2
 					//report.signGroup[10] ^= 0x01
 					m.Lock()
-					newLen := len(report.selfSign.Content) - 32
-					err := d.chainConn.SetRandomNum(report.selfSign.Content[:newLen], report.signGroup)
+					err := d.chainConn.SetRandomNum(report.signGroup)
 					if err != nil {
 						fmt.Println("SetRandomNum err ", err)
 					}
@@ -541,21 +539,21 @@ func (d *DosNode) PipeCleanFinishMap(chValidation <-chan interface{}, forValidat
 				if d.p2pDkg.IsCetified() {
 					dur := time.Since(lastValidatedRandom)
 					if dur.Minutes() >= WATCHDOGTIMEOUT {
-						fmt.Println("WatchDog Random tiemout.........")
+						fmt.Println("WatchDog Random timeout.........")
 						m.Lock()
 						d.chainConn.RandomNumberTimeOut()
 						m.Unlock()
 					}
 				}
 				validateMap.Range(func(key, value interface{}) bool {
-					fmt.Println("Tiem to check and clean .........")
+					fmt.Println("Time to check and clean .........")
 					report := value.(Report)
 					dur := time.Since(report.timeStamp)
 					//If a submitter is not alive then 3 minutes timeout will be trigged
 					if dur.Minutes() >= VALIDATIONTIMEOUT {
 						switch report.selfSign.Index {
 						case ForRandomNumber:
-							//fmt.Println("Random tiemout.........")
+							//fmt.Println("Random timeout.........")
 						default:
 							fmt.Println("Retrigger query.........")
 							result, ok := validateMap.Load(report.selfSign.QueryId)
@@ -579,7 +577,7 @@ func (d *DosNode) PipeCleanFinishMap(chValidation <-chan interface{}, forValidat
 							}
 						}
 					}
-					if dur.Minutes() >= WATCHDOGTIMEOUT {
+					if dur.Minutes() >= LOGEXPIRED {
 						//Failed too long ,just delete
 						validateMap.Delete(key)
 					}
