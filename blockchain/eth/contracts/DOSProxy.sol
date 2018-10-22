@@ -134,7 +134,6 @@ contract DOSProxy {
     event LogQueryFromNonExistentUC();
     event LogUpdateRandom(
         uint lastRandomness,
-        uint lastUpdatedBlock,
         uint[4] dispatchedGroup
     );
     // 0: query; 1: random
@@ -315,33 +314,22 @@ contract DOSProxy {
         delete pendingQueries[queryId];
     }
 
-    function toBytes(bytes32[2] data) internal pure returns (bytes) {
-        bytes memory result = new bytes(32 * 2);
-        assembly {
-            mstore(add(result, 0x20), mload(data))
-            mstore(add(result, 0x40), mload(add(data, 0x20)))
-        }
-        return result;
+    function toBytes(uint x) internal pure returns (bytes b) {
+        b = new bytes(32);
+        assembly { mstore(add(b, 32), x) }
     }
 
-    function updateRandomness(bytes content, uint[2] sig) external {
+    function updateRandomness(uint[2] sig) external {
         if (!validateAndVerify(
                 1,
                 lastRandomness,
-                // (lastBlockhash || lastRandomness)
-                content,
+                toBytes(lastRandomness),
                 BN256.G1Point(sig[0], sig[1]),
                 lastHandledGroup))
         {
             return;
         }
-        // Update new randomness = sha3(group signature)
-        lastRandomness = uint(keccak256(abi.encodePacked(sig[0], sig[1])));
-        lastUpdatedBlock = block.number - 1;
-        uint idx = lastRandomness % groupPubKeys.length;
-        lastHandledGroup = groupPubKeys[idx];
-        // Signal off-chain clients
-        emit LogUpdateRandom(lastRandomness, lastUpdatedBlock, getGroupPubKey(idx));
+        fireRandom();
     }
 
     // For test. To trigger first random number after first grouping has done
@@ -351,12 +339,12 @@ contract DOSProxy {
         uint idx = lastRandomness % groupPubKeys.length;
         lastHandledGroup = groupPubKeys[idx];
         // Signal off-chain clients
-        emit LogUpdateRandom(lastRandomness, lastUpdatedBlock, getGroupPubKey(idx));
+        emit LogUpdateRandom(lastRandomness, getGroupPubKey(idx));
     }
 
     function handleTimeout() public onlyWhitelisted {
         uint currentBlockNumber = block.number - 1;
-        if (currentBlockNumber - lastUpdatedBlock > 4) {
+        if (currentBlockNumber - lastUpdatedBlock > 5) {
             fireRandom();
         }
     }

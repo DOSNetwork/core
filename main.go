@@ -31,7 +31,7 @@ func main() {
 	bootstrapIp := *bootstrapIpFlag
 
 	//1)Connect to Eth and Set node ID
-	chainConn, err := blockchain.AdaptTo(blockchain.ETH, true, eth.Private)
+	chainConn, err := blockchain.AdaptTo(blockchain.ETH, true, eth.RinkebyPrivate)
 	if err != nil {
 		log.Fatal(err)
 	}

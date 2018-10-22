@@ -225,9 +225,8 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 			case i := <-transitChan:
 				if !e.filterLog(i.Raw) {
 					ch <- &DOSProxyLogUpdateRandom{
-						LastRandomness:   i.LastRandomness,
-						LastUpdatedBlock: i.LastUpdatedBlock,
-						DispatchedGroup:  i.DispatchedGroup,
+						LastRandomness:  i.LastRandomness,
+						DispatchedGroup: i.DispatchedGroup,
 					}
 				}
 			}
@@ -442,9 +441,8 @@ func (e *EthAdaptor) GetBlockHashByNumber(blknum *big.Int) (hash common.Hash, er
 	return
 }
 
-func (e *EthAdaptor) SetRandomNum(content, sig []byte) (err error) {
+func (e *EthAdaptor) SetRandomNum(sig []byte) (err error) {
 	fmt.Println("Starting submitting random number...")
-
 	auth, err := e.getAuth()
 	if err != nil {
 		return
@@ -452,7 +450,7 @@ func (e *EthAdaptor) SetRandomNum(content, sig []byte) (err error) {
 
 	x, y := DecodeSig(sig)
 
-	tx, err := e.proxy.UpdateRandomness(auth, content, [2]*big.Int{x, y})
+	tx, err := e.proxy.UpdateRandomness(auth, [2]*big.Int{x, y})
 	if err != nil {
 		return
 	}
@@ -591,6 +589,13 @@ func (e *EthAdaptor) getAuth() (auth *bind.TransactOpts, err error) {
 	}
 
 	e.ethNonce++
+	automatedNonce, err := e.client.PendingNonceAt(context.Background(), e.key.Address)
+	if err != nil {
+		return
+	}
+	if automatedNonce > e.ethNonce {
+		e.ethNonce = automatedNonce
+	}
 	auth.Nonce = big.NewInt(int64(e.ethNonce))
 
 	//for test only
@@ -601,7 +606,7 @@ func (e *EthAdaptor) getAuth() (auth *bind.TransactOpts, err error) {
 	fmt.Print("localNonce:", auth.Nonce, "onChain nonce:", onChainNonce)
 
 	auth.GasLimit = uint64(6000000) // in units
-	auth.GasPrice = gasPrice.Mul(gasPrice, big.NewInt(2))
+	auth.GasPrice = gasPrice.Mul(gasPrice, big.NewInt(3))
 
 	return
 }
@@ -709,7 +714,7 @@ func (e *EthAdaptor) transferEth(from, to *keystore.Key) (err error) {
 
 	value := big.NewInt(800000000000000000) //0.8 Eth
 	gasLimit := uint64(6000000)
-	tx := types.NewTransaction(nonce, to.Address, value, gasLimit, gasPrice.Mul(gasPrice, big.NewInt(2)), nil)
+	tx := types.NewTransaction(nonce, to.Address, value, gasLimit, gasPrice.Mul(gasPrice, big.NewInt(3)), nil)
 
 	chainId, err := e.client.NetworkID(context.Background())
 	if err != nil {
