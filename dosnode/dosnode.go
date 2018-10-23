@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/DOSNetwork/core/blockchain"
-	"github.com/DOSNetwork/core/blockchain/eth"
 	"github.com/DOSNetwork/core/p2p"
 	"github.com/DOSNetwork/core/share"
 	"github.com/DOSNetwork/core/share/dkg/pedersen"
@@ -76,7 +75,7 @@ type Report struct {
 	selfSign   vss.Signature
 	timeStamp  time.Time
 	//For retrigger
-	backupTask eth.DOSProxyLogUrl
+	backupTask blockchain.DOSProxyLogUrl
 }
 
 func (d *DosNode) SetParticipants(nbParticipants int) {
@@ -111,7 +110,7 @@ func (d *DosNode) isMember(dispatchedGroup [4]*big.Int) bool {
 		temp = append(dispatchedGroup[1].Bytes(), temp...)
 		temp = append(dispatchedGroup[0].Bytes(), temp...)
 		temp = append([]byte{0x01}, temp...)
-		//fmt.Println("isMember from eth : ", temp)
+		//fmt.Println("isMember from blockchain : ", temp)
 		groupPub, err := d.p2pDkg.GetGroupPublicPoly().Commit().MarshalBinary()
 		//fmt.Println("isMember : ", groupPub)
 		if err != nil {
@@ -150,7 +149,7 @@ func (d *DosNode) PipeGrouping(chGroup <-chan interface{}) {
 			//event from blockChain
 			case msg := <-chGroup:
 				switch content := msg.(type) {
-				case *eth.DOSProxyLogGrouping:
+				case *blockchain.DOSProxyLogGrouping:
 					isMember := false
 					groupIds := [][]byte{}
 					for i, node := range content.NodeId {
@@ -187,7 +186,7 @@ func (d *DosNode) PipeCheckURL(chLogUrl <-chan interface{}) <-chan Report {
 			//event from blockChain
 			case msg := <-chLogUrl:
 				switch content := msg.(type) {
-				case *eth.DOSProxyLogUrl:
+				case *blockchain.DOSProxyLogUrl:
 					//Check to see if this request is for node's group
 					if d.isMember(content.DispatchedGroup) {
 						queryId := content.QueryId
@@ -247,7 +246,7 @@ func (d *DosNode) PipeGenerateRandomNumber(chRandom <-chan interface{}) <-chan R
 			//event from blockChain
 			case msg := <-chRandom:
 				switch content := msg.(type) {
-				case *eth.DOSProxyLogUpdateRandom:
+				case *blockchain.DOSProxyLogUpdateRandom:
 					if d.isMember(content.DispatchedGroup) {
 						preRandom := content.LastRandomness
 						fmt.Printf("1 ) GenerateRandomNumber preRandom #%v \n", preRandom)
@@ -373,7 +372,7 @@ func (d *DosNode) PipeRecoverAndVerify(cSignatureFromPeer chan vss.Signature, fr
 							fmt.Println("Verify failed!!!!!!!!!!!!!!!!!")
 							continue
 						}
-						x, y := eth.DecodeSig(sig)
+						x, y := blockchain.DecodeSig(sig)
 						fmt.Println("5) Verify success signature ", x.String(), y.String())
 						report.signGroup = sig
 						report.timeStamp = time.Now()
@@ -392,8 +391,8 @@ func (d *DosNode) PipeRecoverAndVerify(cSignatureFromPeer chan vss.Signature, fr
 						reportMap.Store(sign.QueryId, report)
 					}
 				} else {
-					//Other nodes has received eth event and send signature to other nodes
-					//Node put back these signatures until it received eth event.
+					//Other nodes has received blockchain event and send signature to other nodes
+					//Node put back these signatures until it received blockchain event.
 					//TODO:It should use a timeStamp that can be used to see if it is a stale signature
 					cSignatureFromPeer <- sign
 				}
@@ -487,7 +486,7 @@ func (d *DosNode) PipeCleanFinishMap(chValidation <-chan interface{}, forValidat
 				validateMap.Store(report.selfSign.QueryId, report)
 			case msg := <-chValidation:
 				switch content := msg.(type) {
-				case *eth.DOSProxyLogValidationResult:
+				case *blockchain.DOSProxyLogValidationResult:
 					fmt.Println("event DOSProxyLogValidationResult========================")
 					fmt.Println("DOSProxyLogValidationResult pass ", content.Pass)
 					fmt.Println("DOSProxyLogValidationResult TrafficType ", content.TrafficType)
@@ -495,7 +494,7 @@ func (d *DosNode) PipeCleanFinishMap(chValidation <-chan interface{}, forValidat
 					fmt.Println("DOSProxyLogValidationResult Signature ", content.Signature)
 					fmt.Println("DOSProxyLogValidationResult GroupKey ", content.PubKey)
 					fmt.Println("DOSProxyLogValidationResult Message ", content.Message)
-					x, y, z, t, _ := eth.DecodePubKey(d.p2pDkg.GetGroupPublicPoly().Commit())
+					x, y, z, t, _ := blockchain.DecodePubKey(d.p2pDkg.GetGroupPublicPoly().Commit())
 					fmt.Println("GroupKey ", x.String(), y.String(), z.String(), t.String())
 					if !content.Pass {
 						switch uint32(content.TrafficType) {
@@ -515,7 +514,7 @@ func (d *DosNode) PipeCleanFinishMap(chValidation <-chan interface{}, forValidat
 								tmp = big.NewInt(1)
 								report.backupTask.Randomness = report.backupTask.Randomness.Sub(report.backupTask.Randomness, tmp)
 								report.backupTask.Timeout = report.backupTask.Timeout.Sub(report.backupTask.Timeout, tmp)
-								chUrl <- &eth.DOSProxyLogUrl{
+								chUrl <- &blockchain.DOSProxyLogUrl{
 									QueryId:         report.backupTask.QueryId,
 									Url:             report.backupTask.Url,
 									Timeout:         report.backupTask.Timeout,
@@ -567,7 +566,7 @@ func (d *DosNode) PipeCleanFinishMap(chValidation <-chan interface{}, forValidat
 								tmp = big.NewInt(1)
 								report.backupTask.Randomness = report.backupTask.Randomness.Sub(report.backupTask.Randomness, tmp)
 								report.backupTask.Timeout = report.backupTask.Timeout.Sub(report.backupTask.Timeout, tmp)
-								chUrl <- &eth.DOSProxyLogUrl{
+								chUrl <- &blockchain.DOSProxyLogUrl{
 									QueryId:         report.backupTask.QueryId,
 									Url:             report.backupTask.Url,
 									Timeout:         report.backupTask.Timeout,

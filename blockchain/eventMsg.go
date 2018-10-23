@@ -1,8 +1,9 @@
-package eth
+package blockchain
 
 import (
-	"github.com/ethereum/go-ethereum/common"
 	"math/big"
+
+	"github.com/ethereum/go-ethereum/common"
 )
 
 //TODO: MAKE IT A UNIVERSAL INTERFACE FOR ALL KIND OF CHAINS IN FUTURE

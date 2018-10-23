@@ -1,14 +1,16 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"math/big"
 	_ "net/http/pprof"
+	"os"
 
 	"github.com/DOSNetwork/core/blockchain"
-	"github.com/DOSNetwork/core/blockchain/eth"
 	dos "github.com/DOSNetwork/core/dosnode"
 	"github.com/DOSNetwork/core/p2p"
 	"github.com/DOSNetwork/core/p2p/dht"
@@ -17,21 +19,63 @@ import (
 	"github.com/DOSNetwork/core/suites"
 )
 
+type NetCofigs struct {
+	NetCofigs []blockchain.NetConfig
+}
+
+func readConfig() (node *blockchain.NetConfig) {
+
+	var configs NetCofigs
+	// Open our jsonFile
+	jsonFile, err := os.Open("./config.json")
+	// if we os.Open returns an error then handle it
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("Successfully Opened NetCofigs json")
+	// defer the closing of our jsonFile so that we can parse it later on
+	defer jsonFile.Close()
+
+	// read our opened xmlFile as a byte array.
+	byteValue, err := ioutil.ReadAll(jsonFile)
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = json.Unmarshal(byteValue, &configs)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	targetNode := os.Getenv("TargetNode")
+	if targetNode == "" {
+		fmt.Println("No TargetNode Environment variable.")
+		targetNode = "rinkebyPrivateNode"
+	}
+
+	for _, config := range configs.NetCofigs {
+		if targetNode == config.RemoteNodeType {
+			fmt.Println("Use : ", config)
+			return &config
+		}
+	}
+	return nil
+}
+
 // main
 func main() {
 	roleFlag := flag.String("role", "", "BootstrapNode or not")
 	nbParticipantsFlag := flag.Int("nbVerifiers", 21, "Number of Participants")
 	portFlag := flag.Int("port", 0, "port number")
 	bootstrapIpFlag := flag.String("bootstrapIp", "67.207.98.117:42745", "bootstrapIp")
-
 	flag.Parse()
 	role := *roleFlag
 	nbParticipants := *nbParticipantsFlag
 	port := *portFlag
 	bootstrapIp := *bootstrapIpFlag
 
+	config := readConfig()
 	//1)Connect to Eth and Set node ID
-	chainConn, err := blockchain.AdaptTo(blockchain.ETH, true, eth.RinkebyPrivate)
+	chainConn, err := blockchain.AdaptTo(blockchain.ETH, true, config)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -79,10 +123,10 @@ func main() {
 	defer close(cSignatureFromPeer)
 	eventValidation := make(chan interface{}, 100)
 	defer close(eventValidation)
-	chainConn.SubscribeEvent(chUrl, eth.SubscribeDOSProxyLogUrl)
-	err = chainConn.SubscribeEvent(eventGrouping, eth.SubscribeDOSProxyLogGrouping)
-	chainConn.SubscribeEvent(chRandom, eth.SubscribeDOSProxyLogUpdateRandom)
-	chainConn.SubscribeEvent(eventValidation, eth.SubscribeDOSProxyLogValidationResult)
+	chainConn.SubscribeEvent(chUrl, blockchain.SubscribeDOSProxyLogUrl)
+	err = chainConn.SubscribeEvent(eventGrouping, blockchain.SubscribeDOSProxyLogGrouping)
+	chainConn.SubscribeEvent(chRandom, blockchain.SubscribeDOSProxyLogUpdateRandom)
+	chainConn.SubscribeEvent(eventValidation, blockchain.SubscribeDOSProxyLogValidationResult)
 	toOnChainQueue := make(chan string, 100)
 	defer close(toOnChainQueue)
 
