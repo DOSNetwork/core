@@ -356,6 +356,14 @@ func (d *DosNode) PipeRecoverAndVerify(cSignatureFromPeer chan vss.Signature, fr
 						continue
 					}
 					//TODO:Should check if content is always the same
+					r := bytes.Compare(report.selfSign.Content, sign.Content)
+					if r != 0 {
+						fmt.Println("report query id ", report.selfSign.QueryId)
+						fmt.Println("report Content ", string(report.selfSign.Content))
+						fmt.Println("sign query id ", sign.QueryId)
+						fmt.Println("sign Content ", string(sign.Content))
+					}
+
 					report.signShares = append(report.signShares, sign.Signature)
 					reportMap.Store(sign.QueryId, report)
 					sigShares = report.signShares
@@ -364,6 +372,8 @@ func (d *DosNode) PipeRecoverAndVerify(cSignatureFromPeer chan vss.Signature, fr
 						fmt.Println("4) PipeRecoverAndVerify recover")
 						sig, err := tbls.Recover(d.suite, d.p2pDkg.GetGroupPublicPoly(), sign.Content, sigShares, d.nbThreshold, d.nbParticipants)
 						if err != nil {
+							fmt.Println("recover failed!!!!!!!!!!!!!!!!! report Content ", string(report.selfSign.Content))
+							fmt.Println("recover failed!!!!!!!!!!!!!!!!! len(sigShares) = ", len(sigShares), " Content ", string(sign.Content))
 							fmt.Println("recover failed!!!!!!!!!!!!!!!!!")
 							continue
 						}
