@@ -16,10 +16,10 @@ import (
 )
 
 // AskMeAnythingABI is the input ABI used to generate the binding from.
-const AskMeAnythingABI = "[{\"constant\":true,\"inputs\":[],\"name\":\"last_queried_url\",\"outputs\":[{\"name\":\"\",\"type\":\"string\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"new_mode\",\"type\":\"bool\"}],\"name\":\"setQueryMode\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"timeout\",\"outputs\":[{\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[],\"name\":\"renounceOwnership\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"response\",\"outputs\":[{\"name\":\"\",\"type\":\"string\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"isOwner\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"url\",\"type\":\"string\"}],\"name\":\"AMA\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"query_id\",\"type\":\"uint256\"},{\"name\":\"result\",\"type\":\"string\"}],\"name\":\"__callback__\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"repeated_call\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"new_timeout\",\"type\":\"uint256\"}],\"name\":\"setTimeout\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"previous_timeout\",\"type\":\"uint256\"},{\"indexed\":false,\"name\":\"new_timeout\",\"type\":\"uint256\"}],\"name\":\"SetTimeout\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"query_id\",\"type\":\"uint256\"}],\"name\":\"CallbackReady\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"previousOwner\",\"type\":\"address\"}],\"name\":\"OwnershipRenounced\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"previousOwner\",\"type\":\"address\"},{\"indexed\":true,\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"}]"
+const AskMeAnythingABI = "[{\"constant\":true,\"inputs\":[],\"name\":\"lastQueriedUrl\",\"outputs\":[{\"name\":\"\",\"type\":\"string\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"newMode\",\"type\":\"bool\"}],\"name\":\"setQueryMode\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"queryId\",\"type\":\"uint256\"},{\"name\":\"result\",\"type\":\"bytes\"}],\"name\":\"__callback__\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"timeout\",\"outputs\":[{\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[],\"name\":\"renounceOwnership\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"response\",\"outputs\":[{\"name\":\"\",\"type\":\"string\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"isOwner\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"url\",\"type\":\"string\"}],\"name\":\"AMA\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"repeatedCall\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"newTimeout\",\"type\":\"uint256\"}],\"name\":\"setTimeout\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"previousTimeout\",\"type\":\"uint256\"},{\"indexed\":false,\"name\":\"newTimeout\",\"type\":\"uint256\"}],\"name\":\"SetTimeout\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"queryId\",\"type\":\"uint256\"},{\"indexed\":false,\"name\":\"result\",\"type\":\"string\"}],\"name\":\"CallbackReady\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"succ\",\"type\":\"bool\"},{\"indexed\":false,\"name\":\"queryId\",\"type\":\"uint256\"}],\"name\":\"QuerySent\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"previousOwner\",\"type\":\"address\"}],\"name\":\"OwnershipRenounced\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"previousOwner\",\"type\":\"address\"},{\"indexed\":true,\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"}]"
 
 // AskMeAnythingBin is the compiled bytecode used for deploying new contracts.
-const AskMeAnythingBin = `0x608060405260028054600160a060020a031990811673dc9a796f8ac402f223132f8a9a5faaf0b462504c179091556005805460ff19169055601c6006556000805490911633179055610c6b806100566000396000f3006080604052600436106100b95763ffffffff7c01000000000000000000000000000000000000000000000000000000006000350416633c4f7a0b81146100be57806357ae678b1461014857806370dea79a14610164578063715018a61461018b5780637a7f01a7146101a05780638da5cb5b146101b55780638f32d59b146101e6578063aa6a1a4d1461020f578063b30f87ec14610268578063be17a5821461028c578063c58a34cc146102a1578063f2fde38b146102b9575b600080fd5b3480156100ca57600080fd5b506100d36102da565b6040805160208082528351818301528351919283929083019185019080838360005b8381101561010d5781810151838201526020016100f5565b50505050905090810190601f16801561013a5780820380516001836020036101000a031916815260200191505b509250505060405180910390f35b34801561015457600080fd5b506101626004351515610368565b005b34801561017057600080fd5b5061017961038e565b60408051918252519081900360200190f35b34801561019757600080fd5b50610162610394565b3480156101ac57600080fd5b506100d36103fc565b3480156101c157600080fd5b506101ca610457565b60408051600160a060020a039092168252519081900360200190f35b3480156101f257600080fd5b506101fb610467565b604080519115158252519081900360200190f35b34801561021b57600080fd5b506040805160206004803580820135601f81018490048402850184019095528484526101629436949293602493928401919081908401838280828437509497506104789650505050505050565b34801561027457600080fd5b50610162600480359060248035908101910135610562565b34801561029857600080fd5b506101fb610782565b3480156102ad57600080fd5b5061016260043561078b565b3480156102c557600080fd5b50610162600160a060020a03600435166107e0565b6007805460408051602060026001851615610100026000190190941693909304601f810184900484028201840190925281815292918301828280156103605780601f1061033557610100808354040283529160200191610360565b820191906000526020600020905b81548152906001019060200180831161034357829003601f168201915b505050505081565b610370610467565b151561037b57600080fd5b6005805460ff1916911515919091179055565b60065481565b61039c610467565b15156103a757600080fd5b60008054604051600160a060020a03909116917ff8df31144d9c2f0f6b59d69b8b98abd5459d07f2742c4df920b25aae33c6482091a26000805473ffffffffffffffffffffffffffffffffffffffff19169055565b6003805460408051602060026001851615610100026000190190941693909304601f810184900484028201840190925281815292918301828280156103605780601f1061033557610100808354040283529160200191610360565b600054600160a060020a03165b90565b600054600160a060020a0316331490565b805160009061048e906007906020850190610b39565b506104d16006546040805190810160405280600381526020017f4150490000000000000000000000000000000000000000000000000000000000815250846107ff565b905080156104f7576000818152600460205260409020805460ff1916600117905561055e565b604080517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601160248201527f496e76616c69642071756572792069642e000000000000000000000000000000604482015290519081900360640190fd5b5050565b61056a610a2c565b600160a060020a0316331461060657604080517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152602660248201527f556e61757468656e7469636174656420726573706f6e73652066726f6d206e6f60448201527f6e2d444f532e0000000000000000000000000000000000000000000000000000606482015290519081900360840190fd5b60008381526004602052604090205460ff16151561068557604080517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601f60248201527f526573706f6e7365207769746820696e76616c69642071756572792069642100604482015290519081900360640190fd5b6040805184815290517f69e02e44616e2da5b8f7ec0cad80ae44a7d1cb069604051d73b6cc3a24330c8d9181900360200190a16106c460038383610bb7565b506000838152600460205260409020805460ff1916905560055460ff161561077d5760078054604080516020601f6002600019610100600188161502019095169490940493840181900481028201810190925282815261077d93909290918301828280156107735780601f1061074857610100808354040283529160200191610773565b820191906000526020600020905b81548152906001019060200180831161075657829003601f168201915b5050505050610478565b505050565b60055460ff1681565b610793610467565b151561079e57600080fd5b600654604080519182526020820183905280517f9aa0de0157c9133b911d2d811f590159622cea28cefe31505c203c828799da589281900390910190a1600655565b6107e8610467565b15156107f357600080fd5b6107fc81610abc565b50565b600254604080517f43a73d9a0000000000000000000000000000000000000000000000000000000081529051600092600160a060020a0316916343a73d9a91600480830192602092919082900301818787803b15801561085e57600080fd5b505af1158015610872573d6000803e3d6000fd5b505050506040513d602081101561088857600080fd5b50516001805473ffffffffffffffffffffffffffffffffffffffff1916600160a060020a0392831617908190556040517f482edfaa00000000000000000000000000000000000000000000000000000000815230600482018181524360248401819052604484018a905260a060648501908152895160a48601528951959096169563482edfaa95939491938b938b938b939192608482019160c40190602087019080838360005b8381101561094757818101518382015260200161092f565b50505050905090810190601f1680156109745780820380516001836020036101000a031916815260200191505b50838103825284518152845160209182019186019080838360005b838110156109a757818101518382015260200161098f565b50505050905090810190601f1680156109d45780820380516001836020036101000a031916815260200191505b50975050505050505050602060405180830381600087803b1580156109f857600080fd5b505af1158015610a0c573d6000803e3d6000fd5b505050506040513d6020811015610a2257600080fd5b5051949350505050565b600254604080517f43a73d9a0000000000000000000000000000000000000000000000000000000081529051600092600160a060020a0316916343a73d9a91600480830192602092919082900301818787803b158015610a8b57600080fd5b505af1158015610a9f573d6000803e3d6000fd5b505050506040513d6020811015610ab557600080fd5b5051905090565b600160a060020a0381161515610ad157600080fd5b60008054604051600160a060020a03808516939216917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e091a36000805473ffffffffffffffffffffffffffffffffffffffff1916600160a060020a0392909216919091179055565b828054600181600116156101000203166002900490600052602060002090601f016020900481019282601f10610b7a57805160ff1916838001178555610ba7565b82800160010185558215610ba7579182015b82811115610ba7578251825591602001919060010190610b8c565b50610bb3929150610c25565b5090565b828054600181600116156101000203166002900490600052602060002090601f016020900481019282601f10610bf85782800160ff19823516178555610ba7565b82800160010185558215610ba7579182015b82811115610ba7578235825591602001919060010190610c0a565b61046491905b80821115610bb35760008155600101610c2b5600a165627a7a723058201f26d11c5452a7b8dc6c58f58557246999c2c1b6d8afef6a28dcb2148523b3730029`
+const AskMeAnythingBin = `0x608060405260028054600160a060020a03199081167387095a8115b8385e6a4852640ec9852cd9b6ad9e179091556005805460ff19169055601c6006556000805490911633179055610c54806100566000396000f3006080604052600436106100b95763ffffffff7c010000000000000000000000000000000000000000000000000000000060003504166349b03ca081146100be57806357ae678b146101485780636d1129771461016457806370dea79a14610188578063715018a6146101af5780637a7f01a7146101c45780638da5cb5b146101d95780638f32d59b1461020a578063aa6a1a4d14610233578063ab8c1bad1461028c578063c58a34cc146102a1578063f2fde38b146102b9575b600080fd5b3480156100ca57600080fd5b506100d36102da565b6040805160208082528351818301528351919283929083019185019080838360005b8381101561010d5781810151838201526020016100f5565b50505050905090810190601f16801561013a5780820380516001836020036101000a031916815260200191505b509250505060405180910390f35b34801561015457600080fd5b506101626004351515610368565b005b34801561017057600080fd5b5061016260048035906024803590810191013561038e565b34801561019457600080fd5b5061019d6105c6565b60408051918252519081900360200190f35b3480156101bb57600080fd5b506101626105cc565b3480156101d057600080fd5b506100d3610634565b3480156101e557600080fd5b506101ee61068f565b60408051600160a060020a039092168252519081900360200190f35b34801561021657600080fd5b5061021f61069f565b604080519115158252519081900360200190f35b34801561023f57600080fd5b506040805160206004803580820135601f81018490048402850184019095528484526101629436949293602493928401919081908401838280828437509497506106b09650505050505050565b34801561029857600080fd5b5061021f6107d9565b3480156102ad57600080fd5b506101626004356107e2565b3480156102c557600080fd5b50610162600160a060020a0360043516610837565b6007805460408051602060026001851615610100026000190190941693909304601f810184900484028201840190925281815292918301828280156103605780601f1061033557610100808354040283529160200191610360565b820191906000526020600020905b81548152906001019060200180831161034357829003601f168201915b505050505081565b61037061069f565b151561037b57600080fd5b6005805460ff1916911515919091179055565b610396610856565b600160a060020a0316331461043257604080517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152602660248201527f556e61757468656e7469636174656420726573706f6e73652066726f6d206e6f60448201527f6e2d444f532e0000000000000000000000000000000000000000000000000000606482015290519081900360840190fd5b60008381526004602052604090205460ff1615156104b157604080517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601f60248201527f526573706f6e7365207769746820696e76616c69642071756572792069642100604482015290519081900360640190fd5b7f3665725cd952e793b43f36fc8911277a8c9d4ec4132603f753afc6f2de7d9744838383604051808481526020018060200182810382528484828181526020019250808284376040519201829003965090945050505050a16000838152600460205260409020805460ff1916905560055460ff16156105c15760078054604080516020601f600260001961010060018816150201909516949094049384018190048102820181019092528281526105c193909290918301828280156105b75780601f1061058c576101008083540402835291602001916105b7565b820191906000526020600020905b81548152906001019060200180831161059a57829003601f168201915b50505050506106b0565b505050565b60065481565b6105d461069f565b15156105df57600080fd5b60008054604051600160a060020a03909116917ff8df31144d9c2f0f6b59d69b8b98abd5459d07f2742c4df920b25aae33c6482091a26000805473ffffffffffffffffffffffffffffffffffffffff19169055565b6003805460408051602060026001851615610100026000190190941693909304601f810184900484028201840190925281815292918301828280156103605780601f1061033557610100808354040283529160200191610360565b600054600160a060020a03165b90565b600054600160a060020a0316331490565b80516000906106c6906007906020850190610b90565b506107096006546040805190810160405280600381526020017f4150490000000000000000000000000000000000000000000000000000000000815250846108e6565b9050801561076e57600081815260046020908152604091829020805460ff19166001908117909155825190815290810183905281517fc1ee262c9d41a7fe35b8a59a0917622c00c50e2d507fa34c77f291e0701043b2929181900390910190a16107d5565b604080517f08c379a000000000000000000000000000000000000000000000000000000000815260206004820152601160248201527f496e76616c69642071756572792069642e000000000000000000000000000000604482015290519081900360640190fd5b5050565b60055460ff1681565b6107ea61069f565b15156107f557600080fd5b600654604080519182526020820183905280517f9aa0de0157c9133b911d2d811f590159622cea28cefe31505c203c828799da589281900390910190a1600655565b61083f61069f565b151561084a57600080fd5b61085381610b13565b50565b600254604080517f43a73d9a0000000000000000000000000000000000000000000000000000000081529051600092600160a060020a0316916343a73d9a91600480830192602092919082900301818787803b1580156108b557600080fd5b505af11580156108c9573d6000803e3d6000fd5b505050506040513d60208110156108df57600080fd5b5051905090565b600254604080517f43a73d9a0000000000000000000000000000000000000000000000000000000081529051600092600160a060020a0316916343a73d9a91600480830192602092919082900301818787803b15801561094557600080fd5b505af1158015610959573d6000803e3d6000fd5b505050506040513d602081101561096f57600080fd5b50516001805473ffffffffffffffffffffffffffffffffffffffff1916600160a060020a0392831617908190556040517f482edfaa00000000000000000000000000000000000000000000000000000000815230600482018181524360248401819052604484018a905260a060648501908152895160a48601528951959096169563482edfaa95939491938b938b938b939192608482019160c40190602087019080838360005b83811015610a2e578181015183820152602001610a16565b50505050905090810190601f168015610a5b5780820380516001836020036101000a031916815260200191505b50838103825284518152845160209182019186019080838360005b83811015610a8e578181015183820152602001610a76565b50505050905090810190601f168015610abb5780820380516001836020036101000a031916815260200191505b50975050505050505050602060405180830381600087803b158015610adf57600080fd5b505af1158015610af3573d6000803e3d6000fd5b505050506040513d6020811015610b0957600080fd5b5051949350505050565b600160a060020a0381161515610b2857600080fd5b60008054604051600160a060020a03808516939216917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e091a36000805473ffffffffffffffffffffffffffffffffffffffff1916600160a060020a0392909216919091179055565b828054600181600116156101000203166002900490600052602060002090601f016020900481019282601f10610bd157805160ff1916838001178555610bfe565b82800160010185558215610bfe579182015b82811115610bfe578251825591602001919060010190610be3565b50610c0a929150610c0e565b5090565b61069c91905b80821115610c0a5760008155600101610c145600a165627a7a7230582014a62348ba64b6173a0d05293a3175b4dfde90b2b0a449464f8e513034f9a6870029`
 
 // DeployAskMeAnything deploys a new Ethereum contract, binding an instance of AskMeAnything to it.
 func DeployAskMeAnything(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *AskMeAnything, error) {
@@ -202,28 +202,28 @@ func (_AskMeAnything *AskMeAnythingCallerSession) IsOwner() (bool, error) {
 	return _AskMeAnything.Contract.IsOwner(&_AskMeAnything.CallOpts)
 }
 
-// LastQueriedUrl is a free data retrieval call binding the contract method 0x3c4f7a0b.
+// LastQueriedUrl is a free data retrieval call binding the contract method 0x49b03ca0.
 //
-// Solidity: function last_queried_url() constant returns(string)
+// Solidity: function lastQueriedUrl() constant returns(string)
 func (_AskMeAnything *AskMeAnythingCaller) LastQueriedUrl(opts *bind.CallOpts) (string, error) {
 	var (
 		ret0 = new(string)
 	)
 	out := ret0
-	err := _AskMeAnything.contract.Call(opts, out, "last_queried_url")
+	err := _AskMeAnything.contract.Call(opts, out, "lastQueriedUrl")
 	return *ret0, err
 }
 
-// LastQueriedUrl is a free data retrieval call binding the contract method 0x3c4f7a0b.
+// LastQueriedUrl is a free data retrieval call binding the contract method 0x49b03ca0.
 //
-// Solidity: function last_queried_url() constant returns(string)
+// Solidity: function lastQueriedUrl() constant returns(string)
 func (_AskMeAnything *AskMeAnythingSession) LastQueriedUrl() (string, error) {
 	return _AskMeAnything.Contract.LastQueriedUrl(&_AskMeAnything.CallOpts)
 }
 
-// LastQueriedUrl is a free data retrieval call binding the contract method 0x3c4f7a0b.
+// LastQueriedUrl is a free data retrieval call binding the contract method 0x49b03ca0.
 //
-// Solidity: function last_queried_url() constant returns(string)
+// Solidity: function lastQueriedUrl() constant returns(string)
 func (_AskMeAnything *AskMeAnythingCallerSession) LastQueriedUrl() (string, error) {
 	return _AskMeAnything.Contract.LastQueriedUrl(&_AskMeAnything.CallOpts)
 }
@@ -254,28 +254,28 @@ func (_AskMeAnything *AskMeAnythingCallerSession) Owner() (common.Address, error
 	return _AskMeAnything.Contract.Owner(&_AskMeAnything.CallOpts)
 }
 
-// RepeatedCall is a free data retrieval call binding the contract method 0xbe17a582.
+// RepeatedCall is a free data retrieval call binding the contract method 0xab8c1bad.
 //
-// Solidity: function repeated_call() constant returns(bool)
+// Solidity: function repeatedCall() constant returns(bool)
 func (_AskMeAnything *AskMeAnythingCaller) RepeatedCall(opts *bind.CallOpts) (bool, error) {
 	var (
 		ret0 = new(bool)
 	)
 	out := ret0
-	err := _AskMeAnything.contract.Call(opts, out, "repeated_call")
+	err := _AskMeAnything.contract.Call(opts, out, "repeatedCall")
 	return *ret0, err
 }
 
-// RepeatedCall is a free data retrieval call binding the contract method 0xbe17a582.
+// RepeatedCall is a free data retrieval call binding the contract method 0xab8c1bad.
 //
-// Solidity: function repeated_call() constant returns(bool)
+// Solidity: function repeatedCall() constant returns(bool)
 func (_AskMeAnything *AskMeAnythingSession) RepeatedCall() (bool, error) {
 	return _AskMeAnything.Contract.RepeatedCall(&_AskMeAnything.CallOpts)
 }
 
-// RepeatedCall is a free data retrieval call binding the contract method 0xbe17a582.
+// RepeatedCall is a free data retrieval call binding the contract method 0xab8c1bad.
 //
-// Solidity: function repeated_call() constant returns(bool)
+// Solidity: function repeatedCall() constant returns(bool)
 func (_AskMeAnything *AskMeAnythingCallerSession) RepeatedCall() (bool, error) {
 	return _AskMeAnything.Contract.RepeatedCall(&_AskMeAnything.CallOpts)
 }
@@ -353,25 +353,25 @@ func (_AskMeAnything *AskMeAnythingTransactorSession) AMA(url string) (*types.Tr
 	return _AskMeAnything.Contract.AMA(&_AskMeAnything.TransactOpts, url)
 }
 
-// Callback_ is a paid mutator transaction binding the contract method 0xb30f87ec.
+// Callback_ is a paid mutator transaction binding the contract method 0x6d112977.
 //
-// Solidity: function __callback__(query_id uint256, result string) returns()
-func (_AskMeAnything *AskMeAnythingTransactor) Callback_(opts *bind.TransactOpts, query_id *big.Int, result string) (*types.Transaction, error) {
-	return _AskMeAnything.contract.Transact(opts, "__callback__", query_id, result)
+// Solidity: function __callback__(queryId uint256, result bytes) returns()
+func (_AskMeAnything *AskMeAnythingTransactor) Callback_(opts *bind.TransactOpts, queryId *big.Int, result []byte) (*types.Transaction, error) {
+	return _AskMeAnything.contract.Transact(opts, "__callback__", queryId, result)
 }
 
-// Callback_ is a paid mutator transaction binding the contract method 0xb30f87ec.
+// Callback_ is a paid mutator transaction binding the contract method 0x6d112977.
 //
-// Solidity: function __callback__(query_id uint256, result string) returns()
-func (_AskMeAnything *AskMeAnythingSession) Callback_(query_id *big.Int, result string) (*types.Transaction, error) {
-	return _AskMeAnything.Contract.Callback_(&_AskMeAnything.TransactOpts, query_id, result)
+// Solidity: function __callback__(queryId uint256, result bytes) returns()
+func (_AskMeAnything *AskMeAnythingSession) Callback_(queryId *big.Int, result []byte) (*types.Transaction, error) {
+	return _AskMeAnything.Contract.Callback_(&_AskMeAnything.TransactOpts, queryId, result)
 }
 
-// Callback_ is a paid mutator transaction binding the contract method 0xb30f87ec.
+// Callback_ is a paid mutator transaction binding the contract method 0x6d112977.
 //
-// Solidity: function __callback__(query_id uint256, result string) returns()
-func (_AskMeAnything *AskMeAnythingTransactorSession) Callback_(query_id *big.Int, result string) (*types.Transaction, error) {
-	return _AskMeAnything.Contract.Callback_(&_AskMeAnything.TransactOpts, query_id, result)
+// Solidity: function __callback__(queryId uint256, result bytes) returns()
+func (_AskMeAnything *AskMeAnythingTransactorSession) Callback_(queryId *big.Int, result []byte) (*types.Transaction, error) {
+	return _AskMeAnything.Contract.Callback_(&_AskMeAnything.TransactOpts, queryId, result)
 }
 
 // RenounceOwnership is a paid mutator transaction binding the contract method 0x715018a6.
@@ -397,44 +397,44 @@ func (_AskMeAnything *AskMeAnythingTransactorSession) RenounceOwnership() (*type
 
 // SetQueryMode is a paid mutator transaction binding the contract method 0x57ae678b.
 //
-// Solidity: function setQueryMode(new_mode bool) returns()
-func (_AskMeAnything *AskMeAnythingTransactor) SetQueryMode(opts *bind.TransactOpts, new_mode bool) (*types.Transaction, error) {
-	return _AskMeAnything.contract.Transact(opts, "setQueryMode", new_mode)
+// Solidity: function setQueryMode(newMode bool) returns()
+func (_AskMeAnything *AskMeAnythingTransactor) SetQueryMode(opts *bind.TransactOpts, newMode bool) (*types.Transaction, error) {
+	return _AskMeAnything.contract.Transact(opts, "setQueryMode", newMode)
 }
 
 // SetQueryMode is a paid mutator transaction binding the contract method 0x57ae678b.
 //
-// Solidity: function setQueryMode(new_mode bool) returns()
-func (_AskMeAnything *AskMeAnythingSession) SetQueryMode(new_mode bool) (*types.Transaction, error) {
-	return _AskMeAnything.Contract.SetQueryMode(&_AskMeAnything.TransactOpts, new_mode)
+// Solidity: function setQueryMode(newMode bool) returns()
+func (_AskMeAnything *AskMeAnythingSession) SetQueryMode(newMode bool) (*types.Transaction, error) {
+	return _AskMeAnything.Contract.SetQueryMode(&_AskMeAnything.TransactOpts, newMode)
 }
 
 // SetQueryMode is a paid mutator transaction binding the contract method 0x57ae678b.
 //
-// Solidity: function setQueryMode(new_mode bool) returns()
-func (_AskMeAnything *AskMeAnythingTransactorSession) SetQueryMode(new_mode bool) (*types.Transaction, error) {
-	return _AskMeAnything.Contract.SetQueryMode(&_AskMeAnything.TransactOpts, new_mode)
+// Solidity: function setQueryMode(newMode bool) returns()
+func (_AskMeAnything *AskMeAnythingTransactorSession) SetQueryMode(newMode bool) (*types.Transaction, error) {
+	return _AskMeAnything.Contract.SetQueryMode(&_AskMeAnything.TransactOpts, newMode)
 }
 
 // SetTimeout is a paid mutator transaction binding the contract method 0xc58a34cc.
 //
-// Solidity: function setTimeout(new_timeout uint256) returns()
-func (_AskMeAnything *AskMeAnythingTransactor) SetTimeout(opts *bind.TransactOpts, new_timeout *big.Int) (*types.Transaction, error) {
-	return _AskMeAnything.contract.Transact(opts, "setTimeout", new_timeout)
+// Solidity: function setTimeout(newTimeout uint256) returns()
+func (_AskMeAnything *AskMeAnythingTransactor) SetTimeout(opts *bind.TransactOpts, newTimeout *big.Int) (*types.Transaction, error) {
+	return _AskMeAnything.contract.Transact(opts, "setTimeout", newTimeout)
 }
 
 // SetTimeout is a paid mutator transaction binding the contract method 0xc58a34cc.
 //
-// Solidity: function setTimeout(new_timeout uint256) returns()
-func (_AskMeAnything *AskMeAnythingSession) SetTimeout(new_timeout *big.Int) (*types.Transaction, error) {
-	return _AskMeAnything.Contract.SetTimeout(&_AskMeAnything.TransactOpts, new_timeout)
+// Solidity: function setTimeout(newTimeout uint256) returns()
+func (_AskMeAnything *AskMeAnythingSession) SetTimeout(newTimeout *big.Int) (*types.Transaction, error) {
+	return _AskMeAnything.Contract.SetTimeout(&_AskMeAnything.TransactOpts, newTimeout)
 }
 
 // SetTimeout is a paid mutator transaction binding the contract method 0xc58a34cc.
 //
-// Solidity: function setTimeout(new_timeout uint256) returns()
-func (_AskMeAnything *AskMeAnythingTransactorSession) SetTimeout(new_timeout *big.Int) (*types.Transaction, error) {
-	return _AskMeAnything.Contract.SetTimeout(&_AskMeAnything.TransactOpts, new_timeout)
+// Solidity: function setTimeout(newTimeout uint256) returns()
+func (_AskMeAnything *AskMeAnythingTransactorSession) SetTimeout(newTimeout *big.Int) (*types.Transaction, error) {
+	return _AskMeAnything.Contract.SetTimeout(&_AskMeAnything.TransactOpts, newTimeout)
 }
 
 // TransferOwnership is a paid mutator transaction binding the contract method 0xf2fde38b.
@@ -528,12 +528,13 @@ func (it *AskMeAnythingCallbackReadyIterator) Close() error {
 // AskMeAnythingCallbackReady represents a CallbackReady event raised by the AskMeAnything contract.
 type AskMeAnythingCallbackReady struct {
 	QueryId *big.Int
+	Result  string
 	Raw     types.Log // Blockchain specific contextual infos
 }
 
-// FilterCallbackReady is a free log retrieval operation binding the contract event 0x69e02e44616e2da5b8f7ec0cad80ae44a7d1cb069604051d73b6cc3a24330c8d.
+// FilterCallbackReady is a free log retrieval operation binding the contract event 0x3665725cd952e793b43f36fc8911277a8c9d4ec4132603f753afc6f2de7d9744.
 //
-// Solidity: e CallbackReady(query_id uint256)
+// Solidity: e CallbackReady(queryId uint256, result string)
 func (_AskMeAnything *AskMeAnythingFilterer) FilterCallbackReady(opts *bind.FilterOpts) (*AskMeAnythingCallbackReadyIterator, error) {
 
 	logs, sub, err := _AskMeAnything.contract.FilterLogs(opts, "CallbackReady")
@@ -543,9 +544,9 @@ func (_AskMeAnything *AskMeAnythingFilterer) FilterCallbackReady(opts *bind.Filt
 	return &AskMeAnythingCallbackReadyIterator{contract: _AskMeAnything.contract, event: "CallbackReady", logs: logs, sub: sub}, nil
 }
 
-// WatchCallbackReady is a free log subscription operation binding the contract event 0x69e02e44616e2da5b8f7ec0cad80ae44a7d1cb069604051d73b6cc3a24330c8d.
+// WatchCallbackReady is a free log subscription operation binding the contract event 0x3665725cd952e793b43f36fc8911277a8c9d4ec4132603f753afc6f2de7d9744.
 //
-// Solidity: e CallbackReady(query_id uint256)
+// Solidity: e CallbackReady(queryId uint256, result string)
 func (_AskMeAnything *AskMeAnythingFilterer) WatchCallbackReady(opts *bind.WatchOpts, sink chan<- *AskMeAnythingCallbackReady) (event.Subscription, error) {
 
 	logs, sub, err := _AskMeAnything.contract.WatchLogs(opts, "CallbackReady")
@@ -853,6 +854,129 @@ func (_AskMeAnything *AskMeAnythingFilterer) WatchOwnershipTransferred(opts *bin
 	}), nil
 }
 
+// AskMeAnythingQuerySentIterator is returned from FilterQuerySent and is used to iterate over the raw logs and unpacked data for QuerySent events raised by the AskMeAnything contract.
+type AskMeAnythingQuerySentIterator struct {
+	Event *AskMeAnythingQuerySent // Event containing the contract specifics and raw log
+
+	contract *bind.BoundContract // Generic contract to use for unpacking event data
+	event    string              // Event name to use for unpacking event data
+
+	logs chan types.Log        // Log channel receiving the found contract events
+	sub  ethereum.Subscription // Subscription for errors, completion and termination
+	done bool                  // Whether the subscription completed delivering logs
+	fail error                 // Occurred error to stop iteration
+}
+
+// Next advances the iterator to the subsequent event, returning whether there
+// are any more events found. In case of a retrieval or parsing error, false is
+// returned and Error() can be queried for the exact failure.
+func (it *AskMeAnythingQuerySentIterator) Next() bool {
+	// If the iterator failed, stop iterating
+	if it.fail != nil {
+		return false
+	}
+	// If the iterator completed, deliver directly whatever's available
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(AskMeAnythingQuerySent)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+	// Iterator still in progress, wait for either a data or an error event
+	select {
+	case log := <-it.logs:
+		it.Event = new(AskMeAnythingQuerySent)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+// Error returns any retrieval or parsing error occurred during filtering.
+func (it *AskMeAnythingQuerySentIterator) Error() error {
+	return it.fail
+}
+
+// Close terminates the iteration process, releasing any pending underlying
+// resources.
+func (it *AskMeAnythingQuerySentIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+// AskMeAnythingQuerySent represents a QuerySent event raised by the AskMeAnything contract.
+type AskMeAnythingQuerySent struct {
+	Succ    bool
+	QueryId *big.Int
+	Raw     types.Log // Blockchain specific contextual infos
+}
+
+// FilterQuerySent is a free log retrieval operation binding the contract event 0xc1ee262c9d41a7fe35b8a59a0917622c00c50e2d507fa34c77f291e0701043b2.
+//
+// Solidity: e QuerySent(succ bool, queryId uint256)
+func (_AskMeAnything *AskMeAnythingFilterer) FilterQuerySent(opts *bind.FilterOpts) (*AskMeAnythingQuerySentIterator, error) {
+
+	logs, sub, err := _AskMeAnything.contract.FilterLogs(opts, "QuerySent")
+	if err != nil {
+		return nil, err
+	}
+	return &AskMeAnythingQuerySentIterator{contract: _AskMeAnything.contract, event: "QuerySent", logs: logs, sub: sub}, nil
+}
+
+// WatchQuerySent is a free log subscription operation binding the contract event 0xc1ee262c9d41a7fe35b8a59a0917622c00c50e2d507fa34c77f291e0701043b2.
+//
+// Solidity: e QuerySent(succ bool, queryId uint256)
+func (_AskMeAnything *AskMeAnythingFilterer) WatchQuerySent(opts *bind.WatchOpts, sink chan<- *AskMeAnythingQuerySent) (event.Subscription, error) {
+
+	logs, sub, err := _AskMeAnything.contract.WatchLogs(opts, "QuerySent")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+				// New log arrived, parse the event and forward to the user
+				event := new(AskMeAnythingQuerySent)
+				if err := _AskMeAnything.contract.UnpackLog(event, "QuerySent", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
 // AskMeAnythingSetTimeoutIterator is returned from FilterSetTimeout and is used to iterate over the raw logs and unpacked data for SetTimeout events raised by the AskMeAnything contract.
 type AskMeAnythingSetTimeoutIterator struct {
 	Event *AskMeAnythingSetTimeout // Event containing the contract specifics and raw log
@@ -929,7 +1053,7 @@ type AskMeAnythingSetTimeout struct {
 
 // FilterSetTimeout is a free log retrieval operation binding the contract event 0x9aa0de0157c9133b911d2d811f590159622cea28cefe31505c203c828799da58.
 //
-// Solidity: e SetTimeout(previous_timeout uint256, new_timeout uint256)
+// Solidity: e SetTimeout(previousTimeout uint256, newTimeout uint256)
 func (_AskMeAnything *AskMeAnythingFilterer) FilterSetTimeout(opts *bind.FilterOpts) (*AskMeAnythingSetTimeoutIterator, error) {
 
 	logs, sub, err := _AskMeAnything.contract.FilterLogs(opts, "SetTimeout")
@@ -941,7 +1065,7 @@ func (_AskMeAnything *AskMeAnythingFilterer) FilterSetTimeout(opts *bind.FilterO
 
 // WatchSetTimeout is a free log subscription operation binding the contract event 0x9aa0de0157c9133b911d2d811f590159622cea28cefe31505c203c828799da58.
 //
-// Solidity: e SetTimeout(previous_timeout uint256, new_timeout uint256)
+// Solidity: e SetTimeout(previousTimeout uint256, newTimeout uint256)
 func (_AskMeAnything *AskMeAnythingFilterer) WatchSetTimeout(opts *bind.WatchOpts, sink chan<- *AskMeAnythingSetTimeout) (event.Subscription, error) {
 
 	logs, sub, err := _AskMeAnything.contract.WatchLogs(opts, "SetTimeout")
@@ -1167,7 +1291,7 @@ func (_DOSAddressBridgeInterface *DOSAddressBridgeInterfaceCallerSession) GetPro
 const DOSOnChainSDKABI = "[]"
 
 // DOSOnChainSDKBin is the compiled bytecode used for deploying new contracts.
-const DOSOnChainSDKBin = `0x608060405260018054600160a060020a03191673dc9a796f8ac402f223132f8a9a5faaf0b462504c179055348015603557600080fd5b5060358060436000396000f3006080604052600080fd00a165627a7a7230582080ea6d13287df6f764d9f14bd035c74d48fe9a2625c38315482f23649c0d84160029`
+const DOSOnChainSDKBin = `0x608060405260018054600160a060020a0319167387095a8115b8385e6a4852640ec9852cd9b6ad9e179055348015603557600080fd5b5060358060436000396000f3006080604052600080fd00a165627a7a72305820313634caa2a65f0e7ddba0f9f7f659ea2069037532e66e8b48a43065a271ac2c0029`
 
 // DeployDOSOnChainSDK deploys a new Ethereum contract, binding an instance of DOSOnChainSDK to it.
 func DeployDOSOnChainSDK(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *DOSOnChainSDK, error) {

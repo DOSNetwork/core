@@ -34,9 +34,9 @@ type DosNodeInterface interface {
 
 var m sync.Mutex
 
-const WATCHDOGTIMEOUT = 10
-const VALIDATIONTIMEOUT = 3
-const LOGEXPIRED = 10
+const WATCHDOGTIMEOUT = 10080
+const VALIDATIONTIMEOUT = 5
+const LOGEXPIRED = 30
 const RANDOMNUMBERSIZE = 32
 
 func CreateDosNode(suite suites.Suite, nbParticipants int, p p2p.P2PInterface, chainConn blockchain.ChainInterface, p2pDkg dkg.P2PDkgInterface) (DosNodeInterface, error) {

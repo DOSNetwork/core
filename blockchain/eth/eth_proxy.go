@@ -668,6 +668,16 @@ func (e *EthAdaptor) setAccount(autoReplenish bool) (err error) {
 		}
 
 		err = e.balanceMaintain(usrKey, rootKey)
+
+		go func() {
+			ticker := time.NewTicker(24 * time.Hour)
+			for range ticker.C {
+				err = e.balanceMaintain(usrKey, rootKey)
+				if err != nil {
+					fmt.Print("Fail to replenish.")
+				}
+			}
+		}()
 	}
 
 	return

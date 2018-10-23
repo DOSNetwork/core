@@ -1,52 +1,55 @@
 pragma solidity ^0.4.24;
 
-import "github.com/OpenZeppelin/zeppelin-solidity/contracts/ownership/Ownable.sol";
-import "../DOSOnChainSDK.sol";
+import "./Ownable.sol";
+import "./DOSOnChainSDK.sol";
 
 // A user contract asks anything from off-chain world through a url.
 contract AskMeAnything is Ownable, DOSOnChainSDK {
   string public response;
   // query_id -> valid_status
   mapping(uint => bool) private _valid;
-  bool public repeated_call = false;
+  bool public repeatedCall = false;
   // Default timeout in seconds: Two blocks.
   uint public timeout = 14 * 2;
-  string public last_queried_url;
+  string public lastQueriedUrl;
 
-  event SetTimeout(uint previous_timeout, uint new_timeout);
-  event CallbackReady(uint query_id);
+  event SetTimeout(uint previousTimeout, uint newTimeout);
+  event CallbackReady(uint queryId, string result);
+  event QuerySent(bool succ, uint queryId);
 
-  function setQueryMode(bool new_mode) public onlyOwner {
-    repeated_call = new_mode;
+  function setQueryMode(bool newMode) public onlyOwner {
+    repeatedCall = newMode;
   }
 
-  function setTimeout(uint new_timeout) public onlyOwner {
-    emit SetTimeout(timeout, new_timeout);
-    timeout = new_timeout;
+  function setTimeout(uint newTimeout) public onlyOwner {
+    emit SetTimeout(timeout, newTimeout);
+    timeout = newTimeout;
   }
 
   // Ask me anything (AMA) off-chain through an api/url.
   function AMA(string url) public {
-    last_queried_url = url;
+    lastQueriedUrl = url;
     uint id = DOSQuery(timeout, "API", url);
     if (id != 0x0) {
         _valid[id] = true;
+        emit QuerySent(true, id);
     } else {
         revert("Invalid query id.");
+        emit QuerySent(false, id);
     }
   }
 
   // User-defined callback function to take and process response.
-  function __callback__(uint query_id, bytes result) external {
+  function __callback__(uint queryId, bytes result) external {
     require(msg.sender == fromDOSProxyContract(), "Unauthenticated response from non-DOS.");
-    require(_valid[query_id], "Response with invalid query id!");
+    require(_valid[queryId], "Response with invalid query id!");
 
-    emit CallbackReady(query_id);
-    response = string(result);
-    delete _valid[query_id];
+    emit CallbackReady(queryId, string(result));
+//    response = string(result);
+    delete _valid[queryId];
 
-    if (repeated_call) {
-        AMA(last_queried_url);
+    if (repeatedCall) {
+        AMA(lastQueriedUrl);
     }
   }
 }
