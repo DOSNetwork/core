@@ -6,16 +6,20 @@ import (
 
 	"github.com/dedis/kyber"
 	"github.com/ethereum/go-ethereum/common"
-
-	"github.com/DOSNetwork/core/blockchain/eth"
 )
 
 const (
 	ETH = iota
 )
 
+type NetConfig struct {
+	RemoteNodeType       string
+	RemoteNodeAddress    string
+	ProxyContractAddress string
+}
+
 type ChainInterface interface {
-	Init(autoReplenish bool, netType int) (err error)
+	Init(autoReplenish bool, netConfig *NetConfig) (err error)
 	SubscribeEvent(ch chan interface{}, subscribeType int) (err error)
 	UploadID() (err error)
 	UploadPubKey(pubKey kyber.Point) (err error)
@@ -31,11 +35,11 @@ type ChainInterface interface {
 	RandomNumberTimeOut() (err error)
 }
 
-func AdaptTo(chainName int, autoReplenish bool, netType int) (conn ChainInterface, err error) {
+func AdaptTo(chainName int, autoReplenish bool, netConfig *NetConfig) (conn ChainInterface, err error) {
 	switch chainName {
 	case ETH:
-		conn = &eth.EthAdaptor{}
-		err = conn.Init(autoReplenish, netType)
+		conn = &EthAdaptor{}
+		err = conn.Init(autoReplenish, netConfig)
 	default:
 		err = fmt.Errorf("Chain %s not supported error\n", chainName)
 	}

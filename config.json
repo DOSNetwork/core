@@ -1,0 +1,21 @@
+{
+  "netCofigs": [
+	 {
+	     "RemoteNodeType" : "rinkebyNode",
+	     "RemoteNodeAddress" : "wss://rinkeby.infura.io/ws",
+	     "ProxyContractAddress" : "0x9b8e711560dB0c60Fe6104C4A46Fa528eFc22b03"
+	  },
+	  {
+	     "RemoteNodeType": "rinkebyPrivateNode",
+	     "RemoteNodeAddress": "ws://13.56.31.73:8546",
+	     "ProxyContractAddress": "0x9b8e711560dB0c60Fe6104C4A46Fa528eFc22b03"
+	  },
+	  {
+	     "RemoteNodeType": "privateNode",
+	     "RemoteNodeAddress": "ws://13.52.16.14:8546",
+	     "ProxyContractAddress": "0xA5a1A5F848B13Aa64ba3bdF5777fF787e4105424"
+	  }
+	]
+}
+
+

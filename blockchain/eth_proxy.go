@@ -1,4 +1,4 @@
-package eth
+package blockchain
 
 import (
 	"context"
@@ -13,11 +13,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dedis/kyber"
-
 	"github.com/DOSNetwork/core/blockchain/eth/contracts"
 	"github.com/DOSNetwork/core/blockchain/eth/contracts/userContract"
 	"github.com/DOSNetwork/core/group/bn256"
+	"github.com/dedis/kyber"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -54,7 +53,7 @@ const (
 	SubscribeDOSProxyLogPublicKeyAccepted
 )
 
-var ethRemoteNode = new(netConfig)
+var ethRemoteNode = new(NetConfig)
 var workingDir string
 
 type EthAdaptor struct {
@@ -65,13 +64,16 @@ type EthAdaptor struct {
 	lock      *sync.Mutex
 	logFilter *sync.Map
 	ethNonce  uint64
+	config    *NetConfig
 }
 
-func (e *EthAdaptor) Init(autoReplenish bool, netType int) (err error) {
+func (e *EthAdaptor) Init(autoReplenish bool, config *NetConfig) (err error) {
 	workingDir, err = os.Getwd()
 	if err != nil {
 		return
 	}
+
+	e.config = config
 
 	fmt.Println("start initial onChainConn...")
 
@@ -79,32 +81,8 @@ func (e *EthAdaptor) Init(autoReplenish bool, netType int) (err error) {
 	go e.logMapTimeout()
 
 	e.lock = new(sync.Mutex)
-	e.lock.Lock()
 
-	switch netType {
-	case Rinkeby:
-		ethRemoteNode = rinkebyNode
-	case RinkebyPrivate:
-		ethRemoteNode = rinkebyPrivateNode
-	case Private:
-		ethRemoteNode = privateNode
-	}
-
-	fmt.Println("dialing...")
-	e.client, err = ethclient.Dial(ethRemoteNode.remoteNodeAddress)
-	for err != nil {
-		fmt.Println(err)
-		fmt.Println("Cannot connect to the network, retrying...")
-		e.client, err = ethclient.Dial(ethRemoteNode.remoteNodeAddress)
-	}
-
-	e.proxy, err = dosproxy.NewDOSProxy(ethRemoteNode.proxyContractAddress, e.client)
-	for err != nil {
-		fmt.Println(err)
-		fmt.Println("Connot Create new proxy, retrying...")
-		e.proxy, err = dosproxy.NewDOSProxy(ethRemoteNode.proxyContractAddress, e.client)
-	}
-	e.lock.Unlock()
+	e.dialToEth()
 
 	if err = e.setAccount(autoReplenish); err != nil {
 		return
@@ -129,26 +107,31 @@ func (e *EthAdaptor) SubscribeEvent(ch chan interface{}, subscribeType int) (err
 			//Todo:This will cause multiple event from eth
 		case <-time.After(60 * time.Second):
 			fmt.Println("retry...")
-			e.lock.Lock()
-			e.client, err = ethclient.Dial(ethRemoteNode.remoteNodeAddress)
-			for err != nil {
-				fmt.Println(err)
-				fmt.Println("Cannot connect to the network, retrying...")
-				e.client, err = ethclient.Dial(ethRemoteNode.remoteNodeAddress)
-			}
-
-			e.proxy, err = dosproxy.NewDOSProxy(ethRemoteNode.proxyContractAddress, e.client)
-			for err != nil {
-				fmt.Println(err)
-				fmt.Println("Connot Create new proxy, retrying...")
-				e.proxy, err = dosproxy.NewDOSProxy(ethRemoteNode.proxyContractAddress, e.client)
-			}
-
-			e.lock.Unlock()
+			e.dialToEth()
 			go e.subscribeEventAttempt(ch, opt, subscribeType, done)
 
 		}
 	}
+}
+
+func (e *EthAdaptor) dialToEth() (err error) {
+	e.lock.Lock()
+	fmt.Println("dialing...")
+	e.client, err = ethclient.Dial(e.config.RemoteNodeAddress)
+	for err != nil {
+		fmt.Println(err)
+		fmt.Println("Cannot connect to the network, retrying...")
+		e.client, err = ethclient.Dial(e.config.RemoteNodeAddress)
+	}
+	addr := common.HexToAddress(e.config.ProxyContractAddress)
+	e.proxy, err = dosproxy.NewDOSProxy(addr, e.client)
+	for err != nil {
+		fmt.Println(err)
+		fmt.Println("Connot Create new proxy, retrying...")
+		e.proxy, err = dosproxy.NewDOSProxy(addr, e.client)
+	}
+	e.lock.Unlock()
+	return
 }
 
 func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchOpts, subscribeType int, done chan bool) {
