@@ -1,0 +1,459 @@
+package eth
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"io/ioutil"
+	"log"
+	"math"
+	"math/big"
+	"os"
+	"sync"
+	"time"
+
+	"github.com/DOSNetwork/core/configuration"
+	"github.com/DOSNetwork/core/onchain"
+	"github.com/DOSNetwork/core/onchain/eth/contracts/userContract"
+	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/accounts/keystore"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/ethclient"
+)
+
+// TODO: Instead of hardcode, read from DOSAddressBridge.go
+
+const (
+	User1 = iota
+	User2
+)
+
+const (
+	SubscribeAskMeAnythingSetTimeout = iota
+	SubscribeAskMeAnythingCallbackReady
+	SubscribeAskMeAnythingQuerySent
+)
+
+var ethRemoteNode = new(onchain.ChainConfig)
+var workingDir string
+
+type EthUserAdaptor struct {
+	key       *keystore.Key
+	client    *ethclient.Client
+	proxy     *userContract.AskMeAnything
+	lock      *sync.Mutex
+	logFilter *sync.Map
+	ethNonce  uint64
+}
+
+func (e *EthUserAdaptor) Init(autoReplenish bool) (err error) {
+	config := configuration.ReadConfig("./config.json")
+	ethRemoteNode := configuration.GetOnChainConfig(config)
+	workingDir, err = os.Getwd()
+	if err != nil {
+		return
+	}
+
+	fmt.Println("start initial onChainConn...")
+
+	e.logFilter = new(sync.Map)
+	go e.logMapTimeout()
+
+	e.lock = new(sync.Mutex)
+	e.lock.Lock()
+
+	fmt.Println("dialing...")
+	e.client, err = ethclient.Dial(ethRemoteNode.RemoteNodeAddress)
+	for err != nil {
+		fmt.Println(err)
+		fmt.Println("Cannot connect to the network, retrying...")
+		e.client, err = ethclient.Dial(ethRemoteNode.RemoteNodeAddress)
+	}
+
+	e.proxy, err = userContract.NewAskMeAnything(common.HexToAddress(ethRemoteNode.AskMeAnythingAddress), e.client)
+	for err != nil {
+		fmt.Println(err)
+		fmt.Println("Connot Create new proxy, retrying...")
+		e.proxy, err = userContract.NewAskMeAnything(common.HexToAddress(ethRemoteNode.AskMeAnythingAddress), e.client)
+	}
+	e.lock.Unlock()
+
+	if err = e.setAccount(autoReplenish); err != nil {
+		return
+	}
+
+	fmt.Println("onChainConn initialization finished.")
+	return
+}
+
+func (e *EthUserAdaptor) SubscribeEvent(ch chan interface{}, subscribeType int) (err error) {
+	opt := &bind.WatchOpts{}
+	done := make(chan bool)
+
+	go e.subscribeEventAttempt(ch, opt, subscribeType, done)
+
+	for {
+		select {
+		case <-done:
+			fmt.Println("subscribing done.")
+			return
+			//Todo:This will cause multiple event from eth
+		case <-time.After(60 * time.Second):
+			fmt.Println("retry...")
+			e.lock.Lock()
+			e.client, err = ethclient.Dial(ethRemoteNode.RemoteNodeAddress)
+			for err != nil {
+				fmt.Println(err)
+				fmt.Println("Cannot connect to the network, retrying...")
+				e.client, err = ethclient.Dial(ethRemoteNode.RemoteNodeAddress)
+			}
+
+			e.proxy, err = userContract.NewAskMeAnything(common.HexToAddress(ethRemoteNode.AskMeAnythingAddress), e.client)
+			for err != nil {
+				fmt.Println(err)
+				fmt.Println("Connot Create new proxy, retrying...")
+				e.proxy, err = userContract.NewAskMeAnything(common.HexToAddress(ethRemoteNode.AskMeAnythingAddress), e.client)
+			}
+
+			e.lock.Unlock()
+			go e.subscribeEventAttempt(ch, opt, subscribeType, done)
+
+		}
+	}
+}
+
+func (e *EthUserAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchOpts, subscribeType int, done chan bool) {
+	fmt.Println("attempt to subscribe event...")
+	switch subscribeType {
+	case SubscribeAskMeAnythingCallbackReady:
+		fmt.Println("subscribing SubscribeAskMeAnythingCallbackReady event...")
+		transitChan := make(chan *userContract.AskMeAnythingCallbackReady)
+		sub, err := e.proxy.AskMeAnythingFilterer.WatchCallbackReady(opt, transitChan)
+		if err != nil {
+			fmt.Println(err)
+			fmt.Println("Network fail, will retry shortly")
+			return
+		}
+		fmt.Println("AskMeAnythingCallbackReady event subscribed")
+
+		done <- true
+		for {
+			select {
+			case err := <-sub.Err():
+				log.Fatal(err)
+			case i := <-transitChan:
+				if !e.filterLog(i.Raw) {
+					ch <- &AskMeAnythingCallbackReady{
+						QueryId: i.QueryId,
+						//						Result:  i.Result,
+					}
+				}
+			}
+		}
+	case SubscribeAskMeAnythingSetTimeout:
+		fmt.Println("subscribing AskMeAnythingSetTimeout event...")
+		transitChan := make(chan *userContract.AskMeAnythingSetTimeout)
+		sub, err := e.proxy.AskMeAnythingFilterer.WatchSetTimeout(opt, transitChan)
+		if err != nil {
+			fmt.Println(err)
+			fmt.Println("Network fail, will retry shortly")
+			return
+		}
+		fmt.Println("AskMeAnythingSetTimeout event subscribed")
+
+		done <- true
+		for {
+			select {
+			case err := <-sub.Err():
+				log.Fatal(err)
+			case i := <-transitChan:
+				if !e.filterLog(i.Raw) {
+					ch <- &AskMeAnythingSetTimeout{
+						PreviousTimeout: i.PreviousTimeout,
+						NewTimeout:      i.NewTimeout,
+					}
+				}
+			}
+		}
+	case SubscribeAskMeAnythingQuerySent:
+		fmt.Println("subscribing AskMeAnythingQuerySent event...")
+		transitChan := make(chan *userContract.AskMeAnythingQuerySent)
+		sub, err := e.proxy.AskMeAnythingFilterer.WatchQuerySent(opt, transitChan)
+		if err != nil {
+			fmt.Println(err)
+			fmt.Println("Network fail, will retry shortly")
+			return
+		}
+		fmt.Println("AskMeAnythingQuerySent event subscribed")
+
+		done <- true
+		for {
+			select {
+			case err := <-sub.Err():
+				log.Fatal(err)
+			case i := <-transitChan:
+				if !e.filterLog(i.Raw) {
+					ch <- &AskMeAnythingQuerySent{
+						Succ:    i.Succ,
+						QueryId: i.QueryId,
+					}
+				}
+			}
+		}
+	}
+}
+
+func (e *EthUserAdaptor) Query(url string) (err error) {
+	auth, err := e.getAuth()
+	if err != nil {
+		return
+	}
+
+	tx, err := e.proxy.AMA(auth, url)
+	if err != nil {
+		return
+	}
+
+	fmt.Println("tx sent: ", tx.Hash().Hex())
+	fmt.Println("Querying ", url, " waiting for confirmation...")
+
+	err = e.checkTransaction(tx)
+
+	return
+}
+
+func (e *EthUserAdaptor) getAuth() (auth *bind.TransactOpts, err error) {
+	gasPrice, err := e.client.SuggestGasPrice(context.Background())
+	if err != nil {
+		return
+	}
+
+	auth = bind.NewKeyedTransactor(e.key.PrivateKey)
+	if err != nil {
+		return
+	}
+
+	e.ethNonce++
+	automatedNonce, err := e.client.PendingNonceAt(context.Background(), e.key.Address)
+	if err != nil {
+		return
+	}
+	if automatedNonce > e.ethNonce {
+		e.ethNonce = automatedNonce
+	}
+	auth.Nonce = big.NewInt(int64(e.ethNonce))
+
+	//for test only
+	onChainNonce, err := e.client.PendingNonceAt(context.Background(), e.key.Address)
+	if err != nil {
+		return
+	}
+	fmt.Print("localNonce:", auth.Nonce, "onChain nonce:", onChainNonce)
+
+	auth.GasLimit = uint64(6000000) // in units
+	auth.GasPrice = gasPrice.Mul(gasPrice, big.NewInt(3))
+
+	return
+}
+
+func (e *EthUserAdaptor) setAccount(autoReplenish bool) (err error) {
+	credentialPath := workingDir + "/credential"
+	fmt.Println("credentialPath: ", credentialPath)
+
+	passPhraseBytes, err := ioutil.ReadFile(credentialPath + "/boot/passPhrase")
+	if err != nil {
+		return
+	}
+
+	passPhrase := string(passPhraseBytes)
+
+	newKeyStore := keystore.NewKeyStore(credentialPath, keystore.StandardScryptN, keystore.StandardScryptP)
+	if len(newKeyStore.Accounts()) < 1 {
+		_, err = newKeyStore.NewAccount(passPhrase)
+		if err != nil {
+			return
+		}
+	}
+
+	usrKeyPath := newKeyStore.Accounts()[0].URL.Path
+	usrKeyJson, err := ioutil.ReadFile(usrKeyPath)
+	if err != nil {
+		return
+	}
+
+	usrKey, err := keystore.DecryptKey(usrKeyJson, passPhrase)
+	if err != nil {
+		return
+	}
+
+	e.key = usrKey
+	e.ethNonce, err = e.client.PendingNonceAt(context.Background(), e.key.Address)
+	if err != nil {
+		return
+	}
+	//for correctness of the first call of getAuth, because getAuth always ++,
+	e.ethNonce--
+
+	if autoReplenish {
+		var rootKeyPath string
+		var rootKeyJson []byte
+		var rootKey *keystore.Key
+
+		rootKeyPath = credentialPath + "/boot/rootKey"
+		rootKeyJson, err = ioutil.ReadFile(rootKeyPath)
+		if err != nil {
+			return
+		}
+
+		rootKey, err = keystore.DecryptKey(rootKeyJson, passPhrase)
+		if err != nil {
+			return
+		}
+
+		err = e.balanceMaintain(usrKey, rootKey)
+
+		go func() {
+			ticker := time.NewTicker(24 * time.Hour)
+			for range ticker.C {
+				err = e.balanceMaintain(usrKey, rootKey)
+				if err != nil {
+					fmt.Print("Fail to replenish.")
+				}
+			}
+		}()
+	}
+
+	return
+}
+
+func (e *EthUserAdaptor) balanceMaintain(usrKey, rootKey *keystore.Key) (err error) {
+	usrKeyBalance, err := e.getBalance(usrKey)
+	if err != nil {
+		return
+	}
+
+	if usrKeyBalance.Cmp(big.NewFloat(0.7)) == -1 {
+		fmt.Println("userKey account replenishing...")
+		if err = e.transferEth(rootKey, usrKey); err == nil {
+			fmt.Println("userKey account replenished.")
+		}
+	}
+
+	return
+}
+
+func (e *EthUserAdaptor) getBalance(key *keystore.Key) (balance *big.Float, err error) {
+	wei, err := e.client.BalanceAt(context.Background(), key.Address, nil)
+	if err != nil {
+		return
+	}
+
+	balance = new(big.Float)
+	balance.SetString(wei.String())
+	balance = balance.Quo(balance, big.NewFloat(math.Pow10(18)))
+	return
+}
+
+func (e *EthUserAdaptor) transferEth(from, to *keystore.Key) (err error) {
+	nonce, err := e.client.PendingNonceAt(context.Background(), from.Address)
+	if err != nil {
+		return
+	}
+
+	gasPrice, err := e.client.SuggestGasPrice(context.Background())
+	if err != nil {
+		return
+	}
+
+	value := big.NewInt(800000000000000000) //0.8 Eth
+	gasLimit := uint64(6000000)
+	tx := types.NewTransaction(nonce, to.Address, value, gasLimit, gasPrice.Mul(gasPrice, big.NewInt(3)), nil)
+
+	chainId, err := e.client.NetworkID(context.Background())
+	if err != nil {
+		return
+	}
+
+	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainId), from.PrivateKey)
+	if err != nil {
+		return
+	}
+
+	err = e.client.SendTransaction(context.Background(), signedTx)
+	if err != nil {
+		return
+	}
+	fmt.Println("replenishing tx sent: ", signedTx.Hash().Hex(), ", waiting for confirmation...")
+
+	err = e.checkTransaction(signedTx)
+
+	return
+}
+
+func (e *EthUserAdaptor) checkTransaction(tx *types.Transaction) (err error) {
+	receipt, err := e.client.TransactionReceipt(context.Background(), tx.Hash())
+	for err == ethereum.NotFound {
+		time.Sleep(1 * time.Second)
+		receipt, err = e.client.TransactionReceipt(context.Background(), tx.Hash())
+	}
+	if err != nil {
+		return
+	}
+
+	if receipt.Status == 1 {
+		fmt.Println("transaction confirmed.")
+	} else {
+		err = errors.New("transaction failed")
+	}
+
+	return
+}
+
+func (e *EthUserAdaptor) SubscribeToAll(msgChan chan interface{}) (err error) {
+	for i := SubscribeAskMeAnythingSetTimeout; i <= SubscribeAskMeAnythingQuerySent; i++ {
+		err = e.SubscribeEvent(msgChan, i)
+	}
+	return
+}
+
+type logRecord struct {
+	content       types.Log
+	currTimeStamp time.Time
+}
+
+func (e *EthUserAdaptor) filterLog(raw types.Log) (duplicates bool) {
+	fmt.Println("check duplicates")
+	identityBytes := append(raw.Address.Bytes(), raw.Topics[0].Bytes()...)
+	identityBytes = append(identityBytes, raw.Data...)
+	identity := new(big.Int).SetBytes(identityBytes).String()
+	fmt.Println("identity: ", identity)
+
+	if record, duplicates := e.logFilter.Load(identity); duplicates {
+		fmt.Println("got duplicate event", record, "\n", raw)
+		//fmt.Println("got duplicate event")
+		//_ = record
+	}
+	e.logFilter.Store(identity, logRecord{raw, time.Now()})
+
+	return duplicates
+}
+
+func (e *EthUserAdaptor) logMapTimeout() {
+	ticker := time.NewTicker(10 * time.Minute)
+	for range ticker.C {
+		e.logFilter.Range(e.checkTime)
+	}
+
+}
+
+func (e *EthUserAdaptor) checkTime(log, deliverTime interface{}) (okToDelete bool) {
+	switch t := deliverTime.(type) {
+	case logRecord:
+		if time.Now().Sub(t.currTimeStamp).Seconds() > 60*10 {
+			e.logFilter.Delete(log)
+		}
+	}
+	return true
+}

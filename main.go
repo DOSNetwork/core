@@ -1,15 +1,14 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"log"
 	"math/big"
 	_ "net/http/pprof"
 
-	"github.com/DOSNetwork/core/blockchain"
-	"github.com/DOSNetwork/core/blockchain/eth"
+	"github.com/DOSNetwork/core/configuration"
 	dos "github.com/DOSNetwork/core/dosnode"
+	"github.com/DOSNetwork/core/onchain"
 	"github.com/DOSNetwork/core/p2p"
 	"github.com/DOSNetwork/core/p2p/dht"
 	"github.com/DOSNetwork/core/share/dkg/pedersen"
@@ -19,19 +18,14 @@ import (
 
 // main
 func main() {
-	roleFlag := flag.String("role", "", "BootstrapNode or not")
-	nbParticipantsFlag := flag.Int("nbVerifiers", 21, "Number of Participants")
-	portFlag := flag.Int("port", 0, "port number")
-	bootstrapIpFlag := flag.String("bootstrapIp", "67.207.98.117:42745", "bootstrapIp")
-
-	flag.Parse()
-	role := *roleFlag
-	nbParticipants := *nbParticipantsFlag
-	port := *portFlag
-	bootstrapIp := *bootstrapIpFlag
-
+	config := configuration.ReadConfig("./config.json")
+	chainConfig := configuration.GetOnChainConfig(config)
+	role := config.NodeRole
+	nbParticipants := config.RandomGroupSize
+	port := config.Port
+	bootstrapIp := config.BootStrapIp
 	//1)Connect to Eth and Set node ID
-	chainConn, err := blockchain.AdaptTo(blockchain.ETH, true, eth.RinkebyPrivate)
+	chainConn, err := onchain.AdaptTo(onchain.ETH, true, &chainConfig)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -79,10 +73,10 @@ func main() {
 	defer close(cSignatureFromPeer)
 	eventValidation := make(chan interface{}, 100)
 	defer close(eventValidation)
-	chainConn.SubscribeEvent(chUrl, eth.SubscribeDOSProxyLogUrl)
-	err = chainConn.SubscribeEvent(eventGrouping, eth.SubscribeDOSProxyLogGrouping)
-	chainConn.SubscribeEvent(chRandom, eth.SubscribeDOSProxyLogUpdateRandom)
-	chainConn.SubscribeEvent(eventValidation, eth.SubscribeDOSProxyLogValidationResult)
+	chainConn.SubscribeEvent(chUrl, onchain.SubscribeDOSProxyLogUrl)
+	err = chainConn.SubscribeEvent(eventGrouping, onchain.SubscribeDOSProxyLogGrouping)
+	chainConn.SubscribeEvent(chRandom, onchain.SubscribeDOSProxyLogUpdateRandom)
+	chainConn.SubscribeEvent(eventValidation, onchain.SubscribeDOSProxyLogValidationResult)
 	toOnChainQueue := make(chan string, 100)
 	defer close(toOnChainQueue)
 
