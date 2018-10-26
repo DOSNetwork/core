@@ -1,13 +1,9 @@
 package main
 
 import (
-	"encoding/json"
-	"flag"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"math/big"
-	"os"
 
 	"github.com/DOSNetwork/core/configuration"
 	dos "github.com/DOSNetwork/core/dosnode"
@@ -18,48 +14,6 @@ import (
 	"github.com/DOSNetwork/core/share/vss/pedersen"
 	"github.com/DOSNetwork/core/suites"
 )
-
-type NetCofigs struct {
-	NetCofigs []onchain.NetConfig
-}
-
-func readConfig() (node *onchain.NetConfig) {
-
-	var configs NetCofigs
-	// Open our jsonFile
-	jsonFile, err := os.Open("./config.json")
-	// if we os.Open returns an error then handle it
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println("Successfully Opened NetCofigs json")
-	// defer the closing of our jsonFile so that we can parse it later on
-	defer jsonFile.Close()
-
-	// read our opened xmlFile as a byte array.
-	byteValue, err := ioutil.ReadAll(jsonFile)
-	if err != nil {
-		log.Fatal(err)
-	}
-	err = json.Unmarshal(byteValue, &configs)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	targetNode := os.Getenv("TargetNode")
-	if targetNode == "" {
-		fmt.Println("No TargetNode Environment variable.")
-		targetNode = "rinkebyPrivateNode"
-	}
-
-	for _, config := range configs.NetCofigs {
-		if targetNode == config.RemoteNodeType {
-			fmt.Println("Use : ", config)
-			return &config
-		}
-	}
-	return nil
-}
 
 // main
 func main() {

@@ -1,7 +1,7 @@
 pragma solidity ^0.4.24;
 
 interface DOSProxyInterface {
-  function query(address, uint, uint, string, string) external returns (bool);
+  function query(address, uint, string, string) external returns (uint);
 }
 
 interface DOSAddressBridgeInterface {
@@ -12,7 +12,6 @@ contract DOSOnChainSDK {
   DOSProxyInterface dosProxy;
   DOSAddressBridgeInterface dosAddrBridge =
     DOSAddressBridgeInterface(0x87095a8115b8385E6A4852640eC9852cD9b6ad9E);
-  uint queryIdSeed;
 
   modifier resolveAddress {
       dosProxy = DOSProxyInterface(dosAddrBridge.getProxyAddress());
@@ -31,11 +30,6 @@ contract DOSOnChainSDK {
     internal
     returns (uint)
     {
-      uint curQueryIdSeed = ++queryIdSeed;
-      uint curQueryId = uint(keccak256(abi.encodePacked(curQueryIdSeed, this)));
-      if (!dosProxy.query(this, curQueryId, timeout, queryType, queryString)) {
-        curQueryId = 0x0;
-      }
-      return curQueryId;
+      return dosProxy.query(this, timeout, queryType, queryString);
     }
 }

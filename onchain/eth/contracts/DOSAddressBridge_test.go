@@ -43,7 +43,7 @@ func (s *DOSAddressBridgeTestSuite) SetupTest() {
 
 }
 
-func (s *DOSAddressBridgeTestSuite) TestPorxyAddress() {
+func (s *DOSAddressBridgeTestSuite) TestProxyAddress() {
 	var z1 big.Int
 	z1.SetUint64(123) // z1 := 123
 	z1.SetString("Ffb6A23dE33eB7efE126A844882F40411a02A21b", 16)

@@ -1,19 +1,18 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
-	"github.com/dedis/kyber"
 	"io/ioutil"
 	"log"
 	"math/big"
 	"net/http"
-	"os"
 	"time"
 
+	"github.com/DOSNetwork/core/configuration"
 	"github.com/DOSNetwork/core/examples/random_number_generator"
 	"github.com/DOSNetwork/core/onchain"
 	"github.com/DOSNetwork/core/suites"
+	"github.com/dedis/kyber"
 )
 
 var groupId = big.NewInt(123)
@@ -73,56 +72,15 @@ func groupSetup(nbParticipants int) (signers *example.RandomNumberGenerator, pub
 	return
 }
 
-type NetCofigs struct {
-	NetCofigs []onchain.NetConfig
-}
-
-func readConfig() (node *onchain.NetConfig) {
-
-	var configs NetCofigs
-	// Open our jsonFile
-	jsonFile, err := os.Open("./config.json")
-	// if we os.Open returns an error then handle it
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println("Successfully Opened NetCofigs json")
-	// defer the closing of our jsonFile so that we can parse it later on
-	defer jsonFile.Close()
-
-	// read our opened xmlFile as a byte array.
-	byteValue, err := ioutil.ReadAll(jsonFile)
-	if err != nil {
-		log.Fatal(err)
-	}
-	err = json.Unmarshal(byteValue, &configs)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	targetNode := os.Getenv("TargetNode")
-	if targetNode == "" {
-		fmt.Println("No TargetNode Environment variable.")
-		targetNode = "rinkebyPrivateNode"
-	}
-
-	for _, config := range configs.NetCofigs {
-		if targetNode == config.RemoteNodeType {
-			fmt.Println("Use : ", config)
-			return &config
-		}
-	}
-	return nil
-}
-
 func main() {
 	signers, pubKey, err := groupSetup(7)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	config := readConfig()
-	chainConn, err := onchain.AdaptTo(onchain.ETH, true, config)
+	config := configuration.ReadConfig("./config.json")
+	chainConfig := configuration.GetOnChainConfig(config)
+	chainConn, err := onchain.AdaptTo(onchain.ETH, true, &chainConfig)
 	if err != nil {
 		log.Fatal(err)
 	}

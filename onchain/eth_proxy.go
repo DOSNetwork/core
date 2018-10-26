@@ -9,13 +9,11 @@ import (
 	"math"
 	"math/big"
 	"os"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/DOSNetwork/core/group/bn256"
 	"github.com/DOSNetwork/core/onchain/eth/contracts"
-	"github.com/DOSNetwork/core/onchain/eth/contracts/userContract"
 	"github.com/dedis/kyber"
 
 	"github.com/ethereum/go-ethereum"
@@ -55,7 +53,6 @@ const (
 
 const balanceCheckInterval = 3
 
-var ethRemoteNode = new(ChainConfig)
 var workingDir string
 
 type EthAdaptor struct {
@@ -728,7 +725,7 @@ func (e *EthAdaptor) transferEth(from, to *keystore.Key) (err error) {
 
 	value := big.NewInt(800000000000000000) //0.8 Eth
 	gasLimit := uint64(1000000)
-  
+
 	tx := types.NewTransaction(nonce, to.Address, value, gasLimit, gasPrice.Mul(gasPrice, big.NewInt(3)), nil)
 
 	chainId, err := e.client.NetworkID(context.Background())

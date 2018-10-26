@@ -12,14 +12,22 @@ const (
 	ETH = iota
 )
 
-type NetConfig struct {
-	RemoteNodeType       string
-	RemoteNodeAddress    string
-	ProxyContractAddress string
+// TODO: Move to configuration/config.go
+type ChainConfig struct {
+	// TODO: Refactor out of ChainConfig
+	RemoteNodeType    string
+	RemoteNodeAddress string
+	// TODO: remove unrelated field
+	AskMeAnythingAddress string
+
+	ChainType               string
+	DOSProxyAddress         string
+	DOSAddressBridgeAddress string
+	DOSOnChainSDKAddress    string
 }
 
 type ChainInterface interface {
-	Init(autoReplenish bool, netConfig *NetConfig) (err error)
+	Init(autoReplenish bool, chainConfig *ChainConfig) (err error)
 	SubscribeEvent(ch chan interface{}, subscribeType int) (err error)
 	UploadID() (err error)
 	UploadPubKey(pubKey kyber.Point) (err error)
@@ -33,12 +41,11 @@ type ChainInterface interface {
 	RandomNumberTimeOut() (err error)
 }
 
-
-func AdaptTo(chainName int, autoReplenish bool, netConfig *ChainConfig) (conn ChainInterface, err error) {
+func AdaptTo(chainName int, autoReplenish bool, chainConfig *ChainConfig) (conn ChainInterface, err error) {
 	switch chainName {
 	case ETH:
 		conn = &EthAdaptor{}
-		err = conn.Init(autoReplenish, netConfig)
+		err = conn.Init(autoReplenish, chainConfig)
 	default:
 		err = fmt.Errorf("Chain %s not supported error\n", chainName)
 	}

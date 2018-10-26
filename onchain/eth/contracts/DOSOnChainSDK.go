@@ -204,7 +204,7 @@ func (_DOSAddressBridgeInterface *DOSAddressBridgeInterfaceCallerSession) GetPro
 const DOSOnChainSDKABI = "[]"
 
 // DOSOnChainSDKBin is the compiled bytecode used for deploying new contracts.
-const DOSOnChainSDKBin = `0x608060405260018054600160a060020a031916735d56b5668395e0bac284282f31c111cb3686e0af179055348015603557600080fd5b5060358060436000396000f3006080604052600080fd00a165627a7a7230582021095f37ee68f259042674858ff7745079f51fefc0079cce5c55713defd394b40029`
+const DOSOnChainSDKBin = `0x608060405260018054600160a060020a0319167387095a8115b8385e6a4852640ec9852cd9b6ad9e179055348015603557600080fd5b5060358060436000396000f3006080604052600080fd00a165627a7a72305820f3f1a2f588f7e810835ca0edd0b6f008a11eb2a06e42b0b6e3214f6d0dfcf6220029`
 
 // DeployDOSOnChainSDK deploys a new Ethereum contract, binding an instance of DOSOnChainSDK to it.
 func DeployDOSOnChainSDK(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *DOSOnChainSDK, error) {
@@ -362,7 +362,7 @@ func (_DOSOnChainSDK *DOSOnChainSDKTransactorRaw) Transact(opts *bind.TransactOp
 }
 
 // DOSProxyInterfaceABI is the input ABI used to generate the binding from.
-const DOSProxyInterfaceABI = "[{\"constant\":false,\"inputs\":[{\"name\":\"\",\"type\":\"address\"},{\"name\":\"\",\"type\":\"uint256\"},{\"name\":\"\",\"type\":\"uint256\"},{\"name\":\"\",\"type\":\"string\"},{\"name\":\"\",\"type\":\"string\"}],\"name\":\"query\",\"outputs\":[{\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]"
+const DOSProxyInterfaceABI = "[{\"constant\":false,\"inputs\":[{\"name\":\"\",\"type\":\"address\"},{\"name\":\"\",\"type\":\"uint256\"},{\"name\":\"\",\"type\":\"string\"},{\"name\":\"\",\"type\":\"string\"}],\"name\":\"query\",\"outputs\":[{\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]"
 
 // DOSProxyInterfaceBin is the compiled bytecode used for deploying new contracts.
 const DOSProxyInterfaceBin = `0x`
@@ -522,23 +522,23 @@ func (_DOSProxyInterface *DOSProxyInterfaceTransactorRaw) Transact(opts *bind.Tr
 	return _DOSProxyInterface.Contract.contract.Transact(opts, method, params...)
 }
 
-// Query is a paid mutator transaction binding the contract method 0x482edfaa.
+// Query is a paid mutator transaction binding the contract method 0xb7fb8fd7.
 //
-// Solidity: function query( address,  uint256,  uint256,  string,  string) returns(uint256)
-func (_DOSProxyInterface *DOSProxyInterfaceTransactor) Query(opts *bind.TransactOpts, arg0 common.Address, arg1 *big.Int, arg2 *big.Int, arg3 string, arg4 string) (*types.Transaction, error) {
-	return _DOSProxyInterface.contract.Transact(opts, "query", arg0, arg1, arg2, arg3, arg4)
+// Solidity: function query( address,  uint256,  string,  string) returns(uint256)
+func (_DOSProxyInterface *DOSProxyInterfaceTransactor) Query(opts *bind.TransactOpts, arg0 common.Address, arg1 *big.Int, arg2 string, arg3 string) (*types.Transaction, error) {
+	return _DOSProxyInterface.contract.Transact(opts, "query", arg0, arg1, arg2, arg3)
 }
 
-// Query is a paid mutator transaction binding the contract method 0x482edfaa.
+// Query is a paid mutator transaction binding the contract method 0xb7fb8fd7.
 //
-// Solidity: function query( address,  uint256,  uint256,  string,  string) returns(uint256)
-func (_DOSProxyInterface *DOSProxyInterfaceSession) Query(arg0 common.Address, arg1 *big.Int, arg2 *big.Int, arg3 string, arg4 string) (*types.Transaction, error) {
-	return _DOSProxyInterface.Contract.Query(&_DOSProxyInterface.TransactOpts, arg0, arg1, arg2, arg3, arg4)
+// Solidity: function query( address,  uint256,  string,  string) returns(uint256)
+func (_DOSProxyInterface *DOSProxyInterfaceSession) Query(arg0 common.Address, arg1 *big.Int, arg2 string, arg3 string) (*types.Transaction, error) {
+	return _DOSProxyInterface.Contract.Query(&_DOSProxyInterface.TransactOpts, arg0, arg1, arg2, arg3)
 }
 
-// Query is a paid mutator transaction binding the contract method 0x482edfaa.
+// Query is a paid mutator transaction binding the contract method 0xb7fb8fd7.
 //
-// Solidity: function query( address,  uint256,  uint256,  string,  string) returns(uint256)
-func (_DOSProxyInterface *DOSProxyInterfaceTransactorSession) Query(arg0 common.Address, arg1 *big.Int, arg2 *big.Int, arg3 string, arg4 string) (*types.Transaction, error) {
-	return _DOSProxyInterface.Contract.Query(&_DOSProxyInterface.TransactOpts, arg0, arg1, arg2, arg3, arg4)
+// Solidity: function query( address,  uint256,  string,  string) returns(uint256)
+func (_DOSProxyInterface *DOSProxyInterfaceTransactorSession) Query(arg0 common.Address, arg1 *big.Int, arg2 string, arg3 string) (*types.Transaction, error) {
+	return _DOSProxyInterface.Contract.Query(&_DOSProxyInterface.TransactOpts, arg0, arg1, arg2, arg3)
 }

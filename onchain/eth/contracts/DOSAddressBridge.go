@@ -15,10 +15,10 @@ import (
 )
 
 // DOSAddressBridgeABI is the input ABI used to generate the binding from.
-const DOSAddressBridgeABI = "[{\"constant\":true,\"inputs\":[],\"name\":\"getProxyAddress\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"new_addr\",\"type\":\"address\"}],\"name\":\"setProxyAddress\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[],\"name\":\"renounceOwnership\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"isOwner\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"previous_proxy\",\"type\":\"address\"},{\"indexed\":false,\"name\":\"new_proxy\",\"type\":\"address\"}],\"name\":\"ProxyAddressUpdated\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"previousOwner\",\"type\":\"address\"}],\"name\":\"OwnershipRenounced\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"previousOwner\",\"type\":\"address\"},{\"indexed\":true,\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"}]"
+const DOSAddressBridgeABI = "[{\"constant\":true,\"inputs\":[],\"name\":\"getProxyAddress\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"newAddr\",\"type\":\"address\"}],\"name\":\"setProxyAddress\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"newAddr\",\"type\":\"address\"}],\"name\":\"setPaymentAddress\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[],\"name\":\"renounceOwnership\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"isOwner\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"getPaymentAddress\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"newAddr\",\"type\":\"address\"}],\"name\":\"setRegistryAddress\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"getRegistryAddress\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"previousProxy\",\"type\":\"address\"},{\"indexed\":false,\"name\":\"newProxy\",\"type\":\"address\"}],\"name\":\"ProxyAddressUpdated\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"previousPayment\",\"type\":\"address\"},{\"indexed\":false,\"name\":\"newPayment\",\"type\":\"address\"}],\"name\":\"PaymentAddressUpdated\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"previousRegistry\",\"type\":\"address\"},{\"indexed\":false,\"name\":\"newRegistry\",\"type\":\"address\"}],\"name\":\"RegistryAddressUpdated\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"previousOwner\",\"type\":\"address\"}],\"name\":\"OwnershipRenounced\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"previousOwner\",\"type\":\"address\"},{\"indexed\":true,\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"}]"
 
 // DOSAddressBridgeBin is the compiled bytecode used for deploying new contracts.
-const DOSAddressBridgeBin = `0x608060405260008054600160a060020a0319163317905561032d806100256000396000f3006080604052600436106100775763ffffffff7c010000000000000000000000000000000000000000000000000000000060003504166343a73d9a811461007c57806346a7dadc146100ad578063715018a6146100d05780638da5cb5b146100e55780638f32d59b146100fa578063f2fde38b14610123575b600080fd5b34801561008857600080fd5b50610091610144565b60408051600160a060020a039092168252519081900360200190f35b3480156100b957600080fd5b506100ce600160a060020a0360043516610153565b005b3480156100dc57600080fd5b506100ce6101dd565b3480156100f157600080fd5b50610091610245565b34801561010657600080fd5b5061010f610254565b604080519115158252519081900360200190f35b34801561012f57600080fd5b506100ce600160a060020a0360043516610265565b600154600160a060020a031690565b61015b610254565b151561016657600080fd5b60015460408051600160a060020a039283168152918316602083015280517fafa5c16901af5d392255707d27b3e2687e79a18df187b9f1525e7f0fc2144f6f9281900390910190a16001805473ffffffffffffffffffffffffffffffffffffffff1916600160a060020a0392909216919091179055565b6101e5610254565b15156101f057600080fd5b60008054604051600160a060020a03909116917ff8df31144d9c2f0f6b59d69b8b98abd5459d07f2742c4df920b25aae33c6482091a26000805473ffffffffffffffffffffffffffffffffffffffff19169055565b600054600160a060020a031690565b600054600160a060020a0316331490565b61026d610254565b151561027857600080fd5b61028181610284565b50565b600160a060020a038116151561029957600080fd5b60008054604051600160a060020a03808516939216917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e091a36000805473ffffffffffffffffffffffffffffffffffffffff1916600160a060020a03929092169190911790555600a165627a7a72305820f9563e318752f0378aab71b279f35b2bbf3349aedef10e2080e54537c735ca2a0029`
+const DOSAddressBridgeBin = `0x608060405260008054600160a060020a031916331790556104f7806100256000396000f3006080604052600436106100a35763ffffffff7c010000000000000000000000000000000000000000000000000000000060003504166343a73d9a81146100a857806346a7dadc146100d95780635e1e1004146100fc578063715018a61461011d5780638da5cb5b146101325780638f32d59b146101475780639d265e5814610170578063ab7b499314610185578063f21de1e8146101a6578063f2fde38b146101bb575b600080fd5b3480156100b457600080fd5b506100bd6101dc565b60408051600160a060020a039092168252519081900360200190f35b3480156100e557600080fd5b506100fa600160a060020a03600435166101eb565b005b34801561010857600080fd5b506100fa600160a060020a0360043516610275565b34801561012957600080fd5b506100fa6102ff565b34801561013e57600080fd5b506100bd610367565b34801561015357600080fd5b5061015c610376565b604080519115158252519081900360200190f35b34801561017c57600080fd5b506100bd610387565b34801561019157600080fd5b506100fa600160a060020a0360043516610396565b3480156101b257600080fd5b506100bd610420565b3480156101c757600080fd5b506100fa600160a060020a036004351661042f565b600154600160a060020a031690565b6101f3610376565b15156101fe57600080fd5b60015460408051600160a060020a039283168152918316602083015280517fafa5c16901af5d392255707d27b3e2687e79a18df187b9f1525e7f0fc2144f6f9281900390910190a16001805473ffffffffffffffffffffffffffffffffffffffff1916600160a060020a0392909216919091179055565b61027d610376565b151561028857600080fd5b60025460408051600160a060020a039283168152918316602083015280517fb3d3f832f05d764f8934189cba7879e2dd829dd3f92749ec959339fd5cd8b0be9281900390910190a16002805473ffffffffffffffffffffffffffffffffffffffff1916600160a060020a0392909216919091179055565b610307610376565b151561031257600080fd5b60008054604051600160a060020a03909116917ff8df31144d9c2f0f6b59d69b8b98abd5459d07f2742c4df920b25aae33c6482091a26000805473ffffffffffffffffffffffffffffffffffffffff19169055565b600054600160a060020a031690565b600054600160a060020a0316331490565b600254600160a060020a031690565b61039e610376565b15156103a957600080fd5b60035460408051600160a060020a039283168152918316602083015280517f6144918c239a794463afd709d2affba8e0a35b21444f4d461c9d700a2d6bb5049281900390910190a16003805473ffffffffffffffffffffffffffffffffffffffff1916600160a060020a0392909216919091179055565b600354600160a060020a031690565b610437610376565b151561044257600080fd5b61044b8161044e565b50565b600160a060020a038116151561046357600080fd5b60008054604051600160a060020a03808516939216917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e091a36000805473ffffffffffffffffffffffffffffffffffffffff1916600160a060020a03929092169190911790555600a165627a7a7230582059f60a14dd389e7c063db5e36033987fc9481d33cc3ab31bb3dae48b449f97da0029`
 
 // DeployDOSAddressBridge deploys a new Ethereum contract, binding an instance of DOSAddressBridge to it.
 func DeployDOSAddressBridge(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *DOSAddressBridge, error) {
@@ -175,6 +175,32 @@ func (_DOSAddressBridge *DOSAddressBridgeTransactorRaw) Transact(opts *bind.Tran
 	return _DOSAddressBridge.Contract.contract.Transact(opts, method, params...)
 }
 
+// GetPaymentAddress is a free data retrieval call binding the contract method 0x9d265e58.
+//
+// Solidity: function getPaymentAddress() constant returns(address)
+func (_DOSAddressBridge *DOSAddressBridgeCaller) GetPaymentAddress(opts *bind.CallOpts) (common.Address, error) {
+	var (
+		ret0 = new(common.Address)
+	)
+	out := ret0
+	err := _DOSAddressBridge.contract.Call(opts, out, "getPaymentAddress")
+	return *ret0, err
+}
+
+// GetPaymentAddress is a free data retrieval call binding the contract method 0x9d265e58.
+//
+// Solidity: function getPaymentAddress() constant returns(address)
+func (_DOSAddressBridge *DOSAddressBridgeSession) GetPaymentAddress() (common.Address, error) {
+	return _DOSAddressBridge.Contract.GetPaymentAddress(&_DOSAddressBridge.CallOpts)
+}
+
+// GetPaymentAddress is a free data retrieval call binding the contract method 0x9d265e58.
+//
+// Solidity: function getPaymentAddress() constant returns(address)
+func (_DOSAddressBridge *DOSAddressBridgeCallerSession) GetPaymentAddress() (common.Address, error) {
+	return _DOSAddressBridge.Contract.GetPaymentAddress(&_DOSAddressBridge.CallOpts)
+}
+
 // GetProxyAddress is a free data retrieval call binding the contract method 0x43a73d9a.
 //
 // Solidity: function getProxyAddress() constant returns(address)
@@ -199,6 +225,32 @@ func (_DOSAddressBridge *DOSAddressBridgeSession) GetProxyAddress() (common.Addr
 // Solidity: function getProxyAddress() constant returns(address)
 func (_DOSAddressBridge *DOSAddressBridgeCallerSession) GetProxyAddress() (common.Address, error) {
 	return _DOSAddressBridge.Contract.GetProxyAddress(&_DOSAddressBridge.CallOpts)
+}
+
+// GetRegistryAddress is a free data retrieval call binding the contract method 0xf21de1e8.
+//
+// Solidity: function getRegistryAddress() constant returns(address)
+func (_DOSAddressBridge *DOSAddressBridgeCaller) GetRegistryAddress(opts *bind.CallOpts) (common.Address, error) {
+	var (
+		ret0 = new(common.Address)
+	)
+	out := ret0
+	err := _DOSAddressBridge.contract.Call(opts, out, "getRegistryAddress")
+	return *ret0, err
+}
+
+// GetRegistryAddress is a free data retrieval call binding the contract method 0xf21de1e8.
+//
+// Solidity: function getRegistryAddress() constant returns(address)
+func (_DOSAddressBridge *DOSAddressBridgeSession) GetRegistryAddress() (common.Address, error) {
+	return _DOSAddressBridge.Contract.GetRegistryAddress(&_DOSAddressBridge.CallOpts)
+}
+
+// GetRegistryAddress is a free data retrieval call binding the contract method 0xf21de1e8.
+//
+// Solidity: function getRegistryAddress() constant returns(address)
+func (_DOSAddressBridge *DOSAddressBridgeCallerSession) GetRegistryAddress() (common.Address, error) {
+	return _DOSAddressBridge.Contract.GetRegistryAddress(&_DOSAddressBridge.CallOpts)
 }
 
 // IsOwner is a free data retrieval call binding the contract method 0x8f32d59b.
@@ -274,25 +326,67 @@ func (_DOSAddressBridge *DOSAddressBridgeTransactorSession) RenounceOwnership() 
 	return _DOSAddressBridge.Contract.RenounceOwnership(&_DOSAddressBridge.TransactOpts)
 }
 
-// SetProxyAddress is a paid mutator transaction binding the contract method 0x46a7dadc.
+// SetPaymentAddress is a paid mutator transaction binding the contract method 0x5e1e1004.
 //
-// Solidity: function setProxyAddress(new_addr address) returns()
-func (_DOSAddressBridge *DOSAddressBridgeTransactor) SetProxyAddress(opts *bind.TransactOpts, new_addr common.Address) (*types.Transaction, error) {
-	return _DOSAddressBridge.contract.Transact(opts, "setProxyAddress", new_addr)
+// Solidity: function setPaymentAddress(newAddr address) returns()
+func (_DOSAddressBridge *DOSAddressBridgeTransactor) SetPaymentAddress(opts *bind.TransactOpts, newAddr common.Address) (*types.Transaction, error) {
+	return _DOSAddressBridge.contract.Transact(opts, "setPaymentAddress", newAddr)
+}
+
+// SetPaymentAddress is a paid mutator transaction binding the contract method 0x5e1e1004.
+//
+// Solidity: function setPaymentAddress(newAddr address) returns()
+func (_DOSAddressBridge *DOSAddressBridgeSession) SetPaymentAddress(newAddr common.Address) (*types.Transaction, error) {
+	return _DOSAddressBridge.Contract.SetPaymentAddress(&_DOSAddressBridge.TransactOpts, newAddr)
+}
+
+// SetPaymentAddress is a paid mutator transaction binding the contract method 0x5e1e1004.
+//
+// Solidity: function setPaymentAddress(newAddr address) returns()
+func (_DOSAddressBridge *DOSAddressBridgeTransactorSession) SetPaymentAddress(newAddr common.Address) (*types.Transaction, error) {
+	return _DOSAddressBridge.Contract.SetPaymentAddress(&_DOSAddressBridge.TransactOpts, newAddr)
 }
 
 // SetProxyAddress is a paid mutator transaction binding the contract method 0x46a7dadc.
 //
-// Solidity: function setProxyAddress(new_addr address) returns()
-func (_DOSAddressBridge *DOSAddressBridgeSession) SetProxyAddress(new_addr common.Address) (*types.Transaction, error) {
-	return _DOSAddressBridge.Contract.SetProxyAddress(&_DOSAddressBridge.TransactOpts, new_addr)
+// Solidity: function setProxyAddress(newAddr address) returns()
+func (_DOSAddressBridge *DOSAddressBridgeTransactor) SetProxyAddress(opts *bind.TransactOpts, newAddr common.Address) (*types.Transaction, error) {
+	return _DOSAddressBridge.contract.Transact(opts, "setProxyAddress", newAddr)
 }
 
 // SetProxyAddress is a paid mutator transaction binding the contract method 0x46a7dadc.
 //
-// Solidity: function setProxyAddress(new_addr address) returns()
-func (_DOSAddressBridge *DOSAddressBridgeTransactorSession) SetProxyAddress(new_addr common.Address) (*types.Transaction, error) {
-	return _DOSAddressBridge.Contract.SetProxyAddress(&_DOSAddressBridge.TransactOpts, new_addr)
+// Solidity: function setProxyAddress(newAddr address) returns()
+func (_DOSAddressBridge *DOSAddressBridgeSession) SetProxyAddress(newAddr common.Address) (*types.Transaction, error) {
+	return _DOSAddressBridge.Contract.SetProxyAddress(&_DOSAddressBridge.TransactOpts, newAddr)
+}
+
+// SetProxyAddress is a paid mutator transaction binding the contract method 0x46a7dadc.
+//
+// Solidity: function setProxyAddress(newAddr address) returns()
+func (_DOSAddressBridge *DOSAddressBridgeTransactorSession) SetProxyAddress(newAddr common.Address) (*types.Transaction, error) {
+	return _DOSAddressBridge.Contract.SetProxyAddress(&_DOSAddressBridge.TransactOpts, newAddr)
+}
+
+// SetRegistryAddress is a paid mutator transaction binding the contract method 0xab7b4993.
+//
+// Solidity: function setRegistryAddress(newAddr address) returns()
+func (_DOSAddressBridge *DOSAddressBridgeTransactor) SetRegistryAddress(opts *bind.TransactOpts, newAddr common.Address) (*types.Transaction, error) {
+	return _DOSAddressBridge.contract.Transact(opts, "setRegistryAddress", newAddr)
+}
+
+// SetRegistryAddress is a paid mutator transaction binding the contract method 0xab7b4993.
+//
+// Solidity: function setRegistryAddress(newAddr address) returns()
+func (_DOSAddressBridge *DOSAddressBridgeSession) SetRegistryAddress(newAddr common.Address) (*types.Transaction, error) {
+	return _DOSAddressBridge.Contract.SetRegistryAddress(&_DOSAddressBridge.TransactOpts, newAddr)
+}
+
+// SetRegistryAddress is a paid mutator transaction binding the contract method 0xab7b4993.
+//
+// Solidity: function setRegistryAddress(newAddr address) returns()
+func (_DOSAddressBridge *DOSAddressBridgeTransactorSession) SetRegistryAddress(newAddr common.Address) (*types.Transaction, error) {
+	return _DOSAddressBridge.Contract.SetRegistryAddress(&_DOSAddressBridge.TransactOpts, newAddr)
 }
 
 // TransferOwnership is a paid mutator transaction binding the contract method 0xf2fde38b.
@@ -589,6 +683,129 @@ func (_DOSAddressBridge *DOSAddressBridgeFilterer) WatchOwnershipTransferred(opt
 	}), nil
 }
 
+// DOSAddressBridgePaymentAddressUpdatedIterator is returned from FilterPaymentAddressUpdated and is used to iterate over the raw logs and unpacked data for PaymentAddressUpdated events raised by the DOSAddressBridge contract.
+type DOSAddressBridgePaymentAddressUpdatedIterator struct {
+	Event *DOSAddressBridgePaymentAddressUpdated // Event containing the contract specifics and raw log
+
+	contract *bind.BoundContract // Generic contract to use for unpacking event data
+	event    string              // Event name to use for unpacking event data
+
+	logs chan types.Log        // Log channel receiving the found contract events
+	sub  ethereum.Subscription // Subscription for errors, completion and termination
+	done bool                  // Whether the subscription completed delivering logs
+	fail error                 // Occurred error to stop iteration
+}
+
+// Next advances the iterator to the subsequent event, returning whether there
+// are any more events found. In case of a retrieval or parsing error, false is
+// returned and Error() can be queried for the exact failure.
+func (it *DOSAddressBridgePaymentAddressUpdatedIterator) Next() bool {
+	// If the iterator failed, stop iterating
+	if it.fail != nil {
+		return false
+	}
+	// If the iterator completed, deliver directly whatever's available
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(DOSAddressBridgePaymentAddressUpdated)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+	// Iterator still in progress, wait for either a data or an error event
+	select {
+	case log := <-it.logs:
+		it.Event = new(DOSAddressBridgePaymentAddressUpdated)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+// Error returns any retrieval or parsing error occurred during filtering.
+func (it *DOSAddressBridgePaymentAddressUpdatedIterator) Error() error {
+	return it.fail
+}
+
+// Close terminates the iteration process, releasing any pending underlying
+// resources.
+func (it *DOSAddressBridgePaymentAddressUpdatedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+// DOSAddressBridgePaymentAddressUpdated represents a PaymentAddressUpdated event raised by the DOSAddressBridge contract.
+type DOSAddressBridgePaymentAddressUpdated struct {
+	PreviousPayment common.Address
+	NewPayment      common.Address
+	Raw             types.Log // Blockchain specific contextual infos
+}
+
+// FilterPaymentAddressUpdated is a free log retrieval operation binding the contract event 0xb3d3f832f05d764f8934189cba7879e2dd829dd3f92749ec959339fd5cd8b0be.
+//
+// Solidity: e PaymentAddressUpdated(previousPayment address, newPayment address)
+func (_DOSAddressBridge *DOSAddressBridgeFilterer) FilterPaymentAddressUpdated(opts *bind.FilterOpts) (*DOSAddressBridgePaymentAddressUpdatedIterator, error) {
+
+	logs, sub, err := _DOSAddressBridge.contract.FilterLogs(opts, "PaymentAddressUpdated")
+	if err != nil {
+		return nil, err
+	}
+	return &DOSAddressBridgePaymentAddressUpdatedIterator{contract: _DOSAddressBridge.contract, event: "PaymentAddressUpdated", logs: logs, sub: sub}, nil
+}
+
+// WatchPaymentAddressUpdated is a free log subscription operation binding the contract event 0xb3d3f832f05d764f8934189cba7879e2dd829dd3f92749ec959339fd5cd8b0be.
+//
+// Solidity: e PaymentAddressUpdated(previousPayment address, newPayment address)
+func (_DOSAddressBridge *DOSAddressBridgeFilterer) WatchPaymentAddressUpdated(opts *bind.WatchOpts, sink chan<- *DOSAddressBridgePaymentAddressUpdated) (event.Subscription, error) {
+
+	logs, sub, err := _DOSAddressBridge.contract.WatchLogs(opts, "PaymentAddressUpdated")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+				// New log arrived, parse the event and forward to the user
+				event := new(DOSAddressBridgePaymentAddressUpdated)
+				if err := _DOSAddressBridge.contract.UnpackLog(event, "PaymentAddressUpdated", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
 // DOSAddressBridgeProxyAddressUpdatedIterator is returned from FilterProxyAddressUpdated and is used to iterate over the raw logs and unpacked data for ProxyAddressUpdated events raised by the DOSAddressBridge contract.
 type DOSAddressBridgeProxyAddressUpdatedIterator struct {
 	Event *DOSAddressBridgeProxyAddressUpdated // Event containing the contract specifics and raw log
@@ -665,7 +882,7 @@ type DOSAddressBridgeProxyAddressUpdated struct {
 
 // FilterProxyAddressUpdated is a free log retrieval operation binding the contract event 0xafa5c16901af5d392255707d27b3e2687e79a18df187b9f1525e7f0fc2144f6f.
 //
-// Solidity: e ProxyAddressUpdated(previous_proxy address, new_proxy address)
+// Solidity: e ProxyAddressUpdated(previousProxy address, newProxy address)
 func (_DOSAddressBridge *DOSAddressBridgeFilterer) FilterProxyAddressUpdated(opts *bind.FilterOpts) (*DOSAddressBridgeProxyAddressUpdatedIterator, error) {
 
 	logs, sub, err := _DOSAddressBridge.contract.FilterLogs(opts, "ProxyAddressUpdated")
@@ -677,7 +894,7 @@ func (_DOSAddressBridge *DOSAddressBridgeFilterer) FilterProxyAddressUpdated(opt
 
 // WatchProxyAddressUpdated is a free log subscription operation binding the contract event 0xafa5c16901af5d392255707d27b3e2687e79a18df187b9f1525e7f0fc2144f6f.
 //
-// Solidity: e ProxyAddressUpdated(previous_proxy address, new_proxy address)
+// Solidity: e ProxyAddressUpdated(previousProxy address, newProxy address)
 func (_DOSAddressBridge *DOSAddressBridgeFilterer) WatchProxyAddressUpdated(opts *bind.WatchOpts, sink chan<- *DOSAddressBridgeProxyAddressUpdated) (event.Subscription, error) {
 
 	logs, sub, err := _DOSAddressBridge.contract.WatchLogs(opts, "ProxyAddressUpdated")
@@ -712,12 +929,134 @@ func (_DOSAddressBridge *DOSAddressBridgeFilterer) WatchProxyAddressUpdated(opts
 	}), nil
 }
 
+// DOSAddressBridgeRegistryAddressUpdatedIterator is returned from FilterRegistryAddressUpdated and is used to iterate over the raw logs and unpacked data for RegistryAddressUpdated events raised by the DOSAddressBridge contract.
+type DOSAddressBridgeRegistryAddressUpdatedIterator struct {
+	Event *DOSAddressBridgeRegistryAddressUpdated // Event containing the contract specifics and raw log
+
+	contract *bind.BoundContract // Generic contract to use for unpacking event data
+	event    string              // Event name to use for unpacking event data
+
+	logs chan types.Log        // Log channel receiving the found contract events
+	sub  ethereum.Subscription // Subscription for errors, completion and termination
+	done bool                  // Whether the subscription completed delivering logs
+	fail error                 // Occurred error to stop iteration
+}
+
+// Next advances the iterator to the subsequent event, returning whether there
+// are any more events found. In case of a retrieval or parsing error, false is
+// returned and Error() can be queried for the exact failure.
+func (it *DOSAddressBridgeRegistryAddressUpdatedIterator) Next() bool {
+	// If the iterator failed, stop iterating
+	if it.fail != nil {
+		return false
+	}
+	// If the iterator completed, deliver directly whatever's available
+	if it.done {
+		select {
+		case log := <-it.logs:
+			it.Event = new(DOSAddressBridgeRegistryAddressUpdated)
+			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+				it.fail = err
+				return false
+			}
+			it.Event.Raw = log
+			return true
+
+		default:
+			return false
+		}
+	}
+	// Iterator still in progress, wait for either a data or an error event
+	select {
+	case log := <-it.logs:
+		it.Event = new(DOSAddressBridgeRegistryAddressUpdated)
+		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
+			it.fail = err
+			return false
+		}
+		it.Event.Raw = log
+		return true
+
+	case err := <-it.sub.Err():
+		it.done = true
+		it.fail = err
+		return it.Next()
+	}
+}
+
+// Error returns any retrieval or parsing error occurred during filtering.
+func (it *DOSAddressBridgeRegistryAddressUpdatedIterator) Error() error {
+	return it.fail
+}
+
+// Close terminates the iteration process, releasing any pending underlying
+// resources.
+func (it *DOSAddressBridgeRegistryAddressUpdatedIterator) Close() error {
+	it.sub.Unsubscribe()
+	return nil
+}
+
+// DOSAddressBridgeRegistryAddressUpdated represents a RegistryAddressUpdated event raised by the DOSAddressBridge contract.
+type DOSAddressBridgeRegistryAddressUpdated struct {
+	PreviousRegistry common.Address
+	NewRegistry      common.Address
+	Raw              types.Log // Blockchain specific contextual infos
+}
+
+// FilterRegistryAddressUpdated is a free log retrieval operation binding the contract event 0x6144918c239a794463afd709d2affba8e0a35b21444f4d461c9d700a2d6bb504.
+//
+// Solidity: e RegistryAddressUpdated(previousRegistry address, newRegistry address)
+func (_DOSAddressBridge *DOSAddressBridgeFilterer) FilterRegistryAddressUpdated(opts *bind.FilterOpts) (*DOSAddressBridgeRegistryAddressUpdatedIterator, error) {
+
+	logs, sub, err := _DOSAddressBridge.contract.FilterLogs(opts, "RegistryAddressUpdated")
+	if err != nil {
+		return nil, err
+	}
+	return &DOSAddressBridgeRegistryAddressUpdatedIterator{contract: _DOSAddressBridge.contract, event: "RegistryAddressUpdated", logs: logs, sub: sub}, nil
+}
+
+// WatchRegistryAddressUpdated is a free log subscription operation binding the contract event 0x6144918c239a794463afd709d2affba8e0a35b21444f4d461c9d700a2d6bb504.
+//
+// Solidity: e RegistryAddressUpdated(previousRegistry address, newRegistry address)
+func (_DOSAddressBridge *DOSAddressBridgeFilterer) WatchRegistryAddressUpdated(opts *bind.WatchOpts, sink chan<- *DOSAddressBridgeRegistryAddressUpdated) (event.Subscription, error) {
+
+	logs, sub, err := _DOSAddressBridge.contract.WatchLogs(opts, "RegistryAddressUpdated")
+	if err != nil {
+		return nil, err
+	}
+	return event.NewSubscription(func(quit <-chan struct{}) error {
+		defer sub.Unsubscribe()
+		for {
+			select {
+			case log := <-logs:
+				// New log arrived, parse the event and forward to the user
+				event := new(DOSAddressBridgeRegistryAddressUpdated)
+				if err := _DOSAddressBridge.contract.UnpackLog(event, "RegistryAddressUpdated", log); err != nil {
+					return err
+				}
+				event.Raw = log
+
+				select {
+				case sink <- event:
+				case err := <-sub.Err():
+					return err
+				case <-quit:
+					return nil
+				}
+			case err := <-sub.Err():
+				return err
+			case <-quit:
+				return nil
+			}
+		}
+	}), nil
+}
+
 // OwnableABI is the input ABI used to generate the binding from.
 const OwnableABI = "[{\"constant\":false,\"inputs\":[],\"name\":\"renounceOwnership\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"isOwner\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"previousOwner\",\"type\":\"address\"}],\"name\":\"OwnershipRenounced\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"previousOwner\",\"type\":\"address\"},{\"indexed\":true,\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"}]"
 
 // OwnableBin is the compiled bytecode used for deploying new contracts.
-const OwnableBin = `0x608060405234801561001057600080fd5b5060008054600160a060020a03191633179055610248806100326000396000f3006080604052600436106100615763ffffffff7c0100000000000000000000000000000000000000000000000000000000600035041663715018a681146100665780638da5cb5b1461007d5780638f32d59b146100ae578063f2fde38b146100d7575b600080fd5b34801561007257600080fd5b5061007b6100f8565b005b34801561008957600080fd5b50610092610160565b60408051600160a060020a039092168252519081900360200190f35b3480156100ba57600080fd5b506100c361016f565b604080519115158252519081900360200190f35b3480156100e357600080fd5b5061007b600160a060020a0360043516610180565b61010061016f565b151561010b57600080fd5b60008054604051600160a060020a03909116917ff8df31144d9c2f0f6b59d69b8b98abd5459d07f2742c4df920b25aae33c6482091a26000805473ffffffffffffffffffffffffffffffffffffffff19169055565b600054600160a060020a031690565b600054600160a060020a0316331490565b61018861016f565b151561019357600080fd5b61019c8161019f565b50565b600160a060020a03811615156101b457600080fd5b60008054604051600160a060020a03808516939216917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e091a36000805473ffffffffffffffffffffffffffffffffffffffff1916600160a060020a03929092169190911790555600a165627a7a7230582053b9266feafd0f4e55d5c8ba892c5dfa91daa42a291f11cff65bfafec7e096750029`
-
+const OwnableBin = `0x608060405234801561001057600080fd5b5060008054600160a060020a03191633179055610248806100326000396000f3006080604052600436106100615763ffffffff7c0100000000000000000000000000000000000000000000000000000000600035041663715018a681146100665780638da5cb5b1461007d5780638f32d59b146100ae578063f2fde38b146100d7575b600080fd5b34801561007257600080fd5b5061007b6100f8565b005b34801561008957600080fd5b50610092610160565b60408051600160a060020a039092168252519081900360200190f35b3480156100ba57600080fd5b506100c361016f565b604080519115158252519081900360200190f35b3480156100e357600080fd5b5061007b600160a060020a0360043516610180565b61010061016f565b151561010b57600080fd5b60008054604051600160a060020a03909116917ff8df31144d9c2f0f6b59d69b8b98abd5459d07f2742c4df920b25aae33c6482091a26000805473ffffffffffffffffffffffffffffffffffffffff19169055565b600054600160a060020a031690565b600054600160a060020a0316331490565b61018861016f565b151561019357600080fd5b61019c8161019f565b50565b600160a060020a03811615156101b457600080fd5b60008054604051600160a060020a03808516939216917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e091a36000805473ffffffffffffffffffffffffffffffffffffffff1916600160a060020a03929092169190911790555600a165627a7a723058206a6ad552b7b356387ae1152ba958dae8c25fb447073478e70967911d38aaef410029`
 
 // DeployOwnable deploys a new Ethereum contract, binding an instance of Ownable to it.
 func DeployOwnable(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *Ownable, error) {
