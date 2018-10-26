@@ -2,14 +2,16 @@
 
 
 [[projects]]
+  branch = "master"
   name = "github.com/aristanetworks/goarista"
   packages = ["monotime"]
-  revision = "ea17b1a17847fb6e4c0a91de0b674704693469b0"
+  revision = "33151c4543a79b013e8e6799ef45b2ba88c3cd1c"
 
 [[projects]]
+  branch = "master"
   name = "github.com/btcsuite/btcd"
   packages = ["btcec"]
-  revision = "2e60448ffcc6bf78332d1fe590260095f554dd78"
+  revision = "67e573d211ace594f1366b4ce9d39726c4b19bd0"
 
 [[projects]]
   name = "github.com/davecgh/go-spew"
@@ -20,7 +22,8 @@
 [[projects]]
   name = "github.com/deckarep/golang-set"
   packages = ["."]
-  revision = "504e848d77ea4752b3057b8fb46da0e7f746ccf3"
+  revision = "cbaa98ba5575e67703b32b4b19f73c91f3c4159e"
+  version = "v1.7.1"
 
 [[projects]]
   name = "github.com/dedis/fixbuf"
@@ -43,7 +46,7 @@
     "util/test",
     "xof/blake2xb"
   ]
-  revision = "81b099844f7e2a8f31f7c69bd01c7a74f6bc0d67"
+  revision = "fca472924ef768c5d551dd263874e38c68c15c5d"
 
 [[projects]]
   name = "github.com/dedis/protobuf"
@@ -52,9 +55,10 @@
   version = "v1.0.3"
 
 [[projects]]
+  branch = "master"
   name = "github.com/edsrzf/mmap-go"
   packages = ["."]
-  revision = "935e0e8a636ca4ba70b713f3e38a19e1b77739e8"
+  revision = "0bce6a6887123b67a60366d2c9fe2dfb74289d2e"
 
 [[projects]]
   name = "github.com/ethereum/go-ethereum"
@@ -98,26 +102,20 @@
     "rpc",
     "trie"
   ]
-  revision = "477eb0933b9529f7deeccc233cc815fe34a8ea56"
-  version = "v1.8.16"
+  revision = "8bbe72075e4e16442c4e28d999edee12e294329e"
+  version = "v1.8.17"
 
 [[projects]]
   name = "github.com/go-stack/stack"
   packages = ["."]
-  revision = "54be5f394ed2c3e19dac9134a40a95ba5a017f7b"
-  version = "v1.5.4"
+  revision = "2fee6af1a9795aafbe0253a0cfbdf668e1fb8a9a"
+  version = "v1.8.0"
 
 [[projects]]
   name = "github.com/gogo/protobuf"
   packages = ["proto"]
   revision = "636bf0302bc95575d69441b25a2603156ffdddf1"
   version = "v1.1.1"
-
-[[projects]]
-  branch = "master"
-  name = "github.com/golang/glog"
-  packages = ["."]
-  revision = "23def4e6c14b4da8ac2ed8007337bc5eb5007998"
 
 [[projects]]
   name = "github.com/golang/protobuf"
@@ -138,15 +136,21 @@
   revision = "2e65f85255dbc3072edf28d6b5b8efc472979f5a"
 
 [[projects]]
+  name = "github.com/google/uuid"
+  packages = ["."]
+  revision = "d460ce9f8df2e77fb1ba55ca87fafed96c607494"
+  version = "v1.0.0"
+
+[[projects]]
   name = "github.com/hashicorp/golang-lru"
   packages = [
     ".",
     "simplelru"
   ]
-  revision = "0a025b7e63adc15a622f29b0b2c4c3848243bbf6"
+  revision = "20f1fb78b0740ba8c3cb143a61e86ba5c8669768"
+  version = "v0.5.0"
 
 [[projects]]
-  branch = "master"
   name = "github.com/huin/goupnp"
   packages = [
     ".",
@@ -157,7 +161,8 @@
     "soap",
     "ssdp"
   ]
-  revision = "1395d1447324cbea88d249fbfcfd70ea878fdfca"
+  revision = "656e61dfadd241c7cbdd22a023fa81ecb6860ea8"
+  version = "v1.0.0"
 
 [[projects]]
   name = "github.com/jackpal/gateway"
@@ -180,7 +185,8 @@
 [[projects]]
   name = "github.com/pborman/uuid"
   packages = ["."]
-  revision = "1b00554d822231195d1babd97ff4a781231955c9"
+  revision = "adf5a7427709b9deb95d29d3fa8a2bf9cfd388f1"
+  version = "v1.2"
 
 [[projects]]
   name = "github.com/pmezard/go-difflib"
@@ -191,20 +197,14 @@
 [[projects]]
   name = "github.com/rjeczalik/notify"
   packages = ["."]
-  revision = "0f065fa99b48b842c3fd3e2c8b194c6f2b69f6b8"
-  version = "v0.9.1"
+  revision = "69d839f37b13a8cb7a78366f7633a4071cb43be7"
+  version = "v0.9.2"
 
 [[projects]]
   name = "github.com/rs/cors"
   packages = ["."]
-  revision = "a62a804a8a009876ca59105f7899938a1349f4b3"
-  version = "v1.0"
-
-[[projects]]
-  name = "github.com/rs/xhandler"
-  packages = ["."]
-  revision = "d9d9599b6aaf6a058cb7b1f48291ded2cbd13390"
-  version = "v1.0"
+  revision = "9a47f48565a795472d43519dd49aac781f3034fb"
+  version = "v1.6.0"
 
 [[projects]]
   name = "github.com/stretchr/testify"
@@ -217,6 +217,7 @@
   version = "v1.2.2"
 
 [[projects]]
+  branch = "master"
   name = "github.com/syndtr/goleveldb"
   packages = [
     "leveldb",
@@ -232,7 +233,7 @@
     "leveldb/table",
     "leveldb/util"
   ]
-  revision = "c4c61651e9e37fa117f53c5a906d3b63090d8445"
+  revision = "6b91fda63f2e36186f1c9d0e48578defb69c5d43"
 
 [[projects]]
   branch = "master"
@@ -244,19 +245,18 @@
     "ripemd160",
     "scrypt"
   ]
-  revision = "e3636079e1a4c1f337f212cc5cd2aca108f6c900"
+  revision = "e84da0312774c21d64ee2317962ef669b27ffb41"
 
 [[projects]]
   branch = "master"
   name = "golang.org/x/net"
   packages = [
-    "context",
     "html",
     "html/atom",
     "html/charset",
     "websocket"
   ]
-  revision = "f5e5bdd778241bfefa8627f7124c39cd6ad8d74f"
+  revision = "9b4f9f5ad5197c79fd623a3638e70d8b26cef344"
 
 [[projects]]
   branch = "master"
@@ -265,7 +265,7 @@
     "cpu",
     "unix"
   ]
-  revision = "e4b3c5e9061176387e7cea65e4dc5853801f3fb7"
+  revision = "2772b66316d2c587efeb188dcd5ebc6987656e84"
 
 [[projects]]
   name = "golang.org/x/text"
@@ -292,14 +292,6 @@
   version = "v0.3.0"
 
 [[projects]]
-  name = "golang.org/x/tools"
-  packages = [
-    "go/ast/astutil",
-    "imports"
-  ]
-  revision = "be0fcc31ae2332374e800dfff29b721c585b35df"
-
-[[projects]]
   branch = "v2"
   name = "gopkg.in/natefinch/npipe.v2"
   packages = ["."]
@@ -308,6 +300,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "1ab9b20c7dddd32c565e1e00faf803dd9e54e177341403fb19eb27624c5b5a3f"
+  inputs-digest = "da43b03ca5abc73ab64b0ecee4cb79d4f06ccdc239a7fa115436b043e56c01b3"
   solver-name = "gps-cdcl"
   solver-version = 1
