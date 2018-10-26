@@ -2,6 +2,7 @@ package dosnode
 
 import (
 	"fmt"
+	"github.com/DOSNetwork/core/onchain"
 	"math/big"
 	"testing"
 
@@ -37,7 +38,7 @@ func TestPipeCheckURL(test *testing.T) {
 	Timeout := big.NewInt(1)
 	Randomness := big.NewInt(1)
 	DispatchedGroup := [4]*big.Int{QueryId, QueryId, QueryId, QueryId}
-	chUrl <- &eth.DOSProxyLogUrl{
+	chUrl <- &onchain.DOSProxyLogUrl{
 		QueryId:         QueryId,
 		Url:             url,
 		Timeout:         Timeout,

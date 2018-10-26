@@ -12,18 +12,14 @@ const (
 	ETH = iota
 )
 
-type ChainConfig struct {
-	ChainType               string
-	RemoteNodeType          string
-	RemoteNodeAddress       string
-	DOSProxyAddress         string
-	DOSAddressBridgeAddress string
-	DOSOnChainSDKAddress    string
-	AskMeAnythingAddress    string
+type NetConfig struct {
+	RemoteNodeType       string
+	RemoteNodeAddress    string
+	ProxyContractAddress string
 }
 
 type ChainInterface interface {
-	Init(autoReplenish bool, netConfig *ChainConfig) (err error)
+	Init(autoReplenish bool, netConfig *NetConfig) (err error)
 	SubscribeEvent(ch chan interface{}, subscribeType int) (err error)
 	UploadID() (err error)
 	UploadPubKey(pubKey kyber.Point) (err error)
@@ -36,6 +32,7 @@ type ChainInterface interface {
 	ResetNodeIDs() (err error)
 	RandomNumberTimeOut() (err error)
 }
+
 
 func AdaptTo(chainName int, autoReplenish bool, netConfig *ChainConfig) (conn ChainInterface, err error) {
 	switch chainName {

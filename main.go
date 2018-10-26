@@ -1,10 +1,13 @@
 package main
 
 import (
+	"encoding/json"
+	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"math/big"
-	_ "net/http/pprof"
+	"os"
 
 	"github.com/DOSNetwork/core/configuration"
 	dos "github.com/DOSNetwork/core/dosnode"
@@ -15,6 +18,48 @@ import (
 	"github.com/DOSNetwork/core/share/vss/pedersen"
 	"github.com/DOSNetwork/core/suites"
 )
+
+type NetCofigs struct {
+	NetCofigs []onchain.NetConfig
+}
+
+func readConfig() (node *onchain.NetConfig) {
+
+	var configs NetCofigs
+	// Open our jsonFile
+	jsonFile, err := os.Open("./config.json")
+	// if we os.Open returns an error then handle it
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("Successfully Opened NetCofigs json")
+	// defer the closing of our jsonFile so that we can parse it later on
+	defer jsonFile.Close()
+
+	// read our opened xmlFile as a byte array.
+	byteValue, err := ioutil.ReadAll(jsonFile)
+	if err != nil {
+		log.Fatal(err)
+	}
+	err = json.Unmarshal(byteValue, &configs)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	targetNode := os.Getenv("TargetNode")
+	if targetNode == "" {
+		fmt.Println("No TargetNode Environment variable.")
+		targetNode = "rinkebyPrivateNode"
+	}
+
+	for _, config := range configs.NetCofigs {
+		if targetNode == config.RemoteNodeType {
+			fmt.Println("Use : ", config)
+			return &config
+		}
+	}
+	return nil
+}
 
 // main
 func main() {
@@ -54,31 +99,29 @@ func main() {
 	}
 	//4)Build a p2pDKG
 	suite := suites.MustFind("bn256")
-	peerEventForDKG := make(chan p2p.P2PMessage, 100)
+	peerEventForDKG := make(chan p2p.P2PMessage, 1)
 	defer close(peerEventForDKG)
 	p2pDkg, _ := dkg.CreateP2PDkg(p, suite, peerEventForDKG, nbParticipants)
 	go p2pDkg.EventLoop()
-	dkgEvent := make(chan string, 100)
+	dkgEvent := make(chan string, 1)
 	p2pDkg.SubscribeEvent(dkgEvent)
 	defer close(dkgEvent)
 
 	//5)Subscribe Event from Eth
-	eventGrouping := make(chan interface{}, 100)
+	eventGrouping := make(chan interface{}, 1)
 	defer close(eventGrouping)
-	chUrl := make(chan interface{}, 100)
+	chUrl := make(chan interface{}, 20)
 	defer close(chUrl)
-	chRandom := make(chan interface{}, 100)
+	chRandom := make(chan interface{}, 20)
 	defer close(chRandom)
 	cSignatureFromPeer := make(chan vss.Signature, 100)
 	defer close(cSignatureFromPeer)
-	eventValidation := make(chan interface{}, 100)
+	eventValidation := make(chan interface{}, 20)
 	defer close(eventValidation)
 	chainConn.SubscribeEvent(chUrl, onchain.SubscribeDOSProxyLogUrl)
 	err = chainConn.SubscribeEvent(eventGrouping, onchain.SubscribeDOSProxyLogGrouping)
 	chainConn.SubscribeEvent(chRandom, onchain.SubscribeDOSProxyLogUpdateRandom)
 	chainConn.SubscribeEvent(eventValidation, onchain.SubscribeDOSProxyLogValidationResult)
-	toOnChainQueue := make(chan string, 100)
-	defer close(toOnChainQueue)
 
 	//6)Set up a dosnode pipeline
 	d, _ := dos.CreateDosNode(suite, nbParticipants, p, chainConn, p2pDkg)

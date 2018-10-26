@@ -9,11 +9,13 @@ import (
 	"math"
 	"math/big"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/DOSNetwork/core/group/bn256"
 	"github.com/DOSNetwork/core/onchain/eth/contracts"
+	"github.com/DOSNetwork/core/onchain/eth/contracts/userContract"
 	"github.com/dedis/kyber"
 
 	"github.com/ethereum/go-ethereum"
@@ -50,6 +52,8 @@ const (
 	SubscribeDOSProxyLogGrouping
 	SubscribeDOSProxyLogPublicKeyAccepted
 )
+
+const balanceCheckInterval = 3
 
 var ethRemoteNode = new(ChainConfig)
 var workingDir string
@@ -389,14 +393,17 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 }
 
 func (e *EthAdaptor) UploadID() (err error) {
+	e.lock.Lock()
 	fmt.Println("Starting submitting nodeId...")
 	auth, err := e.getAuth()
 	if err != nil {
+		e.lock.Unlock()
 		return
 	}
 
 	tx, err := e.proxy.UploadNodeId(auth, e.id)
 	if err != nil {
+		e.lock.Unlock()
 		return
 	}
 
@@ -404,6 +411,7 @@ func (e *EthAdaptor) UploadID() (err error) {
 	fmt.Println("NodeId submitted, waiting for confirmation...")
 
 	err = e.checkTransaction(tx)
+	e.lock.Unlock()
 
 	return
 }
@@ -423,9 +431,11 @@ func (e *EthAdaptor) GetBlockHashByNumber(blknum *big.Int) (hash common.Hash, er
 }
 
 func (e *EthAdaptor) SetRandomNum(sig []byte) (err error) {
+	e.lock.Lock()
 	fmt.Println("Starting submitting random number...")
 	auth, err := e.getAuth()
 	if err != nil {
+		e.lock.Unlock()
 		return
 	}
 
@@ -433,6 +443,7 @@ func (e *EthAdaptor) SetRandomNum(sig []byte) (err error) {
 
 	tx, err := e.proxy.UpdateRandomness(auth, [2]*big.Int{x, y})
 	if err != nil {
+		e.lock.Unlock()
 		return
 	}
 
@@ -440,24 +451,29 @@ func (e *EthAdaptor) SetRandomNum(sig []byte) (err error) {
 	fmt.Println("new random number submitted, waiting for confirmation...")
 
 	err = e.checkTransaction(tx)
+	e.lock.Unlock()
 
 	return
 }
 
 func (e *EthAdaptor) UploadPubKey(pubKey kyber.Point) (err error) {
+	e.lock.Lock()
 	fmt.Println("Starting submitting group public key...")
 	auth, err := e.getAuth()
 	if err != nil {
+		e.lock.Unlock()
 		return
 	}
 
 	x0, x1, y0, y1, err := DecodePubKey(pubKey)
 	if err != nil {
+		e.lock.Unlock()
 		return
 	}
 
 	tx, err := e.proxy.SetPublicKey(auth, x0, x1, y0, y1)
 	if err != nil {
+		e.lock.Unlock()
 		return
 	}
 
@@ -469,39 +485,48 @@ func (e *EthAdaptor) UploadPubKey(pubKey kyber.Point) (err error) {
 	fmt.Println("Group public key submitted, waiting for confirmation...")
 
 	err = e.checkTransaction(tx)
+	e.lock.Unlock()
 
 	return
 }
 
 func (e *EthAdaptor) ResetNodeIDs() (err error) {
+	e.lock.Lock()
 	fmt.Println("Starting ResetNodeIDs...")
 	auth, err := e.getAuth()
 	if err != nil {
+		e.lock.Unlock()
 		return
 	}
 
 	tx, err := e.proxy.ResetContract(auth)
 	if err != nil {
+		e.lock.Unlock()
 		return
 	}
 
 	err = e.checkTransaction(tx)
+	e.lock.Unlock()
 	return
 }
 
 func (e *EthAdaptor) RandomNumberTimeOut() (err error) {
+	e.lock.Lock()
 	fmt.Println("Starting RandomNumberTimeOut...")
 	auth, err := e.getAuth()
 	if err != nil {
+		e.lock.Unlock()
 		return
 	}
 
 	tx, err := e.proxy.HandleTimeout(auth)
 	if err != nil {
+		e.lock.Unlock()
 		return
 	}
 
 	err = e.checkTransaction(tx)
+	e.lock.Unlock()
 	return
 }
 
@@ -523,8 +548,10 @@ func DecodePubKey(pubKey kyber.Point) (*big.Int, *big.Int, *big.Int, *big.Int, e
 }
 
 func (e *EthAdaptor) DataReturn(queryId *big.Int, data, sig []byte) (err error) {
+	e.lock.Lock()
 	auth, err := e.getAuth()
 	if err != nil {
+		e.lock.Unlock()
 		return
 	}
 
@@ -532,6 +559,7 @@ func (e *EthAdaptor) DataReturn(queryId *big.Int, data, sig []byte) (err error) 
 
 	tx, err := e.proxy.TriggerCallback(auth, queryId, data, [2]*big.Int{x, y})
 	if err != nil {
+		e.lock.Unlock()
 		return
 	}
 
@@ -539,6 +567,7 @@ func (e *EthAdaptor) DataReturn(queryId *big.Int, data, sig []byte) (err error) 
 	fmt.Println("Query_ID request fulfilled ", queryId, " waiting for confirmation...")
 
 	err = e.checkTransaction(tx)
+	e.lock.Unlock()
 
 	return
 }
@@ -559,11 +588,6 @@ func DecodeSig(sig []byte) (x, y *big.Int) {
 }
 
 func (e *EthAdaptor) getAuth() (auth *bind.TransactOpts, err error) {
-	gasPrice, err := e.client.SuggestGasPrice(context.Background())
-	if err != nil {
-		return
-	}
-
 	auth = bind.NewKeyedTransactor(e.key.PrivateKey)
 	if err != nil {
 		return
@@ -574,20 +598,19 @@ func (e *EthAdaptor) getAuth() (auth *bind.TransactOpts, err error) {
 	if err != nil {
 		return
 	}
+
 	if automatedNonce > e.ethNonce {
 		e.ethNonce = automatedNonce
 	}
 	auth.Nonce = big.NewInt(int64(e.ethNonce))
 
-	//for test only
-	onChainNonce, err := e.client.PendingNonceAt(context.Background(), e.key.Address)
+	gasPrice, err := e.client.SuggestGasPrice(context.Background())
 	if err != nil {
 		return
 	}
-	fmt.Print("localNonce:", auth.Nonce, "onChain nonce:", onChainNonce)
 
-	auth.GasLimit = uint64(3000000) // in units
-	auth.GasPrice = gasPrice.Mul(gasPrice, big.NewInt(1))
+	auth.GasPrice = gasPrice.Mul(gasPrice, big.NewInt(3))
+	auth.GasLimit = uint64(1000000)
 
 	return
 }
@@ -649,6 +672,16 @@ func (e *EthAdaptor) setAccount(autoReplenish bool) (err error) {
 		}
 
 		err = e.balanceMaintain(usrKey, rootKey)
+
+		go func() {
+			ticker := time.NewTicker(balanceCheckInterval * time.Hour)
+			for range ticker.C {
+				err = e.balanceMaintain(usrKey, rootKey)
+				if err != nil {
+					fmt.Print("Fail to replenish.")
+				}
+			}
+		}()
 	}
 
 	return
@@ -694,7 +727,8 @@ func (e *EthAdaptor) transferEth(from, to *keystore.Key) (err error) {
 	}
 
 	value := big.NewInt(800000000000000000) //0.8 Eth
-	gasLimit := uint64(6000000)
+	gasLimit := uint64(1000000)
+  
 	tx := types.NewTransaction(nonce, to.Address, value, gasLimit, gasPrice.Mul(gasPrice, big.NewInt(3)), nil)
 
 	chainId, err := e.client.NetworkID(context.Background())
@@ -719,8 +753,14 @@ func (e *EthAdaptor) transferEth(from, to *keystore.Key) (err error) {
 }
 
 func (e *EthAdaptor) checkTransaction(tx *types.Transaction) (err error) {
+	start := time.Now()
 	receipt, err := e.client.TransactionReceipt(context.Background(), tx.Hash())
 	for err == ethereum.NotFound {
+		if time.Since(start).Seconds() > 30 {
+			fmt.Println("no receipt yet, set to successful")
+			return
+		}
+
 		time.Sleep(1 * time.Second)
 		receipt, err = e.client.TransactionReceipt(context.Background(), tx.Hash())
 	}

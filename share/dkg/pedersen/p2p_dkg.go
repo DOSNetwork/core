@@ -38,14 +38,14 @@ func CreateP2PDkg(p p2p.P2PInterface, suite suites.Suite, peerEvent chan p2p.P2P
 	d := &P2PDkg{
 		suite:       suite,
 		publicKeys:  Pubkeys{},
-		chResponse:  make(chan Response, 100),
+		chResponse:  make(chan Response, 1),
 		pubkeyIdMap: make(map[string]string),
 		partSec:     sec,
 		partPub:     suite.Point().Mul(sec, nil),
 
 		nbParticipants: nbParticipants,
 		network:        &p,
-		chFsmEvent:     make(chan string, 100),
+		chFsmEvent:     make(chan string, 1),
 		chPeerEvent:    peerEvent,
 	}
 	d.FSM = fsm.NewFSM(
@@ -197,7 +197,7 @@ func (d *P2PDkg) enterInit(e *fsm.Event) {
 	//Data Buffer
 	d.publicKeys = d.publicKeys[:0]
 	d.deals = d.deals[:0]
-	d.chResponse = make(chan Response, 100)
+	d.chResponse = make(chan Response, 1)
 
 	d.pubkeyIdMap = make(map[string]string)
 	d.partSec = d.suite.Scalar().Pick(d.suite.RandomStream())

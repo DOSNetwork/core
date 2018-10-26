@@ -215,19 +215,19 @@ contract DOSProxy {
     // TODO: restrict query from subscribed/paid calling contract address.
     function query(
         address from,
-        uint blkNum,
+        uint queryId,
         uint timeout,
         string queryType,
         string queryPath
     )
         external
-        returns (uint)
+        returns (bool)
     {
         if (getCodeSize(from) > 0) {
             // Only supporting api/url for alpha release.
             if (strEqual(queryType, 'API')) {
-                uint queryId = uint(keccak256(abi.encodePacked(
-                    from, blkNum, timeout, queryType, queryPath)));
+//                uint queryId = uint(keccak256(abi.encodePacked(
+//                    from, blkNum, timeout, queryType, queryPath)));
                 uint idx = lastRandomness % groupPubKeys.length;
                 pendingQueries[queryId] =
                     PendingQuery(queryId, groupPubKeys[idx], from);
@@ -238,15 +238,18 @@ contract DOSProxy {
                     lastRandomness,
                     getGroupPubKey(idx)
                 );
-                return queryId;
+//                return queryId;
+                return true;
             } else {
                 emit LogNonSupportedType(queryType);
-                return 0x0;
+//                return 0x0;
+                return false;
             }
         } else {
             // Skip if @from is not contract address.
             emit LogNonContractCall(from);
-            return 0x0;
+            return false;
+//            return 0x0;
         }
     }
 
