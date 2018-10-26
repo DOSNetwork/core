@@ -7,11 +7,10 @@ import (
 	"io/ioutil"
 	"log"
 	"math/big"
-	_ "net/http/pprof"
 	"os"
 
-	"github.com/DOSNetwork/core/blockchain"
 	dos "github.com/DOSNetwork/core/dosnode"
+	"github.com/DOSNetwork/core/onchain"
 	"github.com/DOSNetwork/core/p2p"
 	"github.com/DOSNetwork/core/p2p/dht"
 	"github.com/DOSNetwork/core/share/dkg/pedersen"
@@ -20,10 +19,10 @@ import (
 )
 
 type NetCofigs struct {
-	NetCofigs []blockchain.NetConfig
+	NetCofigs []onchain.NetConfig
 }
 
-func readConfig() (node *blockchain.NetConfig) {
+func readConfig() (node *onchain.NetConfig) {
 
 	var configs NetCofigs
 	// Open our jsonFile
@@ -75,7 +74,7 @@ func main() {
 
 	config := readConfig()
 	//1)Connect to Eth and Set node ID
-	chainConn, err := blockchain.AdaptTo(blockchain.ETH, true, config)
+	chainConn, err := onchain.AdaptTo(onchain.ETH, true, config)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -104,31 +103,29 @@ func main() {
 	}
 	//4)Build a p2pDKG
 	suite := suites.MustFind("bn256")
-	peerEventForDKG := make(chan p2p.P2PMessage, 100)
+	peerEventForDKG := make(chan p2p.P2PMessage, 1)
 	defer close(peerEventForDKG)
 	p2pDkg, _ := dkg.CreateP2PDkg(p, suite, peerEventForDKG, nbParticipants)
 	go p2pDkg.EventLoop()
-	dkgEvent := make(chan string, 100)
+	dkgEvent := make(chan string, 1)
 	p2pDkg.SubscribeEvent(dkgEvent)
 	defer close(dkgEvent)
 
 	//5)Subscribe Event from Eth
-	eventGrouping := make(chan interface{}, 100)
+	eventGrouping := make(chan interface{}, 1)
 	defer close(eventGrouping)
-	chUrl := make(chan interface{}, 100)
+	chUrl := make(chan interface{}, 20)
 	defer close(chUrl)
-	chRandom := make(chan interface{}, 100)
+	chRandom := make(chan interface{}, 20)
 	defer close(chRandom)
 	cSignatureFromPeer := make(chan vss.Signature, 100)
 	defer close(cSignatureFromPeer)
-	eventValidation := make(chan interface{}, 100)
+	eventValidation := make(chan interface{}, 20)
 	defer close(eventValidation)
-	chainConn.SubscribeEvent(chUrl, blockchain.SubscribeDOSProxyLogUrl)
-	err = chainConn.SubscribeEvent(eventGrouping, blockchain.SubscribeDOSProxyLogGrouping)
-	chainConn.SubscribeEvent(chRandom, blockchain.SubscribeDOSProxyLogUpdateRandom)
-	chainConn.SubscribeEvent(eventValidation, blockchain.SubscribeDOSProxyLogValidationResult)
-	toOnChainQueue := make(chan string, 100)
-	defer close(toOnChainQueue)
+	chainConn.SubscribeEvent(chUrl, onchain.SubscribeDOSProxyLogUrl)
+	err = chainConn.SubscribeEvent(eventGrouping, onchain.SubscribeDOSProxyLogGrouping)
+	chainConn.SubscribeEvent(chRandom, onchain.SubscribeDOSProxyLogUpdateRandom)
+	chainConn.SubscribeEvent(eventValidation, onchain.SubscribeDOSProxyLogValidationResult)
 
 	//6)Set up a dosnode pipeline
 	d, _ := dos.CreateDosNode(suite, nbParticipants, p, chainConn, p2pDkg)

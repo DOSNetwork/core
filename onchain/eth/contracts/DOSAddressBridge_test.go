@@ -34,7 +34,7 @@ func (s *DOSAddressBridgeTestSuite) SetupTest() {
 		s.address: {Balance: big.NewInt(10000000000)},
 	}
 
-	s.sim = backends.NewSimulatedBackend(s.gAlloc)
+	s.sim = backends.NewSimulatedBackend(s.gAlloc, uint64(8000000))
 
 	_, _, contract, e := DeployDOSAddressBridge(s.auth, s.sim)
 	s.bridge = contract
@@ -55,6 +55,6 @@ func (s *DOSAddressBridgeTestSuite) TestPorxyAddress() {
 	}, toAddr)
 	s.Nil(err)
 	s.sim.Commit()
-	got, _ := s.bridge.ProxyAddress(nil)
+	got, _ := s.bridge.GetProxyAddress(nil)
 	s.Exactly(got.String(), toAddr.String())
 }
