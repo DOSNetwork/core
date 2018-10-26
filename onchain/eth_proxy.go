@@ -606,15 +606,12 @@ func (e *EthAdaptor) getAuth() (auth *bind.TransactOpts, err error) {
 		return
 	}
 
-	// Geth automatically calculates gasPrice and gasLimit if not provided, see:
-	// https://github.com/ethereum/go-ethereum/blob/a5aaab2f224f0871a838d0a97160c2c002eea4ab/accounts/abi/bind/base.go#L204-L211
-	auth.GasPrice = gasPrice.Mul(gasPrice, big.NewInt(2))
-	auth.GasLimit = 0
+	auth.GasPrice = gasPrice.Mul(gasPrice, big.NewInt(3))
+	auth.GasLimit = uint64(1000000)
 
 	return
 }
 
-// TODO: Alpha test/debug usage only
 func (e *EthAdaptor) setAccount(autoReplenish bool) (err error) {
 	credentialPath := workingDir + "/credential"
 	fmt.Println("credentialPath: ", credentialPath)
@@ -729,7 +726,7 @@ func (e *EthAdaptor) transferEth(from, to *keystore.Key) (err error) {
 	value := big.NewInt(800000000000000000) //0.8 Eth
 	gasLimit := uint64(1000000)
 
-	tx := types.NewTransaction(nonce, to.Address, value, gasLimit, gasPrice, nil)
+	tx := types.NewTransaction(nonce, to.Address, value, gasLimit, gasPrice.Mul(gasPrice, big.NewInt(3)), nil)
 
 	chainId, err := e.client.NetworkID(context.Background())
 	if err != nil {
@@ -751,8 +748,6 @@ func (e *EthAdaptor) transferEth(from, to *keystore.Key) (err error) {
 
 	return
 }
-
-// END TODO
 
 func (e *EthAdaptor) checkTransaction(tx *types.Transaction) (err error) {
 	start := time.Now()
