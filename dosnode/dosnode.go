@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"math/big"
 	"net/http"
-	_ "net/http/pprof"
 	"sync"
 	"time"
 
@@ -108,7 +107,8 @@ func (d *DosNode) isMember(dispatchedGroup [4]*big.Int) bool {
 		temp = append(dispatchedGroup[1].Bytes(), temp...)
 		temp = append(dispatchedGroup[0].Bytes(), temp...)
 		temp = append([]byte{0x01}, temp...)
-		//fmt.Println("isMember from blockchain : ", temp)
+
+		//fmt.Println("isMember from onchain : ", temp)
 		groupPub, err := d.p2pDkg.GetGroupPublicPoly().Commit().MarshalBinary()
 		//fmt.Println("isMember : ", groupPub)
 		if err != nil {

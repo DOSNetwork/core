@@ -55,7 +55,7 @@ const (
 
 const balanceCheckInterval = 3
 
-var ethRemoteNode = new(NetConfig)
+var ethRemoteNode = new(ChainConfig)
 var workingDir string
 
 type EthAdaptor struct {
@@ -66,10 +66,10 @@ type EthAdaptor struct {
 	lock      *sync.Mutex
 	logFilter *sync.Map
 	ethNonce  uint64
-	config    *NetConfig
+	config    *ChainConfig
 }
 
-func (e *EthAdaptor) Init(autoReplenish bool, config *NetConfig) (err error) {
+func (e *EthAdaptor) Init(autoReplenish bool, config *ChainConfig) (err error) {
 	workingDir, err = os.Getwd()
 	if err != nil {
 		return
@@ -77,7 +77,7 @@ func (e *EthAdaptor) Init(autoReplenish bool, config *NetConfig) (err error) {
 
 	e.config = config
 
-	fmt.Println("start initial onChainConn...")
+	fmt.Println("start initial onChainConn...", config.DOSProxyAddress)
 
 	e.logFilter = new(sync.Map)
 	go e.logMapTimeout()
@@ -125,7 +125,7 @@ func (e *EthAdaptor) dialToEth() (err error) {
 		fmt.Println("Cannot connect to the network, retrying...")
 		e.client, err = ethclient.Dial(e.config.RemoteNodeAddress)
 	}
-	addr := common.HexToAddress(e.config.ProxyContractAddress)
+	addr := common.HexToAddress(e.config.DOSProxyAddress)
 	e.proxy, err = dosproxy.NewDOSProxy(addr, e.client)
 	for err != nil {
 		fmt.Println(err)
@@ -728,7 +728,7 @@ func (e *EthAdaptor) transferEth(from, to *keystore.Key) (err error) {
 
 	value := big.NewInt(800000000000000000) //0.8 Eth
 	gasLimit := uint64(1000000)
-
+  
 	tx := types.NewTransaction(nonce, to.Address, value, gasLimit, gasPrice.Mul(gasPrice, big.NewInt(3)), nil)
 
 	chainId, err := e.client.NetworkID(context.Background())
@@ -760,6 +760,7 @@ func (e *EthAdaptor) checkTransaction(tx *types.Transaction) (err error) {
 			fmt.Println("no receipt yet, set to successful")
 			return
 		}
+
 		time.Sleep(1 * time.Second)
 		receipt, err = e.client.TransactionReceipt(context.Background(), tx.Hash())
 	}
@@ -772,111 +773,6 @@ func (e *EthAdaptor) checkTransaction(tx *types.Transaction) (err error) {
 	} else {
 		err = errors.New("transaction failed")
 	}
-
-	return
-}
-
-func (e *EthAdaptor) DeployContract(contractName int) (address common.Address, err error) {
-	var tx *types.Transaction
-
-	auth, err := e.getAuth()
-	if err != nil {
-		return
-	}
-
-	switch contractName {
-	case AskMeAnyThing:
-		fmt.Println("Starting deploy AskMeAnyThing.sol...")
-		address, tx, _, err = userContract.DeployAskMeAnything(auth, e.client)
-	case DOSAddressBridge:
-		fmt.Println("Starting deploy DOSAddressBridge.sol...")
-		address, tx, _, err = dosproxy.DeployDOSAddressBridge(auth, e.client)
-	case DOSProxy:
-		fmt.Println("Starting deploy DOSProxy.sol...")
-		address, tx, _, err = dosproxy.DeployDOSProxy(auth, e.client)
-	}
-	if err != nil {
-		return
-	}
-
-	fmt.Println("contract Address: ", address.Hex())
-	fmt.Println("tx sent: ", tx.Hash().Hex())
-	fmt.Println("contract deployed, waiting for confirmation...")
-
-	err = e.checkTransaction(tx)
-
-	return
-}
-
-func (e *EthAdaptor) DeployAll() (proxyAddress, bridgeAddress, askAddress common.Address, err error) {
-	proxyAddress, err = e.DeployContract(DOSProxy)
-	if err != nil {
-		return
-	}
-
-	bridgeAddress, err = e.DeployContract(DOSAddressBridge)
-	if err != nil {
-		return
-	}
-
-	if err = updataSDK(bridgeAddress.Hex()); err != nil {
-		return
-	}
-
-	askAddress, err = e.DeployContract(AskMeAnyThing)
-	if err != nil {
-		return
-	}
-
-	err = e.updateBridge(bridgeAddress, proxyAddress)
-	return
-}
-
-func updataSDK(bridgeAddress string) (err error) {
-	sdkPath := workingDir + "/blockchain/eth/contracts/DOSOnChainSDK.sol"
-	fmt.Println("SDKPath: ", sdkPath)
-
-	sdkContent, err := ioutil.ReadFile(sdkPath)
-	if err != nil {
-		return
-	}
-
-	lines := strings.Split(string(sdkContent), "\n")
-	for _, line := range lines {
-		if strings.Contains(line, "0x") {
-			parts := strings.Split(line, "(")
-			parts[len(parts)-1] = "(" + bridgeAddress + ");"
-			line = strings.Join(parts, "")
-		}
-	}
-
-	newSdk := strings.Join(lines, "\n")
-	err = ioutil.WriteFile(sdkPath, []byte(newSdk), 0644)
-	return
-}
-
-func (e *EthAdaptor) updateBridge(bridgeAddress, proxyAddress common.Address) (err error) {
-	fmt.Println("start to update proxy address to bridge...")
-
-	auth, err := e.getAuth()
-	if err != nil {
-		return
-	}
-
-	bridge, err := dosproxy.NewDOSAddressBridge(bridgeAddress, e.client)
-	if err != nil {
-		return
-	}
-
-	tx, err := bridge.SetProxyAddress(auth, proxyAddress)
-	if err != nil {
-		return
-	}
-
-	fmt.Println("tx sent: ", tx.Hash().Hex())
-	fmt.Println("proxy address updated in bridge")
-
-	err = e.checkTransaction(tx)
 
 	return
 }

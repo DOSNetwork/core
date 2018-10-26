@@ -27,15 +27,14 @@ type ChainInterface interface {
 	GetBlockHashByNumber(blknum *big.Int) (hash common.Hash, err error)
 	SetRandomNum(sig []byte) (err error)
 	DataReturn(queryId *big.Int, data, sig []byte) (err error)
-	DeployContract(contractName int) (address common.Address, err error)
-	DeployAll() (proxyAddress, bridgeAddress, askAddress common.Address, err error)
 	SubscribeToAll(msgChan chan interface{}) (err error)
 	//For test
 	ResetNodeIDs() (err error)
 	RandomNumberTimeOut() (err error)
 }
 
-func AdaptTo(chainName int, autoReplenish bool, netConfig *NetConfig) (conn ChainInterface, err error) {
+
+func AdaptTo(chainName int, autoReplenish bool, netConfig *ChainConfig) (conn ChainInterface, err error) {
 	switch chainName {
 	case ETH:
 		conn = &EthAdaptor{}

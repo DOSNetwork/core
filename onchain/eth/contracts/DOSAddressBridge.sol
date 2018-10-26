@@ -1,6 +1,6 @@
 pragma solidity ^0.4.24;
 
-import "github.com/OpenZeppelin/zeppelin-solidity/contracts/ownership/Ownable.sol";
+import "./Ownable.sol";
 
 contract DOSAddressBridge is Ownable {
   // Deployed DOSProxy contract address.

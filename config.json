@@ -1,21 +1,32 @@
 {
-  "netCofigs": [
-	 {
-	     "RemoteNodeType" : "rinkebyNode",
-	     "RemoteNodeAddress" : "wss://rinkeby.infura.io/ws",
-	     "ProxyContractAddress" : "0x9b8e711560dB0c60Fe6104C4A46Fa528eFc22b03"
-	  },
-	  {
-	     "RemoteNodeType": "rinkebyPrivateNode",
-	     "RemoteNodeAddress": "ws://13.56.31.73:8546",
-	     "ProxyContractAddress": "0x9b8e711560dB0c60Fe6104C4A46Fa528eFc22b03"
-	  },
-	  {
-	     "RemoteNodeType": "privateNode",
-	     "RemoteNodeAddress": "ws://13.52.16.14:8546",
-	     "ProxyContractAddress": "0xA5a1A5F848B13Aa64ba3bdF5777fF787e4105424"
-	  }
-	]
+	"NodeRole": "BootstrapNode",
+	"BootStrapIp": "127.0.0.1",
+	"Port": 44460,
+	"RandomGroupSize": 3,
+	"QueryGroupSize": 3,
+	"ChainConfigs": [{
+		"ChainType": "ETH",
+		"RemoteNodeType": "rinkebyInfura",
+		"RemoteNodeAddress": "wss://rinkeby.infura.io/ws/8e609c76fce442f8a1735fbea9999747",
+		"DOSProxyAddress": "0xaD1732b75D021BB1Be65Fd0E249bd919481cd567",
+		"DOSAddressBridgeAddress": "0x68258Eb5F3Cf3b8e010Dc9F0EBbf0af13Ae80804",
+		"DOSOnChainSDKAddress": "0x8B4Fba92BF3b68530ac222eebd33b7F61AC85b19",
+		"AskMeAnythingAddress": "0xf0eBF23f4544591652B240DAf38facEe47d31bd9"
+	}, {
+		"ChainType": "ETH",
+		"RemoteNodeType": "rinkebyPrivateNode",
+		"RemoteNodeAddress": "ws://13.56.31.73:8546",
+		"DOSProxyAddress": "0x5D4F9d12704C44584C1EE57D9D3F8c12E53b56Fe",
+		"DOSAddressBridgeAddress": "0x5d56b5668395e0baC284282f31C111cb3686e0AF",
+		"DOSOnChainSDKAddress": "0x6Db8a1d81dA47DC3ED9f2BDAe1E0A4E24f09A836",
+		"AskMeAnythingAddress": "0xF937421ab4Bb491e2C178E974DaBccCBdeaa2172"
+	}, {
+		"ChainType": "ETH",
+		"RemoteNodeType": "privateNode",
+		"RemoteNodeAddress": "ws://13.52.16.14:8546",
+		"DOSProxyAddress": "0xD6fca8CeDb9C625FfbB8E1806f868bad356d8918",
+		"DOSAddressBridgeAddress": "0x7736Ee7f4399e59BCB7Bbb6435d0395287a1eCCe",
+		"DOSOnChainSDKAddress": "0x1B9b5C15b4BC3768b48611DE4B79f51477c814a8",
+		"AskMeAnythingAddress": "0x2d65683F610afd7c658D2cCD9BF7522769500987"
+	}]
 }
-
-
