@@ -39,6 +39,11 @@ const (
 	SubscribeDOSProxyLogPublicKeyAccepted
 )
 
+const (
+	TrafficUserQuery = iota // 0
+	TrafficUserRandom
+)
+
 const balanceCheckInterval = 3
 
 var workingDir string
@@ -304,8 +309,8 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 		}
 	case SubscribeDOSProxyLogQueryFromNonExistentUC:
 		fmt.Println("subscribing DOSProxyLogQueryFromNonExistentUC event...")
-		transitChan := make(chan *dosproxy.DOSProxyLogQueryFromNonExistentUC)
-		sub, err := e.proxy.DOSProxyFilterer.WatchLogQueryFromNonExistentUC(opt, transitChan)
+		transitChan := make(chan *dosproxy.DOSProxyLogRequestFromNonExistentUC)
+		sub, err := e.proxy.DOSProxyFilterer.WatchLogRequestFromNonExistentUC(opt, transitChan)
 		if err != nil {
 			fmt.Println(err)
 			fmt.Println("Network fail, will retry shortly")
@@ -320,7 +325,7 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 				log.Fatal(err)
 			case i := <-transitChan:
 				if !e.filterLog(i.Raw) {
-					ch <- &DOSProxyLogQueryFromNonExistentUC{}
+					ch <- &DOSProxyLogRequestFromNonExistentUC{}
 				}
 			}
 		}
@@ -511,7 +516,7 @@ func DecodePubKey(pubKey kyber.Point) (*big.Int, *big.Int, *big.Int, *big.Int, e
 	return x0, x1, y0, y1, nil
 }
 
-func (e *EthAdaptor) DataReturn(queryId *big.Int, data, sig []byte) (err error) {
+func (e *EthAdaptor) DataReturn(requestId *big.Int, trafficType uint8, data, sig []byte) (err error) {
 	auth, err := e.getAuth()
 	if err != nil {
 		return
@@ -519,13 +524,13 @@ func (e *EthAdaptor) DataReturn(queryId *big.Int, data, sig []byte) (err error) 
 
 	x, y := DecodeSig(sig)
 
-	tx, err := e.proxy.TriggerCallback(auth, queryId, data, [2]*big.Int{x, y})
+	tx, err := e.proxy.TriggerCallback(auth, requestId, trafficType, data, [2]*big.Int{x, y})
 	if err != nil {
 		return
 	}
 
 	fmt.Println("tx sent: ", tx.Hash().Hex())
-	fmt.Println("Query_ID request fulfilled ", queryId, " waiting for confirmation...")
+	fmt.Printf("Request with id(%v) type(%v) fulfilled, waiting for confirmation...\n", requestId, trafficType)
 
 	err = e.checkTransaction(tx)
 

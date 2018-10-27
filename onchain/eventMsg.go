@@ -28,7 +28,7 @@ type DOSProxyLogCallbackTriggeredFor struct {
 	CallbackAddr common.Address
 }
 
-type DOSProxyLogQueryFromNonExistentUC struct{}
+type DOSProxyLogRequestFromNonExistentUC struct{}
 
 type DOSProxyLogUpdateRandom struct {
 	LastRandomness  *big.Int
