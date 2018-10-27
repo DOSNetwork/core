@@ -27,18 +27,6 @@ import (
 // TODO: Instead of hardcode, read from DOSAddressBridge.go
 
 const (
-	Rinkeby = iota
-	RinkebyPrivate
-	Private
-)
-
-const (
-	AskMeAnyThing = iota
-	DOSAddressBridge
-	DOSProxy
-)
-
-const (
 	SubscribeDOSProxyLogUrl = iota
 	SubscribeDOSProxyLogNonSupportedType
 	SubscribeDOSProxyLogNonContractCall
@@ -390,17 +378,14 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 }
 
 func (e *EthAdaptor) UploadID() (err error) {
-	e.lock.Lock()
 	fmt.Println("Starting submitting nodeId...")
 	auth, err := e.getAuth()
 	if err != nil {
-		e.lock.Unlock()
 		return
 	}
 
 	tx, err := e.proxy.UploadNodeId(auth, e.id)
 	if err != nil {
-		e.lock.Unlock()
 		return
 	}
 
@@ -408,7 +393,6 @@ func (e *EthAdaptor) UploadID() (err error) {
 	fmt.Println("NodeId submitted, waiting for confirmation...")
 
 	err = e.checkTransaction(tx)
-	e.lock.Unlock()
 
 	return
 }
@@ -428,11 +412,9 @@ func (e *EthAdaptor) GetBlockHashByNumber(blknum *big.Int) (hash common.Hash, er
 }
 
 func (e *EthAdaptor) SetRandomNum(sig []byte) (err error) {
-	e.lock.Lock()
 	fmt.Println("Starting submitting random number...")
 	auth, err := e.getAuth()
 	if err != nil {
-		e.lock.Unlock()
 		return
 	}
 
@@ -440,7 +422,6 @@ func (e *EthAdaptor) SetRandomNum(sig []byte) (err error) {
 
 	tx, err := e.proxy.UpdateRandomness(auth, [2]*big.Int{x, y})
 	if err != nil {
-		e.lock.Unlock()
 		return
 	}
 
@@ -448,29 +429,24 @@ func (e *EthAdaptor) SetRandomNum(sig []byte) (err error) {
 	fmt.Println("new random number submitted, waiting for confirmation...")
 
 	err = e.checkTransaction(tx)
-	e.lock.Unlock()
 
 	return
 }
 
 func (e *EthAdaptor) UploadPubKey(pubKey kyber.Point) (err error) {
-	e.lock.Lock()
 	fmt.Println("Starting submitting group public key...")
 	auth, err := e.getAuth()
 	if err != nil {
-		e.lock.Unlock()
 		return
 	}
 
 	x0, x1, y0, y1, err := DecodePubKey(pubKey)
 	if err != nil {
-		e.lock.Unlock()
 		return
 	}
 
 	tx, err := e.proxy.SetPublicKey(auth, x0, x1, y0, y1)
 	if err != nil {
-		e.lock.Unlock()
 		return
 	}
 
@@ -482,48 +458,39 @@ func (e *EthAdaptor) UploadPubKey(pubKey kyber.Point) (err error) {
 	fmt.Println("Group public key submitted, waiting for confirmation...")
 
 	err = e.checkTransaction(tx)
-	e.lock.Unlock()
 
 	return
 }
 
 func (e *EthAdaptor) ResetNodeIDs() (err error) {
-	e.lock.Lock()
 	fmt.Println("Starting ResetNodeIDs...")
 	auth, err := e.getAuth()
 	if err != nil {
-		e.lock.Unlock()
 		return
 	}
 
 	tx, err := e.proxy.ResetContract(auth)
 	if err != nil {
-		e.lock.Unlock()
 		return
 	}
 
 	err = e.checkTransaction(tx)
-	e.lock.Unlock()
 	return
 }
 
 func (e *EthAdaptor) RandomNumberTimeOut() (err error) {
-	e.lock.Lock()
 	fmt.Println("Starting RandomNumberTimeOut...")
 	auth, err := e.getAuth()
 	if err != nil {
-		e.lock.Unlock()
 		return
 	}
 
 	tx, err := e.proxy.HandleTimeout(auth)
 	if err != nil {
-		e.lock.Unlock()
 		return
 	}
 
 	err = e.checkTransaction(tx)
-	e.lock.Unlock()
 	return
 }
 
@@ -545,10 +512,8 @@ func DecodePubKey(pubKey kyber.Point) (*big.Int, *big.Int, *big.Int, *big.Int, e
 }
 
 func (e *EthAdaptor) DataReturn(queryId *big.Int, data, sig []byte) (err error) {
-	e.lock.Lock()
 	auth, err := e.getAuth()
 	if err != nil {
-		e.lock.Unlock()
 		return
 	}
 
@@ -556,7 +521,6 @@ func (e *EthAdaptor) DataReturn(queryId *big.Int, data, sig []byte) (err error) 
 
 	tx, err := e.proxy.TriggerCallback(auth, queryId, data, [2]*big.Int{x, y})
 	if err != nil {
-		e.lock.Unlock()
 		return
 	}
 
@@ -564,7 +528,6 @@ func (e *EthAdaptor) DataReturn(queryId *big.Int, data, sig []byte) (err error) 
 	fmt.Println("Query_ID request fulfilled ", queryId, " waiting for confirmation...")
 
 	err = e.checkTransaction(tx)
-	e.lock.Unlock()
 
 	return
 }
@@ -590,6 +553,7 @@ func (e *EthAdaptor) getAuth() (auth *bind.TransactOpts, err error) {
 		return
 	}
 
+	e.lock.Lock()
 	e.ethNonce++
 	automatedNonce, err := e.client.PendingNonceAt(context.Background(), e.key.Address)
 	if err != nil {
@@ -600,6 +564,7 @@ func (e *EthAdaptor) getAuth() (auth *bind.TransactOpts, err error) {
 		e.ethNonce = automatedNonce
 	}
 	auth.Nonce = big.NewInt(int64(e.ethNonce))
+	e.lock.Unlock()
 
 	gasPrice, err := e.client.SuggestGasPrice(context.Background())
 	if err != nil {
@@ -793,10 +758,11 @@ func (e *EthAdaptor) filterLog(raw types.Log) (duplicates bool) {
 	identity := new(big.Int).SetBytes(identityBytes).String()
 	fmt.Println("identity: ", identity)
 
-	if record, loaded := e.logFilter.Load(identity); loaded {
+	var record interface{}
+	if record, duplicates = e.logFilter.Load(identity); duplicates {
 		fmt.Println("got duplicate event", record, "\n", raw)
 	}
-	_, duplicates = e.logFilter.LoadOrStore(identity, logRecord{raw, time.Now()})
+	e.logFilter.Store(identity, logRecord{raw, time.Now()})
 
 	return
 }

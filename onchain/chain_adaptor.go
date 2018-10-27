@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	ETH = iota
+	ETH = "ETH"
 )
 
 // TODO: Move to configuration/config.go
@@ -41,8 +41,8 @@ type ChainInterface interface {
 	RandomNumberTimeOut() (err error)
 }
 
-func AdaptTo(chainName int, autoReplenish bool, chainConfig *ChainConfig) (conn ChainInterface, err error) {
-	switch chainName {
+func AdaptTo(chainName string, autoReplenish bool, chainConfig *ChainConfig) (conn ChainInterface, err error) {
+	switch chainConfig.ChainType {
 	case ETH:
 		conn = &EthAdaptor{}
 		err = conn.Init(autoReplenish, chainConfig)

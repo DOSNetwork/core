@@ -5,26 +5,22 @@ import (
 	"log"
 	"time"
 
+	"github.com/DOSNetwork/core/configuration"
 	"github.com/DOSNetwork/core/test/userTest/eth"
 )
 
 var queryUrls = []string{"https://api.coinbase.com/v2/prices/ETH-USD/spot", "https://api.coinmarketcap.com/v1/global/"}
 
 func main() {
-	/*
-		arg := os.Args[1]
-		user, err := strconv.Atoi(arg)
-		if err != nil {
-			log.Fatal(err)
-		}*/
 	user := 1
 	startQuery(user)
 }
 
 func startQuery(user int) {
-
+	config := configuration.ReadConfig("./config.json")
+	chainConfig := configuration.GetOnChainConfig(config)
 	userTestAdaptor := &eth.EthUserAdaptor{}
-	err := userTestAdaptor.Init(true)
+	err := userTestAdaptor.Init(true, &chainConfig)
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -12,7 +12,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/DOSNetwork/core/configuration"
 	"github.com/DOSNetwork/core/onchain"
 	"github.com/DOSNetwork/core/onchain/eth/contracts/userContract"
 	"github.com/ethereum/go-ethereum"
@@ -24,17 +23,13 @@ import (
 )
 
 // TODO: Instead of hardcode, read from DOSAddressBridge.go
-
-const (
-	User1 = iota
-	User2
-)
-
 const (
 	SubscribeAskMeAnythingSetTimeout = iota
 	SubscribeAskMeAnythingCallbackReady
 	SubscribeAskMeAnythingQuerySent
 )
+
+const balanceCheckInterval = 3
 
 var ethRemoteNode = new(onchain.ChainConfig)
 var workingDir string
@@ -46,15 +41,16 @@ type EthUserAdaptor struct {
 	lock      *sync.Mutex
 	logFilter *sync.Map
 	ethNonce  uint64
+	config    *onchain.ChainConfig
 }
 
-func (e *EthUserAdaptor) Init(autoReplenish bool) (err error) {
-	config := configuration.ReadConfig("./config.json")
-	ethRemoteNode := configuration.GetOnChainConfig(config)
+func (e *EthUserAdaptor) Init(autoReplenish bool, config *onchain.ChainConfig) (err error) {
 	workingDir, err = os.Getwd()
 	if err != nil {
 		return
 	}
+
+	e.config = config
 
 	fmt.Println("start initial onChainConn...")
 
@@ -62,29 +58,34 @@ func (e *EthUserAdaptor) Init(autoReplenish bool) (err error) {
 	go e.logMapTimeout()
 
 	e.lock = new(sync.Mutex)
-	e.lock.Lock()
 
-	fmt.Println("dialing...")
-	e.client, err = ethclient.Dial(ethRemoteNode.RemoteNodeAddress)
-	for err != nil {
-		fmt.Println(err)
-		fmt.Println("Cannot connect to the network, retrying...")
-		e.client, err = ethclient.Dial(ethRemoteNode.RemoteNodeAddress)
-	}
-
-	e.proxy, err = userContract.NewAskMeAnything(common.HexToAddress(ethRemoteNode.AskMeAnythingAddress), e.client)
-	for err != nil {
-		fmt.Println(err)
-		fmt.Println("Connot Create new proxy, retrying...")
-		e.proxy, err = userContract.NewAskMeAnything(common.HexToAddress(ethRemoteNode.AskMeAnythingAddress), e.client)
-	}
-	e.lock.Unlock()
+	e.dialToEth()
 
 	if err = e.setAccount(autoReplenish); err != nil {
 		return
 	}
 
 	fmt.Println("onChainConn initialization finished.")
+	return
+}
+
+func (e *EthUserAdaptor) dialToEth() (err error) {
+	e.lock.Lock()
+	fmt.Println("dialing...")
+	e.client, err = ethclient.Dial(e.config.RemoteNodeAddress)
+	for err != nil {
+		fmt.Println(err)
+		fmt.Println("Cannot connect to the network, retrying...")
+		e.client, err = ethclient.Dial(e.config.RemoteNodeAddress)
+	}
+	addr := common.HexToAddress(e.config.AskMeAnythingAddress)
+	e.proxy, err = userContract.NewAskMeAnything(addr, e.client)
+	for err != nil {
+		fmt.Println(err)
+		fmt.Println("Connot Create new proxy, retrying...")
+		e.proxy, err = userContract.NewAskMeAnything(addr, e.client)
+	}
+	e.lock.Unlock()
 	return
 }
 
@@ -102,22 +103,7 @@ func (e *EthUserAdaptor) SubscribeEvent(ch chan interface{}, subscribeType int) 
 			//Todo:This will cause multiple event from eth
 		case <-time.After(60 * time.Second):
 			fmt.Println("retry...")
-			e.lock.Lock()
-			e.client, err = ethclient.Dial(ethRemoteNode.RemoteNodeAddress)
-			for err != nil {
-				fmt.Println(err)
-				fmt.Println("Cannot connect to the network, retrying...")
-				e.client, err = ethclient.Dial(ethRemoteNode.RemoteNodeAddress)
-			}
-
-			e.proxy, err = userContract.NewAskMeAnything(common.HexToAddress(ethRemoteNode.AskMeAnythingAddress), e.client)
-			for err != nil {
-				fmt.Println(err)
-				fmt.Println("Connot Create new proxy, retrying...")
-				e.proxy, err = userContract.NewAskMeAnything(common.HexToAddress(ethRemoteNode.AskMeAnythingAddress), e.client)
-			}
-
-			e.lock.Unlock()
+			e.dialToEth()
 			go e.subscribeEventAttempt(ch, opt, subscribeType, done)
 
 		}
@@ -147,7 +133,7 @@ func (e *EthUserAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.Wa
 				if !e.filterLog(i.Raw) {
 					ch <- &AskMeAnythingCallbackReady{
 						QueryId: i.QueryId,
-						//						Result:  i.Result,
+						Result:  i.Result,
 					}
 				}
 			}
@@ -225,16 +211,12 @@ func (e *EthUserAdaptor) Query(url string) (err error) {
 }
 
 func (e *EthUserAdaptor) getAuth() (auth *bind.TransactOpts, err error) {
-	gasPrice, err := e.client.SuggestGasPrice(context.Background())
-	if err != nil {
-		return
-	}
-
 	auth = bind.NewKeyedTransactor(e.key.PrivateKey)
 	if err != nil {
 		return
 	}
 
+	e.lock.Lock()
 	e.ethNonce++
 	automatedNonce, err := e.client.PendingNonceAt(context.Background(), e.key.Address)
 	if err != nil {
@@ -244,13 +226,12 @@ func (e *EthUserAdaptor) getAuth() (auth *bind.TransactOpts, err error) {
 		e.ethNonce = automatedNonce
 	}
 	auth.Nonce = big.NewInt(int64(e.ethNonce))
+	e.lock.Unlock()
 
-	//for test only
-	onChainNonce, err := e.client.PendingNonceAt(context.Background(), e.key.Address)
+	gasPrice, err := e.client.SuggestGasPrice(context.Background())
 	if err != nil {
 		return
 	}
-	fmt.Print("localNonce:", auth.Nonce, "onChain nonce:", onChainNonce)
 
 	auth.GasLimit = uint64(6000000) // in units
 	auth.GasPrice = gasPrice.Mul(gasPrice, big.NewInt(3))
@@ -315,7 +296,7 @@ func (e *EthUserAdaptor) setAccount(autoReplenish bool) (err error) {
 		err = e.balanceMaintain(usrKey, rootKey)
 
 		go func() {
-			ticker := time.NewTicker(24 * time.Hour)
+			ticker := time.NewTicker(balanceCheckInterval * time.Hour)
 			for range ticker.C {
 				err = e.balanceMaintain(usrKey, rootKey)
 				if err != nil {
@@ -369,6 +350,7 @@ func (e *EthUserAdaptor) transferEth(from, to *keystore.Key) (err error) {
 
 	value := big.NewInt(800000000000000000) //0.8 Eth
 	gasLimit := uint64(6000000)
+
 	tx := types.NewTransaction(nonce, to.Address, value, gasLimit, gasPrice.Mul(gasPrice, big.NewInt(3)), nil)
 
 	chainId, err := e.client.NetworkID(context.Background())
@@ -430,14 +412,13 @@ func (e *EthUserAdaptor) filterLog(raw types.Log) (duplicates bool) {
 	identity := new(big.Int).SetBytes(identityBytes).String()
 	fmt.Println("identity: ", identity)
 
-	if record, duplicates := e.logFilter.Load(identity); duplicates {
+	var record interface{}
+	if record, duplicates = e.logFilter.Load(identity); duplicates {
 		fmt.Println("got duplicate event", record, "\n", raw)
-		//fmt.Println("got duplicate event")
-		//_ = record
 	}
 	e.logFilter.Store(identity, logRecord{raw, time.Now()})
 
-	return duplicates
+	return
 }
 
 func (e *EthUserAdaptor) logMapTimeout() {

@@ -2,11 +2,10 @@ package dosnode
 
 import (
 	"fmt"
-	"github.com/DOSNetwork/core/onchain"
 	"math/big"
 	"testing"
 
-	"github.com/DOSNetwork/core/onchain/eth"
+	"github.com/DOSNetwork/core/onchain"
 	"github.com/DOSNetwork/core/p2p"
 	"github.com/DOSNetwork/core/share/dkg/pedersen"
 	"github.com/DOSNetwork/core/suites"

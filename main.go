@@ -24,7 +24,7 @@ func main() {
 	port := config.Port
 	bootstrapIp := config.BootStrapIp
 	//1)Connect to Eth and Set node ID
-	chainConn, err := onchain.AdaptTo(onchain.ETH, true, &chainConfig)
+	chainConn, err := onchain.AdaptTo(chainConfig.ChainType, true, &chainConfig)
 	if err != nil {
 		log.Fatal(err)
 	}

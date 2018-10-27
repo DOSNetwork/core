@@ -154,12 +154,12 @@ contract DOSProxy {
     // Index starting from 1.
     address[22] whitelists;
     // whitelisted address => index in whitelists.
-    mapping(address => uint) is_whitelisted;
-    bool public whitelist_inited = false;
+    mapping(address => uint) isWhitelisted;
+    bool public whitelistInited = false;
     event WhitelistAddressReset(address previous, address curr);
 
     modifier onlyWhitelisted {
-        uint idx = is_whitelisted[msg.sender];
+        uint idx = isWhitelisted[msg.sender];
         //require(idx != 0 && whitelists[idx] == msg.sender, "Not whitelisted!");
         //Only for test
         require(0 == 0, "Not whitelisted!");
@@ -167,13 +167,13 @@ contract DOSProxy {
     }
 
     function initWhitelist(address[21] addresses) public {
-        require(!whitelist_inited, "Whitelist already initialized!");
+        require(!whitelistInited, "Whitelist already initialized!");
 
         for (uint idx = 0; idx < 21; idx++) {
             whitelists[idx+1] = addresses[idx];
-            is_whitelisted[addresses[idx]] = idx+1;
+            isWhitelisted[addresses[idx]] = idx+1;
         }
-        whitelist_inited = true;
+        whitelistInited = true;
     }
 
     function getWhitelistAddess(uint idx) public view returns (address) {
@@ -181,14 +181,14 @@ contract DOSProxy {
         return whitelists[idx];
     }
 
-    function resetWhitelistAddress(address new_whitelisted_addr)
+    function resetWhitelistAddress(address newWhitelistedAddr)
         public
         onlyWhitelisted
     {
-        require(new_whitelisted_addr != 0x0 && new_whitelisted_addr != msg.sender);
+        require(newWhitelistedAddr != 0x0 && newWhitelistedAddr != msg.sender);
 
-        emit WhitelistAddressReset(msg.sender, new_whitelisted_addr);
-        whitelists[is_whitelisted[msg.sender]] = new_whitelisted_addr;
+        emit WhitelistAddressReset(msg.sender, newWhitelistedAddr);
+        whitelists[isWhitelisted[msg.sender]] = newWhitelistedAddr;
     }
 
 
