@@ -553,13 +553,13 @@ func (e *EthAdaptor) getAuth() (auth *bind.TransactOpts, err error) {
 		return
 	}
 
-	e.lock.Lock()
-	e.ethNonce++
 	automatedNonce, err := e.client.PendingNonceAt(context.Background(), e.key.Address)
 	if err != nil {
 		return
 	}
 
+	e.lock.Lock()
+	e.ethNonce++
 	if automatedNonce > e.ethNonce {
 		e.ethNonce = automatedNonce
 	}
