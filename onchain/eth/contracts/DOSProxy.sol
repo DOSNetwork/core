@@ -329,7 +329,13 @@ contract DOSProxy {
         {
             return;
         }
-        fireRandom();
+        // Update new randomness = sha3(group signature)
+        lastRandomness = uint(keccak256(abi.encodePacked(sig[0], sig[1])));
+        lastUpdatedBlock = block.number - 1;
+        uint idx = lastRandomness % groupPubKeys.length;
+        lastHandledGroup = groupPubKeys[idx];
+        // Signal off-chain clients
+        emit LogUpdateRandom(lastRandomness, getGroupPubKey(idx));
     }
 
     // For test. To trigger first random number after first grouping has done
