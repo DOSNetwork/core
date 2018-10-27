@@ -133,10 +133,7 @@ contract DOSProxy {
     event LogNonContractCall(address from);
     event LogCallbackTriggeredFor(address callbackAddr);
     event LogQueryFromNonExistentUC();
-    event LogUpdateRandom(
-        uint lastRandomness,
-        uint[4] dispatchedGroup
-    );
+    event LogUpdateRandom(uint lastRandomness, uint[4] dispatchedGroup);
     // 0: query; 1: random
     event LogValidationResult(
         uint8 trafficType,
@@ -156,13 +153,11 @@ contract DOSProxy {
     // whitelisted address => index in whitelists.
     mapping(address => uint) isWhitelisted;
     bool public whitelistInited = false;
-    event WhitelistAddressReset(address previous, address curr);
+    event WhitelistAddressTransferred(address previous, address curr);
 
     modifier onlyWhitelisted {
         uint idx = isWhitelisted[msg.sender];
-        //require(idx != 0 && whitelists[idx] == msg.sender, "Not whitelisted!");
-        //Only for test
-        require(0 == 0, "Not whitelisted!");
+        require(idx != 0 && whitelists[idx] == msg.sender, "Not whitelisted!");
         _;
     }
 
@@ -181,13 +176,13 @@ contract DOSProxy {
         return whitelists[idx];
     }
 
-    function resetWhitelistAddress(address newWhitelistedAddr)
+    function transferWhitelistAddress(address newWhitelistedAddr)
         public
         onlyWhitelisted
     {
         require(newWhitelistedAddr != 0x0 && newWhitelistedAddr != msg.sender);
 
-        emit WhitelistAddressReset(msg.sender, newWhitelistedAddr);
+        emit WhitelistAddressTransferred(msg.sender, newWhitelistedAddr);
         whitelists[isWhitelisted[msg.sender]] = newWhitelistedAddr;
     }
 
@@ -212,8 +207,8 @@ contract DOSProxy {
         return true;
     }
 
-    // @return query id.
-    // TODO: restrict query from subscribed/paid calling contract address.
+    // Returns query id.
+    // TODO: restrict query from subscribed/paid calling contracts.
     function query(
         address from,
         uint timeout,
@@ -289,7 +284,6 @@ contract DOSProxy {
             passVerify
         );
         return passVerify;
-
     }
 
     function triggerCallback(uint queryId, bytes result, uint[2] sig) external {
@@ -338,7 +332,8 @@ contract DOSProxy {
         emit LogUpdateRandom(lastRandomness, getGroupPubKey(idx));
     }
 
-    // For test. To trigger first random number after first grouping has done
+    // For alpha. To trigger first random number after grouping has done
+    // or timeout.
     function fireRandom() public onlyWhitelisted {
         lastRandomness = uint(keccak256(abi.encode(blockhash(block.number - 1))));
         lastUpdatedBlock = block.number - 1;
