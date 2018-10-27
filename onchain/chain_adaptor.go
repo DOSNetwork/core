@@ -34,7 +34,7 @@ type ChainInterface interface {
 	GetId() (id []byte)
 	GetBlockHashByNumber(blknum *big.Int) (hash common.Hash, err error)
 	SetRandomNum(sig []byte) (err error)
-	DataReturn(queryId *big.Int, data, sig []byte) (err error)
+	DataReturn(requestId *big.Int, trafficType uint8, data, sig []byte) (err error)
 	SubscribeToAll(msgChan chan interface{}) (err error)
 	//For test
 	ResetNodeIDs() (err error)

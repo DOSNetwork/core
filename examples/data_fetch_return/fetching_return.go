@@ -110,7 +110,11 @@ func main() {
 				if err != nil {
 					log.Fatal(err)
 				}
-				chainConn.DataReturn(i.(*onchain.DOSProxyLogUrl).QueryId, data, sig)
+				chainConn.DataReturn(
+					i.(*onchain.DOSProxyLogUrl).QueryId,
+					onchain.TrafficUserQuery,
+					data,
+					sig)
 			default:
 				fmt.Println("type mismatch")
 			}

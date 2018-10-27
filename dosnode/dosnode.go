@@ -480,7 +480,7 @@ func (d *DosNode) PipeSendToOnchain(chReport <-chan Report) {
 					*/
 					//TODO:chainCoo should use a sendToOnChain(protobuf message) instead of DataReturn with mutex
 					//sendToOnChain receive a message from channel then call the corresponding function
-					err := d.chainConn.DataReturn(qID, queryResult, report.signGroup)
+					err := d.chainConn.DataReturn(qID, onchain.TrafficUserQuery, queryResult, report.signGroup)
 					if err != nil {
 						fmt.Println("DataReturn err ", err)
 					}
