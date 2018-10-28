@@ -93,9 +93,9 @@ library BN256 {
 
 interface UserContractInterface {
     // Query callback.
-    function __callbackQ__(uint, bytes) external;
+    function __callback__(uint, bytes) external;
     // Random number callback.
-    function __callbackR__(uint, uint) external;
+    function __callback__(uint, uint) external;
 }
 
 contract DOSProxy {
@@ -354,11 +354,11 @@ contract DOSProxy {
         emit LogCallbackTriggeredFor(ucAddr);
         delete PendingRequests[requestId];
         if (trafficType == TrafficUserQuery) {
-            UserContractInterface(ucAddr).__callbackQ__(requestId, result);
+            UserContractInterface(ucAddr).__callback__(requestId, result);
         } else if (trafficType == TrafficUserRandom) {
             // Safe random number is the collectively signed threshold signature
             // of msg (lastRandomness || userSeed || selected sender in group).
-            UserContractInterface(ucAddr).__callbackR__(
+            UserContractInterface(ucAddr).__callback__(
                 requestId, uint(keccak256(abi.encodePacked(sig[0], sig[1]))));
         } else {
             revert("Unsupported traffic type");

@@ -50,7 +50,7 @@ contract AskMeAnything is Ownable, DOSOnChainSDK {
     }
 
     // User-defined callback function handling query response.
-    function __callbackQ__(uint queryId, bytes result) external auth(queryId) {
+    function __callback__(uint queryId, bytes result) external auth(queryId) {
         response = string(result);
         emit QueryResponseReady(queryId, response);
         delete _valid[queryId];
@@ -75,7 +75,7 @@ contract AskMeAnything is Ownable, DOSOnChainSDK {
 
     // User-defined callback function handling newly generated secure
     // random number.
-    function __callbackR__(uint requestId, uint generatedRandom)
+    function __callback__(uint requestId, uint generatedRandom)
         external
         auth(requestId)
     {

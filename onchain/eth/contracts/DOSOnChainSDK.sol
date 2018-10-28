@@ -40,19 +40,19 @@ contract DOSOnChainSDK {
         return dosProxy.query(this, timeout, queryType, queryString);
     }
 
-    // @dev: Must override __callbackQ__ to process a corresponding response. A
+    // @dev: Must override __callback__ to process a corresponding response. A
     //       user-defined event could be added to notify the Dapp frontend that
     //       the response is ready.
     // @queryId: A unique queryId returned by DOSQuery() for callers to
     //           differenciate parallel responses.
     // @result: Response for the specified queryId.
-    function __callbackQ__(uint queryId, bytes result) external {
+    function __callback__(uint queryId, bytes result) external {
         // To be overriden in the caller contract.
     }
 
     // @dev: Call this function to request either a fast but unsecure
     //       random number or a safe and secure random number delivered back
-    //       asynchronously through the __callbackR__ function.
+    //       asynchronously through the __callback__ function.
     //       Depending on the mode, the return value would be a random number
     //       (for fast mode) or a requestId (for safe mode).
     // @mode: 0: fast mode - Return a random number in one invocation directly.
@@ -74,14 +74,14 @@ contract DOSOnChainSDK {
         return dosProxy.requestRandom(this, mode, seed);
     }
 
-    // @dev: Must override __callbackR__ to process a corresponding random
+    // @dev: Must override __callback__ to process a corresponding random
     //       number. A user-defined event could be added to notify the Dapp
     //       frontend that a new secure random number is generated.
     // @requestId: A unique requestId returned by DOSRandom() for requesters to
     //             differenciate parallelly generated  random numbers.
     // @generatedRandom: Generated secure random number for the specific
     //                   requestId.
-    function __callbackR__(uint requestId, uint generatedRandom) external {
+    function __callback__(uint requestId, uint generatedRandom) external {
         // To be overriden in the caller contract.
     }
 }
