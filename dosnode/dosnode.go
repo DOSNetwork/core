@@ -225,8 +225,9 @@ func (d *DosNode) PipeQueries(queries ...<-chan interface{}) <-chan Report {
 						requestId := content.RequestId
 						fmt.Println("PipeUserRandom!!", requestId)
 						submitter := d.choseSubmitter(content.LastSystemRandomness)
-						// signed message = concat(lastSystemRandom, userSeed, submitter address)
-						msg := append(content.LastSystemRandomness.Bytes(), content.UserSeed.Bytes()...)
+						// signed message: concat(requestId, lastSystemRandom, userSeed, submitter address)
+						msg := append(content.RequestId.Bytes(), content.LastSystemRandomness.Bytes()...)
+						msg = append(msg, content.UserSeed.Bytes()...)
 						msg = append(msg, submitter...)
 						//combine result with submitter
 						sign := &vss.Signature{

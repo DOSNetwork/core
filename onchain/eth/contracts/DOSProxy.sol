@@ -273,7 +273,8 @@ contract DOSProxy {
             uint idx = lastRandomness % groupPubKeys.length;
             PendingRequests[requestId] =
                 PendingRequest(requestId, groupPubKeys[idx], from);
-            // sign(lastSystemRandomness || userSeed) with selected group
+            // sign(requestId ||lastSystemRandomness || userSeed) with
+            // selected group
             emit LogRequestUserRandom(
                 requestId,
                 lastRandomness,
@@ -357,7 +358,8 @@ contract DOSProxy {
             UserContractInterface(ucAddr).__callback__(requestId, result);
         } else if (trafficType == TrafficUserRandom) {
             // Safe random number is the collectively signed threshold signature
-            // of msg (lastRandomness || userSeed || selected sender in group).
+            // of the message (requestId || lastRandomness || userSeed ||
+            // selected sender in group).
             UserContractInterface(ucAddr).__callback__(
                 requestId, uint(keccak256(abi.encodePacked(sig[0], sig[1]))));
         } else {
