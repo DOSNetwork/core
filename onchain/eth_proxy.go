@@ -24,8 +24,6 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 )
 
-// TODO: Instead of hardcode, read from DOSAddressBridge.go
-
 const (
 	SubscribeDOSProxyLogUrl = iota
 	SubscribeDOSProxyLogRequestUserRandom
@@ -40,6 +38,7 @@ const (
 	SubscribeDOSProxyLogPublicKeyAccepted
 )
 
+// TODO: Move constants to some unified places.
 const (
 	TrafficSystemRandom = iota // 0
 	TrafficUserRandom
@@ -206,7 +205,6 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 						RequestId:            i.RequestId,
 						LastSystemRandomness: i.LastSystemRandomness,
 						UserSeed:             i.UserSeed,
-						Timeout:              i.Timeout,
 						DispatchedGroup:      i.DispatchedGroup,
 					}
 				}

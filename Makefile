@@ -2,7 +2,7 @@
 # $ make == $ make build
 # $ make install
 
-.PHONY: dep client install 
+.PHONY: dep build client install clean gen deploy
 
 .DEFAULT_GOAL := build
 ETH_CONTRACTS := onchain/eth/contracts

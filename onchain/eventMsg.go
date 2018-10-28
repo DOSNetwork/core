@@ -20,7 +20,6 @@ type DOSProxyLogRequestUserRandom struct {
 	RequestId            *big.Int
 	LastSystemRandomness *big.Int
 	UserSeed             *big.Int
-	Timeout              *big.Int
 	DispatchedGroup      [4]*big.Int
 }
 

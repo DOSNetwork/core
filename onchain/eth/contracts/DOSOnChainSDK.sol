@@ -2,7 +2,7 @@ pragma solidity ^0.4.24;
 
 interface DOSProxyInterface {
     function query(address, uint, string, string) external returns (uint);
-    function requestRandom(address, uint8, uint, uint) external returns (uint);
+    function requestRandom(address, uint8, uint) external returns (uint);
 }
 
 interface DOSAddressBridgeInterface {
@@ -40,37 +40,48 @@ contract DOSOnChainSDK {
         return dosProxy.query(this, timeout, queryType, queryString);
     }
 
+    // @dev: Must override __callbackQ__ to process a corresponding response. A
+    //       user-defined event could be added to notify the Dapp frontend that
+    //       the response is ready.
+    // @queryId: A unique queryId returned by DOSQuery() for callers to
+    //           differenciate parallel responses.
+    // @result: Response for the specified queryId.
+    function __callbackQ__(uint queryId, bytes result) external {
+        // To be overriden in the caller contract.
+    }
+
     // @dev: Call this function to request either a fast but unsecure
     //       random number or a safe and secure random number delivered back
-    //       asynchronously through the __callback__ function.
+    //       asynchronously through the __callbackR__ function.
     //       Depending on the mode, the return value would be a random number
     //       (for fast mode) or a requestId (for safe mode).
     // @mode: 0: fast mode - Return a random number in one invocation directly.
     //                       The returned random is the sha3 hash of latest
     //                       generated random number by DOS Network combining
     //                       with the optional seed.
-    //                       Thus the result should NOT be considered safe and is
-    //                       for testing purpose only. It's free of charge.
+    //                       Thus the result should NOT be considered safe and
+    //                       is for testing purpose only. It's free of charge.
     //        1: safe mode - The asynchronous but safe way to generate a new
-    //                       secure random number by a group of off-chain clients
-    //                       using VRF and Threshold Signature. There would be a
-    //                       fee to run in safe mode.
+    //                       secure random number by a group of off-chain
+    //                       clients using VRF and Threshold Signature. There
+    //                       would be a fee to run in safe mode.
     // @seed: Optional random seed provided by caller.
-    function DOSRandom(uint8 mode, uint seed, uint timeout)
+    function DOSRandom(uint8 mode, uint seed)
         resolveAddress
         internal
         returns (uint)
     {
-        return dosProxy.requestRandom(this, mode, seed, timeout);
+        return dosProxy.requestRandom(this, mode, seed);
     }
 
-    // @dev: Must override __callback__ to process a corresponding response. A
-    //       user-defined event could be added to notify the Dapp frontend that
-    //       the response is ready.
-    // @requestId: The unique requestId returned by DOSQuery() or DOSRandom()
-    //             for callers to differenciate parallel responses.
-    // @result: Response for the specified requestId.
-    function __callback__(uint requestId, uint8 trafficType, bytes result) external {
+    // @dev: Must override __callbackR__ to process a corresponding random
+    //       number. A user-defined event could be added to notify the Dapp
+    //       frontend that a new secure random number is generated.
+    // @requestId: A unique requestId returned by DOSRandom() for requesters to
+    //             differenciate parallelly generated  random numbers.
+    // @generatedRandom: Generated secure random number for the specific
+    //                   requestId.
+    function __callbackR__(uint requestId, uint generatedRandom) external {
         // To be overriden in the caller contract.
     }
 }
