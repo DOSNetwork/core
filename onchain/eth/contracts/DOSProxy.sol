@@ -92,7 +92,7 @@ library BN256 {
 }
 
 interface UserContractInterface {
-    function __callback__(uint, bytes) external;
+    function __callback__(uint, uint8, bytes) external;
 }
 
 contract DOSProxy {
@@ -133,6 +133,7 @@ contract DOSProxy {
         uint requestId,
         uint lastSystemRandomness,
         uint userSeed,
+        uint timeout,
         uint[4] dispatchedGroup
     );
     event LogNonSupportedType(string queryType);
@@ -140,7 +141,7 @@ contract DOSProxy {
     event LogCallbackTriggeredFor(address callbackAddr);
     event LogRequestFromNonExistentUC();
     event LogUpdateRandom(uint lastRandomness, uint[4] dispatchedGroup);
-    // 0: User query request; 1: User random request; 2: System random request
+    // 0: System random request; 1: User random request; 2: User query request
     event LogValidationResult(
         uint8 trafficType,
         uint trafficId,
@@ -252,7 +253,7 @@ contract DOSProxy {
     }
 
     // Request a new user-level random number.
-    function requestRandom(address from, uint8 mode, uint userSeed)
+    function requestRandom(address from, uint8 mode, uint userSeed, uint timeout)
         external
         returns (uint)
     {
@@ -268,11 +269,12 @@ contract DOSProxy {
             PendingRequests[requestId] =
                 PendingRequest(requestId, groupPubKeys[idx], from);
             // TODO: client to handle this event and deliver back via triggerCallback.
-            // sign(lastSystemRandomness || userSeed) with selected group
+            // sign(requestId || lastSystemRandomness || userSeed) with selected group
             emit LogRequestUserRandom(
                 requestId,
                 lastRandomness,
                 userSeed,
+                timeout,
                 getGroupPubKey(idx)
             );
             return requestId;
@@ -348,7 +350,12 @@ contract DOSProxy {
 
         emit LogCallbackTriggeredFor(ucAddr);
         delete PendingRequests[requestId];
-        UserContractInterface(ucAddr).__callback__(requestId, result);
+
+        if (trafficType == 1) {
+            UserContractInterface(ucAddr).__callback__(requestId, trafficType, abi.encodePacked(keccak256(abi.encodePacked(sig[0], sig[1]))));
+        } else {
+            UserContractInterface(ucAddr).__callback__(requestId, trafficType, result);
+        }
     }
 
     function toBytes(uint x) internal pure returns (bytes b) {
@@ -359,7 +366,7 @@ contract DOSProxy {
     // Update system-level random number.
     function updateRandomness(uint[2] sig) external {
         if (!validateAndVerify(
-                2,
+                0,
                 lastRandomness,
                 toBytes(lastRandomness),
                 BN256.G1Point(sig[0], sig[1]),

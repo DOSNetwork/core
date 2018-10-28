@@ -28,6 +28,7 @@ import (
 
 const (
 	SubscribeDOSProxyLogUrl = iota
+	SubscribeDOSProxyLogRequestUserRandom
 	SubscribeDOSProxyLogNonSupportedType
 	SubscribeDOSProxyLogNonContractCall
 	SubscribeDOSProxyLogCallbackTriggeredFor
@@ -40,8 +41,9 @@ const (
 )
 
 const (
-	TrafficUserQuery = iota // 0
+	TrafficSystemRandom = iota // 0
 	TrafficUserRandom
+	TrafficUserQuery
 )
 
 const balanceCheckInterval = 3
@@ -177,6 +179,35 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 						Timeout:         i.Timeout,
 						Randomness:      i.Randomness,
 						DispatchedGroup: i.DispatchedGroup,
+					}
+				}
+			}
+		}
+
+	case SubscribeDOSProxyLogRequestUserRandom:
+		fmt.Println("subscribing DOSProxyLogRequestUserRandom event...")
+		transitChan := make(chan *dosproxy.DOSProxyLogRequestUserRandom)
+		sub, err := e.proxy.DOSProxyFilterer.WatchLogRequestUserRandom(opt, transitChan)
+		if err != nil {
+			fmt.Println(err)
+			fmt.Println("Network fail, will retry shortly")
+			return
+		}
+		fmt.Println("DOSProxyLogRequestUserRandom event subscribed")
+
+		done <- true
+		for {
+			select {
+			case err := <-sub.Err():
+				log.Fatal(err)
+			case i := <-transitChan:
+				if !e.filterLog(i.Raw) {
+					ch <- &DOSProxyLogRequestUserRandom{
+						RequestId:            i.RequestId,
+						LastSystemRandomness: i.LastSystemRandomness,
+						UserSeed:             i.UserSeed,
+						Timeout:              i.Timeout,
+						DispatchedGroup:      i.DispatchedGroup,
 					}
 				}
 			}

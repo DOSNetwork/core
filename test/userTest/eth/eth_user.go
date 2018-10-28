@@ -132,8 +132,9 @@ func (e *EthUserAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.Wa
 			case i := <-transitChan:
 				if !e.filterLog(i.Raw) {
 					ch <- &AskMeAnythingCallbackReady{
-						QueryId: i.QueryId,
-						Result:  i.Result,
+						QueryId:      i.QueryId,
+						Result:       i.Result,
+						RandomNumber: i.RandomNumber,
 					}
 				}
 			}
@@ -182,8 +183,9 @@ func (e *EthUserAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.Wa
 			case i := <-transitChan:
 				if !e.filterLog(i.Raw) {
 					ch <- &AskMeAnythingQuerySent{
-						Succ:    i.Succ,
-						QueryId: i.QueryId,
+						TrafficType: i.TrafficType,
+						Succ:        i.Succ,
+						QueryId:     i.QueryId,
 					}
 				}
 			}
@@ -204,6 +206,25 @@ func (e *EthUserAdaptor) Query(url string) (err error) {
 
 	fmt.Println("tx sent: ", tx.Hash().Hex())
 	fmt.Println("Querying ", url, " waiting for confirmation...")
+
+	err = e.checkTransaction(tx)
+
+	return
+}
+
+func (e *EthUserAdaptor) GetRandom(mode uint8, seed *big.Int) (err error) {
+	auth, err := e.getAuth()
+	if err != nil {
+		return
+	}
+
+	tx, err := e.proxy.RequestRandom(auth, mode, seed)
+	if err != nil {
+		return
+	}
+
+	fmt.Println("tx sent: ", tx.Hash().Hex())
+	fmt.Println("random mode ", mode, "seed", seed, " waiting for confirmation...")
 
 	err = e.checkTransaction(tx)
 

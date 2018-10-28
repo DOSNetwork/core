@@ -15,11 +15,11 @@
     }, {
         "RemoteNodeType": "rinkebyPrivateNode",
         "RemoteNodeAddress": "ws://13.56.31.73:8546",
-        "AskMeAnythingAddress": "0xD6cD39ad8Fdd3E3c87C6144B6B916DE460DfD5b9",
+        "AskMeAnythingAddress": "0x5427cd4210fA86E726375AA99dC7c6a85fB60957",
         "ChainType": "ETH",
-        "DOSProxyAddress": "0x103d38096C00cbf02F2a56417721343df9caA106",
-        "DOSAddressBridgeAddress": "0x61CB062B94935CDeE542d28334cee72bbd17E3c9",
-        "DOSOnChainSDKAddress": "0x846Cd8fb9D70B84bCe41fe4d3fC98A7Ca6a56738"
+        "DOSProxyAddress": "0x947a779236eDB240DDf956971d4F6f60DB3fDa7c",
+        "DOSAddressBridgeAddress": "0xe987926A226932DFB1f71FA316461db272E05317",
+        "DOSOnChainSDKAddress": "0x6367aBFa293cB2AF1aDfE49A37fF7A10A660700A"
     }, {
         "RemoteNodeType": "privateNode",
         "RemoteNodeAddress": "ws://13.52.16.14:8546",

@@ -2,7 +2,7 @@ pragma solidity ^0.4.24;
 
 interface DOSProxyInterface {
     function query(address, uint, string, string) external returns (uint);
-    function requestRandom(uint8, uint) external returns (uint);
+    function requestRandom(address, uint8, uint, uint) external returns (uint);
 }
 
 interface DOSAddressBridgeInterface {
@@ -12,7 +12,7 @@ interface DOSAddressBridgeInterface {
 contract DOSOnChainSDK {
     DOSProxyInterface dosProxy;
     DOSAddressBridgeInterface dosAddrBridge =
-        DOSAddressBridgeInterface(0xf3c4695fe4DE7BCC79F3d4A9e7A1cC7d9ED7Dd98);
+        DOSAddressBridgeInterface(0xe987926A226932DFB1f71FA316461db272E05317);
 
     modifier resolveAddress {
         dosProxy = DOSProxyInterface(dosAddrBridge.getProxyAddress());
@@ -56,12 +56,12 @@ contract DOSOnChainSDK {
     //                       using VRF and Threshold Signature. There would be a
     //                       fee to run in safe mode.
     // @seed: Optional random seed provided by caller.
-    function DOSRandom(uint8 mode, uint seed)
+    function DOSRandom(uint8 mode, uint seed, uint timeout)
         resolveAddress
         internal
         returns (uint)
     {
-        return dosProxy.requestRandom(mode, seed);
+        return dosProxy.requestRandom(this, mode, seed, timeout);
     }
 
     // @dev: Must override __callback__ to process a corresponding response. A
@@ -70,7 +70,7 @@ contract DOSOnChainSDK {
     // @requestId: The unique requestId returned by DOSQuery() or DOSRandom()
     //             for callers to differenciate parallel responses.
     // @result: Response for the specified requestId.
-    function __callback__(uint requestId, bytes result) external {
+    function __callback__(uint requestId, uint8 trafficType, bytes result) external {
         // To be overriden in the caller contract.
     }
 }

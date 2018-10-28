@@ -16,6 +16,14 @@ type DOSProxyLogUrl struct {
 	DispatchedGroup [4]*big.Int
 }
 
+type DOSProxyLogRequestUserRandom struct {
+	RequestId            *big.Int
+	LastSystemRandomness *big.Int
+	UserSeed             *big.Int
+	Timeout              *big.Int
+	DispatchedGroup      [4]*big.Int
+}
+
 type DOSProxyLogNonSupportedType struct {
 	QueryType string
 }
@@ -55,18 +63,4 @@ type DOSProxyLogPublicKeyAccepted struct {
 	X2 *big.Int
 	Y1 *big.Int
 	Y2 *big.Int
-}
-
-type DOSAddressBridgeProxyAddressUpdated struct {
-	PreviousProxy common.Address
-	NewProxy      common.Address
-}
-
-type AskMeAnythingSetTimeout struct {
-	PreviousTimeout *big.Int
-	NewTimeout      *big.Int
-}
-
-type AskMeAnythingCallbackReady struct {
-	QueryId *big.Int
 }

@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"math/big"
 	"time"
 
 	"github.com/DOSNetwork/core/configuration"
@@ -32,6 +33,8 @@ func startQuery(user int) {
 
 	userTestAdaptor.Query(queryUrls[user])
 
+	randomTurn := true
+
 	for {
 		select {
 		case event := <-events:
@@ -46,12 +49,20 @@ func startQuery(user int) {
 				fmt.Println("AskMeAnythingCallbackReady")
 				fmt.Println("Callback Ready Query id:", i.QueryId)
 				fmt.Println("result: ", i.Result)
+				fmt.Println("randomNumber", i.RandomNumber)
 				fmt.Println("initial new query...")
-				userTestAdaptor.Query(queryUrls[user])
+				if randomTurn {
+					userTestAdaptor.GetRandom(0, big.NewInt(0))
+					userTestAdaptor.GetRandom(1, big.NewInt(0))
+				} else {
+					userTestAdaptor.Query(queryUrls[user])
+				}
+				randomTurn = !randomTurn
 				lastQuery = time.Now()
 				fmt.Println("____________________________________________")
 			case *eth.AskMeAnythingQuerySent:
 				fmt.Println("AskMeAnythingQuerySent")
+				fmt.Println("TrafficType", i.TrafficType)
 				fmt.Println("succ:", i.Succ)
 				fmt.Println("Query Id", i.QueryId)
 				fmt.Println("____________________________________________")
@@ -61,6 +72,7 @@ func startQuery(user int) {
 		case <-ticker.C:
 			if time.Since(lastQuery).Minutes() > 3 {
 				userTestAdaptor.Query(queryUrls[user])
+				randomTurn = true
 			}
 		}
 	}

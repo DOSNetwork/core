@@ -20,9 +20,8 @@ import (
 )
 
 type DosNodeInterface interface {
-	PipeCheckURL(<-chan interface{}) <-chan Report
-	PipeGenerateRandomNumber(<-chan interface{}) <-chan Report
-	PipeSignAndBroadcast(reports ...<-chan Report) <-chan Report
+	PipeQueries(queries ...<-chan interface{}) <-chan Report
+	PipeSignAndBroadcast(reports <-chan Report) <-chan Report
 	PipeRecoverAndVerify(chan vss.Signature, <-chan Report) (<-chan Report, <-chan Report)
 	PipeSendToOnchain(<-chan Report)
 	PipeCleanFinishMap(chan interface{}, <-chan Report) <-chan interface{}
@@ -30,28 +29,16 @@ type DosNodeInterface interface {
 	SetParticipants(int)
 }
 
+const (
+	ForSysRandomNumber = uint32(0)
+	ForUsrRandomNumber = uint32(1)
+	ForCheckURL        = uint32(2)
+)
+
 const WATCHDOGTIMEOUT = 20
 const VALIDATIONTIMEOUT = 20
 const RANDOMNUMBERSIZE = 32
 const NETMSGTIMEOUT = 20
-
-func CreateDosNode(suite suites.Suite, nbParticipants int, p p2p.P2PInterface, chainConn onchain.ChainInterface, p2pDkg dkg.P2PDkgInterface) (DosNodeInterface, error) {
-	d := &DosNode{
-		suite:          suite,
-		quit:           make(chan struct{}),
-		nbParticipants: nbParticipants,
-		nbThreshold:    nbParticipants/2 + 1,
-		network:        &p,
-		chainConn:      chainConn,
-		p2pDkg:         p2pDkg,
-	}
-	return d, nil
-}
-
-const (
-	ForRandomNumber = uint32(1)
-	ForCheckURL     = uint32(0)
-)
 
 type DosNode struct {
 	suite          suites.Suite
@@ -72,7 +59,20 @@ type Report struct {
 	selfSign   vss.Signature
 	timeStamp  time.Time
 	//For retrigger
-	backupTask onchain.DOSProxyLogUrl
+	backupTask interface{}
+}
+
+func CreateDosNode(suite suites.Suite, nbParticipants int, p p2p.P2PInterface, chainConn onchain.ChainInterface, p2pDkg dkg.P2PDkgInterface) (DosNodeInterface, error) {
+	d := &DosNode{
+		suite:          suite,
+		quit:           make(chan struct{}),
+		nbParticipants: nbParticipants,
+		nbThreshold:    nbParticipants/2 + 1,
+		network:        &p,
+		chainConn:      chainConn,
+		p2pDkg:         p2pDkg,
+	}
+	return d, nil
 }
 
 func (d *DosNode) SetParticipants(nbParticipants int) {
@@ -176,13 +176,28 @@ func (d *DosNode) PipeGrouping(chGroup <-chan interface{}) {
 	}()
 	return
 }
-func (d *DosNode) PipeCheckURL(chLogUrl <-chan interface{}) <-chan Report {
+
+// TODO: error handling and logging
+// Note: Signed messages keep synced with on-chain contracts
+func (d *DosNode) PipeQueries(queries ...<-chan interface{}) <-chan Report {
+	merged := make(chan interface{})
+	var wg sync.WaitGroup
+	wg.Add(len(queries))
+	for _, c := range queries {
+		go func(c <-chan interface{}) {
+			for v := range c {
+				merged <- v
+			}
+			wg.Done()
+		}(c)
+	}
 	out := make(chan Report)
+
 	go func() {
 		for {
 			select {
 			//event from blockChain
-			case msg := <-chLogUrl:
+			case msg := <-merged:
 				switch content := msg.(type) {
 				case *onchain.DOSProxyLogUrl:
 					//Check to see if this request is for node's group
@@ -209,41 +224,28 @@ func (d *DosNode) PipeCheckURL(chLogUrl <-chan interface{}) <-chan Report {
 						report.backupTask = *content
 						out <- *report
 					}
-				default:
-					fmt.Println("DOSProxyLogUrl type mismatch", msg)
-				}
-			case <-d.quit:
-				close(out)
-				break
-			}
-		}
-	}()
-	return out
-}
-
-func padOrTrim(bb []byte, size int) []byte {
-	l := len(bb)
-	if l == size {
-		return bb
-	}
-	if l > size {
-		return bb[l-size:]
-	}
-	tmp := make([]byte, size)
-	copy(tmp[size-l:], bb)
-	return tmp
-}
-
-// TODO: error handling and logging
-// Note: Signed messages keep synced with on-chain contracts
-func (d *DosNode) PipeGenerateRandomNumber(chRandom <-chan interface{}) <-chan Report {
-	out := make(chan Report)
-	go func() {
-		for {
-			select {
-			//event from blockChain
-			case msg := <-chRandom:
-				switch content := msg.(type) {
+				case *onchain.DOSProxyLogRequestUserRandom:
+					//Check to see if this request is for node's group
+					if d.isMember(content.DispatchedGroup) {
+						requestId := content.RequestId
+						fmt.Println("PipeUserRandom!!", requestId)
+						submitter := d.choseSubmitter(content.LastSystemRandomness)
+						msg := append(content.RequestId.Bytes(), content.LastSystemRandomness.Bytes()...)
+						msg = append(msg, content.UserSeed.Bytes()...)
+						msg = append(msg, make([]byte, 12)...)
+						msg = append(msg, submitter...)
+						//combine result with submitter
+						sign := &vss.Signature{
+							Index:   uint32(ForUsrRandomNumber),
+							QueryId: requestId.String(),
+							Content: msg,
+						}
+						report := &Report{}
+						report.selfSign = *sign
+						report.submitter = submitter
+						report.backupTask = *content
+						out <- *report
+					}
 				case *onchain.DOSProxyLogUpdateRandom:
 					if d.isMember(content.DispatchedGroup) {
 						preRandom := content.LastRandomness
@@ -265,7 +267,7 @@ func (d *DosNode) PipeGenerateRandomNumber(chRandom <-chan interface{}) <-chan R
 						fmt.Println("GenerateRandomNumber content = ", randomNum)
 
 						sign := &vss.Signature{
-							Index:   uint32(ForRandomNumber),
+							Index:   uint32(ForSysRandomNumber),
 							QueryId: preRandom.String(),
 							Content: randomNum,
 						}
@@ -276,9 +278,11 @@ func (d *DosNode) PipeGenerateRandomNumber(chRandom <-chan interface{}) <-chan R
 						//}
 					}
 				default:
-					fmt.Println("DOSProxyLogUpdateRandom type mismatch")
+					fmt.Println("query type mismatch", msg)
 				}
 			case <-d.quit:
+				wg.Wait()
+				close(merged)
 				close(out)
 				break
 			}
@@ -287,24 +291,26 @@ func (d *DosNode) PipeGenerateRandomNumber(chRandom <-chan interface{}) <-chan R
 	return out
 }
 
-func (d *DosNode) PipeSignAndBroadcast(reports ...<-chan Report) <-chan Report {
-	merged := make(chan Report)
-	var wg sync.WaitGroup
-	wg.Add(len(reports))
-	for _, c := range reports {
-		go func(c <-chan Report) {
-			for v := range c {
-				merged <- v
-			}
-			wg.Done()
-		}(c)
+func padOrTrim(bb []byte, size int) []byte {
+	l := len(bb)
+	if l == size {
+		return bb
 	}
+	if l > size {
+		return bb[l-size:]
+	}
+	tmp := make([]byte, size)
+	copy(tmp[size-l:], bb)
+	return tmp
+}
+
+func (d *DosNode) PipeSignAndBroadcast(reports <-chan Report) <-chan Report {
 	out := make(chan Report)
 
 	go func() {
 		for {
 			select {
-			case report := <-merged:
+			case report := <-reports:
 				fmt.Println("2) PipeSignAndBroadcast")
 				sign := report.selfSign
 				sig, err := tbls.Sign(d.suite, d.p2pDkg.GetShareSecuirty(), sign.Content)
@@ -325,8 +331,6 @@ func (d *DosNode) PipeSignAndBroadcast(reports ...<-chan Report) <-chan Report {
 				}
 
 			case <-d.quit:
-				wg.Wait()
-				close(merged)
 				close(out)
 				break
 			}
@@ -446,7 +450,7 @@ func (d *DosNode) PipeSendToOnchain(chReport <-chan Report) {
 			select {
 			case report := <-chReport:
 				switch report.selfSign.Index {
-				case ForRandomNumber:
+				case ForSysRandomNumber:
 					//fmt.Println("PipeSendToOnchain = ", report.signGroup)
 					//Test Case 1
 					//os.Exit(0)
@@ -459,12 +463,11 @@ func (d *DosNode) PipeSendToOnchain(chReport <-chan Report) {
 						fmt.Println("randomNumber Set for ", report.selfSign.QueryId)
 					}
 				default:
-					fmt.Println("PipeSendToOnchain checkURL result = ", report.selfSign.Content)
+					fmt.Println("PipeSendToOnchain URL/usrRandom result = ", report.selfSign.Content)
 					//fmt.Println("PipeSendToOnchain checkURL result = ", report.signGroup)
 					qID := big.NewInt(0)
 					qID.SetString(report.selfSign.QueryId, 10)
 
-					fmt.Println("content", report.selfSign.Content)
 					t := len(report.selfSign.Content) - 32
 					if t < 0 {
 						fmt.Println("Error : length of content less than 0", t)
@@ -480,7 +483,7 @@ func (d *DosNode) PipeSendToOnchain(chReport <-chan Report) {
 					*/
 					//TODO:chainCoo should use a sendToOnChain(protobuf message) instead of DataReturn with mutex
 					//sendToOnChain receive a message from channel then call the corresponding function
-					err := d.chainConn.DataReturn(qID, onchain.TrafficUserQuery, queryResult, report.signGroup)
+					err := d.chainConn.DataReturn(qID, uint8(report.selfSign.Index), queryResult, report.signGroup)
 					if err != nil {
 						fmt.Println("DataReturn err ", err)
 					}
@@ -499,7 +502,7 @@ func (d *DosNode) PipeCleanFinishMap(chValidation chan interface{}, forValidate 
 	validateMap := map[string]Report{}
 	chValidationAwait := map[interface{}]time.Time{}
 	lastValidatedRandom := time.Now()
-	chUrl := make(chan interface{})
+	queries := make(chan interface{})
 	go func() {
 		for {
 			select {
@@ -545,7 +548,7 @@ func (d *DosNode) PipeCleanFinishMap(chValidation chan interface{}, forValidate 
 							//}
 						} else {
 							fmt.Println("Validated ", content.TrafficId.String())
-							if uint32(content.TrafficType) == ForRandomNumber {
+							if uint32(content.TrafficType) == ForSysRandomNumber {
 								lastValidatedRandom = time.Now()
 							}
 						}
@@ -606,11 +609,11 @@ func (d *DosNode) PipeCleanFinishMap(chValidation chan interface{}, forValidate 
 					}
 				}
 			case <-d.quit:
-				close(chUrl)
+				close(queries)
 				ticker.Stop()
 				return
 			}
 		}
 	}()
-	return chUrl
+	return queries
 }
