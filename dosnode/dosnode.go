@@ -29,12 +29,7 @@ type DosNodeInterface interface {
 	SetParticipants(int)
 }
 
-const (
-	ForSysRandomNumber = uint32(0)
-	ForUsrRandomNumber = uint32(1)
-	ForCheckURL        = uint32(2)
-)
-
+// TODO: Move constants to some unified places.
 const WATCHDOGTIMEOUT = 20
 const VALIDATIONTIMEOUT = 20
 const RANDOMNUMBERSIZE = 32
@@ -210,11 +205,11 @@ func (d *DosNode) PipeQueries(queries ...<-chan interface{}) <-chan Report {
 						if err != nil {
 							fmt.Println(err)
 						}
-						msg = append(msg, make([]byte, 12)...)
+						// signed message = concat(msg, submitter address)
 						msg = append(msg, submitter...)
 						//combine result with submitter
 						sign := &vss.Signature{
-							Index:   uint32(ForCheckURL),
+							Index:   uint32(onchain.TrafficUserQuery),
 							QueryId: queryId.String(),
 							Content: msg,
 						}
@@ -230,13 +225,12 @@ func (d *DosNode) PipeQueries(queries ...<-chan interface{}) <-chan Report {
 						requestId := content.RequestId
 						fmt.Println("PipeUserRandom!!", requestId)
 						submitter := d.choseSubmitter(content.LastSystemRandomness)
-						msg := append(content.RequestId.Bytes(), content.LastSystemRandomness.Bytes()...)
-						msg = append(msg, content.UserSeed.Bytes()...)
-						msg = append(msg, make([]byte, 12)...)
+						// signed message = concat(lastSystemRandom, userSeed, submitter address)
+						msg := append(content.LastSystemRandomness.Bytes(), content.UserSeed.Bytes()...)
 						msg = append(msg, submitter...)
 						//combine result with submitter
 						sign := &vss.Signature{
-							Index:   uint32(ForUsrRandomNumber),
+							Index:   uint32(onchain.TrafficUserRandom),
 							QueryId: requestId.String(),
 							Content: msg,
 						}
@@ -260,14 +254,13 @@ func (d *DosNode) PipeQueries(queries ...<-chan interface{}) <-chan Report {
 						//	fmt.Printf("GetBlockHashByNumber #%v fails\n", preBlock)
 						//	return
 						//}
-						// message = concat(lastUpdatedBlockhash, lastRandomness, submitter)
-						preRandomBytes := padOrTrim(preRandom.Bytes(), RANDOMNUMBERSIZE)
-						randomNum := append(preRandomBytes, make([]byte, 12)...)
-						randomNum = append(randomNum, submitter...)
+						// signed message = concat(lastSystemRandomness, submitter address)
+						paddedRandomBytes := padOrTrim(preRandom.Bytes(), RANDOMNUMBERSIZE)
+						randomNum := append(paddedRandomBytes, submitter...)
 						fmt.Println("GenerateRandomNumber content = ", randomNum)
 
 						sign := &vss.Signature{
-							Index:   uint32(ForSysRandomNumber),
+							Index:   uint32(onchain.TrafficSystemRandom),
 							QueryId: preRandom.String(),
 							Content: randomNum,
 						}
@@ -275,7 +268,6 @@ func (d *DosNode) PipeQueries(queries ...<-chan interface{}) <-chan Report {
 						report.selfSign = *sign
 						report.submitter = submitter
 						out <- *report
-						//}
 					}
 				default:
 					fmt.Println("query type mismatch", msg)
@@ -450,7 +442,7 @@ func (d *DosNode) PipeSendToOnchain(chReport <-chan Report) {
 			select {
 			case report := <-chReport:
 				switch report.selfSign.Index {
-				case ForSysRandomNumber:
+				case onchain.TrafficSystemRandom:
 					//fmt.Println("PipeSendToOnchain = ", report.signGroup)
 					//Test Case 1
 					//os.Exit(0)
@@ -548,7 +540,7 @@ func (d *DosNode) PipeCleanFinishMap(chValidation chan interface{}, forValidate 
 							//}
 						} else {
 							fmt.Println("Validated ", content.TrafficId.String())
-							if uint32(content.TrafficType) == ForSysRandomNumber {
+							if content.TrafficType == onchain.TrafficSystemRandom {
 								lastValidatedRandom = time.Now()
 							}
 						}
