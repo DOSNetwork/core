@@ -25,13 +25,13 @@ import (
 // TODO: Instead of hardcode, read from DOSAddressBridge.go
 const (
 	SubscribeAskMeAnythingSetTimeout = iota
-	SubscribeAskMeAnythingCallbackReady
-	SubscribeAskMeAnythingQuerySent
+	SubscribeAskMeAnythingQueryResponseReady
+	SubscribeAskMeAnythingRequestSent
+	SubscribeAskMeAnythingRandomReady
 )
 
 const balanceCheckInterval = 3
 
-var ethRemoteNode = new(onchain.ChainConfig)
 var workingDir string
 
 type EthUserAdaptor struct {
@@ -113,32 +113,6 @@ func (e *EthUserAdaptor) SubscribeEvent(ch chan interface{}, subscribeType int) 
 func (e *EthUserAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchOpts, subscribeType int, done chan bool) {
 	fmt.Println("attempt to subscribe event...")
 	switch subscribeType {
-	case SubscribeAskMeAnythingCallbackReady:
-		fmt.Println("subscribing SubscribeAskMeAnythingCallbackReady event...")
-		transitChan := make(chan *userContract.AskMeAnythingCallbackReady)
-		sub, err := e.proxy.AskMeAnythingFilterer.WatchCallbackReady(opt, transitChan)
-		if err != nil {
-			fmt.Println(err)
-			fmt.Println("Network fail, will retry shortly")
-			return
-		}
-		fmt.Println("AskMeAnythingCallbackReady event subscribed")
-
-		done <- true
-		for {
-			select {
-			case err := <-sub.Err():
-				log.Fatal(err)
-			case i := <-transitChan:
-				if !e.filterLog(i.Raw) {
-					ch <- &AskMeAnythingCallbackReady{
-						QueryId:      i.QueryId,
-						Result:       i.Result,
-						RandomNumber: i.RandomNumber,
-					}
-				}
-			}
-		}
 	case SubscribeAskMeAnythingSetTimeout:
 		fmt.Println("subscribing AskMeAnythingSetTimeout event...")
 		transitChan := make(chan *userContract.AskMeAnythingSetTimeout)
@@ -164,16 +138,16 @@ func (e *EthUserAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.Wa
 				}
 			}
 		}
-	case SubscribeAskMeAnythingQuerySent:
-		fmt.Println("subscribing AskMeAnythingQuerySent event...")
-		transitChan := make(chan *userContract.AskMeAnythingQuerySent)
-		sub, err := e.proxy.AskMeAnythingFilterer.WatchQuerySent(opt, transitChan)
+	case SubscribeAskMeAnythingQueryResponseReady:
+		fmt.Println("subscribing AskMeAnythingQueryResponseReady event...")
+		transitChan := make(chan *userContract.AskMeAnythingQueryResponseReady)
+		sub, err := e.proxy.AskMeAnythingFilterer.WatchQueryResponseReady(opt, transitChan)
 		if err != nil {
 			fmt.Println(err)
 			fmt.Println("Network fail, will retry shortly")
 			return
 		}
-		fmt.Println("AskMeAnythingQuerySent event subscribed")
+		fmt.Println("AskMeAnythingQueryResponseReady event subscribed")
 
 		done <- true
 		for {
@@ -182,10 +156,58 @@ func (e *EthUserAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.Wa
 				log.Fatal(err)
 			case i := <-transitChan:
 				if !e.filterLog(i.Raw) {
-					ch <- &AskMeAnythingQuerySent{
-						TrafficType: i.TrafficType,
-						Succ:        i.Succ,
-						QueryId:     i.QueryId,
+					ch <- &AskMeAnythingQueryResponseReady{
+						QueryId: i.QueryId,
+						Result:  i.Result,
+					}
+				}
+			}
+		}
+	case SubscribeAskMeAnythingRequestSent:
+		fmt.Println("subscribing AskMeAnythingRequestSent event...")
+		transitChan := make(chan *userContract.AskMeAnythingRequestSent)
+		sub, err := e.proxy.AskMeAnythingFilterer.WatchRequestSent(opt, transitChan)
+		if err != nil {
+			fmt.Println(err)
+			fmt.Println("Network fail, will retry shortly")
+			return
+		}
+		fmt.Println("AskMeAnythingRequestSent event subscribed")
+
+		done <- true
+		for {
+			select {
+			case err := <-sub.Err():
+				log.Fatal(err)
+			case i := <-transitChan:
+				if !e.filterLog(i.Raw) {
+					ch <- &AskMeAnythingRequestSent{
+						Succ:      i.Succ,
+						RequestId: i.RequestId,
+					}
+				}
+			}
+		}
+	case SubscribeAskMeAnythingRandomReady:
+		fmt.Println("subscribing AskMeAnythingRandomReady event...")
+		transitChan := make(chan *userContract.AskMeAnythingRandomReady)
+		sub, err := e.proxy.AskMeAnythingFilterer.WatchRandomReady(opt, transitChan)
+		if err != nil {
+			fmt.Println(err)
+			fmt.Println("Network fail, will retry shortly")
+			return
+		}
+		fmt.Println("AskMeAnythingRandomReady event subscribed")
+
+		done <- true
+		for {
+			select {
+			case err := <-sub.Err():
+				log.Fatal(err)
+			case i := <-transitChan:
+				if !e.filterLog(i.Raw) {
+					ch <- &AskMeAnythingRandomReady{
+						GeneratedRandom: i.GeneratedRandom,
 					}
 				}
 			}
@@ -212,19 +234,19 @@ func (e *EthUserAdaptor) Query(url string) (err error) {
 	return
 }
 
-func (e *EthUserAdaptor) GetRandom(mode uint8, seed *big.Int) (err error) {
+func (e *EthUserAdaptor) GetRandom() (err error) {
 	auth, err := e.getAuth()
 	if err != nil {
 		return
 	}
 
-	tx, err := e.proxy.RequestRandom(auth, mode, seed)
+	tx, err := e.proxy.RequestSafeRandom(auth)
 	if err != nil {
 		return
 	}
 
 	fmt.Println("tx sent: ", tx.Hash().Hex())
-	fmt.Println("random mode ", mode, "seed", seed, " waiting for confirmation...")
+	fmt.Println("RequestSafeRandom ", " waiting for confirmation...")
 
 	err = e.checkTransaction(tx)
 
@@ -415,7 +437,7 @@ func (e *EthUserAdaptor) checkTransaction(tx *types.Transaction) (err error) {
 }
 
 func (e *EthUserAdaptor) SubscribeToAll(msgChan chan interface{}) (err error) {
-	for i := SubscribeAskMeAnythingSetTimeout; i <= SubscribeAskMeAnythingQuerySent; i++ {
+	for i := SubscribeAskMeAnythingSetTimeout; i <= SubscribeAskMeAnythingRandomReady; i++ {
 		err = e.SubscribeEvent(msgChan, i)
 	}
 	return

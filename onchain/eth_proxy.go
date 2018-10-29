@@ -36,6 +36,7 @@ const (
 	SubscribeDOSProxyLogInsufficientGroupNumber
 	SubscribeDOSProxyLogGrouping
 	SubscribeDOSProxyLogPublicKeyAccepted
+	SubscribeDOSProxyWhitelistAddressTransferred
 )
 
 // TODO: Move constants to some unified places.
@@ -407,6 +408,31 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 				}
 			}
 		}
+	case SubscribeDOSProxyWhitelistAddressTransferred:
+		fmt.Println("subscribing DOSProxyWhitelistAddressTransferred event...")
+		transitChan := make(chan *dosproxy.DOSProxyWhitelistAddressTransferred)
+		sub, err := e.proxy.DOSProxyFilterer.WatchWhitelistAddressTransferred(opt, transitChan)
+		if err != nil {
+			fmt.Println(err)
+			fmt.Println("Network fail, will retry shortly")
+			return
+		}
+		fmt.Println("DOSProxyWhitelistAddressTransferred event subscribed")
+
+		done <- true
+		for {
+			select {
+			case err := <-sub.Err():
+				log.Fatal(err)
+			case i := <-transitChan:
+				if !e.filterLog(i.Raw) {
+					ch <- &DOSProxyWhitelistAddressTransferred{
+						Previous: i.Previous,
+						Curr:     i.Curr,
+					}
+				}
+			}
+		}
 	}
 
 }
@@ -774,7 +800,7 @@ func (e *EthAdaptor) checkTransaction(tx *types.Transaction) (err error) {
 }
 
 func (e *EthAdaptor) SubscribeToAll(msgChan chan interface{}) (err error) {
-	for i := 0; i < 10; i++ {
+	for i := SubscribeDOSProxyLogUrl; i <= SubscribeDOSProxyWhitelistAddressTransferred; i++ {
 		err = e.SubscribeEvent(msgChan, i)
 	}
 	return

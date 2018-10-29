@@ -63,3 +63,8 @@ type DOSProxyLogPublicKeyAccepted struct {
 	Y1 *big.Int
 	Y2 *big.Int
 }
+
+type DOSProxyWhitelistAddressTransferred struct {
+	Previous common.Address
+	Curr     common.Address
+}

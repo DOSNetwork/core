@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"log"
-	"math/big"
 	"time"
 
 	"github.com/DOSNetwork/core/configuration"
@@ -33,8 +32,6 @@ func startQuery(user int) {
 
 	userTestAdaptor.Query(queryUrls[user])
 
-	randomTurn := true
-
 	for {
 		select {
 		case event := <-events:
@@ -45,34 +42,31 @@ func startQuery(user int) {
 				fmt.Println("new timeout:", i.NewTimeout)
 				fmt.Println("previous timeout:", i.PreviousTimeout)
 				fmt.Println("____________________________________________")
-			case *eth.AskMeAnythingCallbackReady:
-				fmt.Println("AskMeAnythingCallbackReady")
+			case *eth.AskMeAnythingQueryResponseReady:
+				fmt.Println("AskMeAnythingQueryResponseReady")
 				fmt.Println("Callback Ready Query id:", i.QueryId)
 				fmt.Println("result: ", i.Result)
-				fmt.Println("randomNumber", i.RandomNumber)
 				fmt.Println("initial new query...")
-				if randomTurn {
-					userTestAdaptor.GetRandom(0, big.NewInt(0))
-					userTestAdaptor.GetRandom(1, big.NewInt(0))
-				} else {
-					userTestAdaptor.Query(queryUrls[user])
-				}
-				randomTurn = !randomTurn
+				fmt.Println("____________________________________________")
+				userTestAdaptor.GetRandom()
 				lastQuery = time.Now()
-				fmt.Println("____________________________________________")
-			case *eth.AskMeAnythingQuerySent:
-				fmt.Println("AskMeAnythingQuerySent")
-				fmt.Println("TrafficType", i.TrafficType)
+			case *eth.AskMeAnythingRequestSent:
+				fmt.Println("AskMeAnythingRequestSent")
 				fmt.Println("succ:", i.Succ)
-				fmt.Println("Query Id", i.QueryId)
+				fmt.Println("RequestId", i.RequestId)
 				fmt.Println("____________________________________________")
+			case *eth.AskMeAnythingRandomReady:
+				fmt.Println("AskMeAnythingRandomReady")
+				fmt.Println("GeneratedRandom:", i.GeneratedRandom)
+				fmt.Println("____________________________________________")
+				userTestAdaptor.Query(queryUrls[user])
+				lastQuery = time.Now()
 			default:
 				fmt.Println("type mismatch")
 			}
 		case <-ticker.C:
 			if time.Since(lastQuery).Minutes() > 3 {
 				userTestAdaptor.Query(queryUrls[user])
-				randomTurn = true
 			}
 		}
 	}

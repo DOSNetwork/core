@@ -105,6 +105,7 @@ func (d *DosNode) isMember(dispatchedGroup [4]*big.Int) bool {
 
 		//fmt.Println("isMember from onchain : ", temp)
 		groupPub, err := d.p2pDkg.GetGroupPublicPoly().Commit().MarshalBinary()
+
 		//fmt.Println("isMember : ", groupPub)
 		if err != nil {
 			fmt.Println(err)
@@ -116,7 +117,7 @@ func (d *DosNode) isMember(dispatchedGroup [4]*big.Int) bool {
 			return true
 		}
 	}
-	fmt.Println("isMember false")
+	fmt.Println("isMember false, isCertified:", d.p2pDkg.IsCetified())
 	return false
 }
 
@@ -461,7 +462,7 @@ func (d *DosNode) PipeSendToOnchain(chReport <-chan Report) {
 					qID := big.NewInt(0)
 					qID.SetString(report.selfSign.QueryId, 10)
 
-					t := len(report.selfSign.Content) - 32
+					t := len(report.selfSign.Content) - 20
 					if t < 0 {
 						fmt.Println("Error : length of content less than 0", t)
 					}
