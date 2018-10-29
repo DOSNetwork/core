@@ -7,17 +7,17 @@
     "ChainConfigs": [{
         "RemoteNodeType": "rinkebyInfura",
         "RemoteNodeAddress": "wss://rinkeby.infura.io/ws/8e609c76fce442f8a1735fbea9999747",
-        "AskMeAnythingAddress": "0xf0eBF23f4544591652B240DAf38facEe47d31bd9",
+        "AskMeAnythingAddress": "0x09d758698754C79705df2CF88F9399fB5Eb4C0dF",
         "ChainType": "ETH",
-        "DOSProxyAddress": "0xaD1732b75D021BB1Be65Fd0E249bd919481cd567",
-        "DOSAddressBridgeAddress": "0x68258Eb5F3Cf3b8e010Dc9F0EBbf0af13Ae80804",
+        "DOSProxyAddress": "0x4872C971A31b640F4951Afeb1D3207b68A8e5337",
+        "DOSAddressBridgeAddress": "0xe987926A226932DFB1f71FA316461db272E05317",
         "DOSOnChainSDKAddress": "0x8B4Fba92BF3b68530ac222eebd33b7F61AC85b19"
     }, {
         "RemoteNodeType": "rinkebyPrivateNode",
         "RemoteNodeAddress": "ws://13.56.31.73:8546",
         "AskMeAnythingAddress": "0x09d758698754C79705df2CF88F9399fB5Eb4C0dF",
         "ChainType": "ETH",
-        "DOSProxyAddress": "0xaC0d7219184C0Fb3A1f9E215FB011928164463eF",
+        "DOSProxyAddress": "0x4872C971A31b640F4951Afeb1D3207b68A8e5337",
         "DOSAddressBridgeAddress": "0xe987926A226932DFB1f71FA316461db272E05317",
         "DOSOnChainSDKAddress": "0x6367aBFa293cB2AF1aDfE49A37fF7A10A660700A"
     }, {

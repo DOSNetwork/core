@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"log"
 	"math/big"
@@ -23,13 +24,9 @@ func main() {
 	nbParticipants := config.RandomGroupSize
 	port := config.Port
 	bootstrapIp := config.BootStrapIp
-	//1)Connect to Eth and Set node ID
-	chainConn, err := onchain.AdaptTo(chainConfig.ChainType, true, &chainConfig)
-	if err != nil {
-		log.Fatal(err)
-	}
 
-	err = chainConn.UploadID()
+	//1)Connect to Eth
+	chainConn, err := onchain.AdaptTo(chainConfig.ChainType, true, &chainConfig)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -41,8 +38,20 @@ func main() {
 	p.SetId(chainConn.GetId())
 	p.Listen()
 
-	//3)Dial to peers to build peerClient
-	if role == "" {
+	//3)Dial to peers to build peerClient and Set node ID
+	if role == "BootstrapNode" {
+		address, err := chainConn.GetWhitelist()
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		if bytes.Compare(address.Bytes(), chainConn.GetId()) != 0 {
+			err = chainConn.InitialWhiteList()
+			if err != nil {
+				log.Fatal(err)
+			}
+		}
+	} else {
 		fmt.Println(bootstrapIp)
 		p.CreatePeer(bootstrapIp, nil)
 		results := p.FindNode(p.GetId(), dht.BucketSize, 20)
@@ -51,6 +60,12 @@ func main() {
 			fmt.Println(p.GetId().Address, "Update peer: ", result.Address)
 		}
 	}
+
+	err = chainConn.UploadID()
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	//4)Build a p2pDKG
 	suite := suites.MustFind("bn256")
 	peerEventForDKG := make(chan p2p.P2PMessage, 1)

@@ -437,6 +437,53 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 
 }
 
+func (e *EthAdaptor) InitialWhiteList() (err error) {
+	fmt.Println("Starting initialing WhiteList...")
+	auth, err := e.getAuth()
+	if err != nil {
+		return
+	}
+
+	addresses := [21]common.Address{common.HexToAddress("0xaec1f213677de24842a96e72fe6efbcbc2b77ca5"),
+		common.HexToAddress("0x5a3582d7c8fc97c194168342f9a347e8d41b4038"),
+		common.HexToAddress("0xe38497ec6d9442413b16a2a7055649ac91106d79"),
+		common.HexToAddress("0xb8c228a842390595751b1a09a2c4ffaccf12c44b"),
+		common.HexToAddress("0xec96405d35c3cadfd3e0bda90c66b74b159d4156"),
+		common.HexToAddress("0x0a65d5dccc87ecb21bc4b24c16a3c01e0cdd42ac"),
+		common.HexToAddress("0x3ebe227e9fd42bb97b9a950e4a731d8975263812"),
+		common.HexToAddress("0x6ca3ee1386f7c05d886211a6378f49bdf9c7ee88"),
+		common.HexToAddress("0x234ae33713afde52de9aa9203fb6696531edc74f"),
+		common.HexToAddress("0xe610c52cbeb14dc722a9668e59bad46c5e464e55"),
+		common.HexToAddress("0xcb04aae925218094863809ec0289a8fdccfd68cf"),
+		common.HexToAddress("0x921f2cf348b8b45d6cd5eaf139d30303e6b9646f"),
+		common.HexToAddress("0x69ba6867602d650fc433fd62eabaf17f11fd5132"),
+		common.HexToAddress("0x4ed2814cd63e83504221424215d0655c6db0b674"),
+		common.HexToAddress("0xac3e1e84e3b7a0a83d36feba984a836c768fcb72"),
+		common.HexToAddress("0x3609aa202ab8b96499e379da7226145e5697695e"),
+		common.HexToAddress("0xc96c0f2d346a3f0f4bbcfbefe70a75c710d23369"),
+		common.HexToAddress("0xc1a3aab78a6dc3e5cbeec059a2727a66f4bc7088"),
+		common.HexToAddress("0xc98a4df797f0b8155ef38c4701588cbed21a1b26"),
+		common.HexToAddress("0x34d950db8e9345a638ba0bee9945d56c9f7728ee"),
+		common.HexToAddress("0x96272c390ae674d3a3e3f1d636f3ae4128afd688")}
+
+	tx, err := e.proxy.InitWhitelist(auth, addresses)
+	if err != nil {
+		return
+	}
+
+	fmt.Println("tx sent: ", tx.Hash().Hex())
+	fmt.Println("NodeId submitted, waiting for confirmation...")
+
+	err = e.checkTransaction(tx)
+
+	return
+
+}
+
+func (e *EthAdaptor) GetWhitelist() (address common.Address, err error) {
+	return e.proxy.GetWhitelistAddess(&bind.CallOpts{}, big.NewInt(1))
+}
+
 func (e *EthAdaptor) UploadID() (err error) {
 	fmt.Println("Starting submitting nodeId...")
 	auth, err := e.getAuth()

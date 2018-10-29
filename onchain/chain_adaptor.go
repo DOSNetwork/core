@@ -29,6 +29,8 @@ type ChainConfig struct {
 type ChainInterface interface {
 	Init(autoReplenish bool, chainConfig *ChainConfig) (err error)
 	SubscribeEvent(ch chan interface{}, subscribeType int) (err error)
+	InitialWhiteList() (err error)
+	GetWhitelist() (address common.Address, err error)
 	UploadID() (err error)
 	UploadPubKey(pubKey kyber.Point) (err error)
 	GetId() (id []byte)
