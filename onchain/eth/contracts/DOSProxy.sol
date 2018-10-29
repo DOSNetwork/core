@@ -92,24 +92,27 @@ library BN256 {
 }
 
 interface UserContractInterface {
+    // Query callback.
     function __callback__(uint, bytes) external;
+    // Random number callback.
+    function __callback__(uint, uint) external;
 }
 
 contract DOSProxy {
     using BN256 for *;
 
-    struct PendingQuery {
-        uint queryId;
+    struct PendingRequest {
+        uint requestId;
         BN256.G2Point handledGroup;
         // User contract issued the query.
         address callbackAddr;
     }
 
-    uint queryIdSeed;
+    uint requestIdSeed;
     uint groupSize;
     uint[] nodeId;
-    // calling queryId => PendingQuery metadata
-    mapping(uint => PendingQuery) pendingQueries;
+    // calling requestId => PendingQuery metadata
+    mapping(uint => PendingRequest) PendingRequests;
     // Note: Make atomic changes to group metadata below.
     BN256.G2Point[] groupPubKeys;
     // groupIdentifier => isExisted
@@ -120,6 +123,9 @@ contract DOSProxy {
     uint public lastUpdatedBlock;
     uint public lastRandomness;
     BN256.G2Point lastHandledGroup;
+    uint8 constant TrafficSystemRandom = 0;
+    uint8 constant TrafficUserRandom = 1;
+    uint8 constant TrafficUserQuery = 2;
 
     event LogUrl(
         uint queryId,
@@ -129,12 +135,17 @@ contract DOSProxy {
         // Log G2Point struct directly is an experimental feature, use with care.
         uint[4] dispatchedGroup
     );
+    event LogRequestUserRandom(
+        uint requestId,
+        uint lastSystemRandomness,
+        uint userSeed,
+        uint[4] dispatchedGroup
+    );
     event LogNonSupportedType(string queryType);
     event LogNonContractCall(address from);
     event LogCallbackTriggeredFor(address callbackAddr);
-    event LogQueryFromNonExistentUC();
+    event LogRequestFromNonExistentUC();
     event LogUpdateRandom(uint lastRandomness, uint[4] dispatchedGroup);
-    // 0: query; 1: random
     event LogValidationResult(
         uint8 trafficType,
         uint trafficId,
@@ -219,13 +230,13 @@ contract DOSProxy {
         returns (uint)
     {
         if (getCodeSize(from) > 0) {
-            // Only supporting api/url for alpha release.
+            // Only supporting api/url requests for alpha release.
             if (strEqual(queryType, 'API')) {
                 uint queryId = uint(keccak256(abi.encodePacked(
-                    ++queryIdSeed, from, timeout, queryType, queryPath)));
+                    ++requestIdSeed, from, timeout, queryType, queryPath)));
                 uint idx = lastRandomness % groupPubKeys.length;
-                pendingQueries[queryId] =
-                    PendingQuery(queryId, groupPubKeys[idx], from);
+                PendingRequests[queryId] =
+                    PendingRequest(queryId, groupPubKeys[idx], from);
                 emit LogUrl(
                     queryId,
                     queryPath,
@@ -242,6 +253,37 @@ contract DOSProxy {
             // Skip if @from is not contract address.
             emit LogNonContractCall(from);
             return 0x0;
+        }
+    }
+
+    // Request a new user-level random number.
+    function requestRandom(address from, uint8 mode, uint userSeed)
+        external
+        returns (uint)
+    {
+        // fast mode
+        if (mode == 0) {
+            return uint(keccak256(abi.encodePacked(
+                ++requestIdSeed,lastRandomness, userSeed)));
+        } else if (mode == 1) {
+            // safe mode
+            // TODO: restrict request from paid calling contract address.
+            uint requestId = uint(keccak256(abi.encodePacked(
+                ++requestIdSeed, from, userSeed)));
+            uint idx = lastRandomness % groupPubKeys.length;
+            PendingRequests[requestId] =
+                PendingRequest(requestId, groupPubKeys[idx], from);
+            // sign(requestId ||lastSystemRandomness || userSeed) with
+            // selected group
+            emit LogRequestUserRandom(
+                requestId,
+                lastRandomness,
+                userSeed,
+                getGroupPubKey(idx)
+            );
+            return requestId;
+        } else {
+            revert("Non-supported random request");
         }
     }
 
@@ -262,8 +304,8 @@ contract DOSProxy {
         // 1. Check msg.sender from registered and staked node operator.
         // 2. Check msg.sender is a member in Group(grpPubKey).
         // Clients actually signs (data || addr(selected_submitter)).
-        // TODO: Sync and change to sign ( sha256(data) || bytes32(address) )
-        bytes memory message = abi.encodePacked(data, bytes32(msg.sender));
+        // TODO: Sync and change to sign ( sha256(data) || address )
+        bytes memory message = abi.encodePacked(data, msg.sender);
 
         // Verification
         BN256.G1Point[] memory p1 = new BN256.G1Point[](2);
@@ -286,26 +328,43 @@ contract DOSProxy {
         return passVerify;
     }
 
-    function triggerCallback(uint queryId, bytes result, uint[2] sig) external {
+    function triggerCallback(
+        uint requestId,
+        uint8 trafficType,
+        bytes result,
+        uint[2] sig
+    )
+        external
+    {
         if (!validateAndVerify(
-                0,
-                queryId,
+                trafficType,
+                requestId,
                 result,
                 BN256.G1Point(sig[0], sig[1]),
-                pendingQueries[queryId].handledGroup))
+                PendingRequests[requestId].handledGroup))
         {
             return;
         }
 
-        address ucAddr = pendingQueries[queryId].callbackAddr;
+        address ucAddr = PendingRequests[requestId].callbackAddr;
         if (ucAddr == 0x0) {
-            emit LogQueryFromNonExistentUC();
+            emit LogRequestFromNonExistentUC();
             return;
         }
 
         emit LogCallbackTriggeredFor(ucAddr);
-        UserContractInterface(ucAddr).__callback__(queryId, result);
-        delete pendingQueries[queryId];
+        delete PendingRequests[requestId];
+        if (trafficType == TrafficUserQuery) {
+            UserContractInterface(ucAddr).__callback__(requestId, result);
+        } else if (trafficType == TrafficUserRandom) {
+            // Safe random number is the collectively signed threshold signature
+            // of the message (requestId || lastRandomness || userSeed ||
+            // selected sender in group).
+            UserContractInterface(ucAddr).__callback__(
+                requestId, uint(keccak256(abi.encodePacked(sig[0], sig[1]))));
+        } else {
+            revert("Unsupported traffic type");
+        }
     }
 
     function toBytes(uint x) internal pure returns (bytes b) {
@@ -313,9 +372,10 @@ contract DOSProxy {
         assembly { mstore(add(b, 32), x) }
     }
 
+    // System-level secure distributed random number generator.
     function updateRandomness(uint[2] sig) external {
         if (!validateAndVerify(
-                1,
+                TrafficSystemRandom,
                 lastRandomness,
                 toBytes(lastRandomness),
                 BN256.G1Point(sig[0], sig[1]),
@@ -323,12 +383,13 @@ contract DOSProxy {
         {
             return;
         }
-        // Update new randomness = sha3(group signature)
+        // Update new randomness = sha3(collectively signed group signature)
         lastRandomness = uint(keccak256(abi.encodePacked(sig[0], sig[1])));
         lastUpdatedBlock = block.number - 1;
         uint idx = lastRandomness % groupPubKeys.length;
         lastHandledGroup = groupPubKeys[idx];
-        // Signal off-chain clients
+        // Signal selected off-chain clients to collectively generate a new
+        // system level random number for next round.
         emit LogUpdateRandom(lastRandomness, getGroupPubKey(idx));
     }
 

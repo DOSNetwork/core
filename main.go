@@ -68,21 +68,42 @@ func main() {
 	defer close(chUrl)
 	chRandom := make(chan interface{}, 20)
 	defer close(chRandom)
+	chUsrRandom := make(chan interface{}, 20)
+	defer close(chUsrRandom)
 	cSignatureFromPeer := make(chan vss.Signature, 100)
 	defer close(cSignatureFromPeer)
 	eventValidation := make(chan interface{}, 20)
 	defer close(eventValidation)
-	chainConn.SubscribeEvent(chUrl, onchain.SubscribeDOSProxyLogUrl)
 	err = chainConn.SubscribeEvent(eventGrouping, onchain.SubscribeDOSProxyLogGrouping)
-	chainConn.SubscribeEvent(chRandom, onchain.SubscribeDOSProxyLogUpdateRandom)
-	chainConn.SubscribeEvent(eventValidation, onchain.SubscribeDOSProxyLogValidationResult)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = chainConn.SubscribeEvent(chUrl, onchain.SubscribeDOSProxyLogUrl)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = chainConn.SubscribeEvent(chRandom, onchain.SubscribeDOSProxyLogUpdateRandom)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = chainConn.SubscribeEvent(chUsrRandom, onchain.SubscribeDOSProxyLogRequestUserRandom)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = chainConn.SubscribeEvent(eventValidation, onchain.SubscribeDOSProxyLogValidationResult)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	//6)Set up a dosnode pipeline
 	d, _ := dos.CreateDosNode(suite, nbParticipants, p, chainConn, p2pDkg)
 	d.PipeGrouping(eventGrouping)
-	queryReports := d.PipeCheckURL(chUrl)
-	randomReports := d.PipeGenerateRandomNumber(chRandom)
-	signedReports := d.PipeSignAndBroadcast(queryReports, randomReports)
+	queriesReports := d.PipeQueries(chUrl, chUsrRandom, chRandom)
+	signedReports := d.PipeSignAndBroadcast(queriesReports)
 	reportsToSubmit, reportToValidate := d.PipeRecoverAndVerify(cSignatureFromPeer, signedReports)
 	d.PipeSendToOnchain(reportsToSubmit)
 	chRetrigerUrl := d.PipeCleanFinishMap(eventValidation, reportToValidate)

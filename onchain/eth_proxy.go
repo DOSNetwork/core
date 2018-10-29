@@ -24,10 +24,9 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 )
 
-// TODO: Instead of hardcode, read from DOSAddressBridge.go
-
 const (
 	SubscribeDOSProxyLogUrl = iota
+	SubscribeDOSProxyLogRequestUserRandom
 	SubscribeDOSProxyLogNonSupportedType
 	SubscribeDOSProxyLogNonContractCall
 	SubscribeDOSProxyLogCallbackTriggeredFor
@@ -37,6 +36,14 @@ const (
 	SubscribeDOSProxyLogInsufficientGroupNumber
 	SubscribeDOSProxyLogGrouping
 	SubscribeDOSProxyLogPublicKeyAccepted
+	SubscribeDOSProxyWhitelistAddressTransferred
+)
+
+// TODO: Move constants to some unified places.
+const (
+	TrafficSystemRandom = iota // 0
+	TrafficUserRandom
+	TrafficUserQuery
 )
 
 const balanceCheckInterval = 3
@@ -176,6 +183,34 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 				}
 			}
 		}
+
+	case SubscribeDOSProxyLogRequestUserRandom:
+		fmt.Println("subscribing DOSProxyLogRequestUserRandom event...")
+		transitChan := make(chan *dosproxy.DOSProxyLogRequestUserRandom)
+		sub, err := e.proxy.DOSProxyFilterer.WatchLogRequestUserRandom(opt, transitChan)
+		if err != nil {
+			fmt.Println(err)
+			fmt.Println("Network fail, will retry shortly")
+			return
+		}
+		fmt.Println("DOSProxyLogRequestUserRandom event subscribed")
+
+		done <- true
+		for {
+			select {
+			case err := <-sub.Err():
+				log.Fatal(err)
+			case i := <-transitChan:
+				if !e.filterLog(i.Raw) {
+					ch <- &DOSProxyLogRequestUserRandom{
+						RequestId:            i.RequestId,
+						LastSystemRandomness: i.LastSystemRandomness,
+						UserSeed:             i.UserSeed,
+						DispatchedGroup:      i.DispatchedGroup,
+					}
+				}
+			}
+		}
 	case SubscribeDOSProxyLogUpdateRandom:
 		fmt.Println("subscribing DOSProxyLogUpdateRandom event...")
 		transitChan := make(chan *dosproxy.DOSProxyLogUpdateRandom)
@@ -304,8 +339,8 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 		}
 	case SubscribeDOSProxyLogQueryFromNonExistentUC:
 		fmt.Println("subscribing DOSProxyLogQueryFromNonExistentUC event...")
-		transitChan := make(chan *dosproxy.DOSProxyLogQueryFromNonExistentUC)
-		sub, err := e.proxy.DOSProxyFilterer.WatchLogQueryFromNonExistentUC(opt, transitChan)
+		transitChan := make(chan *dosproxy.DOSProxyLogRequestFromNonExistentUC)
+		sub, err := e.proxy.DOSProxyFilterer.WatchLogRequestFromNonExistentUC(opt, transitChan)
 		if err != nil {
 			fmt.Println(err)
 			fmt.Println("Network fail, will retry shortly")
@@ -320,7 +355,7 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 				log.Fatal(err)
 			case i := <-transitChan:
 				if !e.filterLog(i.Raw) {
-					ch <- &DOSProxyLogQueryFromNonExistentUC{}
+					ch <- &DOSProxyLogRequestFromNonExistentUC{}
 				}
 			}
 		}
@@ -369,6 +404,31 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 						X2: i.X2,
 						Y1: i.Y1,
 						Y2: i.Y2,
+					}
+				}
+			}
+		}
+	case SubscribeDOSProxyWhitelistAddressTransferred:
+		fmt.Println("subscribing DOSProxyWhitelistAddressTransferred event...")
+		transitChan := make(chan *dosproxy.DOSProxyWhitelistAddressTransferred)
+		sub, err := e.proxy.DOSProxyFilterer.WatchWhitelistAddressTransferred(opt, transitChan)
+		if err != nil {
+			fmt.Println(err)
+			fmt.Println("Network fail, will retry shortly")
+			return
+		}
+		fmt.Println("DOSProxyWhitelistAddressTransferred event subscribed")
+
+		done <- true
+		for {
+			select {
+			case err := <-sub.Err():
+				log.Fatal(err)
+			case i := <-transitChan:
+				if !e.filterLog(i.Raw) {
+					ch <- &DOSProxyWhitelistAddressTransferred{
+						Previous: i.Previous,
+						Curr:     i.Curr,
 					}
 				}
 			}
@@ -511,7 +571,7 @@ func DecodePubKey(pubKey kyber.Point) (*big.Int, *big.Int, *big.Int, *big.Int, e
 	return x0, x1, y0, y1, nil
 }
 
-func (e *EthAdaptor) DataReturn(queryId *big.Int, data, sig []byte) (err error) {
+func (e *EthAdaptor) DataReturn(requestId *big.Int, trafficType uint8, data, sig []byte) (err error) {
 	auth, err := e.getAuth()
 	if err != nil {
 		return
@@ -519,13 +579,13 @@ func (e *EthAdaptor) DataReturn(queryId *big.Int, data, sig []byte) (err error) 
 
 	x, y := DecodeSig(sig)
 
-	tx, err := e.proxy.TriggerCallback(auth, queryId, data, [2]*big.Int{x, y})
+	tx, err := e.proxy.TriggerCallback(auth, requestId, trafficType, data, [2]*big.Int{x, y})
 	if err != nil {
 		return
 	}
 
 	fmt.Println("tx sent: ", tx.Hash().Hex())
-	fmt.Println("Query_ID request fulfilled ", queryId, " waiting for confirmation...")
+	fmt.Printf("Request with id(%v) type(%v) fulfilled, waiting for confirmation...\n", requestId, trafficType)
 
 	err = e.checkTransaction(tx)
 
@@ -740,7 +800,7 @@ func (e *EthAdaptor) checkTransaction(tx *types.Transaction) (err error) {
 }
 
 func (e *EthAdaptor) SubscribeToAll(msgChan chan interface{}) (err error) {
-	for i := 0; i < 10; i++ {
+	for i := SubscribeDOSProxyLogUrl; i <= SubscribeDOSProxyWhitelistAddressTransferred; i++ {
 		err = e.SubscribeEvent(msgChan, i)
 	}
 	return

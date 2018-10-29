@@ -11,12 +11,16 @@ type AskMeAnythingSetTimeout struct {
 	NewTimeout      *big.Int
 }
 
-type AskMeAnythingCallbackReady struct {
+type AskMeAnythingQueryResponseReady struct {
 	QueryId *big.Int
 	Result  string
 }
 
-type AskMeAnythingQuerySent struct {
-	Succ    bool
-	QueryId *big.Int
+type AskMeAnythingRequestSent struct {
+	Succ      bool
+	RequestId *big.Int
+}
+
+type AskMeAnythingRandomReady struct {
+	GeneratedRandom *big.Int
 }

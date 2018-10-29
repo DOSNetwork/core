@@ -31,7 +31,7 @@ func TestPipeCheckURL(test *testing.T) {
 	d, _ := CreateDosNode(suite, nbParticipants, nil, nil, p2pDkg)
 	chUrl := make(chan interface{}, 100)
 	defer close(chUrl)
-	out1 := d.PipeCheckURL(chUrl)
+	out1 := d.PipeQueries(chUrl)
 	QueryId := big.NewInt(1)
 	url := "test"
 	Timeout := big.NewInt(1)

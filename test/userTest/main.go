@@ -42,19 +42,25 @@ func startQuery(user int) {
 				fmt.Println("new timeout:", i.NewTimeout)
 				fmt.Println("previous timeout:", i.PreviousTimeout)
 				fmt.Println("____________________________________________")
-			case *eth.AskMeAnythingCallbackReady:
-				fmt.Println("AskMeAnythingCallbackReady")
+			case *eth.AskMeAnythingQueryResponseReady:
+				fmt.Println("AskMeAnythingQueryResponseReady")
 				fmt.Println("Callback Ready Query id:", i.QueryId)
 				fmt.Println("result: ", i.Result)
 				fmt.Println("initial new query...")
+				fmt.Println("____________________________________________")
+				userTestAdaptor.GetRandom()
+				lastQuery = time.Now()
+			case *eth.AskMeAnythingRequestSent:
+				fmt.Println("AskMeAnythingRequestSent")
+				fmt.Println("succ:", i.Succ)
+				fmt.Println("RequestId", i.RequestId)
+				fmt.Println("____________________________________________")
+			case *eth.AskMeAnythingRandomReady:
+				fmt.Println("AskMeAnythingRandomReady")
+				fmt.Println("GeneratedRandom:", i.GeneratedRandom)
+				fmt.Println("____________________________________________")
 				userTestAdaptor.Query(queryUrls[user])
 				lastQuery = time.Now()
-				fmt.Println("____________________________________________")
-			case *eth.AskMeAnythingQuerySent:
-				fmt.Println("AskMeAnythingQuerySent")
-				fmt.Println("succ:", i.Succ)
-				fmt.Println("Query Id", i.QueryId)
-				fmt.Println("____________________________________________")
 			default:
 				fmt.Println("type mismatch")
 			}

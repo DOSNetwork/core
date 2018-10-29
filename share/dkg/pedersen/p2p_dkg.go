@@ -58,8 +58,8 @@ func CreateP2PDkg(p p2p.P2PInterface, suite suites.Suite, peerEvent chan p2p.P2P
 			{Name: "receiveAllPubkey", Src: []string{"ExchangePubKey"}, Dst: "NewDistKeyGenerator"},
 			{Name: "receiveDeal", Src: []string{"NewDistKeyGenerator"}, Dst: "NewDistKeyGenerator"},
 			{Name: "receiveAllDeal", Src: []string{"NewDistKeyGenerator"}, Dst: "ProcessDeal"},
-			{Name: "receiveResponse", Src: []string{"ProcessDeal"}, Dst: "ProcessDeal"},
-			{Name: "cetified", Src: []string{"ProcessDeal"}, Dst: "Verified"},
+			{Name: "ReadyForResponse", Src: []string{"ProcessDeal"}, Dst: "ProcessResponse"},
+			{Name: "cetified", Src: []string{"ProcessResponse"}, Dst: "Verified"},
 			{Name: "checkURL", Src: []string{"Verified"}, Dst: "Verified"},
 			{Name: "receiveSignature", Src: []string{"Verified"}, Dst: "Verified"},
 			{Name: "verify", Src: []string{"Verified"}, Dst: "Verified"},
@@ -84,6 +84,7 @@ type P2PDkg struct {
 	//Data Buffer
 	publicKeys Pubkeys
 	deals      []Deal
+	responses  []Response
 	chResponse chan Response
 	//Group member ID
 	groupIds [][]byte
@@ -217,6 +218,7 @@ func (d *P2PDkg) enterExchangePubKey(e *fsm.Event) {
 		fmt.Println(err)
 	}
 	d.broadcast(&public)
+
 	//TODO: Should check if publicKeys are all belong to the members
 	if len(d.publicKeys) == d.nbParticipants {
 		d.chFsmEvent <- "receiveAllPubkey"
@@ -232,6 +234,31 @@ func (d *P2PDkg) afterReceivePubkey(e *fsm.Event) {
 
 //Can't call NewDistKeyGenerator .need to wait unitl all deal has been received
 func (d *P2PDkg) enterNewDistKeyGenerator(e *fsm.Event) {
+
+	go func() {
+		for r := range d.chResponse {
+			if d.FSM.Current() != "ProcessResponse" {
+				d.responses = append(d.responses, r)
+			} else {
+				for _, savedResponses := range d.responses {
+					_, err := (*d.partDkg).ProcessResponse(&savedResponses)
+					if err != nil {
+						fmt.Println(err)
+					}
+				}
+				d.responses = d.responses[:0]
+				_, err := (*d.partDkg).ProcessResponse(&r)
+				if err != nil {
+					fmt.Println(err)
+				}
+				if (*d.partDkg).Certified() && d.FSM.Current() == "ProcessResponse" {
+					fmt.Println("resp Certified ")
+					d.chFsmEvent <- "cetified"
+				}
+			}
+		}
+	}()
+
 	var err error
 	sort.Sort(d.publicKeys)
 	d.partDkg, err = NewDistKeyGenerator(d.suite, d.partSec, d.publicKeys, d.nbParticipants/2+1)
@@ -244,7 +271,10 @@ func (d *P2PDkg) enterNewDistKeyGenerator(e *fsm.Event) {
 	}
 	for i, pub := range d.publicKeys {
 		if !pub.Equal(d.partPub) {
-			(*d.network).SendMessageById([]byte(d.pubkeyIdMap[pub.String()]), deals[i])
+			err = (*d.network).SendMessageById([]byte(d.pubkeyIdMap[pub.String()]), deals[i])
+			if err != nil {
+				fmt.Println(err)
+			}
 		} else {
 			d.dkgIndex = i
 		}
@@ -271,18 +301,7 @@ func (d *P2PDkg) enterProcessDeal(e *fsm.Event) {
 			d.broadcast(resp)
 		}
 	}
-	go func() {
-		for r := range d.chResponse {
-			_, err := (*d.partDkg).ProcessResponse(&r)
-			if err != nil {
-				fmt.Println(err)
-			}
-			if (*d.partDkg).Certified() {
-				fmt.Println("resp Certified ")
-				d.chFsmEvent <- "cetified"
-			}
-		}
-	}()
+	d.chFsmEvent <- "ReadyForResponse"
 }
 
 func (d *P2PDkg) enterVerified(e *fsm.Event) {
