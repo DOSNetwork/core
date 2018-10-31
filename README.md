@@ -3,11 +3,12 @@
 
 ### Components and file structure (TODO)
 - Shamir's secret sharing 
-- Feldman/Pedersen's DKG approach
+- Pedersen's DKG approach
 - Paring Library and BLS Signature
 - DHT & Gossip implementation
 - P2P NAT Support
 - On-chain Verification Contracts
+- Json / xml / html parser
 - .
 
 
@@ -26,5 +27,6 @@
 
 
 
-### Deploy 
+### Trouble shooting and Deploy
+- Run `$ dep ensure -update` when it complains about missing dependencies/packages, and commits updated Gopkg.lock file.
 - Dockerize ... (TODO)

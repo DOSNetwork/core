@@ -66,8 +66,8 @@ contract DOSOnChainSDK {
         // To be overridden in the caller contract.
     }
 
-    // @dev: Call this function to request either a fast but unsecured
-    //       random number or a safe and secure random number delivered back
+    // @dev: Call this function to request either a fast but insecure random
+    //       number or a safe and secure random number delivered back
     //       asynchronously through the __callback__ function.
     //       Depending on the mode, the return value would be a random number
     //       (for fast mode) or a requestId (for safe mode).

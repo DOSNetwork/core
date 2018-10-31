@@ -77,7 +77,7 @@ contract DOSProxy {
     address[22] whitelists;
     // whitelisted address => index in whitelists.
     mapping(address => uint) isWhitelisted;
-    bool public whitelistInitialled = false;
+    bool public whitelistInitialized = false;
     event WhitelistAddressTransferred(address previous, address curr);
 
     modifier onlyWhitelisted {
@@ -87,13 +87,13 @@ contract DOSProxy {
     }
 
     function initWhitelist(address[21] addresses) public {
-        require(!whitelistInitialled, "Whitelist already initialized!");
+        require(!whitelistInitialized, "Whitelist already initialized!");
 
         for (uint idx = 0; idx < 21; idx++) {
             whitelists[idx+1] = addresses[idx];
             isWhitelisted[addresses[idx]] = idx+1;
         }
-        whitelistInitialled = true;
+        whitelistInitialized = true;
     }
 
     function getWhitelistAddress(uint idx) public view returns (address) {
