@@ -44,7 +44,7 @@ contract DOSProxy {
         uint queryId,
         uint timeout,
         string dataSource,
-        string selecor,
+        string selector,
         uint randomness,
         // Log G2Point struct directly is an experimental feature, use with care.
         uint[4] dispatchedGroup
@@ -55,7 +55,7 @@ contract DOSProxy {
         uint userSeed,
         uint[4] dispatchedGroup
     );
-    event LogNonSupportedType(string invalidSelecor);
+    event LogNonSupportedType(string invalidSelector);
     event LogNonContractCall(address from);
     event LogCallbackTriggeredFor(address callbackAddr);
     event LogRequestFromNonExistentUC();
@@ -77,7 +77,7 @@ contract DOSProxy {
     address[22] whitelists;
     // whitelisted address => index in whitelists.
     mapping(address => uint) isWhitelisted;
-    bool public whitelistInited = false;
+    bool public whitelistInitialled = false;
     event WhitelistAddressTransferred(address previous, address curr);
 
     modifier onlyWhitelisted {
@@ -87,16 +87,16 @@ contract DOSProxy {
     }
 
     function initWhitelist(address[21] addresses) public {
-        require(!whitelistInited, "Whitelist already initialized!");
+        require(!whitelistInitialled, "Whitelist already initialized!");
 
         for (uint idx = 0; idx < 21; idx++) {
             whitelists[idx+1] = addresses[idx];
             isWhitelisted[addresses[idx]] = idx+1;
         }
-        whitelistInited = true;
+        whitelistInitialled = true;
     }
 
-    function getWhitelistAddess(uint idx) public view returns (address) {
+    function getWhitelistAddress(uint idx) public view returns (address) {
         require(idx > 0 && idx <= 21, "Index out of range");
         return whitelists[idx];
     }

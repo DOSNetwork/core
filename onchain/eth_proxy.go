@@ -14,6 +14,7 @@ import (
 
 	"github.com/DOSNetwork/core/group/bn256"
 	"github.com/DOSNetwork/core/onchain/eth/contracts"
+
 	"github.com/dedis/kyber"
 
 	"github.com/ethereum/go-ethereum"
@@ -175,8 +176,9 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 				if !e.filterLog(i.Raw) {
 					ch <- &DOSProxyLogUrl{
 						QueryId:         i.QueryId,
-						Url:             i.Url,
 						Timeout:         i.Timeout,
+						DataSource:      i.DataSource,
+						Selector:        i.Selector,
 						Randomness:      i.Randomness,
 						DispatchedGroup: i.DispatchedGroup,
 					}
@@ -284,7 +286,7 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 			case i := <-transitChan:
 				if !e.filterLog(i.Raw) {
 					ch <- &DOSProxyLogNonSupportedType{
-						QueryType: i.QueryType,
+						InvalidSelector: i.InvalidSelector,
 					}
 				}
 			}
@@ -481,7 +483,7 @@ func (e *EthAdaptor) InitialWhiteList() (err error) {
 }
 
 func (e *EthAdaptor) GetWhitelist() (address common.Address, err error) {
-	return e.proxy.GetWhitelistAddess(&bind.CallOpts{}, big.NewInt(1))
+	return e.proxy.GetWhitelistAddress(&bind.CallOpts{}, big.NewInt(1))
 }
 
 func (e *EthAdaptor) UploadID() (err error) {

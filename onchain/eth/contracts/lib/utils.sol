@@ -4,7 +4,7 @@ pragma solidity ^0.4.24;
 library utils {
     uint constant UINT256MAX = ~uint(0);
     
-    // A decmial byte to uint. Return value of 10 indicating invalid input.
+    // A decimal byte to uint. Return value of 10 indicating invalid input.
     function byte2Uint(byte b) internal pure returns(uint) {
         if (b >= '0' && b <= '9') {
             return uint(b) - 48;  // '0'

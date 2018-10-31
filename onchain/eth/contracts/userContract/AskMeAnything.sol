@@ -13,6 +13,7 @@ contract AskMeAnything is Ownable, DOSOnChainSDK {
     // Default timeout in seconds: Two blocks.
     uint public timeout = 14 * 2;
     string public lastQueriedUrl;
+    string public lastQueriedSelector;
     uint public lastRequestedRandom;
 
     event SetTimeout(uint previousTimeout, uint newTimeout);
@@ -37,9 +38,10 @@ contract AskMeAnything is Ownable, DOSOnChainSDK {
     }
 
     // Ask me anything (AMA) off-chain through an api/url.
-    function AMA(string url) public {
+    function AMA(string url, string selector) public {
         lastQueriedUrl = url;
-        uint id = DOSQuery(timeout, "API", url);
+        lastQueriedSelector = selector;
+        uint id = DOSQuery(timeout, url, selector);
         if (id != 0x0) {
             _valid[id] = true;
             emit RequestSent(true, id);
@@ -56,7 +58,7 @@ contract AskMeAnything is Ownable, DOSOnChainSDK {
         delete _valid[queryId];
 
         if (repeatedCall) {
-            AMA(lastQueriedUrl);
+            AMA(lastQueriedUrl, lastQueriedSelector);
         }
     }
 

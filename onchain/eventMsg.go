@@ -10,8 +10,9 @@ import (
 //TODO: NEED TO MOVE IT DIRECTLY INSIDE BLOCKCHAIN FOLDER
 type DOSProxyLogUrl struct {
 	QueryId         *big.Int
-	Url             string
 	Timeout         *big.Int
+	DataSource      string
+	Selector        string
 	Randomness      *big.Int
 	DispatchedGroup [4]*big.Int
 }
@@ -24,7 +25,7 @@ type DOSProxyLogRequestUserRandom struct {
 }
 
 type DOSProxyLogNonSupportedType struct {
-	QueryType string
+	InvalidSelector string
 }
 
 type DOSProxyLogNonContractCall struct {
