@@ -111,7 +111,6 @@ contract DOSProxy {
         whitelists[isWhitelisted[msg.sender]] = newWhitelistedAddr;
     }
 
-
     function getCodeSize(address addr) internal constant returns (uint size) {
         assembly {
             size := extcodesize(addr)
