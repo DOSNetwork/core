@@ -228,31 +228,31 @@ library utils {
         pi[1] = 0;
         uint k = 0;
         // KMP pre-processing
-		for(uint q = 2; q <= needle.length; q++) {
-		    while(k > 0 && needle[k] != needle[q-1]) {
-		        k = pi[k];
-		    }
-			if(needle[k] == needle[q-1]) {
-			    k++;
-		    }
-			pi[q] = k;
-		}
-		// KMP matching
-		q = 0;
-		for(uint i = 0; i < haystack.length; i++) {
-			while(q > 0 && needle[q] != haystack[i]) {
-				q = pi[q];
-			}
-			if(needle[q] == haystack[i]) {
-				q++;
-			}
-			// Match
-			if(q == needle.length) {
-			    return int(i - q + 1);
-			}
-		}
-		// No match
-		return -1;
+        for(uint q = 2; q <= needle.length; q++) {
+            while(k > 0 && needle[k] != needle[q-1]) {
+                k = pi[k];
+            }
+            if(needle[k] == needle[q-1]) {
+                k++;
+            }
+            pi[q] = k;
+        }
+        // KMP matching
+        q = 0;
+        for(uint i = 0; i < haystack.length; i++) {
+            while(q > 0 && needle[q] != haystack[i]) {
+                q = pi[q];
+            }
+            if(needle[q] == haystack[i]) {
+                q++;
+            }
+            // Match
+            if(q == needle.length) {
+                return int(i - q + 1);
+            }
+        }
+        // No match
+        return -1;
     }
 
     // subStr("1234567890", 2, 5) => "34567"
