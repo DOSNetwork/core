@@ -14,6 +14,7 @@ import (
 
 	"github.com/DOSNetwork/core/onchain"
 	"github.com/DOSNetwork/core/onchain/eth/contracts/userContract"
+
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
@@ -215,19 +216,19 @@ func (e *EthUserAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.Wa
 	}
 }
 
-func (e *EthUserAdaptor) Query(url string) (err error) {
+func (e *EthUserAdaptor) Query(url, selector string) (err error) {
 	auth, err := e.getAuth()
 	if err != nil {
 		return
 	}
 
-	tx, err := e.proxy.AMA(auth, url)
+	tx, err := e.proxy.AMA(auth, url, selector)
 	if err != nil {
 		return
 	}
 
 	fmt.Println("tx sent: ", tx.Hash().Hex())
-	fmt.Println("Querying ", url, " waiting for confirmation...")
+	fmt.Println("Querying ", url, "selector", selector, "waiting for confirmation...")
 
 	err = e.checkTransaction(tx)
 
