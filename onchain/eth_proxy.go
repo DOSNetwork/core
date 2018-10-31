@@ -474,7 +474,7 @@ func (e *EthAdaptor) InitialWhiteList() (err error) {
 	}
 
 	fmt.Println("tx sent: ", tx.Hash().Hex())
-	fmt.Println("NodeId submitted, waiting for confirmation...")
+	fmt.Println("Whitelist initialized, waiting for confirmation...")
 
 	err = e.checkTransaction(tx)
 
