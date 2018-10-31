@@ -12,7 +12,7 @@ interface DOSAddressBridgeInterface {
 }
 
 contract DOSOnChainSDK {
-	using utils for *;
+    using utils for *;
 
     DOSProxyInterface dosProxy;
     DOSAddressBridgeInterface dosAddrBridge =

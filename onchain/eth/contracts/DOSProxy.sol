@@ -42,10 +42,10 @@ contract DOSProxy {
 
     event LogUrl(
         uint queryId,
-		uint timeout,
+        uint timeout,
         string dataSource,
-		string selecor,
-		uint randomness,
+        string selecor
+        uint randomness,
         // Log G2Point struct directly is an experimental feature, use with care.
         uint[4] dispatchedGroup
     );
@@ -131,10 +131,10 @@ contract DOSProxy {
     {
         if (getCodeSize(from) > 0) {
             bytes memory bs = bytes(selector);
-			// '': Return whole raw response;
-			// Starts with '$': response format is parsed as json.
-			// Starts with '/': response format is parsed as xml/html.
-			if (bs.length == 0 || bs[0] == '$' || bs[0] == '/') {
+            // '': Return whole raw response;
+            // Starts with '$': response format is parsed as json.
+            // Starts with '/': response format is parsed as xml/html.
+            if (bs.length == 0 || bs[0] == '$' || bs[0] == '/') {
                 uint queryId = uint(keccak256(abi.encodePacked(
                     ++requestIdSeed, from, timeout, dataSource, selector)));
                 uint idx = lastRandomness % groupPubKeys.length;
