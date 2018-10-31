@@ -17,12 +17,12 @@
 - [How to go-get from a private repo](https://blog.wilianto.com/go-get-from-private-repository.html)
 - Install [dep](https://golang.github.io/dep/docs/daily-dep.html#key-takeaways) to manage package dependencies and versions.
   - [Visualize package dependencies](https://golang.github.io/dep/docs/daily-dep.html#visualizing-dependencies)
-- Use ```$ go fmt .```; or plugin before commit.
-- Download: $ go get -d github.com/DOSNetwork/core/...
-- Build: ```$ make```
-- Install: ```$ make install```
+- Download: `$ go get -d github.com/DOSNetwork/core/...`
+- Build: `$ make`
+- Install: `$ make install`
 - ... Hack ...
-- ```$ make clean``` before commit
+- Use `$ go fmt .`; or plugin before commit.
+- `$ make clean` before commit
 
 
 

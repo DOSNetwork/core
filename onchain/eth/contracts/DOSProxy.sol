@@ -44,7 +44,7 @@ contract DOSProxy {
         uint queryId,
         uint timeout,
         string dataSource,
-        string selecor
+        string selecor,
         uint randomness,
         // Log G2Point struct directly is an experimental feature, use with care.
         uint[4] dispatchedGroup
