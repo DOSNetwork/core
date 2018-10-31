@@ -268,7 +268,7 @@ library utils {
     }
 
     // string num = "123.4567";
-    // subStr(num, indexOf(num, '.')) => "4567"
+    // subStr(num, indexOf(num, '.') + 1) => "4567"
     function subStr(bytes a, uint start) internal pure returns(bytes) {
         require(start < a.length, "Invalid start index out of range");
         return subStr(a, start, a.length - start);
