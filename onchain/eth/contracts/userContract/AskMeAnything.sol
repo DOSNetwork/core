@@ -46,7 +46,6 @@ contract AskMeAnything is Ownable, DOSOnChainSDK {
             _valid[id] = true;
             emit RequestSent(true, id);
         } else {
-            emit RequestSent(false, id);
             revert("Invalid query id.");
         }
     }

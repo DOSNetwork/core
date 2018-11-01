@@ -7,7 +7,6 @@ import (
 	"io/ioutil"
 	"math/big"
 	"net/http"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -119,10 +118,7 @@ func dataParse(rawMsg []byte, pathStr string) (msg []byte, err error) {
 			return
 		}
 
-		switch content := msgJson.(type) {
-		case interface{}:
-			msg = dataExtract(content)
-		}
+		msg, err = json.Marshal(msgJson)
 	} else if strings.HasPrefix(pathStr, "/") {
 		var rawMsgXml *xmlquery.Node
 		rawMsgXml, err = xmlquery.Parse(bytes.NewReader(rawMsg))
@@ -137,25 +133,6 @@ func dataParse(rawMsg []byte, pathStr string) (msg []byte, err error) {
 		}
 	}
 
-	return
-}
-
-func dataExtract(rawData interface{}) (dataBytes []byte) {
-	switch content := rawData.(type) {
-	case float64:
-		dataString := strconv.FormatFloat(content, 'f', -1, 64)
-		dataBytes = []byte(dataString)
-	case string:
-		dataBytes = []byte(content)
-	case []interface{}:
-		for _, rawData := range content {
-			switch innerContent := rawData.(type) {
-			case interface{}:
-				dataBytes = append(dataBytes, dataExtract(innerContent)...)
-				dataBytes = append(dataBytes, "\n"...)
-			}
-		}
-	}
 	return
 }
 
@@ -266,6 +243,7 @@ func (d *DosNode) PipeQueries(queries ...<-chan interface{}) <-chan Report {
 							fmt.Println(err)
 						}
 						msgReturn, err := dataParse(rawMsg, content.Selector)
+						fmt.Println("Data to return:", string(msgReturn))
 						// signed message = concat(msgReturn, submitter address)
 						msgReturn = append(msgReturn, submitter...)
 						//combine result with submitter
