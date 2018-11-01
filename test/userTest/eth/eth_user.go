@@ -419,8 +419,15 @@ func (e *EthUserAdaptor) transferEth(from, to *keystore.Key) (err error) {
 }
 
 func (e *EthUserAdaptor) checkTransaction(tx *types.Transaction) (err error) {
+	//TODO: Need more reliable method other than timeout
+	start := time.Now()
 	receipt, err := e.client.TransactionReceipt(context.Background(), tx.Hash())
 	for err == ethereum.NotFound {
+		if time.Since(start).Seconds() > 30 {
+			fmt.Println("no receipt yet, set to successful")
+			return
+		}
+
 		time.Sleep(1 * time.Second)
 		receipt, err = e.client.TransactionReceipt(context.Background(), tx.Hash())
 	}

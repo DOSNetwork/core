@@ -50,7 +50,7 @@ func startQuery(user int) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	events := make(chan interface{})
+	events := make(chan interface{}, 50)
 	userTestAdaptor.SubscribeToAll(events)
 
 	ticker := time.NewTicker(3 * time.Minute)
