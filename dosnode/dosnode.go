@@ -2,12 +2,18 @@ package dosnode
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"math/big"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
+
+	"github.com/antchfx/xmlquery"
+
+	"github.com/oliveagle/jsonpath"
 
 	"github.com/DOSNetwork/core/onchain"
 	"github.com/DOSNetwork/core/p2p"
@@ -74,17 +80,18 @@ func (d *DosNode) SetParticipants(nbParticipants int) {
 	d.nbParticipants = nbParticipants
 	d.nbThreshold = nbParticipants/2 + 1
 }
-func (d *DosNode) dataFetch(url string) ([]byte, error) {
+
+func dataFetch(url string) (body []byte, err error) {
 	sTime := time.Now()
 	client := &http.Client{Timeout: 60 * time.Second}
 	r, err := client.Get(url)
 	if err != nil {
-		return nil, err
+		return
 	}
 
-	body, err := ioutil.ReadAll(r.Body)
+	body, err = ioutil.ReadAll(r.Body)
 	if err != nil {
-		return nil, err
+		return
 	}
 
 	r.Body.Close()
@@ -92,8 +99,41 @@ func (d *DosNode) dataFetch(url string) ([]byte, error) {
 	fmt.Println("fetched data: ", string(body))
 	fmt.Println("dataFetch End:	took", time.Now().Sub(sTime))
 
-	return body, nil
+	return
 
+}
+
+func dataParse(rawMsg []byte, pathStr string) (msg []byte, err error) {
+	if pathStr == "" {
+		msg = rawMsg
+	} else if strings.HasPrefix(pathStr, "$") {
+		var rawMsgJson, msgJson interface{}
+		err = json.Unmarshal(rawMsg, &rawMsgJson)
+		if err != nil {
+			return
+		}
+
+		msgJson, err = jsonpath.JsonPathLookup(rawMsgJson, pathStr)
+		if err != nil {
+			return
+		}
+
+		msg, err = json.Marshal(msgJson)
+	} else if strings.HasPrefix(pathStr, "/") {
+		var rawMsgXml *xmlquery.Node
+		rawMsgXml, err = xmlquery.Parse(bytes.NewReader(rawMsg))
+		if err != nil {
+			return
+		}
+
+		xmlNodes := xmlquery.Find(rawMsgXml, pathStr)
+		for _, xmlNode := range xmlNodes {
+			msg = append(msg, []byte(xmlNode.OutputXML(false))...)
+			msg = append(msg, "\n"...)
+		}
+	}
+
+	return
 }
 
 func (d *DosNode) isMember(dispatchedGroup [4]*big.Int) bool {
@@ -103,10 +143,7 @@ func (d *DosNode) isMember(dispatchedGroup [4]*big.Int) bool {
 		temp = append(dispatchedGroup[0].Bytes(), temp...)
 		temp = append([]byte{0x01}, temp...)
 
-		//fmt.Println("isMember from onchain : ", temp)
 		groupPub, err := d.p2pDkg.GetGroupPublicPoly().Commit().MarshalBinary()
-
-		//fmt.Println("isMember : ", groupPub)
 		if err != nil {
 			fmt.Println(err)
 			return false
@@ -130,7 +167,6 @@ func (d *DosNode) choseSubmitter(r *big.Int) (id []byte) {
 	submitter := x % y
 	//TODO:Check to see if submitter is alive
 	id = d.groupIds[submitter]
-	//id = append(new([12]byte)[:], d.groupIds[submitter]...)
 	fmt.Println("choseSubmitter ", id)
 	return
 }
@@ -145,7 +181,7 @@ func (d *DosNode) PipeGrouping(chGroup <-chan interface{}) {
 				switch content := msg.(type) {
 				case *onchain.DOSProxyLogGrouping:
 					isMember := false
-					groupIds := [][]byte{}
+					var groupIds [][]byte
 					for i, node := range content.NodeId {
 						id := node.Bytes()
 						if string(id) == string((*d.network).GetId().Id) {
@@ -200,19 +236,21 @@ func (d *DosNode) PipeQueries(queries ...<-chan interface{}) <-chan Report {
 					if d.isMember(content.DispatchedGroup) {
 						queryId := content.QueryId
 						fmt.Println("PipeCheckURL!!", queryId)
-						url := content.Url
+						url := content.DataSource
 						submitter := d.choseSubmitter(content.Randomness)
-						msg, err := d.dataFetch(url)
+						rawMsg, err := dataFetch(url)
 						if err != nil {
 							fmt.Println(err)
 						}
-						// signed message = concat(msg, submitter address)
-						msg = append(msg, submitter...)
+						msgReturn, err := dataParse(rawMsg, content.Selector)
+						fmt.Println("Data to return:", string(msgReturn))
+						// signed message = concat(msgReturn, submitter address)
+						msgReturn = append(msgReturn, submitter...)
 						//combine result with submitter
 						sign := &vss.Signature{
 							Index:   uint32(onchain.TrafficUserQuery),
 							QueryId: queryId.String(),
-							Content: msg,
+							Content: msgReturn,
 						}
 						report := &Report{}
 						report.selfSign = *sign
@@ -227,14 +265,14 @@ func (d *DosNode) PipeQueries(queries ...<-chan interface{}) <-chan Report {
 						fmt.Println("PipeUserRandom!!", requestId)
 						submitter := d.choseSubmitter(content.LastSystemRandomness)
 						// signed message: concat(requestId, lastSystemRandom, userSeed, submitter address)
-						msg := append(content.RequestId.Bytes(), content.LastSystemRandomness.Bytes()...)
-						msg = append(msg, content.UserSeed.Bytes()...)
-						msg = append(msg, submitter...)
+						msgReturn := append(content.RequestId.Bytes(), content.LastSystemRandomness.Bytes()...)
+						msgReturn = append(msgReturn, content.UserSeed.Bytes()...)
+						msgReturn = append(msgReturn, submitter...)
 						//combine result with submitter
 						sign := &vss.Signature{
 							Index:   uint32(onchain.TrafficUserRandom),
 							QueryId: requestId.String(),
-							Content: msg,
+							Content: msgReturn,
 						}
 						report := &Report{}
 						report.selfSign = *sign
@@ -247,16 +285,8 @@ func (d *DosNode) PipeQueries(queries ...<-chan interface{}) <-chan Report {
 						preRandom := content.LastRandomness
 						fmt.Printf("1 ) GenerateRandomNumber preRandom #%v \n", preRandom)
 						fmt.Println("1 ) GenerateRandomNumber preRandom ", preRandom)
-						//To avoid duplicate query
-						//_, ok := (*d.reportMap).Load(preRandom.String())
-						//if !ok {
+
 						submitter := d.choseSubmitter(preRandom)
-						//hash, err := d.chainConn.GetBlockHashByNumber(preBlock)
-						//if err != nil {
-						//	fmt.Printf("GetBlockHashByNumber #%v fails\n", preBlock)
-						//	return
-						//}
-						// signed message = concat(lastSystemRandomness, submitter address)
 						paddedRandomBytes := padOrTrim(preRandom.Bytes(), RANDOMNUMBERSIZE)
 						randomNum := append(paddedRandomBytes, submitter...)
 						fmt.Println("GenerateRandomNumber content = ", randomNum)
@@ -318,7 +348,6 @@ func (d *DosNode) PipeSignAndBroadcast(reports <-chan Report) <-chan Report {
 				for _, member := range d.groupIds {
 					if string(member) != string((*d.network).GetId().Id) {
 						//Todo:Need to check to see if it is thread safe
-						//fmt.Println(i, " : send to ", member)
 						(*d.network).SendMessageById(member, &sign)
 						fmt.Println("send to ", member)
 					}
@@ -348,12 +377,10 @@ func (d *DosNode) PipeRecoverAndVerify(cSignatureFromPeer chan vss.Signature, fr
 				fmt.Println("3) PipeRecoverAndVerify fromEth")
 				reportMap[report.selfSign.QueryId] = report
 			case sign := <-cSignatureFromPeer:
-				//fmt.Println("PipeRecoverAndVerify fromPeer")
 				var sigShares [][]byte
 				signIdentityBytes := append([]byte(sign.QueryId), sign.Signature...)
 				signIdentity := new(big.Int).SetBytes(signIdentityBytes).String()
 				if report, ok := reportMap[sign.QueryId]; ok {
-					//fmt.Println("4) PipeRecoverAndVerify start")
 					delete(signatureAwait, signIdentity)
 					//TODO:Should check if content is always the same
 					r := bytes.Compare(report.selfSign.Content, sign.Content)
@@ -367,7 +394,6 @@ func (d *DosNode) PipeRecoverAndVerify(cSignatureFromPeer chan vss.Signature, fr
 					report.signShares = append(report.signShares, sign.Signature)
 
 					sigShares = report.signShares
-					//fmt.Println("receiveSignature id ", sign.QueryId, " len ", len(sigShares), " nbParticipants ", d.nbParticipants)
 					if report.signGroup == nil && len(sigShares) >= d.nbThreshold {
 						fmt.Println("4) PipeRecoverAndVerify recover")
 						sig, err := tbls.Recover(d.suite, d.p2pDkg.GetGroupPublicPoly(), sign.Content, sigShares, d.nbThreshold, d.nbParticipants)
@@ -402,9 +428,6 @@ func (d *DosNode) PipeRecoverAndVerify(cSignatureFromPeer chan vss.Signature, fr
 						outForValidate <- report
 						fmt.Println("submit to outForValidate", sign.QueryId)
 						delete(reportMap, sign.QueryId)
-						//if string(d.chainConn.GetId()) == string(report.submitter) {
-						//	outForSubmit <- report
-						//}
 					} else {
 						reportMap[sign.QueryId] = report
 					}
@@ -423,9 +446,7 @@ func (d *DosNode) PipeRecoverAndVerify(cSignatureFromPeer chan vss.Signature, fr
 					}
 
 					go func() {
-						//fmt.Println("4) PipeRecoverAndVerify not enough ->")
 						cSignatureFromPeer <- sign
-						//fmt.Println("4) PipeRecoverAndVerify not enough <-")
 					}()
 				}
 			case <-d.quit:
@@ -445,11 +466,6 @@ func (d *DosNode) PipeSendToOnchain(chReport <-chan Report) {
 			case report := <-chReport:
 				switch report.selfSign.Index {
 				case onchain.TrafficSystemRandom:
-					//fmt.Println("PipeSendToOnchain = ", report.signGroup)
-					//Test Case 1
-					//os.Exit(0)
-					//Test Case 2
-					//report.signGroup[10] ^= 0x01
 					err := d.chainConn.SetRandomNum(report.signGroup)
 					if err != nil {
 						fmt.Println("SetRandomNum err ", err)
@@ -458,7 +474,6 @@ func (d *DosNode) PipeSendToOnchain(chReport <-chan Report) {
 					}
 				default:
 					fmt.Println("PipeSendToOnchain URL/usrRandom result = ", report.selfSign.Content)
-					//fmt.Println("PipeSendToOnchain checkURL result = ", report.signGroup)
 					qID := big.NewInt(0)
 					qID.SetString(report.selfSign.QueryId, 10)
 
@@ -468,6 +483,7 @@ func (d *DosNode) PipeSendToOnchain(chReport <-chan Report) {
 					}
 					queryResult := make([]byte, t)
 					copy(queryResult, report.selfSign.Content)
+
 					/*//Test Case 3
 					tmp := big.NewInt(20)
 					if report.backupTask.Timeout.Cmp(tmp) > 0 {
@@ -475,6 +491,7 @@ func (d *DosNode) PipeSendToOnchain(chReport <-chan Report) {
 						queryResult[0] ^= 0x01
 					}
 					*/
+
 					//TODO:chainCoo should use a sendToOnChain(protobuf message) instead of DataReturn with mutex
 					//sendToOnChain receive a message from channel then call the corresponding function
 					err := d.chainConn.DataReturn(qID, uint8(report.selfSign.Index), queryResult, report.signGroup)
@@ -501,7 +518,6 @@ func (d *DosNode) PipeCleanFinishMap(chValidation chan interface{}, forValidate 
 		for {
 			select {
 			case report := <-forValidate:
-				//fmt.Println("PipeCleanFinishMap ", report.timeStamp)
 				validateMap[report.selfSign.QueryId] = report
 			case msg := <-chValidation:
 				switch content := msg.(type) {
@@ -558,9 +574,7 @@ func (d *DosNode) PipeCleanFinishMap(chValidation chan interface{}, forValidate 
 							chValidationAwait[msg] = time.Now()
 						}
 						go func() {
-							//fmt.Println("4) PipeRecoverAndVerify not enough ->")
 							chValidation <- msg
-							//fmt.Println("4) PipeRecoverAndVerify not enough <-")
 						}()
 					}
 				default:

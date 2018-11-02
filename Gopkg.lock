@@ -3,6 +3,18 @@
 
 [[projects]]
   branch = "master"
+  name = "github.com/antchfx/xmlquery"
+  packages = ["."]
+  revision = "98cdbc3221ed492316cca5a4711e48ee0ca0dc9a"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/antchfx/xpath"
+  packages = ["."]
+  revision = "3de91f3991a1af6e495d49c9218318b5544b20e3"
+
+[[projects]]
+  branch = "master"
   name = "github.com/aristanetworks/goarista"
   packages = ["monotime"]
   revision = "33151c4543a79b013e8e6799ef45b2ba88c3cd1c"
@@ -46,7 +58,7 @@
     "util/test",
     "xof/blake2xb"
   ]
-  revision = "fca472924ef768c5d551dd263874e38c68c15c5d"
+  revision = "cdc776d8331b9aa96286d629df242fc0c5fc3256"
 
 [[projects]]
   name = "github.com/dedis/protobuf"
@@ -183,6 +195,12 @@
   revision = "f980bdb68a8962823200eafe6c0aa99e917be0d7"
 
 [[projects]]
+  branch = "master"
+  name = "github.com/oliveagle/jsonpath"
+  packages = ["."]
+  revision = "2e52cf6e685269ed8aefec6390f3cac3ef74e730"
+
+[[projects]]
   name = "github.com/pborman/uuid"
   packages = ["."]
   revision = "adf5a7427709b9deb95d29d3fa8a2bf9cfd388f1"
@@ -245,7 +263,7 @@
     "ripemd160",
     "scrypt"
   ]
-  revision = "e84da0312774c21d64ee2317962ef669b27ffb41"
+  revision = "4d3f4d9ffa16a13f451c3b2999e9c49e9750bf06"
 
 [[projects]]
   branch = "master"
@@ -256,7 +274,7 @@
     "html/charset",
     "websocket"
   ]
-  revision = "9b4f9f5ad5197c79fd623a3638e70d8b26cef344"
+  revision = "c44066c5c816ec500d459a2a324a753f78531ae0"
 
 [[projects]]
   branch = "master"
@@ -265,7 +283,7 @@
     "cpu",
     "unix"
   ]
-  revision = "2772b66316d2c587efeb188dcd5ebc6987656e84"
+  revision = "9b800f95dbbc54abff0acf7ee32d88ba4e328c89"
 
 [[projects]]
   name = "golang.org/x/text"
@@ -300,6 +318,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "da43b03ca5abc73ab64b0ecee4cb79d4f06ccdc239a7fa115436b043e56c01b3"
+  inputs-digest = "39fd9c147902eee9cbd432f0b6a68994773b2a117e4d970d57708528acfc2920"
   solver-name = "gps-cdcl"
   solver-version = 1
