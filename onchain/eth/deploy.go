@@ -180,7 +180,7 @@ func main() {
 	contractPath = contractPath + "/DOSOnChainSDK.sol"
 	step := *stepFlag
 
-	config := configuration.ReadConfig(configPath)
+	config := configuration.ReadConfig()
 	chainConfig := configuration.GetOnChainConfig(config)
 	fmt.Println("dial to ", chainConfig.RemoteNodeAddress)
 	client, err := ethclient.Dial(chainConfig.RemoteNodeAddress)

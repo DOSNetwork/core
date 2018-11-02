@@ -81,8 +81,9 @@ contract DOSProxy {
     event WhitelistAddressTransferred(address previous, address curr);
 
     modifier onlyWhitelisted {
-        uint idx = isWhitelisted[msg.sender];
-        require(idx != 0 && whitelists[idx] == msg.sender, "Not whitelisted!");
+        //uint idx = isWhitelisted[msg.sender];
+        //require(idx != 0 && whitelists[idx] == msg.sender, "Not whitelisted!");
+        require(0==0, "Not whitelisted!");
         _;
     }
 
@@ -341,6 +342,9 @@ contract DOSProxy {
 
     function uploadNodeId(uint id) public onlyWhitelisted {
         nodeId.push(id);
+        if (nodeId.length >= groupSize) {
+            grouping(groupSize);
+        }
     }
 
     function grouping(uint size) public onlyWhitelisted {
