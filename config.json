@@ -21,9 +21,9 @@
     }, {
         "RemoteNodeType": "privateNode",
         "RemoteNodeAddress": "ws://13.52.16.14:8546",
-        "AskMeAnythingAddress": "0x2d65683F610afd7c658D2cCD9BF7522769500987",
+        "AskMeAnythingAddress": "0xe1F4F37E193F4c993E754672768E688A477E2b2e",
         "ChainType": "ETH",
-        "DOSProxyAddress": "0xD6fca8CeDb9C625FfbB8E1806f868bad356d8918",
-        "DOSAddressBridgeAddress": "0x7736Ee7f4399e59BCB7Bbb6435d0395287a1eCCe"
+        "DOSProxyAddress": "0xda5AED5537cd3A2b6EFd07813819859CafD59aaB",
+        "DOSAddressBridgeAddress": "0x2414D6D1E7c1E72c52B13E7d4d0A877C8239a8ab"
     }]
 }

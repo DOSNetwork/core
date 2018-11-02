@@ -1,0 +1,63 @@
+version: '3'
+services:
+ bootstrap:
+   image: nien0223/bootstrap:bootstarpv0
+   networks:
+     - webnet
+   deploy:
+     replicas: 1
+   environment:
+     - CHAINNODE=privateNode
+     - GROUPSIZE=7
+ dosnode:
+   image: nien0223/dosnode:dosnodev0
+   networks:
+     - webnet
+   depends_on:
+     - bootstrap
+   deploy:
+     replicas: 7
+   environment:
+     - NODEROLE=testNode
+     - CHAINNODE=privateNode
+     - BOOTSTRAPIP=bootstrap:44460
+ randomnode:
+   image: nien0223/usernode:usernodev0
+   networks:
+     - webnet
+   depends_on:
+     - dosnode
+   deploy:
+     replicas: 2
+   environment:
+     - NODEROLE=testNode
+     - QUERYTIMES=50
+     - QUERYTYPE=random
+     - CHAINNODE=privateNode
+     - BOOTSTRAPIP=bootstrap:44460
+ urlnode:
+   image: nien0223/usernode:usernodev0
+   networks:
+     - webnet
+   depends_on:
+     - dosnode
+   deploy:
+     replicas: 1
+   environment:
+     - NODEROLE=testNode
+     - QUERYTIMES=50
+     - QUERYTYPE=url
+     - CHAINNODE=privateNode
+     - BOOTSTRAPIP=bootstrap:44460
+ visualizer:
+   image: dockersamples/visualizer:stable
+   ports:
+     - "8080:8080"
+   volumes:
+     - "/var/run/docker.sock:/var/run/docker.sock"
+   deploy:
+     placement:
+       constraints: [node.role == manager]
+networks:
+  webnet:
+    driver: overlay
