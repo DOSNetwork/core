@@ -699,7 +699,6 @@ func (e *EthAdaptor) getAuth() (auth *bind.TransactOpts, err error) {
 		return
 	}
 
-	//auth.GasPrice = gasPrice.Mul(gasPrice, big.NewInt(3))
 	auth.GasLimit = uint64(1000000)
 
 	return

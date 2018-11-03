@@ -19,8 +19,6 @@ import (
 var lock sync.Mutex
 var credentialIndex int
 
-const key = `{"address":"2a3b59ac638f90d82bdaf5e2da5d37c1a31b29f3","crypto":{"cipher":"aes-128-ctr","ciphertext":"35000234819a4c42415922281ca492eb27eceb09d12fdd15b145a8b9cbc585b4","cipherparams":{"iv":"d65304cd8d8098a4e286ec589d746c1c"},"kdf":"scrypt","kdfparams":{"dklen":32,"n":262144,"p":1,"r":8,"salt":"dbd946ab7d2e4ae9646c2abdb7260d64b1c217b99b699dcd30ef46d24daf4f48"},"mac":"476f013db27f7fd37fb45c6224e80833771bbd764e42032bf1d02a4de58783e4"},"id":"e9cd78c8-feb8-4f6e-9512-22dd5187b72e","version":3}`
-
 var adaptor *onchain.EthAdaptor
 
 // main
