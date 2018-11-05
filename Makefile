@@ -2,7 +2,7 @@
 # $ make == $ make build
 # $ make install
 
-.PHONY: dep build client install clean gen
+.PHONY: dep build client install clean gen deploy
 
 .DEFAULT_GOAL := build
 ETH_CONTRACTS := onchain/eth/contracts
@@ -28,6 +28,12 @@ gen:
 
 install: dep client
 	go install
+
+
+deploy: gen
+	go run onchain/eth/deploy.go -contractPath $(ETH_CONTRACTS) -step ProxyAndBridg
+	go run onchain/eth/deploy.go -contractPath $(ETH_CONTRACTS) -step SDKAndAMA
+	go run onchain/eth/deploy.go -contractPath $(ETH_CONTRACTS) -step SetProxyAddress
 
 
 clean:
