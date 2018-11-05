@@ -482,6 +482,25 @@ func (e *EthAdaptor) InitialWhiteList() (err error) {
 
 }
 
+func (e *EthAdaptor) GetGroupPubKey(idx int) (groupPubKeys [4]*big.Int, err error) {
+	return e.proxy.GetGroupPubKey(&bind.CallOpts{}, big.NewInt(int64(idx)))
+}
+
+func (e *EthAdaptor) Grouping(size int) (err error) {
+	auth, err := e.getAuth()
+	if err != nil {
+		return
+	}
+
+	tx, err := e.proxy.Grouping(auth, big.NewInt(int64(size)))
+	if err != nil {
+		return
+	}
+
+	err = e.checkTransaction(tx)
+	return
+}
+
 func (e *EthAdaptor) GetWhitelist() (address common.Address, err error) {
 	return e.proxy.GetWhitelistAddress(&bind.CallOpts{}, big.NewInt(1))
 }
@@ -675,12 +694,11 @@ func (e *EthAdaptor) getAuth() (auth *bind.TransactOpts, err error) {
 	auth.Nonce = big.NewInt(int64(e.ethNonce))
 	e.lock.Unlock()
 
-	gasPrice, err := e.client.SuggestGasPrice(context.Background())
+	_, err = e.client.SuggestGasPrice(context.Background())
 	if err != nil {
 		return
 	}
 
-	auth.GasPrice = gasPrice.Mul(gasPrice, big.NewInt(3))
 	auth.GasLimit = uint64(1000000)
 
 	return
@@ -758,11 +776,45 @@ func (e *EthAdaptor) setAccount(autoReplenish bool) (err error) {
 	return
 }
 
+func (e *EthAdaptor) getKey(keyPath, passPrase string) (key *keystore.Key, err error) {
+	var keyJson []byte
+	keyJson, err = ioutil.ReadFile(keyPath)
+	if err != nil {
+		return
+	}
+
+	key, err = keystore.DecryptKey(keyJson, passPrase)
+	if err != nil {
+		return
+	}
+	return
+}
+
+func (e *EthAdaptor) BalanceMaintain(rootKeyPath, usrKeyPath, rPassPhrase, uPassPhrase string) (err error) {
+	rootKey, err := e.getKey(rootKeyPath, rPassPhrase)
+	if err != nil {
+		return
+	}
+	usrKey, err := e.getKey(usrKeyPath, uPassPhrase)
+	if err != nil {
+		return
+	}
+	err = e.balanceMaintain(usrKey, rootKey)
+	return
+}
+
 func (e *EthAdaptor) balanceMaintain(usrKey, rootKey *keystore.Key) (err error) {
 	usrKeyBalance, err := e.getBalance(usrKey)
 	if err != nil {
 		return
 	}
+	fmt.Println("usrKeyBalance ", usrKeyBalance)
+
+	rootKeyBalance, err := e.getBalance(rootKey)
+	if err != nil {
+		return
+	}
+	fmt.Println("rootKeyBalance ", rootKeyBalance)
 
 	if usrKeyBalance.Cmp(big.NewFloat(0.7)) == -1 {
 		fmt.Println("userKey account replenishing...")
@@ -865,7 +917,6 @@ func (e *EthAdaptor) filterLog(raw types.Log) (duplicates bool) {
 	identityBytes := append(raw.Address.Bytes(), raw.Topics[0].Bytes()...)
 	identityBytes = append(identityBytes, raw.Data...)
 	identity := new(big.Int).SetBytes(identityBytes).String()
-	fmt.Println("identity: ", identity)
 
 	var record interface{}
 	if record, duplicates = e.logFilter.Load(identity); duplicates {

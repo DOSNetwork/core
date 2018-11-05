@@ -1,0 +1,50 @@
+version: '3'
+services:
+ bootstrap:
+   image: bootstrap
+   networks:
+     - webnet
+   deploy:
+     replicas: 1
+   environment:
+     - CHAINNODE=privateNode
+     - GROUPSIZE=3
+ dosnode:
+   image: dosnode
+   networks:
+     - webnet
+   depends_on:
+     - bootstrap
+   deploy:
+     replicas: 3
+   environment:
+     - NODEROLE=testNode
+     - CHAINNODE=privateNode
+     - BOOTSTRAPIP=bootstrap:44460
+ randomnode:
+   image: usernode
+   networks:
+     - webnet
+   deploy:
+     replicas: 1
+   environment:
+     - NODEROLE=testNode
+     - CHAINNODE=privateNode
+     - BOOTSTRAPIP=bootstrap:44460
+     - QUERYTIMES=50
+     - QUERYTYPE=random
+ urlnode:
+   image: usernode
+   networks:
+     - webnet
+   deploy:
+     replicas: 1
+   environment:
+     - NODEROLE=testNode
+     - CHAINNODE=privateNode
+     - BOOTSTRAPIP=bootstrap:44460
+     - QUERYTIMES=50
+     - QUERYTYPE=url
+networks:
+  webnet:
+    driver: overlay

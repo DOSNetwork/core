@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"math/big"
+	_ "net/http/pprof"
+	"runtime/debug"
 
 	"github.com/DOSNetwork/core/configuration"
 	dos "github.com/DOSNetwork/core/dosnode"
@@ -18,7 +20,7 @@ import (
 
 // main
 func main() {
-	config := configuration.ReadConfig("./config.json")
+	config := configuration.ReadConfig()
 	chainConfig := configuration.GetOnChainConfig(config)
 	role := config.NodeRole
 	nbParticipants := config.RandomGroupSize
@@ -26,7 +28,7 @@ func main() {
 	bootstrapIp := config.BootStrapIp
 
 	//1)Connect to Eth
-	chainConn, err := onchain.AdaptTo(chainConfig.ChainType, true, &chainConfig)
+	chainConn, err := onchain.AdaptTo(chainConfig.ChainType, false, &chainConfig)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -59,11 +61,6 @@ func main() {
 			p.GetRoutingTable().Update(result)
 			fmt.Println(p.GetId().Address, "Update peer: ", result.Address)
 		}
-	}
-
-	err = chainConn.UploadID()
-	if err != nil {
-		log.Fatal(err)
 	}
 
 	//4)Build a p2pDKG
@@ -123,6 +120,15 @@ func main() {
 	d.PipeSendToOnchain(reportsToSubmit)
 	chRetrigerUrl := d.PipeCleanFinishMap(eventValidation, reportToValidate)
 
+	err = chainConn.UploadID()
+	if err != nil {
+		log.Fatal(err)
+	}
+	//TODO:/crypto/scrypt: memory not released after hash is calculated
+	//https://github.com/golang/go/issues/20000
+	//This caused dosnode take over 500MB memory usage.
+	//Need to check to see if there is other way to trigger GC
+	debug.FreeOSMemory()
 	//7)Dispatch events
 	for {
 		select {
