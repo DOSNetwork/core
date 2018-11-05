@@ -17,6 +17,8 @@ type ChainConfig struct {
 	// TODO: Refactor out of ChainConfig
 	RemoteNodeType    string
 	RemoteNodeAddress string
+	// TODO: remove unrelated field
+	AskMeAnythingAddress string
 
 	ChainType               string
 	DOSProxyAddress         string

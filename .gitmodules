@@ -1,3 +1,0 @@
-[submodule "onchain/contracts"]
-	path = onchain/eth
-	url = git@github.com:DOSNetwork/contracts.git
