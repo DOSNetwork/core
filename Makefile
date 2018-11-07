@@ -2,7 +2,7 @@
 # $ make == $ make build
 # $ make install
 
-.PHONY: dep build client install clean gen deploy
+.PHONY: dep build client install clean gen
 
 .DEFAULT_GOAL := build
 GENERATED_FILES := $(filter-out $(shell find $(ETH_CONTRACTS) -name '*_test.go'), $(shell find $(ETH_CONTRACTS) -name '*.go'))

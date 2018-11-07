@@ -24,7 +24,7 @@
 - ... Hack ...
 - Use `$ go fmt .`; or plugin before commit.
 - `$ make clean` before commit
-
+- Changing `github.com/DOSNetwork/eth-contracts` instead of modifying locally cloned submodules, and using `$ git submodule update --remote --merge` to checkout latest changes.
 
 
 ### Trouble shooting and Deploy
