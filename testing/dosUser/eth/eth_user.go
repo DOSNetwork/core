@@ -195,18 +195,20 @@ func (e *EthUserAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.Wa
 func (e *EthUserAdaptor) Query(url, selector string) (err error) {
 	auth, err := e.GetAuth()
 	if err != nil {
+		fmt.Println(" Query GetAuth err ", err)
 		return
 	}
 
 	tx, err := e.proxy.AMA(auth, url, selector)
 	if err != nil {
+		fmt.Println(" Query AMAerr ", err)
 		return
 	}
 
 	fmt.Println("tx sent: ", tx.Hash().Hex())
 	fmt.Println("Querying ", url, "selector", selector, "waiting for confirmation...")
 
-	//err = e.checkTransaction(tx)
+	err = e.CheckTransaction(tx)
 
 	return
 }
@@ -225,7 +227,7 @@ func (e *EthUserAdaptor) GetSafeRandom() (err error) {
 	fmt.Println("tx sent: ", tx.Hash().Hex())
 	fmt.Println("RequestSafeRandom ", " waiting for confirmation...")
 
-	//err = e.checkTransaction(tx)
+	err = e.CheckTransaction(tx)
 
 	return
 }

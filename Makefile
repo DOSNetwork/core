@@ -10,6 +10,7 @@ GENERATED_FILES := $(filter-out $(shell find $(ETH_CONTRACTS) -name '*_test.go')
 DOCKER_IMAGES := dockerImages
 TEST_ACCOUNTS := testAccounts
 ETH_CONTRACTS := onchain/eth/contracts
+CONTRACTS_GOPATH := onchain/dosproxy
 USER_CONTRACTS := testing/dosUser/contract
 BOOT_CREDENTIAL := testAccounts/bootCredential
 AMA_CONFIGPATH := testing/dosUser/ama.json
@@ -52,13 +53,13 @@ buildDockers:genDockers
 
 #Only used for deploy a new contracts for testing
 deploy:
-	abigen -sol $(ETH_CONTRACTS)/DOSProxy.sol --pkg dosproxy --out $(ETH_CONTRACTS)/DOSProxy.go
-	abigen -sol $(ETH_CONTRACTS)/DOSAddressBridge.sol --pkg dosproxy --out $(ETH_CONTRACTS)/DOSAddressBridge.go
-	abigen -sol $(ETH_CONTRACTS)/DOSOnChainSDK.sol --pkg dosproxy --out $(ETH_CONTRACTS)/DOSOnChainSDK.go
+	abigen -sol $(ETH_CONTRACTS)/DOSProxy.sol --pkg dosproxy --out $(CONTRACTS_GOPATH)/DOSProxy.go
+	abigen -sol $(ETH_CONTRACTS)/DOSAddressBridge.sol --pkg dosproxy --out $(CONTRACTS_GOPATH)/DOSAddressBridge.go
 	cp $(ETH_CONTRACTS)/DOSOnChainSDK.sol $(USER_CONTRACTS)/
 	cp $(ETH_CONTRACTS)/Ownable.sol $(USER_CONTRACTS)/
 	mkdir -p $(USER_CONTRACTS)/lib/
 	cp $(ETH_CONTRACTS)/lib/utils.sol $(USER_CONTRACTS)/lib/
+#	abigen -sol $(USER_CONTRACTS)/DOSOnChainSDK.sol --pkg dosUser --out $(USER_CONTRACTS)/DOSOnChainSDK.go
 	abigen -sol $(USER_CONTRACTS)/AskMeAnything.sol --pkg dosUser --out $(USER_CONTRACTS)/AskMeAnything.go
 	rm $(USER_CONTRACTS)/DOSOnChainSDK.sol
 	rm $(USER_CONTRACTS)/Ownable.sol

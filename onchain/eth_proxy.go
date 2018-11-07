@@ -10,7 +10,7 @@ import (
 
 	"github.com/DOSNetwork/core/configuration"
 	"github.com/DOSNetwork/core/group/bn256"
-	"github.com/DOSNetwork/core/onchain/eth/contracts"
+	"github.com/DOSNetwork/core/onchain/dosproxy"
 	"github.com/dedis/kyber"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"

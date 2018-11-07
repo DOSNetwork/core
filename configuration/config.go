@@ -45,7 +45,6 @@ type ChainConfig struct {
 	ChainType               string
 	DOSProxyAddress         string
 	DOSAddressBridgeAddress string
-	DOSOnChainSDKAddress    string
 }
 
 func LoadConfig(path string, c interface{}) (err error) {
@@ -72,12 +71,11 @@ func LoadConfig(path string, c interface{}) (err error) {
 		fmt.Println("Unmarshal error ", err)
 		return
 	}
-	fmt.Println("config  ", c)
 	return
 }
 
 func UpdateConfig(path string, c interface{}) (err error) {
-	configsJson, _ := json.Marshal(c)
+	configsJson, _ := json.MarshalIndent(c, "", "    ")
 	err = ioutil.WriteFile(path, configsJson, 0644)
 	return
 }
@@ -224,7 +222,7 @@ func (c *OnChainConfig) UpdateConfig(updated ChainConfig) (err error) {
 			c.ChainConfigs[i] = updated
 		}
 	}
-	configsJson, _ := json.Marshal(c)
+	configsJson, _ := json.MarshalIndent(c, "", "    ")
 	err = ioutil.WriteFile(c.path, configsJson, 0644)
 	return nil
 }

@@ -10,7 +10,7 @@ import (
 
 	"github.com/DOSNetwork/core/configuration"
 	"github.com/DOSNetwork/core/onchain"
-	"github.com/DOSNetwork/core/onchain/eth/contracts"
+	"github.com/DOSNetwork/core/onchain/dosproxy"
 	"github.com/DOSNetwork/core/testing/dosUser/contract"
 	"github.com/DOSNetwork/core/testing/dosUser/eth"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -22,7 +22,6 @@ const (
 	AskMeAnyThing = iota
 	DOSAddressBridge
 	DOSProxy
-	DOSOnChainSDK
 )
 
 func between(value string, a string, b string) string {
@@ -83,9 +82,6 @@ func deployContract(ethComm *onchain.EthCommon, contractName int) string {
 	case DOSProxy:
 		fmt.Println("Starting deploy DOSProxy.sol...")
 		address, tx, _, err = dosproxy.DeployDOSProxy(auth, ethComm.Client)
-	case DOSOnChainSDK:
-		fmt.Println("Starting deploy DeployDOSOnChainSDK.sol...")
-		address, tx, _, err = dosproxy.DeployDOSOnChainSDK(auth, ethComm.Client)
 	case AskMeAnyThing:
 		fmt.Println("Starting deploy AskMeAnyThing.sol...")
 		address, tx, _, err = dosUser.DeployAskMeAnything(auth, ethComm.Client)

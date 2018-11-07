@@ -223,12 +223,12 @@ func (e *EthCommon) CheckTransaction(tx *types.Transaction) (err error) {
 	//start := time.Now()
 	receipt, err := e.Client.TransactionReceipt(context.Background(), tx.Hash())
 	for err == ethereum.NotFound {
-/*
-		if time.Since(start).Seconds() > 30 {
-			fmt.Println("no receipt yet, set to successful")
-			return
-		}
-*/
+		/*
+			if time.Since(start).Seconds() > 30 {
+				fmt.Println("no receipt yet, set to successful")
+				return
+			}
+		*/
 		time.Sleep(1 * time.Second)
 		receipt, err = e.Client.TransactionReceipt(context.Background(), tx.Hash())
 	}

@@ -69,10 +69,12 @@ func main() {
 	//
 	config := eth.AMAConfig{}
 	configuration.LoadConfig("./ama.json", &config)
-
+	fmt.Println("AMA Address", config.AskMeAnythingAddress)
 	onChainConfig := configuration.OnChainConfig{}
 	onChainConfig.LoadConfig()
 	chainConfig := onChainConfig.GetChainConfig()
+	offChainConfig := configuration.OffChainConfig{}
+	offChainConfig.LoadConfig()
 
 	//Wait until contract has group public key
 	hasGroupPubkey := false
@@ -147,7 +149,7 @@ func main() {
 		wg.Done()
 	}()
 
-	fmt.Println("start Query ")
+	fmt.Println("start Query ", times)
 	for i := 0; i < times; i++ {
 		switch envTypes {
 		case "url":
