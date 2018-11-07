@@ -1,25 +1,18 @@
 package eth
 
 import (
-	"context"
-	"errors"
 	"fmt"
-	"io/ioutil"
 	"log"
-	"math"
 	"math/big"
-	"os"
 	"sync"
 	"time"
 
+	"github.com/DOSNetwork/core/configuration"
 	"github.com/DOSNetwork/core/onchain"
-	"github.com/DOSNetwork/core/onchain/eth/contracts/userContract"
-	"github.com/ethereum/go-ethereum"
+	"github.com/DOSNetwork/core/testing/dosUser/contract"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/ethclient"
 )
 
 // TODO: Instead of hardcode, read from DOSAddressBridge.go
@@ -30,70 +23,44 @@ const (
 	SubscribeAskMeAnythingRandomReady
 )
 
+type AMAConfig struct {
+	AskMeAnythingAddress string
+}
+
 const balanceCheckInterval = 3
 
 var workingDir string
 
 type EthUserAdaptor struct {
-	key       *keystore.Key
-	client    *ethclient.Client
-	proxy     *userContract.AskMeAnything
+	onchain.EthCommon
+	proxy     *dosUser.AskMeAnything
 	lock      *sync.Mutex
 	logFilter *sync.Map
-	ethNonce  uint64
-	config    *onchain.ChainConfig
+	address   string
 }
 
-func (e *EthUserAdaptor) Init(autoReplenish bool, config *onchain.ChainConfig) (err error) {
-
-	path := os.Getenv("CONFIGPATH")
-	if path != "" {
-		workingDir = path
-	} else {
-		workingDir, err = os.Getwd()
-		if err != nil {
-			return
-		}
-	}
-
-	if err != nil {
-		return
-	}
-
-	e.config = config
-
-	fmt.Println("start initial onChainConn...")
-
+func (e *EthUserAdaptor) Init(address string, config *configuration.ChainConfig) (err error) {
+	e.EthCommon.Init("./credential", config)
 	e.logFilter = new(sync.Map)
 	go e.logMapTimeout()
 
-	e.lock = new(sync.Mutex)
-
-	e.dialToEth()
-
-	if err = e.setAccount(autoReplenish); err != nil {
-		return
-	}
-
+	e.address = address
 	fmt.Println("onChainConn initialization finished.")
+	e.lock = new(sync.Mutex)
+	e.dialToEth()
 	return
 }
 
 func (e *EthUserAdaptor) dialToEth() (err error) {
 	e.lock.Lock()
 	fmt.Println("dialing...")
-	e.client, err = ethclient.Dial(e.config.RemoteNodeAddress)
-	for err != nil {
-		fmt.Println(err)
-		fmt.Println("Cannot connect to the network, retrying...")
-		e.client, err = ethclient.Dial(e.config.RemoteNodeAddress)
-	}
-	addr := common.HexToAddress(e.config.AskMeAnythingAddress)
-	e.proxy, err = userContract.NewAskMeAnything(addr, e.client)
+	e.EthCommon.DialToEth()
+	addr := common.HexToAddress(e.address)
+	e.proxy, err = dosUser.NewAskMeAnything(addr, e.Client)
 	for err != nil {
 		fmt.Println(err)
 		fmt.Println("Connot Create new proxy, retrying...")
-		e.proxy, err = userContract.NewAskMeAnything(addr, e.client)
+		e.proxy, err = dosUser.NewAskMeAnything(addr, e.Client)
 	}
 	e.lock.Unlock()
 	return
@@ -125,7 +92,7 @@ func (e *EthUserAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.Wa
 	switch subscribeType {
 	case SubscribeAskMeAnythingSetTimeout:
 		fmt.Println("subscribing AskMeAnythingSetTimeout event...")
-		transitChan := make(chan *userContract.AskMeAnythingSetTimeout)
+		transitChan := make(chan *dosUser.AskMeAnythingSetTimeout)
 		sub, err := e.proxy.AskMeAnythingFilterer.WatchSetTimeout(opt, transitChan)
 		if err != nil {
 			fmt.Println(err)
@@ -150,7 +117,7 @@ func (e *EthUserAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.Wa
 		}
 	case SubscribeAskMeAnythingQueryResponseReady:
 		fmt.Println("subscribing AskMeAnythingQueryResponseReady event...")
-		transitChan := make(chan *userContract.AskMeAnythingQueryResponseReady)
+		transitChan := make(chan *dosUser.AskMeAnythingQueryResponseReady)
 		sub, err := e.proxy.AskMeAnythingFilterer.WatchQueryResponseReady(opt, transitChan)
 		if err != nil {
 			fmt.Println(err)
@@ -175,7 +142,7 @@ func (e *EthUserAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.Wa
 		}
 	case SubscribeAskMeAnythingRequestSent:
 		fmt.Println("subscribing AskMeAnythingRequestSent event...")
-		transitChan := make(chan *userContract.AskMeAnythingRequestSent)
+		transitChan := make(chan *dosUser.AskMeAnythingRequestSent)
 		sub, err := e.proxy.AskMeAnythingFilterer.WatchRequestSent(opt, transitChan)
 		if err != nil {
 			fmt.Println(err)
@@ -200,7 +167,7 @@ func (e *EthUserAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.Wa
 		}
 	case SubscribeAskMeAnythingRandomReady:
 		fmt.Println("subscribing AskMeAnythingRandomReady event...")
-		transitChan := make(chan *userContract.AskMeAnythingRandomReady)
+		transitChan := make(chan *dosUser.AskMeAnythingRandomReady)
 		sub, err := e.proxy.AskMeAnythingFilterer.WatchRandomReady(opt, transitChan)
 		if err != nil {
 			fmt.Println(err)
@@ -226,7 +193,7 @@ func (e *EthUserAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.Wa
 }
 
 func (e *EthUserAdaptor) Query(url, selector string) (err error) {
-	auth, err := e.getAuth()
+	auth, err := e.GetAuth()
 	if err != nil {
 		return
 	}
@@ -245,7 +212,7 @@ func (e *EthUserAdaptor) Query(url, selector string) (err error) {
 }
 
 func (e *EthUserAdaptor) GetSafeRandom() (err error) {
-	auth, err := e.getAuth()
+	auth, err := e.GetAuth()
 	if err != nil {
 		return
 	}
@@ -264,7 +231,7 @@ func (e *EthUserAdaptor) GetSafeRandom() (err error) {
 }
 
 func (e *EthUserAdaptor) GetFastRandom() (err error) {
-	auth, err := e.getAuth()
+	auth, err := e.GetAuth()
 	if err != nil {
 		return
 	}
@@ -277,190 +244,7 @@ func (e *EthUserAdaptor) GetFastRandom() (err error) {
 	fmt.Println("tx sent: ", tx.Hash().Hex())
 	fmt.Println("RequestSafeRandom ", " waiting for confirmation...")
 
-	err = e.checkTransaction(tx)
-
-	return
-}
-
-func (e *EthUserAdaptor) getAuth() (auth *bind.TransactOpts, err error) {
-	auth = bind.NewKeyedTransactor(e.key.PrivateKey)
-	if err != nil {
-		return
-	}
-
-	e.lock.Lock()
-	e.ethNonce++
-	automatedNonce, err := e.client.PendingNonceAt(context.Background(), e.key.Address)
-	if err != nil {
-		return
-	}
-	if automatedNonce > e.ethNonce {
-		e.ethNonce = automatedNonce
-	}
-	auth.Nonce = big.NewInt(int64(e.ethNonce))
-	e.lock.Unlock()
-
-	gasPrice, err := e.client.SuggestGasPrice(context.Background())
-	if err != nil {
-		return
-	}
-
-	auth.GasLimit = uint64(6000000) // in units
-	auth.GasPrice = gasPrice.Mul(gasPrice, big.NewInt(3))
-
-	return
-}
-
-func (e *EthUserAdaptor) setAccount(autoReplenish bool) (err error) {
-	credentialPath := workingDir + "/credential"
-	fmt.Println("credentialPath: ", credentialPath)
-
-	passPhraseBytes, err := ioutil.ReadFile(credentialPath + "/boot/passPhrase")
-	if err != nil {
-		return
-	}
-
-	passPhrase := string(passPhraseBytes)
-
-	newKeyStore := keystore.NewKeyStore(credentialPath, keystore.StandardScryptN, keystore.StandardScryptP)
-	if len(newKeyStore.Accounts()) < 1 {
-		_, err = newKeyStore.NewAccount(passPhrase)
-		if err != nil {
-			return
-		}
-	}
-
-	usrKeyPath := newKeyStore.Accounts()[0].URL.Path
-	usrKeyJson, err := ioutil.ReadFile(usrKeyPath)
-	if err != nil {
-		return
-	}
-
-	usrKey, err := keystore.DecryptKey(usrKeyJson, passPhrase)
-	if err != nil {
-		return
-	}
-
-	e.key = usrKey
-	e.ethNonce, err = e.client.PendingNonceAt(context.Background(), e.key.Address)
-	if err != nil {
-		return
-	}
-	//for correctness of the first call of getAuth, because getAuth always ++,
-	e.ethNonce--
-
-	if autoReplenish {
-		var rootKeyPath string
-		var rootKeyJson []byte
-		var rootKey *keystore.Key
-
-		rootKeyPath = credentialPath + "/boot/rootKey"
-		rootKeyJson, err = ioutil.ReadFile(rootKeyPath)
-		if err != nil {
-			return
-		}
-
-		rootKey, err = keystore.DecryptKey(rootKeyJson, passPhrase)
-		if err != nil {
-			return
-		}
-
-		err = e.balanceMaintain(usrKey, rootKey)
-
-		go func() {
-			ticker := time.NewTicker(balanceCheckInterval * time.Hour)
-			for range ticker.C {
-				err = e.balanceMaintain(usrKey, rootKey)
-				if err != nil {
-					fmt.Print("Fail to replenish.")
-				}
-			}
-		}()
-	}
-
-	return
-}
-
-func (e *EthUserAdaptor) balanceMaintain(usrKey, rootKey *keystore.Key) (err error) {
-	usrKeyBalance, err := e.getBalance(usrKey)
-	if err != nil {
-		return
-	}
-
-	if usrKeyBalance.Cmp(big.NewFloat(0.7)) == -1 {
-		fmt.Println("userKey account replenishing...")
-		if err = e.transferEth(rootKey, usrKey); err == nil {
-			fmt.Println("userKey account replenished.")
-		}
-	}
-
-	return
-}
-
-func (e *EthUserAdaptor) getBalance(key *keystore.Key) (balance *big.Float, err error) {
-	wei, err := e.client.BalanceAt(context.Background(), key.Address, nil)
-	if err != nil {
-		return
-	}
-
-	balance = new(big.Float)
-	balance.SetString(wei.String())
-	balance = balance.Quo(balance, big.NewFloat(math.Pow10(18)))
-	return
-}
-
-func (e *EthUserAdaptor) transferEth(from, to *keystore.Key) (err error) {
-	nonce, err := e.client.PendingNonceAt(context.Background(), from.Address)
-	if err != nil {
-		return
-	}
-
-	gasPrice, err := e.client.SuggestGasPrice(context.Background())
-	if err != nil {
-		return
-	}
-
-	value := big.NewInt(800000000000000000) //0.8 Eth
-	gasLimit := uint64(6000000)
-
-	tx := types.NewTransaction(nonce, to.Address, value, gasLimit, gasPrice.Mul(gasPrice, big.NewInt(3)), nil)
-
-	chainId, err := e.client.NetworkID(context.Background())
-	if err != nil {
-		return
-	}
-
-	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainId), from.PrivateKey)
-	if err != nil {
-		return
-	}
-
-	err = e.client.SendTransaction(context.Background(), signedTx)
-	if err != nil {
-		return
-	}
-	fmt.Println("replenishing tx sent: ", signedTx.Hash().Hex(), ", waiting for confirmation...")
-
-	err = e.checkTransaction(signedTx)
-
-	return
-}
-
-func (e *EthUserAdaptor) checkTransaction(tx *types.Transaction) (err error) {
-	receipt, err := e.client.TransactionReceipt(context.Background(), tx.Hash())
-	for err == ethereum.NotFound {
-		time.Sleep(1 * time.Second)
-		receipt, err = e.client.TransactionReceipt(context.Background(), tx.Hash())
-	}
-	if err != nil {
-		return
-	}
-
-	if receipt.Status == 1 {
-		fmt.Println("transaction confirmed.")
-	} else {
-		err = errors.New("transaction failed")
-	}
+	err = e.CheckTransaction(tx)
 
 	return
 }

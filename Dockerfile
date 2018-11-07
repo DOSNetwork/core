@@ -1,5 +1,6 @@
 FROM scratch
 ADD clientNode /
-ADD config.json /
+ADD onChain.json /
+ADD offChain.json /
 ADD credential /credential/
 CMD ["/clientNode"]

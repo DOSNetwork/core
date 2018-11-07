@@ -7,7 +7,7 @@ services:
    deploy:
      replicas: 1
    environment:
-     - CHAINNODE=privateNode
+     - CHAINNODE=rinkebyPrivateNode
      - GROUPSIZE=3
  dosnode:
    image: dosnode
@@ -19,7 +19,7 @@ services:
      replicas: 3
    environment:
      - NODEROLE=testNode
-     - CHAINNODE=privateNode
+     - CHAINNODE=rinkebyPrivateNode
      - BOOTSTRAPIP=bootstrap:44460
  randomnode:
    image: usernode
@@ -29,7 +29,7 @@ services:
      replicas: 1
    environment:
      - NODEROLE=testNode
-     - CHAINNODE=privateNode
+     - CHAINNODE=rinkebyPrivateNode
      - BOOTSTRAPIP=bootstrap:44460
      - QUERYTIMES=50
      - QUERYTYPE=random
@@ -41,7 +41,7 @@ services:
      replicas: 1
    environment:
      - NODEROLE=testNode
-     - CHAINNODE=privateNode
+     - CHAINNODE=rinkebyPrivateNode
      - BOOTSTRAPIP=bootstrap:44460
      - QUERYTIMES=50
      - QUERYTYPE=url

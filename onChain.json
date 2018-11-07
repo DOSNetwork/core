@@ -1,0 +1,25 @@
+{
+	"ChainConfigs": [{
+		"RemoteNodeType": "rinkebyInfura",
+		"RemoteNodeAddress": "wss://rinkeby.infura.io/ws/8e609c76fce442f8a1735fbea9999747",
+		"ChainType": "ETH",
+		"DOSProxyAddress": "0x1882d681b01e13F2CB3A5b1F8c05496EC02Ea035",
+		"DOSAddressBridgeAddress": "0xe987926A226932DFB1f71FA316461db272E05317",
+		"DOSOnChainSDKAddress": ""
+	}, {
+		"RemoteNodeType": "rinkebyPrivateNode",
+		"RemoteNodeAddress": "ws://13.56.31.73:8546",
+		"ChainType": "ETH",
+		"DOSProxyAddress": "0x2000dD079f72c1d7E76a050Ce7eE0DAc017CB510",
+		"DOSAddressBridgeAddress": "0x8DceCa21930AE11c3626ED7E67C147C09f0fC62D",
+		"DOSOnChainSDKAddress": ""
+	}, {
+		"RemoteNodeType": "privateNode",
+		"RemoteNodeAddress": "ws://13.52.16.14:8546",
+		"ChainType": "ETH",
+		"DOSProxyAddress": "0xC784Dc5E7A18f046085D08f7F41c262C16e190ab",
+		"DOSAddressBridgeAddress": "0x7fFEAEFcbCeacdf46d0B74D26d79000e590f0088",
+		"DOSOnChainSDKAddress": ""
+	}],
+	"CredentialPath": ""
+}

@@ -4,14 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/DOSNetwork/core/onchain"
 )
 
 const ENVCHAINTYPE = "CHAINTYPE"
@@ -22,19 +19,152 @@ const ENVBOOTSTRAPIP = "BOOTSTRAPIP"
 const ENVNODEPORT = "NODEPORT"
 const CONFIGMODE = "TESTMODE"
 const ENVGROUPSIZE = "GROUPSIZE"
+const ENVCREDENTIALPATH = "CREDENTIALPATH"
 
-type Config struct {
+type OffChainConfig struct {
 	NodeRole        string
 	BootStrapIp     string
 	Port            int
 	RandomGroupSize int
 	QueryGroupSize  int
-	ChainConfigs    []onchain.ChainConfig
 }
 
-func ReadConfig() (config Config) {
+type OnChainConfig struct {
+	ChainConfigs   []ChainConfig
+	CredentialPath string
+	path           string
+	currentType    string
+	currentNode    string
+}
+
+type ChainConfig struct {
+	// TODO: Refactor out of ChainConfig
+	RemoteNodeType    string
+	RemoteNodeAddress string
+
+	ChainType               string
+	DOSProxyAddress         string
+	DOSAddressBridgeAddress string
+	DOSOnChainSDKAddress    string
+}
+
+func LoadConfig(path string, c interface{}) (err error) {
+	var jsonFile *os.File
+	var byteValue []byte
+
+	fmt.Println("Path ", path)
+	// Open our jsonFile
+	jsonFile, err = os.Open(path)
+	// if we os.Open returns an error then handle it
+	if err != nil {
+		fmt.Println("LoadConfig error ", err)
+		return
+	}
+	fmt.Println("Successfully Opened json")
+	// defer the closing of our jsonFile so that we can parse it later on
+	defer jsonFile.Close()
+
+	// read our opened xmlFile as a byte array.
+	byteValue, err = ioutil.ReadAll(jsonFile)
+
+	err = json.Unmarshal(byteValue, &c)
+	if err != nil {
+		fmt.Println("Unmarshal error ", err)
+		return
+	}
+	fmt.Println("config  ", c)
+	return
+}
+
+func UpdateConfig(path string, c interface{}) (err error) {
+	configsJson, _ := json.Marshal(c)
+	err = ioutil.WriteFile(path, configsJson, 0644)
+	return
+}
+
+func (c *OffChainConfig) LoadConfig() (err error) {
 	var workingDir string
-	var err error
+	path := os.Getenv(ENVCONFIGPATH)
+	if path != "" {
+		workingDir = path
+	} else {
+		workingDir, err = os.Getwd()
+		if err != nil {
+			return
+		}
+	}
+	_ = workingDir
+	err = LoadConfig("./offChain.json", c)
+	if err != nil {
+		fmt.Println("LoadConfig  err", err)
+		return
+	}
+
+	err = c.overWrite()
+	//---------------------------------
+	if c.NodeRole == "testNode" {
+		var credential []byte
+		var resp *http.Response
+		fmt.Println("This is a test node : ", c.BootStrapIp)
+		s := strings.Split(c.BootStrapIp, ":")
+		ip, _ := s[0], s[1]
+		tServer := "http://" + ip + ":8080/getCredential"
+		resp, err = http.Get(tServer)
+		for err != nil {
+			time.Sleep(1 * time.Second)
+			resp, err = http.Get(tServer)
+		}
+
+		credential, err = ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return
+		}
+		fmt.Println("credential : ", string(credential))
+		credentialPath := workingDir + "/credential/usrKey"
+		err = ioutil.WriteFile(credentialPath, []byte(credential), 0644)
+		resp.Body.Close()
+		if err != nil {
+			return
+		}
+	}
+	//---------------------------------
+	return
+}
+
+func (c *OffChainConfig) overWrite() (err error) {
+	bootStrapIP := os.Getenv(ENVBOOTSTRAPIP)
+	if bootStrapIP != "" {
+		c.BootStrapIp = bootStrapIP
+	}
+
+	envSize := os.Getenv(ENVGROUPSIZE)
+	if envSize != "" {
+		var size int
+		size, err = strconv.Atoi(envSize)
+		if err != nil {
+			return
+		}
+		c.RandomGroupSize = size
+		c.QueryGroupSize = size
+	}
+
+	nodeRole := os.Getenv(ENVNODEROLE)
+	if nodeRole != "" {
+		c.NodeRole = nodeRole
+	}
+
+	port := os.Getenv(ENVNODEPORT)
+	if port != "" {
+		i, err := strconv.Atoi(port)
+		if err == nil {
+			c.Port = i
+		}
+	}
+	return
+}
+
+func (c *OnChainConfig) LoadConfig() (err error) {
+	var workingDir string
 
 	path := os.Getenv(ENVCONFIGPATH)
 	if path != "" {
@@ -45,125 +175,56 @@ func ReadConfig() (config Config) {
 			return
 		}
 	}
-	// Open our jsonFile
-	jsonFile, err := os.Open(workingDir + "/config.json")
-	// if we os.Open returns an error then handle it
+	_ = workingDir
+	c.path = "./onChain.json"
+	chainType := os.Getenv(ENVCHAINTYPE)
+	if chainType == "" {
+		fmt.Println("No CHAINTYPE Environment variable.")
+		chainType = "ETH"
+	}
+	c.currentType = chainType
+
+	chainNode := os.Getenv(ENVCHAINNODE)
+	if chainNode == "" {
+		fmt.Println("No CHAINNODE Environment variable.")
+		chainNode = "rinkebyPrivateNode"
+	}
+	c.currentNode = chainNode
+
+	credentialPath := os.Getenv(ENVCREDENTIALPATH)
+	if chainNode == "" {
+		fmt.Println("No ENVCREDENTIALPATH Environment variable.")
+		credentialPath = "."
+	}
+	c.CredentialPath = credentialPath
+
+	err = LoadConfig(c.path, c)
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println("read config err ", err)
+		return
 	}
-	fmt.Println("Successfully Opened NetConfigs json")
-	// defer the closing of our jsonFile so that we can parse it later on
-	defer jsonFile.Close()
+	return
+}
 
-	// read our opened xmlFile as a byte array.
-	byteValue, err := ioutil.ReadAll(jsonFile)
-	if err != nil {
-		log.Fatal(err)
-	}
-	err = json.Unmarshal(byteValue, &config)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	bootStrapIP := os.Getenv(ENVBOOTSTRAPIP)
-	if bootStrapIP != "" {
-		config.BootStrapIp = bootStrapIP
-	}
-
-	envSize := os.Getenv(ENVGROUPSIZE)
-	if envSize != "" {
-		size, err := strconv.Atoi(envSize)
-		if err != nil {
-			log.Fatal(err)
-		}
-		config.RandomGroupSize = size
-		config.QueryGroupSize = size
-	}
-
-	nodeRole := os.Getenv(ENVNODEROLE)
-	if nodeRole != "" {
-		config.NodeRole = nodeRole
-	}
-	//---------------------------------
-	if nodeRole == "testNode" {
-		fmt.Println("This is a test node : ", config.BootStrapIp)
-		s := strings.Split(config.BootStrapIp, ":")
-		ip, _ := s[0], s[1]
-		tServer := "http://" + ip + ":8080/getCredential"
-		// Generated by curl-to-Go: https://mholt.github.io/curl-to-go
-		resp, err := http.Get(tServer)
-		//start := time.Now()
-		for err != nil {
-			time.Sleep(1 * time.Second)
-			resp, err = http.Get(tServer)
-		}
-
-		credential, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			log.Fatalln(err)
-		}
-		fmt.Println("credential : ", string(credential))
-		credentialPath := workingDir + "/credential/usrKey"
-		err = ioutil.WriteFile(credentialPath, []byte(credential), 0644)
-		resp.Body.Close()
-		if err != nil {
-			fmt.Println(err)
-			log.Fatal(err)
-		}
-	}
-	//---------------------------------
-
-	port := os.Getenv(ENVNODEPORT)
-	if port != "" {
-		i, err := strconv.Atoi(port)
-		if err == nil {
-			config.Port = i
+func (c *OnChainConfig) GetChainConfig() (config ChainConfig) {
+	for _, config := range c.ChainConfigs {
+		if c.currentNode == config.RemoteNodeType &&
+			c.currentType == config.ChainType {
+			fmt.Println("Use : ", config)
+			return config
 		}
 	}
 	return
 }
 
-func UpdateOnChainConfig(path string, config Config, updated onchain.ChainConfig) (err error) {
-	chainType := os.Getenv(ENVCHAINTYPE)
-	if chainType == "" {
-		fmt.Println("No CHAINTYPE Environment variable.")
-		chainType = "ETH"
-	}
-	chainNode := os.Getenv(ENVCHAINNODE)
-	if chainNode == "" {
-		fmt.Println("No CHAINNODE Environment variable.")
-		chainNode = "rinkebyPrivateNode"
-	}
-
-	for i, c := range config.ChainConfigs {
-		if chainNode == c.RemoteNodeType &&
-			chainType == c.ChainType {
-			config.ChainConfigs[i] = updated
+func (c *OnChainConfig) UpdateConfig(updated ChainConfig) (err error) {
+	for i, config := range c.ChainConfigs {
+		if c.currentNode == config.RemoteNodeType &&
+			c.currentType == config.ChainType {
+			c.ChainConfigs[i] = updated
 		}
 	}
-	configsJson, _ := json.Marshal(config)
-	err = ioutil.WriteFile(path, configsJson, 0644)
+	configsJson, _ := json.Marshal(c)
+	err = ioutil.WriteFile(c.path, configsJson, 0644)
 	return nil
-}
-
-func GetOnChainConfig(config Config) (node onchain.ChainConfig) {
-	chainType := os.Getenv(ENVCHAINTYPE)
-	if chainType == "" {
-		fmt.Println("No CHAINTYPE Environment variable.")
-		chainType = "ETH"
-	}
-	chainNode := os.Getenv(ENVCHAINNODE)
-	if chainNode == "" {
-		fmt.Println("No CHAINNODE Environment variable.")
-		chainNode = "rinkebyPrivateNode"
-	}
-
-	for _, c := range config.ChainConfigs {
-		if chainNode == c.RemoteNodeType &&
-			chainType == c.ChainType {
-			fmt.Println("Use : ", c)
-			return c
-		}
-	}
-	return onchain.ChainConfig{}
 }

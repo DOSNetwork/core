@@ -1,5 +1,7 @@
 FROM scratch
 ADD userNode /
-ADD config.json /
+ADD onChain.json /
+ADD offChain.json /
+ADD ama.json /
 ADD credential/ /credential/
 CMD ["/userNode"]
