@@ -19,7 +19,7 @@ contract AskMeAnything is Ownable, DOSOnChainSDK {
     event SetTimeout(uint previousTimeout, uint newTimeout);
     event QueryResponseReady(uint queryId, string result);
     event RequestSent(bool succ, uint requestId);
-    event RandomReady(uint generatedRandom);
+    event RandomReady(uint requestId, uint generatedRandom);
 
     modifier auth(uint id) {
         require(msg.sender == fromDOSProxyContract(),
@@ -81,7 +81,7 @@ contract AskMeAnything is Ownable, DOSOnChainSDK {
         auth(requestId)
     {
         random = generatedRandom;
-        emit RandomReady(generatedRandom);
+        emit RandomReady(requestId, generatedRandom);
         delete _valid[requestId];
     }
 }

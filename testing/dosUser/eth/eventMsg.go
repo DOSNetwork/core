@@ -22,5 +22,6 @@ type AskMeAnythingRequestSent struct {
 }
 
 type AskMeAnythingRandomReady struct {
+	RequestId       *big.Int
 	GeneratedRandom *big.Int
 }

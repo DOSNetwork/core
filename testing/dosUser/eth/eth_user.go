@@ -218,6 +218,7 @@ func (e *EthUserAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.Wa
 				if !e.filterLog(i.Raw) {
 					ch <- &AskMeAnythingRandomReady{
 						GeneratedRandom: i.GeneratedRandom,
+						RequestId:       i.RequestId,
 					}
 				}
 			}
