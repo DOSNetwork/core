@@ -61,9 +61,20 @@ func main() {
 		envTypes = "random"
 	}
 
+	//It also need to connect to bootstrape node to get crential
 	bootStrapIP := os.Getenv("BOOTSTRAPIP")
 	s := strings.Split(bootStrapIP, ":")
 	ip, _ := s[0], s[1]
+
+	//
+	config := eth.AMAConfig{}
+	configuration.LoadConfig("./ama.json", &config)
+	fmt.Println("AMA Address", config.AskMeAnythingAddress)
+	onChainConfig := configuration.OnChainConfig{}
+	onChainConfig.LoadConfig()
+	chainConfig := onChainConfig.GetChainConfig()
+	offChainConfig := configuration.OffChainConfig{}
+	offChainConfig.LoadConfig()
 
 	//Wait until contract has group public key
 	hasGroupPubkey := false
@@ -91,10 +102,8 @@ func main() {
 		}
 	}
 
-	config := configuration.ReadConfig()
-	chainConfig := configuration.GetOnChainConfig(config)
 	userTestAdaptor := &eth.EthUserAdaptor{}
-	err = userTestAdaptor.Init(true, &chainConfig)
+	err = userTestAdaptor.Init(config.AskMeAnythingAddress, &chainConfig)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -140,7 +149,7 @@ func main() {
 		wg.Done()
 	}()
 
-	fmt.Println("start Query ")
+	fmt.Println("start Query ", times)
 	for i := 0; i < times; i++ {
 		switch envTypes {
 		case "url":

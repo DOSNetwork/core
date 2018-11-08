@@ -2,27 +2,20 @@ package onchain
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"io/ioutil"
 	"log"
-	"math"
 	"math/big"
-	"os"
 	"sync"
 	"time"
 
+	"github.com/DOSNetwork/core/configuration"
 	"github.com/DOSNetwork/core/group/bn256"
-	"github.com/DOSNetwork/core/onchain/eth/contracts"
-
+	"github.com/DOSNetwork/core/onchain/dosproxy"
 	"github.com/dedis/kyber"
 
-	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/ethclient"
 )
 
 const (
@@ -52,39 +45,21 @@ const balanceCheckInterval = 3
 var workingDir string
 
 type EthAdaptor struct {
-	id        *big.Int
-	key       *keystore.Key
-	client    *ethclient.Client
+	EthCommon
 	proxy     *dosproxy.DOSProxy
 	lock      *sync.Mutex
 	logFilter *sync.Map
-	ethNonce  uint64
-	config    *ChainConfig
 }
 
-func (e *EthAdaptor) Init(autoReplenish bool, config *ChainConfig) (err error) {
-	workingDir, err = os.Getwd()
-	if err != nil {
-		return
-	}
+func (e *EthAdaptor) Init(config *configuration.ChainConfig) (err error) {
 
-	e.config = config
-
-	fmt.Println("start initial onChainConn...", config.DOSProxyAddress)
-
+	e.EthCommon.Init("./credential", config)
 	e.logFilter = new(sync.Map)
 	go e.logMapTimeout()
 
-	e.lock = new(sync.Mutex)
-
-	e.dialToEth()
-
-	if err = e.setAccount(autoReplenish); err != nil {
-		return
-	}
-	fmt.Println("nodeId: ", e.id)
-
 	fmt.Println("onChainConn initialization finished.")
+	e.lock = new(sync.Mutex)
+	e.dialToEth()
 	return
 }
 
@@ -111,19 +86,13 @@ func (e *EthAdaptor) SubscribeEvent(ch chan interface{}, subscribeType int) (err
 
 func (e *EthAdaptor) dialToEth() (err error) {
 	e.lock.Lock()
-	fmt.Println("dialing...")
-	e.client, err = ethclient.Dial(e.config.RemoteNodeAddress)
-	for err != nil {
-		fmt.Println(err)
-		fmt.Println("Cannot connect to the network, retrying...")
-		e.client, err = ethclient.Dial(e.config.RemoteNodeAddress)
-	}
+	e.EthCommon.DialToEth()
 	addr := common.HexToAddress(e.config.DOSProxyAddress)
-	e.proxy, err = dosproxy.NewDOSProxy(addr, e.client)
+	e.proxy, err = dosproxy.NewDOSProxy(addr, e.Client)
 	for err != nil {
 		fmt.Println(err)
 		fmt.Println("Connot Create new proxy, retrying...")
-		e.proxy, err = dosproxy.NewDOSProxy(addr, e.client)
+		e.proxy, err = dosproxy.NewDOSProxy(addr, e.Client)
 	}
 	e.lock.Unlock()
 	return
@@ -441,7 +410,7 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 
 func (e *EthAdaptor) InitialWhiteList() (err error) {
 	fmt.Println("Starting initialing WhiteList...")
-	auth, err := e.getAuth()
+	auth, err := e.GetAuth()
 	if err != nil {
 		return
 	}
@@ -476,7 +445,7 @@ func (e *EthAdaptor) InitialWhiteList() (err error) {
 	fmt.Println("tx sent: ", tx.Hash().Hex())
 	fmt.Println("Whitelist initialized, waiting for confirmation...")
 
-	err = e.checkTransaction(tx)
+	err = e.CheckTransaction(tx)
 
 	return
 
@@ -487,7 +456,8 @@ func (e *EthAdaptor) GetGroupPubKey(idx int) (groupPubKeys [4]*big.Int, err erro
 }
 
 func (e *EthAdaptor) Grouping(size int) (err error) {
-	auth, err := e.getAuth()
+	fmt.Println("!!!!!!Starting Grouping ", size)
+	auth, err := e.GetAuth()
 	if err != nil {
 		return
 	}
@@ -497,7 +467,7 @@ func (e *EthAdaptor) Grouping(size int) (err error) {
 		return
 	}
 
-	err = e.checkTransaction(tx)
+	err = e.CheckTransaction(tx)
 	return
 }
 
@@ -507,7 +477,7 @@ func (e *EthAdaptor) GetWhitelist() (address common.Address, err error) {
 
 func (e *EthAdaptor) UploadID() (err error) {
 	fmt.Println("Starting submitting nodeId...")
-	auth, err := e.getAuth()
+	auth, err := e.GetAuth()
 	if err != nil {
 		return
 	}
@@ -520,7 +490,7 @@ func (e *EthAdaptor) UploadID() (err error) {
 	fmt.Println("tx sent: ", tx.Hash().Hex())
 	fmt.Println("NodeId submitted, waiting for confirmation...")
 
-	err = e.checkTransaction(tx)
+	err = e.CheckTransaction(tx)
 
 	return
 }
@@ -530,7 +500,7 @@ func (e *EthAdaptor) GetId() (id []byte) {
 }
 
 func (e *EthAdaptor) GetBlockHashByNumber(blknum *big.Int) (hash common.Hash, err error) {
-	block, err := e.client.BlockByNumber(context.Background(), blknum)
+	block, err := e.Client.BlockByNumber(context.Background(), blknum)
 	if err != nil {
 		return
 	}
@@ -541,7 +511,7 @@ func (e *EthAdaptor) GetBlockHashByNumber(blknum *big.Int) (hash common.Hash, er
 
 func (e *EthAdaptor) SetRandomNum(sig []byte) (err error) {
 	fmt.Println("Starting submitting random number...")
-	auth, err := e.getAuth()
+	auth, err := e.GetAuth()
 	if err != nil {
 		return
 	}
@@ -556,14 +526,14 @@ func (e *EthAdaptor) SetRandomNum(sig []byte) (err error) {
 	fmt.Println("tx sent: ", tx.Hash().Hex())
 	fmt.Println("new random number submitted, waiting for confirmation...")
 
-	err = e.checkTransaction(tx)
+	err = e.CheckTransaction(tx)
 
 	return
 }
 
 func (e *EthAdaptor) UploadPubKey(pubKey kyber.Point) (err error) {
 	fmt.Println("Starting submitting group public key...")
-	auth, err := e.getAuth()
+	auth, err := e.GetAuth()
 	if err != nil {
 		return
 	}
@@ -585,14 +555,14 @@ func (e *EthAdaptor) UploadPubKey(pubKey kyber.Point) (err error) {
 	fmt.Println("y1: ", y1)
 	fmt.Println("Group public key submitted, waiting for confirmation...")
 
-	err = e.checkTransaction(tx)
+	err = e.CheckTransaction(tx)
 
 	return
 }
 
 func (e *EthAdaptor) ResetNodeIDs() (err error) {
 	fmt.Println("Starting ResetNodeIDs...")
-	auth, err := e.getAuth()
+	auth, err := e.GetAuth()
 	if err != nil {
 		return
 	}
@@ -602,13 +572,13 @@ func (e *EthAdaptor) ResetNodeIDs() (err error) {
 		return
 	}
 
-	err = e.checkTransaction(tx)
+	err = e.CheckTransaction(tx)
 	return
 }
 
 func (e *EthAdaptor) RandomNumberTimeOut() (err error) {
 	fmt.Println("Starting RandomNumberTimeOut...")
-	auth, err := e.getAuth()
+	auth, err := e.GetAuth()
 	if err != nil {
 		return
 	}
@@ -618,7 +588,7 @@ func (e *EthAdaptor) RandomNumberTimeOut() (err error) {
 		return
 	}
 
-	err = e.checkTransaction(tx)
+	err = e.CheckTransaction(tx)
 	return
 }
 
@@ -640,7 +610,7 @@ func DecodePubKey(pubKey kyber.Point) (*big.Int, *big.Int, *big.Int, *big.Int, e
 }
 
 func (e *EthAdaptor) DataReturn(requestId *big.Int, trafficType uint8, data, sig []byte) (err error) {
-	auth, err := e.getAuth()
+	auth, err := e.GetAuth()
 	if err != nil {
 		return
 	}
@@ -655,7 +625,7 @@ func (e *EthAdaptor) DataReturn(requestId *big.Int, trafficType uint8, data, sig
 	fmt.Println("tx sent: ", tx.Hash().Hex())
 	fmt.Printf("Request with id(%v) type(%v) fulfilled, waiting for confirmation...\n", requestId, trafficType)
 
-	err = e.checkTransaction(tx)
+	err = e.CheckTransaction(tx)
 
 	return
 }
@@ -671,231 +641,6 @@ func DecodeSig(sig []byte) (x, y *big.Int) {
 	}
 
 	y = big.NewInt(0).Sub(bn256.P, big.NewInt(0).Mod(y, bn256.P))
-
-	return
-}
-
-func (e *EthAdaptor) getAuth() (auth *bind.TransactOpts, err error) {
-	auth = bind.NewKeyedTransactor(e.key.PrivateKey)
-	if err != nil {
-		return
-	}
-
-	automatedNonce, err := e.client.PendingNonceAt(context.Background(), e.key.Address)
-	if err != nil {
-		return
-	}
-
-	e.lock.Lock()
-	e.ethNonce++
-	if automatedNonce > e.ethNonce {
-		e.ethNonce = automatedNonce
-	}
-	auth.Nonce = big.NewInt(int64(e.ethNonce))
-	e.lock.Unlock()
-
-	_, err = e.client.SuggestGasPrice(context.Background())
-	if err != nil {
-		return
-	}
-
-	auth.GasLimit = uint64(1000000)
-
-	return
-}
-
-func (e *EthAdaptor) setAccount(autoReplenish bool) (err error) {
-	credentialPath := workingDir + "/credential"
-	fmt.Println("credentialPath: ", credentialPath)
-
-	passPhraseBytes, err := ioutil.ReadFile(credentialPath + "/boot/passPhrase")
-	if err != nil {
-		return
-	}
-
-	passPhrase := string(passPhraseBytes)
-
-	newKeyStore := keystore.NewKeyStore(credentialPath, keystore.StandardScryptN, keystore.StandardScryptP)
-	if len(newKeyStore.Accounts()) < 1 {
-		_, err = newKeyStore.NewAccount(passPhrase)
-		if err != nil {
-			return
-		}
-	}
-
-	usrKeyPath := newKeyStore.Accounts()[0].URL.Path
-	usrKeyJson, err := ioutil.ReadFile(usrKeyPath)
-	if err != nil {
-		return
-	}
-
-	usrKey, err := keystore.DecryptKey(usrKeyJson, passPhrase)
-	if err != nil {
-		return
-	}
-
-	e.key = usrKey
-	e.id = new(big.Int)
-	e.id.SetBytes(e.key.Address.Bytes())
-	e.ethNonce, err = e.client.PendingNonceAt(context.Background(), e.key.Address)
-	if err != nil {
-		return
-	}
-	//for correctness of the first call of getAuth, because getAuth always ++,
-	e.ethNonce--
-
-	if autoReplenish {
-		var rootKeyPath string
-		var rootKeyJson []byte
-		var rootKey *keystore.Key
-
-		rootKeyPath = credentialPath + "/boot/rootKey"
-		rootKeyJson, err = ioutil.ReadFile(rootKeyPath)
-		if err != nil {
-			return
-		}
-
-		rootKey, err = keystore.DecryptKey(rootKeyJson, passPhrase)
-		if err != nil {
-			return
-		}
-
-		err = e.balanceMaintain(usrKey, rootKey)
-
-		go func() {
-			ticker := time.NewTicker(balanceCheckInterval * time.Hour)
-			for range ticker.C {
-				err = e.balanceMaintain(usrKey, rootKey)
-				if err != nil {
-					fmt.Print("Fail to replenish.")
-				}
-			}
-		}()
-	}
-
-	return
-}
-
-func (e *EthAdaptor) getKey(keyPath, passPrase string) (key *keystore.Key, err error) {
-	var keyJson []byte
-	keyJson, err = ioutil.ReadFile(keyPath)
-	if err != nil {
-		return
-	}
-
-	key, err = keystore.DecryptKey(keyJson, passPrase)
-	if err != nil {
-		return
-	}
-	return
-}
-
-func (e *EthAdaptor) BalanceMaintain(rootKeyPath, usrKeyPath, rPassPhrase, uPassPhrase string) (err error) {
-	rootKey, err := e.getKey(rootKeyPath, rPassPhrase)
-	if err != nil {
-		return
-	}
-	usrKey, err := e.getKey(usrKeyPath, uPassPhrase)
-	if err != nil {
-		return
-	}
-	err = e.balanceMaintain(usrKey, rootKey)
-	return
-}
-
-func (e *EthAdaptor) balanceMaintain(usrKey, rootKey *keystore.Key) (err error) {
-	usrKeyBalance, err := e.getBalance(usrKey)
-	if err != nil {
-		return
-	}
-	fmt.Println("usrKeyBalance ", usrKeyBalance)
-
-	rootKeyBalance, err := e.getBalance(rootKey)
-	if err != nil {
-		return
-	}
-	fmt.Println("rootKeyBalance ", rootKeyBalance)
-
-	if usrKeyBalance.Cmp(big.NewFloat(0.7)) == -1 {
-		fmt.Println("userKey account replenishing...")
-		if err = e.transferEth(rootKey, usrKey); err == nil {
-			fmt.Println("userKey account replenished.")
-		}
-	}
-
-	return
-}
-
-func (e *EthAdaptor) getBalance(key *keystore.Key) (balance *big.Float, err error) {
-	wei, err := e.client.BalanceAt(context.Background(), key.Address, nil)
-	if err != nil {
-		return
-	}
-
-	balance = new(big.Float)
-	balance.SetString(wei.String())
-	balance = balance.Quo(balance, big.NewFloat(math.Pow10(18)))
-	return
-}
-
-func (e *EthAdaptor) transferEth(from, to *keystore.Key) (err error) {
-	nonce, err := e.client.PendingNonceAt(context.Background(), from.Address)
-	if err != nil {
-		return
-	}
-
-	gasPrice, err := e.client.SuggestGasPrice(context.Background())
-	if err != nil {
-		return
-	}
-
-	value := big.NewInt(800000000000000000) //0.8 Eth
-	gasLimit := uint64(1000000)
-
-	tx := types.NewTransaction(nonce, to.Address, value, gasLimit, gasPrice.Mul(gasPrice, big.NewInt(3)), nil)
-
-	chainId, err := e.client.NetworkID(context.Background())
-	if err != nil {
-		return
-	}
-
-	signedTx, err := types.SignTx(tx, types.NewEIP155Signer(chainId), from.PrivateKey)
-	if err != nil {
-		return
-	}
-
-	err = e.client.SendTransaction(context.Background(), signedTx)
-	if err != nil {
-		return
-	}
-	fmt.Println("replenishing tx sent: ", signedTx.Hash().Hex(), ", waiting for confirmation...")
-
-	err = e.checkTransaction(signedTx)
-
-	return
-}
-
-func (e *EthAdaptor) checkTransaction(tx *types.Transaction) (err error) {
-	start := time.Now()
-	receipt, err := e.client.TransactionReceipt(context.Background(), tx.Hash())
-	for err == ethereum.NotFound {
-		if time.Since(start).Seconds() > 30 {
-			fmt.Println("no receipt yet, set to successful")
-			return
-		}
-
-		time.Sleep(1 * time.Second)
-		receipt, err = e.client.TransactionReceipt(context.Background(), tx.Hash())
-	}
-	if err != nil {
-		return
-	}
-
-	if receipt.Status == 1 {
-		fmt.Println("transaction confirmed.")
-	} else {
-		err = errors.New("transaction failed")
-	}
 
 	return
 }

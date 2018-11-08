@@ -20,15 +20,18 @@ import (
 
 // main
 func main() {
-	config := configuration.ReadConfig()
-	chainConfig := configuration.GetOnChainConfig(config)
-	role := config.NodeRole
-	nbParticipants := config.RandomGroupSize
-	port := config.Port
-	bootstrapIp := config.BootStrapIp
+	offChainConfig := configuration.OffChainConfig{}
+	offChainConfig.LoadConfig()
+	role := offChainConfig.NodeRole
+	nbParticipants := offChainConfig.RandomGroupSize
+	port := offChainConfig.Port
+	bootstrapIp := offChainConfig.BootStrapIp
 
+	onChainConfig := configuration.OnChainConfig{}
+	onChainConfig.LoadConfig()
+	chainConfig := onChainConfig.GetChainConfig()
 	//1)Connect to Eth
-	chainConn, err := onchain.AdaptTo(chainConfig.ChainType, false, &chainConfig)
+	chainConn, err := onchain.AdaptTo(chainConfig.ChainType, &chainConfig)
 	if err != nil {
 		log.Fatal(err)
 	}

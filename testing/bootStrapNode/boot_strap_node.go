@@ -27,16 +27,21 @@ func main() {
 	credentialIndex = 0
 
 	//1) Connect to Ethereum to reset contract
-	config := configuration.ReadConfig()
-	chainConfig := configuration.GetOnChainConfig(config)
-	port := config.Port
+	offChainConfig := configuration.OffChainConfig{}
+	offChainConfig.LoadConfig()
+
+	onChainConfig := configuration.OnChainConfig{}
+	onChainConfig.LoadConfig()
+	chainConfig := onChainConfig.GetChainConfig()
+
+	port := offChainConfig.Port
 	adaptor = &onchain.EthAdaptor{}
-	err = adaptor.Init(false, &chainConfig)
+	err = adaptor.Init(&chainConfig)
 	if err != nil {
 		fmt.Println(err)
 	}
 	(*adaptor).ResetNodeIDs()
-	(*adaptor).Grouping(config.RandomGroupSize)
+	(*adaptor).Grouping(offChainConfig.RandomGroupSize)
 
 	//2)Build a p2p network
 	peerEvent := make(chan p2p.P2PMessage, 100)
@@ -78,9 +83,9 @@ func getCredential(w http.ResponseWriter, r *http.Request) {
 	credentialPath := "testAccounts/" + strconv.Itoa(credentialIndex) + "/credential"
 
 	usrKeyPath := credentialPath + "/usrKey"
-	rootKeyPath := credentialPath + "/boot/rootKey"
+	rootKeyPath := "testAccounts/bootCredential/useKey"
 
-	passPhraseBytes, err := ioutil.ReadFile(credentialPath + "/boot/passPhrase")
+	passPhraseBytes, err := ioutil.ReadFile(credentialPath + "/passPhrase")
 	if err != nil {
 		return
 	}

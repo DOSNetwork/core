@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/DOSNetwork/core/configuration"
 	"github.com/dedis/kyber"
 	"github.com/ethereum/go-ethereum/common"
 )
@@ -12,22 +13,8 @@ const (
 	ETH = "ETH"
 )
 
-// TODO: Move to configuration/config.go
-type ChainConfig struct {
-	// TODO: Refactor out of ChainConfig
-	RemoteNodeType    string
-	RemoteNodeAddress string
-	// TODO: remove unrelated field
-	AskMeAnythingAddress string
-
-	ChainType               string
-	DOSProxyAddress         string
-	DOSAddressBridgeAddress string
-	DOSOnChainSDKAddress    string
-}
-
 type ChainInterface interface {
-	Init(autoReplenish bool, chainConfig *ChainConfig) (err error)
+	Init(chainConfig *configuration.ChainConfig) (err error)
 	SubscribeEvent(ch chan interface{}, subscribeType int) (err error)
 	InitialWhiteList() (err error)
 	GetWhitelist() (address common.Address, err error)
@@ -43,11 +30,11 @@ type ChainInterface interface {
 	RandomNumberTimeOut() (err error)
 }
 
-func AdaptTo(chainName string, autoReplenish bool, chainConfig *ChainConfig) (conn ChainInterface, err error) {
+func AdaptTo(chainName string, chainConfig *configuration.ChainConfig) (conn ChainInterface, err error) {
 	switch chainConfig.ChainType {
 	case ETH:
 		conn = &EthAdaptor{}
-		err = conn.Init(autoReplenish, chainConfig)
+		err = conn.Init(chainConfig)
 	default:
 		err = fmt.Errorf("Chain %s not supported error\n", chainName)
 	}
