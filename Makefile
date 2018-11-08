@@ -47,6 +47,7 @@ genDockers:
 	cp testing/dosUser/Dockerfile $(DOCKER_IMAGES)/Dockerfile.usernode
 updateSubmodeule:
 	git submodule update --init --recursive
+	git submodule update --remote
 buildDockers:genDockers
 	cd $(DOCKER_IMAGES);docker build -t bootstrap -f Dockerfile.bootstrap  .
 	cd $(DOCKER_IMAGES);docker build -t dosnode -f Dockerfile.dosnode .
