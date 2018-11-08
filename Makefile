@@ -45,14 +45,15 @@ genDockers:
 	cp Dockerfile $(DOCKER_IMAGES)/Dockerfile.dosnode
 	cp testing/bootStrapNode/Dockerfile $(DOCKER_IMAGES)/Dockerfile.bootstrap
 	cp testing/dosUser/Dockerfile $(DOCKER_IMAGES)/Dockerfile.usernode
-
+updateSubmodeule:
+	git submodule update --init --recursive
 buildDockers:genDockers
 	cd $(DOCKER_IMAGES);docker build -t bootstrap -f Dockerfile.bootstrap  .
 	cd $(DOCKER_IMAGES);docker build -t dosnode -f Dockerfile.dosnode .
 	cd $(DOCKER_IMAGES);docker build -t usernode -f Dockerfile.usernode  .
 
 #Only used for deploy a new contracts for testing
-deploy:
+deploy:updateSubmodeule
 	abigen -sol $(ETH_CONTRACTS)/DOSProxy.sol --pkg dosproxy --out $(CONTRACTS_GOPATH)/DOSProxy.go
 	abigen -sol $(ETH_CONTRACTS)/DOSAddressBridge.sol --pkg dosproxy --out $(CONTRACTS_GOPATH)/DOSAddressBridge.go
 	cp $(ETH_CONTRACTS)/DOSOnChainSDK.sol $(USER_CONTRACTS)/
