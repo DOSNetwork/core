@@ -1,3 +1,5 @@
-.idea/
 # dependencies
 vendor/
+testAccounts/
+.idea/
+

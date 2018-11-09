@@ -19,8 +19,9 @@
 - Install [dep](https://golang.github.io/dep/docs/daily-dep.html#key-takeaways) to manage package dependencies and versions.
   - [Visualize package dependencies](https://golang.github.io/dep/docs/daily-dep.html#visualizing-dependencies)
 - Download: `$ go get -d github.com/DOSNetwork/core/...`
-- Build: `$ make`
+- Build: `$ make build`
 - Install: `$ make install`
+- Test: `$ make build && cd testing && make deploy && make buildDockers && cd ../ && docker-compose up --scale dosnode=3`    
 - ... Hack ...
 - Use `$ go fmt .`; or plugin before commit.
 - `$ make clean` before commit
