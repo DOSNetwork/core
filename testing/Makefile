@@ -28,6 +28,7 @@ buildDockers:
 	cp Dockerfile ../Dockerfile.base
 	cp ../Dockerfile ../Dockerfile.dosnode
 	cp bootStrapNode/Dockerfile  ../Dockerfile.bootstrap
+	cp dosUser/Dockerfile ../Dockerfile.usernode
 	cd ../;docker build -t dosbase -f Dockerfile.base .
 	cd ../;docker build -t dosnode -f Dockerfile.dosnode .
 	cd ../;docker build -t bootstrap -f Dockerfile.bootstrap  .
