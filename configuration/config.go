@@ -90,9 +90,11 @@ func (c *OffChainConfig) LoadConfig() (err error) {
 		if err != nil {
 			return
 		}
+		if workingDir == "/" {
+			workingDir = "."
+		}
 	}
-	_ = workingDir
-	err = LoadConfig("./offChain.json", c)
+	err = LoadConfig(workingDir+"/offChain.json", c)
 	if err != nil {
 		fmt.Println("LoadConfig  err", err)
 		return
@@ -172,9 +174,11 @@ func (c *OnChainConfig) LoadConfig() (err error) {
 		if err != nil {
 			return
 		}
+		if workingDir == "/" {
+			workingDir = "."
+		}
 	}
-	_ = workingDir
-	c.path = "./onChain.json"
+	c.path = workingDir + "/onChain.json"
 	chainType := os.Getenv(ENVCHAINTYPE)
 	if chainType == "" {
 		fmt.Println("No CHAINTYPE Environment variable.")

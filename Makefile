@@ -5,15 +5,12 @@
 .PHONY: dep build client install clean gen
 
 .DEFAULT_GOAL := build
+DOSPROXY_PATH := onchain/eth/contracts/DOSProxy.sol
 CONTRACTS_GOPATH := onchain/dosproxy
-GENERATED_FILES := $(shell find $(CONTRACTS_GOPATH) -name '*.go')
-#For testing
-DOCKER_IMAGES := dockerImages
-TEST_ACCOUNTS := testAccounts
+TEST_CONTRACTS_GOPATH := testing/dosUser/contract
+GENERATED_FILES := $(shell find $(CONTRACTS_GOPATH) $(TEST_CONTRACTS_GOPATH) -name '*.go')
 ETH_CONTRACTS := onchain/eth/contracts
-USER_CONTRACTS := testing/dosUser/contract
 BOOT_CREDENTIAL := testAccounts/bootCredential
-AMA_CONFIGPATH := testing/dosUser/ama.json
 
 build: dep client
 
@@ -23,53 +20,24 @@ dep:
 client: gen
 	go build -o client
 
+docker-prepare:
+        ifeq ($(shell docker images -q dosenv 2> /dev/null),)
+		docker build -t dosenv -f Dockerfile.env  .
+        endif
+
+client-docker: docker-prepare
+	docker build -t dosnode -f Dockerfile .
+
 install: dep client
 	go install
 
 updateSubmodule:
+	test -f $(DOSPROXY_PATH) || git submodule update --init --recursive
 	git submodule update --remote
 
 gen: updateSubmodule
 	abigen -sol $(ETH_CONTRACTS)/DOSAddressBridge.sol --pkg dosproxy --out $(CONTRACTS_GOPATH)/DOSAddressBridge.go
-	abigen -sol $(ETH_CONTRACTS)/DOSOnChainSDK.sol --pkg dosproxy --out $(CONTRACTS_GOPATH)/DOSOnChainSDK.go
 	abigen -sol $(ETH_CONTRACTS)/DOSProxy.sol --pkg dosproxy --out $(CONTRACTS_GOPATH)/DOSProxy.go
-
-#For testing
-genDockers:
-	mkdir -p $(DOCKER_IMAGES)
-	cp -r $(TEST_ACCOUNTS) $(DOCKER_IMAGES)/
-	cp -r credential $(DOCKER_IMAGES)/
-	cp onChain.json $(DOCKER_IMAGES)/
-	cp offChain.json $(DOCKER_IMAGES)/
-	go build -ldflags "-linkmode external -extldflags -static" -a -o clientNode main.go
-	mv clientNode $(DOCKER_IMAGES)/
-	cd testing/bootStrapNode/;go build -ldflags "-linkmode external -extldflags -static" -a -o bootstrapNode boot_strap_node.go
-	mv testing/bootStrapNode/bootstrapNode $(DOCKER_IMAGES)/
-	cd testing/dosUser/;go build -ldflags "-linkmode external -extldflags -static" -a -o userNode dos_user.go
-	mv testing/dosUser/userNode $(DOCKER_IMAGES)/
-	cp testing/dosUser/ama.json $(DOCKER_IMAGES)/
-	cp Dockerfile $(DOCKER_IMAGES)/Dockerfile.dosnode
-	cp testing/bootStrapNode/Dockerfile $(DOCKER_IMAGES)/Dockerfile.bootstrap
-	cp testing/dosUser/Dockerfile $(DOCKER_IMAGES)/Dockerfile.usernode
-
-buildDockers: genDockers
-	cd $(DOCKER_IMAGES);docker build -t bootstrap -f Dockerfile.bootstrap  .
-	cd $(DOCKER_IMAGES);docker build -t dosnode -f Dockerfile.dosnode .
-	cd $(DOCKER_IMAGES);docker build -t usernode -f Dockerfile.usernode  .
-
-#Only used for deploy a new contracts for testing
-deploy: gen
-	cp $(ETH_CONTRACTS)/DOSOnChainSDK.sol $(USER_CONTRACTS)/
-	cp $(ETH_CONTRACTS)/Ownable.sol $(USER_CONTRACTS)/
-	mkdir -p $(USER_CONTRACTS)/lib/
-	cp $(ETH_CONTRACTS)/lib/utils.sol $(USER_CONTRACTS)/lib/
-	abigen -sol $(USER_CONTRACTS)/AskMeAnything.sol --pkg dosUser --out $(USER_CONTRACTS)/AskMeAnything.go
-	rm $(USER_CONTRACTS)/DOSOnChainSDK.sol
-	rm $(USER_CONTRACTS)/Ownable.sol
-	rm -r $(USER_CONTRACTS)/lib/
-	go run testing/contracts_deploy/deploy.go -credentialPath $(BOOT_CREDENTIAL) -contractPath $(ETH_CONTRACTS) -step ProxyAndBridge
-	go run testing/contracts_deploy/deploy.go -AMAPath $(AMA_CONFIGPATH) -contractPath $(ETH_CONTRACTS) -credentialPath $(BOOT_CREDENTIAL) -step SDKAndAMA
-	go run testing/contracts_deploy/deploy.go -contractPath $(ETH_CONTRACTS) -credentialPath $(BOOT_CREDENTIAL) -step SetProxyAddress
 
 clean:
 	rm -f client

@@ -11,16 +11,13 @@ import (
 	"github.com/DOSNetwork/core/configuration"
 	"github.com/DOSNetwork/core/onchain"
 	"github.com/DOSNetwork/core/onchain/dosproxy"
-	"github.com/DOSNetwork/core/testing/dosUser/contract"
-	"github.com/DOSNetwork/core/testing/dosUser/eth"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
 const (
-	AskMeAnyThing = iota
-	DOSAddressBridge
+	DOSAddressBridge = iota
 	DOSProxy
 )
 
@@ -82,9 +79,6 @@ func deployContract(ethComm *onchain.EthCommon, contractName int) string {
 	case DOSProxy:
 		fmt.Println("Starting deploy DOSProxy.sol...")
 		address, tx, _, err = dosproxy.DeployDOSProxy(auth, ethComm.Client)
-	case AskMeAnyThing:
-		fmt.Println("Starting deploy AskMeAnyThing.sol...")
-		address, tx, _, err = dosUser.DeployAskMeAnything(auth, ethComm.Client)
 	}
 	if err != nil {
 		fmt.Println(err)
@@ -132,24 +126,14 @@ func main() {
 	credentialPathFlag := flag.String("credentialPath", "./testAccounts/bootCredential/", "credentialPath")
 	contractPathFlag := flag.String("contractPath", "./contracts", "Contract file path")
 	stepFlag := flag.String("step", "ProxyAndBridge", "ProxyAndBridge or SDKAndAMA")
-	amaConfigPathFlag := flag.String("AMAPath", "ama.json", "ama.json path")
 	flag.Parse()
 	credentialPath := *credentialPathFlag
 	contractPath := *contractPathFlag
 	contractPath = contractPath + "/DOSOnChainSDK.sol"
 	step := *stepFlag
-	amaConfigPath := *amaConfigPathFlag
 
-	//For test
-	/*
-		contractPath = "../../onchain/eth/contracts/"
-		os.Setenv("CHAINNODE", "privateNode")
-		os.Setenv("CONFIGPATH", "../..")
-		credentialPath = "../../testAccounts/bootCredential/"
-		_ = credentialPath
-		step = "SDKAndAMA"
-		amaConfigPath = "../ama.json"
-	*/
+	os.Setenv("CONFIGPATH", "..")
+
 	config := configuration.OnChainConfig{}
 	config.LoadConfig()
 	chainConfig := config.GetChainConfig()
@@ -170,9 +154,5 @@ func main() {
 		if err != nil {
 			log.Fatal(err)
 		}
-	} else if step == "SDKAndAMA" {
-		config := eth.AMAConfig{}
-		config.AskMeAnythingAddress = deployContract(conn, AskMeAnyThing)
-		configuration.UpdateConfig(amaConfigPath, config)
 	}
 }

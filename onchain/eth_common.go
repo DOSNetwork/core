@@ -114,6 +114,8 @@ func (e *EthCommon) GetAuth() (auth *bind.TransactOpts, err error) {
 	}
 
 	auth.GasLimit = uint64(6000000)
+	//set gasPrice
+	//auth.GasPrice = big.NewInt(10000000000)
 
 	return
 }
