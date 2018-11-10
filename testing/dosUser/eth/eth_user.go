@@ -10,6 +10,7 @@ import (
 	"github.com/DOSNetwork/core/configuration"
 	"github.com/DOSNetwork/core/onchain"
 	"github.com/DOSNetwork/core/testing/dosUser/contract"
+
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -26,8 +27,6 @@ const (
 type AMAConfig struct {
 	AskMeAnythingAddress string
 }
-
-const balanceCheckInterval = 3
 
 var workingDir string
 
@@ -143,7 +142,7 @@ func (e *EthUserAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.Wa
 	case SubscribeAskMeAnythingRequestSent:
 		fmt.Println("subscribing AskMeAnythingRequestSent event...")
 		transitChan := make(chan *dosUser.AskMeAnythingRequestSent)
-		sub, err := e.proxy.AskMeAnythingFilterer.WatchRequestSent(opt, transitChan)
+		sub, err := e.proxy.AskMeAnythingFilterer.WatchRequestSent(opt, transitChan, []common.Address{e.EthCommon.GetKey().Address})
 		if err != nil {
 			fmt.Println(err)
 			fmt.Println("Network fail, will retry shortly")
@@ -159,8 +158,9 @@ func (e *EthUserAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.Wa
 			case i := <-transitChan:
 				if !e.filterLog(i.Raw) {
 					ch <- &AskMeAnythingRequestSent{
-						Succ:      i.Succ,
-						RequestId: i.RequestId,
+						InternalSerial: i.InternalSerial,
+						Succ:           i.Succ,
+						RequestId:      i.RequestId,
 					}
 				}
 			}
@@ -193,14 +193,14 @@ func (e *EthUserAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.Wa
 	}
 }
 
-func (e *EthUserAdaptor) Query(url, selector string) (err error) {
+func (e *EthUserAdaptor) Query(internalSerial uint8, url, selector string) (err error) {
 	auth, err := e.GetAuth()
 	if err != nil {
 		fmt.Println(" Query GetAuth err ", err)
 		return
 	}
 
-	tx, err := e.proxy.AMA(auth, url, selector)
+	tx, err := e.proxy.AMA(auth, internalSerial, url, selector)
 	if err != nil {
 		fmt.Println(" Query AMAerr ", err)
 		return
@@ -209,18 +209,18 @@ func (e *EthUserAdaptor) Query(url, selector string) (err error) {
 	fmt.Println("tx sent: ", tx.Hash().Hex())
 	fmt.Println("Querying ", url, "selector", selector, "waiting for confirmation...")
 
-	err = e.CheckTransaction(tx)
+	//err = e.CheckTransaction(tx)
 
 	return
 }
 
-func (e *EthUserAdaptor) GetSafeRandom() (err error) {
+func (e *EthUserAdaptor) GetSafeRandom(internalSerial uint8) (err error) {
 	auth, err := e.GetAuth()
 	if err != nil {
 		return
 	}
 
-	tx, err := e.proxy.RequestSafeRandom(auth)
+	tx, err := e.proxy.RequestSafeRandom(auth, internalSerial)
 	if err != nil {
 		return
 	}
@@ -228,7 +228,7 @@ func (e *EthUserAdaptor) GetSafeRandom() (err error) {
 	fmt.Println("tx sent: ", tx.Hash().Hex())
 	fmt.Println("RequestSafeRandom ", " waiting for confirmation...")
 
-	err = e.CheckTransaction(tx)
+	//err = e.CheckTransaction(tx)
 
 	return
 }
@@ -247,7 +247,7 @@ func (e *EthUserAdaptor) GetFastRandom() (err error) {
 	fmt.Println("tx sent: ", tx.Hash().Hex())
 	fmt.Println("RequestSafeRandom ", " waiting for confirmation...")
 
-	err = e.CheckTransaction(tx)
+	//err = e.CheckTransaction(tx)
 
 	return
 }

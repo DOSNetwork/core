@@ -2,8 +2,6 @@ version: '3'
 services:
  bootstrap:
    image: bootstrap
-   networks:
-     - webnet
    deploy:
      replicas: 1
    environment:
@@ -11,8 +9,6 @@ services:
      - GROUPSIZE=3
  dosnode:
    image: dosnode
-   networks:
-     - webnet
    depends_on:
      - bootstrap
    deploy:
@@ -23,8 +19,6 @@ services:
      - BOOTSTRAPIP=bootstrap:44460
  randomnode:
    image: usernode
-   networks:
-     - webnet
    deploy:
      replicas: 1
    environment:
@@ -35,8 +29,6 @@ services:
      - QUERYTYPE=random
  urlnode:
    image: usernode
-   networks:
-     - webnet
    deploy:
      replicas: 1
    environment:
@@ -45,6 +37,3 @@ services:
      - BOOTSTRAPIP=bootstrap:44460
      - QUERYTIMES=50
      - QUERYTYPE=url
-networks:
-  webnet:
-    driver: overlay
