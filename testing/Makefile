@@ -9,8 +9,10 @@ USER_CONTRACTS := dosUser/contract
 BOOT_CREDENTIAL := ../testAccounts/bootCredential
 AMA_CONFIGPATH := dosUser/ama.json
 
+contract-prepare:
+	cd ../;$(MAKE) gen
 
-deploy:
+deploy:contract-prepare
 	go run contracts_deploy/deploy.go -credentialPath $(BOOT_CREDENTIAL) -contractPath $(ETH_CONTRACTS) -step ProxyAndBridge
 	go run contracts_deploy/deploy.go -credentialPath $(BOOT_CREDENTIAL) -contractPath $(ETH_CONTRACTS) -step SetProxyAddress
 	cp $(ETH_CONTRACTS)/DOSOnChainSDK.sol $(USER_CONTRACTS)/
@@ -24,15 +26,21 @@ deploy:
 	go run contracts_deploy/depoy_ama.go -AMAPath $(AMA_CONFIGPATH) -credentialPath $(BOOT_CREDENTIAL)
 
 
-buildDockers:
-	cp Dockerfile ../Dockerfile.base
-	cp ../Dockerfile ../Dockerfile.dosnode
-	cp bootStrapNode/Dockerfile  ../Dockerfile.bootstrap
-	cp dosUser/Dockerfile ../Dockerfile.usernode
-	cd ../;docker build -t dosbase -f Dockerfile.base .
-	cd ../;docker build -t dosnode -f Dockerfile.dosnode .
+docker-prepare:
+	cd ../;$(MAKE) docker-prepare
+
+docker-bootnode:docker-prepare
+	cp bootStrapNode/Dockerfile  ../Dockerfile.bootstrap	
 	cd ../;docker build -t bootstrap -f Dockerfile.bootstrap  .
+	rm ../Dockerfile.bootstrap
+
+docker-dosnode:docker-prepare
+	cd ../;$(MAKE) client-docker
+
+docker-usernode:docker-prepare
+	cp dosUser/Dockerfile ../Dockerfile.usernode
 	cd ../;docker build -t usernode -f Dockerfile.usernode  .
+	rm ../Dockerfile.usernode
+
+docker-all: docker-bootnode docker-dosnode docker-usernode
 	docker image prune -f
-	docker rmi dosbase
-	cd ../;rm -f Dockerfile.bootstrap Dockerfile.dosnode Dockerfile.usernode Dockerfile.base

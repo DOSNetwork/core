@@ -132,7 +132,7 @@ func main() {
 	contractPath = contractPath + "/DOSOnChainSDK.sol"
 	step := *stepFlag
 
-	os.Setenv("CONFIGPATH", "../")
+	os.Setenv("CONFIGPATH", "..")
 
 	config := configuration.OnChainConfig{}
 	config.LoadConfig()
@@ -141,7 +141,6 @@ func main() {
 
 	conn := &onchain.EthCommon{}
 	_ = conn.Init(credentialPath, &chainConfig)
-
 
 	if step == "ProxyAndBridge" {
 		chainConfig.DOSProxyAddress = deployContract(conn, DOSProxy)

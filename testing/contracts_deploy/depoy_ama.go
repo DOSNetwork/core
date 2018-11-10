@@ -1,15 +1,16 @@
 package main
 
 import (
-"flag"
-"fmt"
-"github.com/DOSNetwork/core/configuration"
-"github.com/DOSNetwork/core/onchain"
-"github.com/DOSNetwork/core/testing/dosUser/contract"
-"github.com/DOSNetwork/core/testing/dosUser/eth"
-"github.com/ethereum/go-ethereum/common"
-"github.com/ethereum/go-ethereum/core/types"
-"os"
+	"flag"
+	"fmt"
+	"os"
+
+	"github.com/DOSNetwork/core/configuration"
+	"github.com/DOSNetwork/core/onchain"
+	"github.com/DOSNetwork/core/testing/dosUser/contract"
+	"github.com/DOSNetwork/core/testing/dosUser/eth"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 )
 
 func deployAMAContract(ethComm *onchain.EthCommon) string {
@@ -53,5 +54,5 @@ func main() {
 	amaConfig := eth.AMAConfig{}
 	fmt.Println("Starting deploy AskMeAnyThing.sol...")
 	amaConfig.AskMeAnythingAddress = deployAMAContract(conn)
-	configuration.UpdateConfig(amaConfigPath, config)
+	configuration.UpdateConfig(amaConfigPath, amaConfig)
 }

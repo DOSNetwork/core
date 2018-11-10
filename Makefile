@@ -20,6 +20,14 @@ dep:
 client: gen
 	go build -o client
 
+docker-prepare:
+        ifeq ($(shell docker images -q dosenv 2> /dev/null),)
+		docker build -t dosenv -f Dockerfile.env  .
+        endif
+
+client-docker: docker-prepare
+	docker build -t dosnode -f Dockerfile .
+
 install: dep client
 	go install
 
