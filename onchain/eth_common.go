@@ -134,6 +134,10 @@ func (e *EthCommon) getKey(keyPath, passPrase string) (key *keystore.Key, err er
 	return
 }
 
+func (e *EthCommon) GetKey() (key *keystore.Key) {
+	return e.key
+}
+
 func (e *EthCommon) BalanceMaintain(rootKeyPath, usrKeyPath, rPassPhrase, uPassPhrase string) (err error) {
 	fmt.Println("EthCommon BalanceMaintain")
 

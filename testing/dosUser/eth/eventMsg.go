@@ -17,8 +17,9 @@ type AskMeAnythingQueryResponseReady struct {
 }
 
 type AskMeAnythingRequestSent struct {
-	Succ      bool
-	RequestId *big.Int
+	InternalSerial uint8
+	Succ           bool
+	RequestId      *big.Int
 }
 
 type AskMeAnythingRandomReady struct {
