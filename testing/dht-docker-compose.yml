@@ -6,7 +6,7 @@ services:
      replicas: 1
    environment:
      - NODEROLE=boot
-     - DHTSIZE=21
+     - DHTSIZE=5
  dhtnode:
    image: dhtnode
    depends_on:
@@ -15,4 +15,3 @@ services:
      replicas: 3
    environment:
      - BOOTSTRAPIP=bootstrap:44460
-     - DHTSIZE=21
