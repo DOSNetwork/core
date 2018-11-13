@@ -23,6 +23,8 @@ import (
 	"github.com/DOSNetwork/core/sign/bls"
 	"github.com/DOSNetwork/core/sign/tbls"
 	"github.com/DOSNetwork/core/suites"
+	"github.com/bshuster-repo/logrus-logstash-hook"
+	"github.com/sirupsen/logrus"
 )
 
 type DosNodeInterface interface {
@@ -63,6 +65,8 @@ type Report struct {
 	backupTask interface{}
 }
 
+var log *logrus.Logger
+
 func CreateDosNode(suite suites.Suite, nbParticipants int, p p2p.P2PInterface, chainConn onchain.ChainInterface, p2pDkg dkg.P2PDkgInterface) (DosNodeInterface, error) {
 	d := &DosNode{
 		suite:          suite,
@@ -73,7 +77,13 @@ func CreateDosNode(suite suites.Suite, nbParticipants int, p p2p.P2PInterface, c
 		chainConn:      chainConn,
 		p2pDkg:         p2pDkg,
 	}
-	return d, nil
+	//init log
+	log = logrus.New()
+	hook, err := logrustash.NewHookWithFields("udp", "13.52.16.14:9500", "DOS_node", logrus.Fields{
+		"DOS_node_ip": (*d.network).GetId().Address,
+	})
+	log.Hooks.Add(hook)
+	return d, err
 }
 
 func (d *DosNode) SetParticipants(nbParticipants int) {
@@ -97,7 +107,7 @@ func dataFetch(url string) (body []byte, err error) {
 	r.Body.Close()
 
 	fmt.Println("fetched data: ", string(body))
-	fmt.Println("dataFetch End:	took", time.Now().Sub(sTime))
+	fmt.Println("dataFetch End:    took", time.Now().Sub(sTime))
 
 	return
 
@@ -234,15 +244,20 @@ func (d *DosNode) PipeQueries(queries ...<-chan interface{}) <-chan Report {
 				case *onchain.DOSProxyLogUrl:
 					//Check to see if this request is for node's group
 					if d.isMember(content.DispatchedGroup) {
+						begin := time.Now()
 						queryId := content.QueryId
 						fmt.Println("PipeCheckURL!!", queryId)
 						url := content.DataSource
 						submitter := d.choseSubmitter(content.Randomness)
+						t := time.Now()
 						rawMsg, err := dataFetch(url)
+						tDataFetch := time.Since(t).Seconds()
 						if err != nil {
 							fmt.Println(err)
 						}
+						t = time.Now()
 						msgReturn, err := dataParse(rawMsg, content.Selector)
+						tDataParse := time.Since(t).Seconds()
 						fmt.Println("Data to return:", string(msgReturn))
 						// signed message = concat(msgReturn, submitter address)
 						msgReturn = append(msgReturn, submitter...)
@@ -257,10 +272,18 @@ func (d *DosNode) PipeQueries(queries ...<-chan interface{}) <-chan Report {
 						report.submitter = submitter
 						report.backupTask = *content
 						out <- *report
+						log.WithFields(logrus.Fields{
+							"timecost-dataFetch": tDataFetch,
+							"timecost-dataParse": tDataParse,
+							"timecost":           time.Since(begin).Seconds(),
+							"method":             "QueryUrl",
+							"QueryId":            queryId.String(),
+						}).Info()
 					}
 				case *onchain.DOSProxyLogRequestUserRandom:
 					//Check to see if this request is for node's group
 					if d.isMember(content.DispatchedGroup) {
+						t := time.Now()
 						requestId := content.RequestId
 						fmt.Println("PipeUserRandom!!", requestId)
 						submitter := d.choseSubmitter(content.LastSystemRandomness)
@@ -279,9 +302,15 @@ func (d *DosNode) PipeQueries(queries ...<-chan interface{}) <-chan Report {
 						report.submitter = submitter
 						report.backupTask = *content
 						out <- *report
+						log.WithFields(logrus.Fields{
+							"timecost": time.Since(t).Seconds(),
+							"method":   "RequestUserRandom",
+							"QueryId":  requestId.String(),
+						}).Info()
 					}
 				case *onchain.DOSProxyLogUpdateRandom:
 					if d.isMember(content.DispatchedGroup) {
+						t := time.Now()
 						preRandom := content.LastRandomness
 						fmt.Printf("1 ) GenerateRandomNumber preRandom #%v \n", preRandom)
 						fmt.Println("1 ) GenerateRandomNumber preRandom ", preRandom)
@@ -300,6 +329,11 @@ func (d *DosNode) PipeQueries(queries ...<-chan interface{}) <-chan Report {
 						report.selfSign = *sign
 						report.submitter = submitter
 						out <- *report
+						log.WithFields(logrus.Fields{
+							"timecost": time.Since(t).Seconds(),
+							"method":   "RequestUserRandom",
+							"QueryId":  preRandom.String(),
+						}).Info()
 					}
 				default:
 					fmt.Println("query type mismatch", msg)
@@ -335,9 +369,12 @@ func (d *DosNode) PipeSignAndBroadcast(reports <-chan Report) <-chan Report {
 		for {
 			select {
 			case report := <-reports:
+				begin := time.Now()
 				fmt.Println("2) PipeSignAndBroadcast")
 				sign := report.selfSign
+				t := time.Now()
 				sig, err := tbls.Sign(d.suite, d.p2pDkg.GetShareSecuirty(), sign.Content)
+				tBls := time.Since(t).Seconds()
 				if err != nil {
 					fmt.Println(err)
 					continue
@@ -352,6 +389,12 @@ func (d *DosNode) PipeSignAndBroadcast(reports <-chan Report) <-chan Report {
 						fmt.Println("send to ", member)
 					}
 				}
+				log.WithFields(logrus.Fields{
+					"timecost":     time.Since(begin).Seconds(),
+					"timecost-bls": tBls,
+					"method":       "SignAndBroadcast",
+					"QueryId":      report.selfSign.QueryId,
+				}).Info()
 
 			case <-d.quit:
 				close(out)
@@ -369,6 +412,7 @@ func (d *DosNode) PipeRecoverAndVerify(cSignatureFromPeer chan vss.Signature, fr
 	outForValidate := make(chan Report, 100)
 	reportMap := map[string]Report{}
 	signatureAwait := map[string]time.Time{}
+	startSigFromePeerTimeMap := make(map[string]time.Time)
 
 	go func() {
 		for {
@@ -377,6 +421,10 @@ func (d *DosNode) PipeRecoverAndVerify(cSignatureFromPeer chan vss.Signature, fr
 				fmt.Println("3) PipeRecoverAndVerify fromEth")
 				reportMap[report.selfSign.QueryId] = report
 			case sign := <-cSignatureFromPeer:
+				_, found := startSigFromePeerTimeMap[sign.QueryId]
+				if !found {
+					startSigFromePeerTimeMap[sign.QueryId] = time.Now()
+				}
 				var sigShares [][]byte
 				signIdentityBytes := append([]byte(sign.QueryId), sign.Signature...)
 				signIdentity := new(big.Int).SetBytes(signIdentityBytes).String()
@@ -396,7 +444,9 @@ func (d *DosNode) PipeRecoverAndVerify(cSignatureFromPeer chan vss.Signature, fr
 					sigShares = report.signShares
 					if report.signGroup == nil && len(sigShares) >= d.nbThreshold {
 						fmt.Println("4) PipeRecoverAndVerify recover")
+						t := time.Now()
 						sig, err := tbls.Recover(d.suite, d.p2pDkg.GetGroupPublicPoly(), sign.Content, sigShares, d.nbThreshold, d.nbParticipants)
+						blsRecover := time.Since(t).Seconds()
 						if err != nil {
 							fmt.Println(err)
 							fmt.Println("recover failed!!!!!!!!!!!!!!!!! report Content ", string(report.selfSign.Content))
@@ -404,7 +454,9 @@ func (d *DosNode) PipeRecoverAndVerify(cSignatureFromPeer chan vss.Signature, fr
 							fmt.Println("recover failed!!!!!!!!!!!!!!!!!")
 							continue
 						}
+						t = time.Now()
 						err = bls.Verify(d.suite, d.p2pDkg.GetGroupPublicPoly().Commit(), sign.Content, sig)
+						blsVerify := time.Since(t).Seconds()
 						if err != nil {
 							fmt.Println(err)
 							fmt.Println("Verify failed!!!!!!!!!!!!!!!!!")
@@ -428,6 +480,14 @@ func (d *DosNode) PipeRecoverAndVerify(cSignatureFromPeer chan vss.Signature, fr
 						outForValidate <- report
 						fmt.Println("submit to outForValidate", sign.QueryId)
 						delete(reportMap, sign.QueryId)
+						log.WithFields(logrus.Fields{
+							"timecost":            time.Since(startSigFromePeerTimeMap[sign.QueryId]).Seconds(),
+							"timecost-blsRecover": blsRecover,
+							"timecost-blsVerify":  blsVerify,
+							"method":              "RecoverAndVerify",
+							"QueryId":             sign.QueryId,
+						}).Info()
+						delete(startSigFromePeerTimeMap, sign.QueryId)
 					} else {
 						reportMap[sign.QueryId] = report
 					}
@@ -466,13 +526,20 @@ func (d *DosNode) PipeSendToOnchain(chReport <-chan Report) {
 			case report := <-chReport:
 				switch report.selfSign.Index {
 				case onchain.TrafficSystemRandom:
+					begin := time.Now()
 					err := d.chainConn.SetRandomNum(report.signGroup)
 					if err != nil {
 						fmt.Println("SetRandomNum err ", err)
 					} else {
 						fmt.Println("randomNumber Set for ", report.selfSign.QueryId)
 					}
+					log.WithFields(logrus.Fields{
+						"timecost":            time.Since(begin).Seconds(),
+						"method":              "SendToOnchain-SystemRandom",
+						"QueryId":             report.selfSign.QueryId,
+					}).Info()
 				default:
+					begin := time.Now()
 					fmt.Println("PipeSendToOnchain URL/usrRandom result = ", report.selfSign.Content)
 					qID := big.NewInt(0)
 					qID.SetString(report.selfSign.QueryId, 10)
@@ -487,8 +554,8 @@ func (d *DosNode) PipeSendToOnchain(chReport <-chan Report) {
 					/*//Test Case 3
 					tmp := big.NewInt(20)
 					if report.backupTask.Timeout.Cmp(tmp) > 0 {
-						//x := []byte{184, 194}
-						queryResult[0] ^= 0x01
+					   //x := []byte{184, 194}
+					   queryResult[0] ^= 0x01
 					}
 					*/
 
@@ -499,6 +566,11 @@ func (d *DosNode) PipeSendToOnchain(chReport <-chan Report) {
 						fmt.Println("DataReturn err ", err)
 					}
 					fmt.Println("urlCallback Set for ", report.selfSign.QueryId)
+					log.WithFields(logrus.Fields{
+						"timecost":            time.Since(begin).Seconds(),
+						"method":              "SendToOnchain-URLorUsrRandom",
+						"QueryId":             report.selfSign.QueryId,
+					}).Info()
 				}
 			case <-d.quit:
 				break
@@ -539,22 +611,22 @@ func (d *DosNode) PipeCleanFinishMap(chValidation chan interface{}, forValidate 
 							fmt.Println("Invalide Signature.........")
 							_ = report
 							//default:
-							//	fmt.Println("===========================================")
-							//	fmt.Println("Retrigger query......... time-out", report.backupTask.Timeout)
-							//	tmp := big.NewInt(0)
-							//	if report.backupTask.Timeout.Cmp(tmp) == 0 {
-							//		fmt.Println("give up this query.........")
-							//	}
-							//	tmp = big.NewInt(1)
-							//	report.backupTask.Randomness = report.backupTask.Randomness.Sub(report.backupTask.Randomness, tmp)
-							//	report.backupTask.Timeout = report.backupTask.Timeout.Sub(report.backupTask.Timeout, tmp)
-							//	chUrl <- &blockchain.DOSProxyLogUrl{
-							//		QueryId:         report.backupTask.QueryId,
-							//		Url:             report.backupTask.Url,
-							//		Timeout:         report.backupTask.Timeout,
-							//		Randomness:      report.backupTask.Randomness,
-							//		DispatchedGroup: report.backupTask.DispatchedGroup,
-							//	}
+							// fmt.Println("===========================================")
+							// fmt.Println("Retrigger query......... time-out", report.backupTask.Timeout)
+							// tmp := big.NewInt(0)
+							// if report.backupTask.Timeout.Cmp(tmp) == 0 {
+							//    fmt.Println("give up this query.........")
+							// }
+							// tmp = big.NewInt(1)
+							// report.backupTask.Randomness = report.backupTask.Randomness.Sub(report.backupTask.Randomness, tmp)
+							// report.backupTask.Timeout = report.backupTask.Timeout.Sub(report.backupTask.Timeout, tmp)
+							// chUrl <- &blockchain.DOSProxyLogUrl{
+							//    QueryId:         report.backupTask.QueryId,
+							//    Url:             report.backupTask.Url,
+							//    Timeout:         report.backupTask.Timeout,
+							//    Randomness:      report.backupTask.Randomness,
+							//    DispatchedGroup: report.backupTask.DispatchedGroup,
+							// }
 							//}
 						} else {
 							fmt.Println("Validated ", content.TrafficId.String())
@@ -597,21 +669,21 @@ func (d *DosNode) PipeCleanFinishMap(chValidation chan interface{}, forValidate 
 						//case ForRandomNumber:
 						fmt.Println("Validation timeout.........")
 						//default:
-						//	fmt.Println("Retrigger query.........")
-						//	tmp := big.NewInt(0)
-						//	if report.backupTask.Timeout.Cmp(tmp) == 0 {
-						//		fmt.Println("give up this query.........")
-						//	}
-						//	tmp = big.NewInt(1)
-						//	report.backupTask.Randomness = report.backupTask.Randomness.Sub(report.backupTask.Randomness, tmp)
-						//	report.backupTask.Timeout = report.backupTask.Timeout.Sub(report.backupTask.Timeout, tmp)
-						//	chUrl <- &blockchain.DOSProxyLogUrl{
-						//		QueryId:         report.backupTask.QueryId,
-						//		Url:             report.backupTask.Url,
-						//		Timeout:         report.backupTask.Timeout,
-						//		Randomness:      report.backupTask.Randomness,
-						//		DispatchedGroup: report.backupTask.DispatchedGroup,
-						//	}
+						// fmt.Println("Retrigger query.........")
+						// tmp := big.NewInt(0)
+						// if report.backupTask.Timeout.Cmp(tmp) == 0 {
+						//    fmt.Println("give up this query.........")
+						// }
+						// tmp = big.NewInt(1)
+						// report.backupTask.Randomness = report.backupTask.Randomness.Sub(report.backupTask.Randomness, tmp)
+						// report.backupTask.Timeout = report.backupTask.Timeout.Sub(report.backupTask.Timeout, tmp)
+						// chUrl <- &blockchain.DOSProxyLogUrl{
+						//    QueryId:         report.backupTask.QueryId,
+						//    Url:             report.backupTask.Url,
+						//    Timeout:         report.backupTask.Timeout,
+						//    Randomness:      report.backupTask.Randomness,
+						//    DispatchedGroup: report.backupTask.DispatchedGroup,
+						// }
 						//}
 						delete(validateMap, queryId)
 					}
