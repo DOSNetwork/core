@@ -22,7 +22,7 @@ const (
 	ENVQUERYTYPE  = "QUERYTYPE"
 )
 
-const INVALIDQUERYINDEX = 13
+const INVALIDQUERYINDEX = 17
 
 type record struct {
 	start     time.Time
@@ -37,11 +37,14 @@ type querySet struct {
 
 var querySets = []querySet{
 	{"https://api.coinbase.com/v2/prices/ETH-USD/spot", ""},
+	{"https://api.coinbase.com/v2/prices/ETH-USD/spot", "$"},
 	{"https://api.coinbase.com/v2/prices/ETH-USD/spot", "$.data"},
 	{"https://api.coinbase.com/v2/prices/ETH-USD/spot", "$.data.base"},
 	{"https://api.coinbase.com/v2/prices/ETH-USD/spot", "$.data.currency"},
 	{"https://api.coinbase.com/v2/prices/ETH-USD/spot", "$.data.amount"},
+	{"https://api.coinbase.com/v2/prices/ETH-USD/spot", "$.data.NOTVALID"},
 	{"https://api.coinmarketcap.com/v1/global/", ""},
+	{"https://api.coinmarketcap.com/v1/global/", "$"},
 	{"https://api.coinmarketcap.com/v1/global/", "$.total_market_cap_usd"},
 	{"https://api.coinmarketcap.com/v1/global/", "$.total_24h_volume_usd"},
 	{"https://api.coinmarketcap.com/v1/global/", "$.bitcoin_percentage_of_market_cap"},
@@ -49,13 +52,10 @@ var querySets = []querySet{
 	{"https://api.coinmarketcap.com/v1/global/", "$.active_assets"},
 	{"https://api.coinmarketcap.com/v1/global/", "$.active_markets"},
 	{"https://api.coinmarketcap.com/v1/global/", "$.last_updated"},
+	{"https://api.coinmarketcap.com/v1/global/", "$.NOTVALID"},
 
 	//invalid queries
-	{"https://api.coinbase.com/v2/prices/ETH-USD/spot", "$"},
-	{"https://api.coinbase.com/v2/prices/ETH-USD/spot", "$.data.NOTVALID"},
 	{"https://api.coinbase.com/v2/prices/ETH-USD/spot", "NOTVALID"},
-	{"https://api.coinmarketcap.com/v1/global/", "$"},
-	{"https://api.coinmarketcap.com/v1/global/", "$.NOTVALID"},
 	{"https://api.coinmarketcap.com/v1/global/", "NOTVALID"},
 }
 
@@ -291,7 +291,7 @@ func query() {
 			}
 		}
 		lastQuery = time.Now()
-		startingTimeMap[uint8(counter)] = lastQuery
+		startingTimeMap[uint8(counter)] = time.Now()
 		counter--
 		totalQuery++
 	}
