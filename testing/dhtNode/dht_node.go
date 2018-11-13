@@ -289,7 +289,6 @@ func (d *dhtNode) EventLoop() {
 							//os.Exit(0)
 						}
 					}
-
 				}
 			default:
 				fmt.Println(content)
