@@ -194,7 +194,7 @@ func (p *PeerClient) decodePackage(bytes []byte) (*internal.Package, *ptypes.Dyn
 }
 
 func (p *PeerClient) SayHi() {
-	fmt.Println(p.p2pnet.identity.Address, "say hi")
+	//fmt.Println(p.p2pnet.identity.Address, "say hi")
 	pa := &internal.Hi{
 		PublicKey: p.p2pnet.identity.PublicKey,
 		Address:   p.p2pnet.identity.Address,
