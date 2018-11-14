@@ -179,7 +179,7 @@ func (n *P2P) GetRoutingTable() *dht.RoutingTable {
 }
 
 func (n *P2P) CreatePeer(addr string, c *net.Conn) {
-	fmt.Println(n.identity.Address, "Create peer clients")
+	//fmt.Println(n.identity.Address, "Create peer clients")
 	peer := &PeerClient{
 		conn:   c,
 		p2pnet: n,
@@ -235,6 +235,7 @@ type lookupBucket struct {
 //
 // Queries at most #ALPHA nodes at a time per lookup, and returns all peer IDs closest to a target peer ID.
 func (n *P2P) findNode(targetID dht.ID, alpha int, disjointPaths int) (results []dht.ID) {
+	start := time.Now()
 	visited := new(sync.Map)
 
 	var lookups []*lookupBucket
@@ -284,6 +285,9 @@ func (n *P2P) findNode(targetID dht.ID, alpha int, disjointPaths int) (results [
 	if len(results) > dht.BucketSize {
 		results = results[:dht.BucketSize]
 	}
+	fmt.Println("===================================================")
+	fmt.Println("FINDNODE ", targetID, time.Since(start))
+	fmt.Println("===================================================")
 	return
 }
 
