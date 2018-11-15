@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"log"
+	"math/big"
 	"net"
 	"sort"
 	"strconv"
@@ -18,6 +19,8 @@ import (
 	"github.com/DOSNetwork/core/p2p/dht"
 	"github.com/DOSNetwork/core/p2p/internal"
 	"github.com/DOSNetwork/core/suites"
+	"github.com/bshuster-repo/logrus-logstash-hook"
+	"github.com/sirupsen/logrus"
 )
 
 type P2P struct {
@@ -31,10 +34,17 @@ type P2P struct {
 	secKey       kyber.Scalar
 	pubKey       kyber.Point
 	routingTable *dht.RoutingTable
+	log          *logrus.Logger
 }
 
 func (n *P2P) SetId(id []byte) {
 	n.identity.Id = id
+	//init log
+	n.log = logrus.New()
+	hook, _ := logrustash.NewHookWithFields("udp", "13.52.16.14:9500", "DOS_node", logrus.Fields{
+		"DOS_node_ip": n.identity.Address,
+	})
+	n.log.Hooks.Add(hook)
 }
 
 func (n *P2P) GetId() dht.ID {
@@ -286,8 +296,18 @@ func (n *P2P) findNode(targetID dht.ID, alpha int, disjointPaths int) (results [
 		results = results[:dht.BucketSize]
 	}
 	fmt.Println("===================================================")
-	fmt.Println("FINDNODE ", targetID, time.Since(start))
+	tFindNode := time.Since(start).Seconds()
+	fmt.Println("FINDNODE ", targetID, tFindNode)
 	fmt.Println("===================================================")
+
+	a := new(big.Int).SetBytes(n.GetId().Id).String()
+	b := new(big.Int).SetBytes(targetID.Id).String()
+
+	n.log.WithFields(logrus.Fields{
+		"timecost-findnode": tFindNode,
+		"targetID":          b,
+		"nodeID":            a,
+	}).Info()
 	return
 }
 

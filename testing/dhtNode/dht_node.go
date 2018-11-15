@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/rand"
 	"fmt"
 	"io/ioutil"
@@ -20,11 +21,21 @@ import (
 	"github.com/gorilla/mux"
 )
 
+/*
+The purpose of meeting is to test findNode and sendMessageById
+1)What is the average time for findNode
+2)What is the average time for SendMessageById.
+3)How many times of cant' find node when it call SendMessageById
+4)The pass criteria for this test is that all nodes should receive check message from all members.
+*/
+
 type node struct {
 	p         p2p.P2PInterface
 	peerEvent chan p2p.P2PMessage
 	members   [][]byte
 	dhtSize   int
+	checkroll map[string]bool
+	done      chan bool
 }
 
 type bootNode struct {
@@ -35,9 +46,9 @@ type bootNode struct {
 
 type dhtNode struct {
 	node
+	bootStrapIp string
 	nodeID      []byte
 	checkCount  int
-	checkroll   map[string]bool
 	findNodeDur time.Duration
 }
 
@@ -54,6 +65,7 @@ func GenerateRandomBytes(n int) ([]byte, error) {
 
 func (n *node) Init(port, dhtSize int) {
 	//fmt.Println("node Init", n.members)
+	n.done = make(chan bool)
 	n.dhtSize = dhtSize
 	//Build a p2p network
 	n.peerEvent = make(chan p2p.P2PMessage, 100)
@@ -65,6 +77,9 @@ func (n *node) EventLoop() {
 		select {
 		//event from peer
 		case _ = <-n.peerEvent:
+		case <-n.done:
+			//os.Exit(0)
+			break
 		}
 	}
 }
@@ -74,14 +89,14 @@ func (b *bootNode) Init(port, dhtSize int) {
 	b.dhtSize = dhtSize
 	b.members = [][]byte{}
 	bootID := []byte{1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1}
-	existing := make(map[string]bool)
 	b.members = append(b.members, bootID)
+	b.checkroll = make(map[string]bool)
 	for i := 1; i <= b.dhtSize; i++ {
 		id, _ := GenerateRandomBytes(len(bootID))
-		for existing[string(id)] {
+		for b.checkroll[string(id)] {
 			id, _ = GenerateRandomBytes(len(bootID))
 		}
-		existing[string(id)] = true
+		b.checkroll[string(id)] = true
 		b.members = append(b.members, id)
 		fmt.Println("i = ", i, " ", id)
 	}
@@ -95,6 +110,7 @@ func (b *bootNode) Init(port, dhtSize int) {
 	r := mux.NewRouter()
 	r.HandleFunc("/getID", b.getID).Methods("GET")
 	r.HandleFunc("/getMembers", b.getMembers).Methods("GET")
+	r.HandleFunc("/post", b.postHandler)
 	go http.ListenAndServe(":8080", r)
 }
 
@@ -118,6 +134,19 @@ func (b *bootNode) getID(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+type Result struct {
+	id string
+}
+
+func (b *bootNode) postHandler(w http.ResponseWriter, r *http.Request) {
+	body, _ := ioutil.ReadAll(r.Body)
+	delete(b.checkroll, string(body))
+	fmt.Println("check done ", len(b.checkroll))
+	if len(b.checkroll) == 0 {
+		b.done <- true
+	}
+}
+
 func (b *bootNode) requestGrouping() {
 	fmt.Println("requestGrouping ", b.members)
 	time.Sleep(5 * time.Second)
@@ -137,6 +166,7 @@ func (d *dhtNode) Init(bootStrapIp string, port, dhtSize int) {
 	d.node.Init(port, dhtSize)
 	d.dhtSize = dhtSize
 	d.checkCount = 1
+	d.bootStrapIp = bootStrapIp
 	//Wait until bootstrap node assign an ID
 	for {
 		tServer := "http://" + bootStrapIp + ":8080/getID"
@@ -189,6 +219,20 @@ func (d *dhtNode) Init(bootStrapIp string, port, dhtSize int) {
 	go d.p.Listen()
 }
 
+func (d *dhtNode) MakeRequest(bootStrapIp string) {
+
+	tServer := "http://" + bootStrapIp + ":8080/post"
+
+	req, err := http.NewRequest("POST", tServer, bytes.NewBuffer(d.nodeID))
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		panic(err)
+	}
+	defer resp.Body.Close()
+
+}
 func (d *dhtNode) EventLoop() {
 	for {
 		select {
@@ -203,31 +247,22 @@ func (d *dhtNode) EventLoop() {
 						Args:  "check",
 					}
 					pb := proto.Message(cmd)
-					//					start := time.Now()
 					for i := 0; i < len(d.members); i++ {
 						member := d.members[i]
 						if string(member[:]) != string(d.p.GetId().Id) {
 							d.p.SendMessageById(member, pb)
 						}
 					}
-					//d.findNodeDur = time.Since(start)
-					//d := float64(d.findNodeDur/time.Millisecond) / float64(len(d.members))
-					//fmt.Println("===================================================")
-					//fmt.Println("From receiving FINDNODE to boradcast", d)
-					//fmt.Println("===================================================")
-
 				} else {
 					sender := string(msg.Sender)
 					if !d.checkroll[sender] {
 						d.checkroll[sender] = true
 						d.checkCount++
 						if d.checkCount == d.dhtSize {
-							fmt.Println("===================================================")
-							fmt.Println("check all done")
-							fmt.Println("===================================================")
+							d.MakeRequest(d.bootStrapIp)
+							fmt.Println("done check")
+							//os.Exit(0)
 						}
-						//fmt.Println("receive check from ", msg.Sender, " ", d.checkCount, " ", d.dhtSize, " ", d.checkroll[sender])
-
 					}
 
 				}
@@ -271,7 +306,7 @@ func main() {
 		results := d.p.FindNode(d.p.GetId(), dht.BucketSize, 20)
 		for _, result := range results {
 			d.p.GetRoutingTable().Update(result)
-			fmt.Println(d.p.GetId().Address, "Update peer: ", result.Address)
+			//fmt.Println(d.p.GetId().Address, "Update peer: ", result.Address)
 		}
 		d.EventLoop()
 	}
