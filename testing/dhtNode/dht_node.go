@@ -278,12 +278,6 @@ func (d *dhtNode) EventLoop() {
 							d.p.SendMessageById(member, pb)
 						}
 					}
-					//d.findNodeDur = time.Since(start)
-					//d := float64(d.findNodeDur/time.Millisecond) / float64(len(d.members))
-					//fmt.Println("===================================================")
-					//fmt.Println("From receiving FINDNODE to boradcast", d)
-					//fmt.Println("===================================================")
-
 				} else {
 					sender := string(msg.Sender)
 					if !d.checkroll[sender] {
