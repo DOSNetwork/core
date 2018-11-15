@@ -38,6 +38,12 @@ type P2P struct {
 
 func (n *P2P) SetId(id []byte) {
 	n.identity.Id = id
+	//init log
+	n.log = logrus.New()
+	hook, _ := logrustash.NewHookWithFields("udp", "13.52.16.14:9500", "DOS_node", logrus.Fields{
+		"DOS_node_ip": n.identity.Address,
+	})
+	n.log.Hooks.Add(hook)
 }
 
 func (n *P2P) GetId() internal.ID {
