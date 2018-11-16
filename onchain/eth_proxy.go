@@ -3,7 +3,6 @@ package onchain
 import (
 	"context"
 	"fmt"
-	"log"
 	"math/big"
 	"sync"
 	"time"
@@ -11,11 +10,14 @@ import (
 	"github.com/DOSNetwork/core/configuration"
 	"github.com/DOSNetwork/core/group/bn256"
 	"github.com/DOSNetwork/core/onchain/dosproxy"
+
 	"github.com/dedis/kyber"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -40,26 +42,24 @@ const (
 	TrafficUserQuery
 )
 
-const balanceCheckInterval = 3
-
-var workingDir string
-
 type EthAdaptor struct {
 	EthCommon
 	proxy     *dosproxy.DOSProxy
-	lock      *sync.Mutex
 	logFilter *sync.Map
 }
 
 func (e *EthAdaptor) Init(config *configuration.ChainConfig) (err error) {
+	err = e.EthCommon.Init("./credential", config)
+	if err != nil {
+		return
+	}
 
-	e.EthCommon.Init("./credential", config)
 	e.logFilter = new(sync.Map)
 	go e.logMapTimeout()
 
 	fmt.Println("onChainConn initialization finished.")
 	e.lock = new(sync.Mutex)
-	e.dialToEth()
+	err = e.dialToEth()
 	return
 }
 
@@ -143,6 +143,13 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 				log.Fatal(err)
 			case i := <-transitChan:
 				if !e.filterLog(i.Raw) {
+					log.WithFields(logrus.Fields{
+						"logEvent":   "LogUrl",
+						"requestId":  i.QueryId.String(),
+						"DataSource": i.DataSource,
+						"Selector":   i.Selector,
+						"Randomness": i.Randomness.String(),
+					}).Info()
 					ch <- &DOSProxyLogUrl{
 						QueryId:         i.QueryId,
 						Timeout:         i.Timeout,
@@ -173,6 +180,12 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 				log.Fatal(err)
 			case i := <-transitChan:
 				if !e.filterLog(i.Raw) {
+					log.WithFields(logrus.Fields{
+						"logEvent":             "RequestUserRandom",
+						"requestId":            i.RequestId.String(),
+						"LastSystemRandomness": i.LastSystemRandomness.String(),
+						"UserSeed":             i.UserSeed.String(),
+					}).Info()
 					ch <- &DOSProxyLogRequestUserRandom{
 						RequestId:            i.RequestId,
 						LastSystemRandomness: i.LastSystemRandomness,
@@ -200,6 +213,10 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 				log.Fatal(err)
 			case i := <-transitChan:
 				if !e.filterLog(i.Raw) {
+					log.WithFields(logrus.Fields{
+						"logEvent":       "UpdateRandom",
+						"LastRandomness": i.LastRandomness.String(),
+					}).Info()
 					ch <- &DOSProxyLogUpdateRandom{
 						LastRandomness:  i.LastRandomness,
 						DispatchedGroup: i.DispatchedGroup,
@@ -225,6 +242,12 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 				log.Fatal(err)
 			case i := <-transitChan:
 				if !e.filterLog(i.Raw) {
+					log.WithFields(logrus.Fields{
+						"logEvent":    "ValidationResultEvent",
+						"TrafficType": i.TrafficType,
+						"requestId":   i.TrafficId.String(),
+						"pass":        i.Pass,
+					}).Info()
 					ch <- &DOSProxyLogValidationResult{
 						TrafficType: i.TrafficType,
 						TrafficId:   i.TrafficId,
@@ -443,7 +466,7 @@ func (e *EthAdaptor) InitialWhiteList() (err error) {
 	}
 
 	fmt.Println("tx sent: ", tx.Hash().Hex())
-	fmt.Println("Whitelist initialized, waiting for confirmation...")
+	fmt.Println("Whitelist initialized")
 
 	err = e.CheckTransaction(tx)
 
@@ -482,21 +505,21 @@ func (e *EthAdaptor) UploadID() (err error) {
 		return
 	}
 
-	tx, err := e.proxy.UploadNodeId(auth, e.id)
+	tx, err := e.proxy.UploadNodeId(auth, new(big.Int).SetBytes(e.GetId()))
 	if err != nil {
 		return
 	}
 
 	fmt.Println("tx sent: ", tx.Hash().Hex())
-	fmt.Println("NodeId submitted, waiting for confirmation...")
+	fmt.Println("NodeId submitted")
 
-	err = e.CheckTransaction(tx)
+	//err = e.CheckTransaction(tx)
 
 	return
 }
 
 func (e *EthAdaptor) GetId() (id []byte) {
-	return e.id.Bytes()
+	return e.GetAddress().Bytes()
 }
 
 func (e *EthAdaptor) GetBlockHashByNumber(blknum *big.Int) (hash common.Hash, err error) {
@@ -510,6 +533,7 @@ func (e *EthAdaptor) GetBlockHashByNumber(blknum *big.Int) (hash common.Hash, er
 }
 
 func (e *EthAdaptor) SetRandomNum(sig []byte) (err error) {
+
 	fmt.Println("Starting submitting random number...")
 	auth, err := e.GetAuth()
 	if err != nil {
@@ -524,9 +548,9 @@ func (e *EthAdaptor) SetRandomNum(sig []byte) (err error) {
 	}
 
 	fmt.Println("tx sent: ", tx.Hash().Hex())
-	fmt.Println("new random number submitted, waiting for confirmation...")
+	fmt.Println("new random number submitted")
 
-	err = e.CheckTransaction(tx)
+	//err = e.CheckTransaction(tx)
 
 	return
 }
@@ -553,9 +577,9 @@ func (e *EthAdaptor) UploadPubKey(pubKey kyber.Point) (err error) {
 	fmt.Println("x1: ", x1)
 	fmt.Println("y0: ", y0)
 	fmt.Println("y1: ", y1)
-	fmt.Println("Group public key submitted, waiting for confirmation...")
+	fmt.Println("Group public key submitted")
 
-	err = e.CheckTransaction(tx)
+	//err = e.CheckTransaction(tx)
 
 	return
 }
@@ -583,12 +607,12 @@ func (e *EthAdaptor) RandomNumberTimeOut() (err error) {
 		return
 	}
 
-	tx, err := e.proxy.HandleTimeout(auth)
+	_, err = e.proxy.HandleTimeout(auth)
 	if err != nil {
 		return
 	}
 
-	err = e.CheckTransaction(tx)
+	//err = e.CheckTransaction(tx)
 	return
 }
 
@@ -610,6 +634,8 @@ func DecodePubKey(pubKey kyber.Point) (*big.Int, *big.Int, *big.Int, *big.Int, e
 }
 
 func (e *EthAdaptor) DataReturn(requestId *big.Int, trafficType uint8, data, sig []byte) (err error) {
+	startingTime := time.Now()
+
 	auth, err := e.GetAuth()
 	if err != nil {
 		return
@@ -623,9 +649,16 @@ func (e *EthAdaptor) DataReturn(requestId *big.Int, trafficType uint8, data, sig
 	}
 
 	fmt.Println("tx sent: ", tx.Hash().Hex())
-	fmt.Printf("Request with id(%v) type(%v) fulfilled, waiting for confirmation...\n", requestId, trafficType)
+	fmt.Printf("Request with id(%v) type(%v) fulfilled", requestId, trafficType)
 
-	err = e.CheckTransaction(tx)
+	//err = e.CheckTransaction(tx)
+
+	log.WithFields(logrus.Fields{
+		"logEvent":   "dataReturn",
+		"requestId":  requestId.String(),
+		"uploadCost": time.Since(startingTime).Seconds(),
+		"tx":         tx.Hash().Hex(),
+	}).Info()
 
 	return
 }

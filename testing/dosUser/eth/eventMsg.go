@@ -20,6 +20,8 @@ type AskMeAnythingRequestSent struct {
 	InternalSerial uint8
 	Succ           bool
 	RequestId      *big.Int
+	Tx             string
+	BlockN         uint64
 }
 
 type AskMeAnythingRandomReady struct {
