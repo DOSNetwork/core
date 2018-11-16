@@ -15,6 +15,8 @@ import (
 
 	"github.com/oliveagle/jsonpath"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/DOSNetwork/core/onchain"
 	"github.com/DOSNetwork/core/p2p"
 	"github.com/DOSNetwork/core/share"
@@ -23,9 +25,18 @@ import (
 	"github.com/DOSNetwork/core/sign/bls"
 	"github.com/DOSNetwork/core/sign/tbls"
 	"github.com/DOSNetwork/core/suites"
-	"github.com/bshuster-repo/logrus-logstash-hook"
-	"github.com/sirupsen/logrus"
 )
+
+// TODO: Move constants to some unified places.
+const (
+	WATCHDOGTIMEOUT   = 20
+	VALIDATIONTIMEOUT = 20
+	RANDOMNUMBERSIZE  = 32
+	UINT256SIZE       = 32
+	NETMSGTIMEOUT     = 20
+)
+
+var log *logrus.Logger
 
 type DosNodeInterface interface {
 	PipeQueries(queries ...<-chan interface{}) <-chan Report
@@ -36,12 +47,6 @@ type DosNodeInterface interface {
 	PipeGrouping(<-chan interface{})
 	SetParticipants(int)
 }
-
-// TODO: Move constants to some unified places.
-const WATCHDOGTIMEOUT = 20
-const VALIDATIONTIMEOUT = 20
-const RANDOMNUMBERSIZE = 32
-const NETMSGTIMEOUT = 20
 
 type DosNode struct {
 	suite          suites.Suite
@@ -54,7 +59,9 @@ type DosNode struct {
 	p2pDkg         dkg.P2PDkgInterface
 	network        *p2p.P2PInterface
 	groupIds       [][]byte
+	timeCostMap    map[string]*timeRecord
 }
+
 type Report struct {
 	submitter  []byte
 	signShares [][]byte
@@ -65,10 +72,22 @@ type Report struct {
 	backupTask interface{}
 }
 
-var log *logrus.Logger
+type timeRecord struct {
+	lastUpdateTime    time.Time
+	sendToChannelTime time.Time
+	dataProcessCost   float64
+	dataSignCost      float64
+	dataChannelCost   float64
+	dataUploadCost    float64
+	dataConfirmCost   float64
+	okToRemove        bool
+	trafficType       uint8
+	pass              bool
+}
 
-func CreateDosNode(suite suites.Suite, nbParticipants int, p p2p.P2PInterface, chainConn onchain.ChainInterface, p2pDkg dkg.P2PDkgInterface) (DosNodeInterface, error) {
-	d := &DosNode{
+func CreateDosNode(suite suites.Suite, nbParticipants int, p p2p.P2PInterface, chainConn onchain.ChainInterface, p2pDkg dkg.P2PDkgInterface, logger *logrus.Logger) (dosNode DosNodeInterface) {
+	log = logger
+	return &DosNode{
 		suite:          suite,
 		quit:           make(chan struct{}),
 		nbParticipants: nbParticipants,
@@ -76,14 +95,8 @@ func CreateDosNode(suite suites.Suite, nbParticipants int, p p2p.P2PInterface, c
 		network:        &p,
 		chainConn:      chainConn,
 		p2pDkg:         p2pDkg,
+		timeCostMap:    make(map[string]*timeRecord),
 	}
-	//init log
-	log = logrus.New()
-	hook, err := logrustash.NewHookWithFields("udp", "13.52.16.14:9500", "DOS_node", logrus.Fields{
-		"DOS_node_ip": (*d.network).GetId().Address,
-	})
-	log.Hooks.Add(hook)
-	return d, err
 }
 
 func (d *DosNode) SetParticipants(nbParticipants int) {
@@ -92,7 +105,6 @@ func (d *DosNode) SetParticipants(nbParticipants int) {
 }
 
 func dataFetch(url string) (body []byte, err error) {
-	sTime := time.Now()
 	client := &http.Client{Timeout: 60 * time.Second}
 	r, err := client.Get(url)
 	if err != nil {
@@ -105,12 +117,8 @@ func dataFetch(url string) (body []byte, err error) {
 	}
 
 	r.Body.Close()
-
 	fmt.Println("fetched data: ", string(body))
-	fmt.Println("dataFetch End:    took", time.Now().Sub(sTime))
-
 	return
-
 }
 
 func dataParse(rawMsg []byte, pathStr string) (msg []byte, err error) {
@@ -142,15 +150,14 @@ func dataParse(rawMsg []byte, pathStr string) (msg []byte, err error) {
 			msg = append(msg, "\n"...)
 		}
 	}
-
 	return
 }
 
 func (d *DosNode) isMember(dispatchedGroup [4]*big.Int) bool {
-	if d.p2pDkg.IsCetified() {
-		temp := append(dispatchedGroup[2].Bytes(), dispatchedGroup[3].Bytes()...)
-		temp = append(dispatchedGroup[1].Bytes(), temp...)
-		temp = append(dispatchedGroup[0].Bytes(), temp...)
+	if d.p2pDkg.IsCertified() {
+		temp := append(padOrTrim(dispatchedGroup[2].Bytes(), UINT256SIZE), padOrTrim(dispatchedGroup[3].Bytes(), UINT256SIZE)...)
+		temp = append(padOrTrim(dispatchedGroup[1].Bytes(), UINT256SIZE), temp...)
+		temp = append(padOrTrim(dispatchedGroup[0].Bytes(), UINT256SIZE), temp...)
 		temp = append([]byte{0x01}, temp...)
 
 		groupPub, err := d.p2pDkg.GetGroupPublicPoly().Commit().MarshalBinary()
@@ -158,13 +165,16 @@ func (d *DosNode) isMember(dispatchedGroup [4]*big.Int) bool {
 			fmt.Println(err)
 			return false
 		}
-		r := bytes.Compare(groupPub, temp)
-		if r == 0 {
+
+		fmt.Println(groupPub)
+		fmt.Println(temp)
+
+		if r := bytes.Compare(groupPub, temp); r == 0 {
 			fmt.Println("isMember TRUE")
 			return true
 		}
 	}
-	fmt.Println("isMember false, isCertified:", d.p2pDkg.IsCetified())
+	fmt.Println("isMember false, isCertified:", d.p2pDkg.IsCertified())
 	return false
 }
 
@@ -244,21 +254,27 @@ func (d *DosNode) PipeQueries(queries ...<-chan interface{}) <-chan Report {
 				case *onchain.DOSProxyLogUrl:
 					//Check to see if this request is for node's group
 					if d.isMember(content.DispatchedGroup) {
-						begin := time.Now()
 						queryId := content.QueryId
 						fmt.Println("PipeCheckURL!!", queryId)
-						url := content.DataSource
 						submitter := d.choseSubmitter(content.Randomness)
-						t := time.Now()
+						newTimeRecord := &timeRecord{lastUpdateTime: time.Now()}
+
+						url := content.DataSource
 						rawMsg, err := dataFetch(url)
-						tDataFetch := time.Since(t).Seconds()
 						if err != nil {
 							fmt.Println(err)
 						}
-						t = time.Now()
+
 						msgReturn, err := dataParse(rawMsg, content.Selector)
-						tDataParse := time.Since(t).Seconds()
+						if err != nil {
+							fmt.Println(err)
+						}
+
 						fmt.Println("Data to return:", string(msgReturn))
+						newTimeRecord.dataProcessCost = time.Since(newTimeRecord.lastUpdateTime).Seconds()
+						newTimeRecord.lastUpdateTime = time.Now()
+						d.timeCostMap[queryId.String()] = newTimeRecord
+
 						// signed message = concat(msgReturn, submitter address)
 						msgReturn = append(msgReturn, submitter...)
 						//combine result with submitter
@@ -272,21 +288,15 @@ func (d *DosNode) PipeQueries(queries ...<-chan interface{}) <-chan Report {
 						report.submitter = submitter
 						report.backupTask = *content
 						out <- *report
-						log.WithFields(logrus.Fields{
-							"timecost-dataFetch": tDataFetch,
-							"timecost-dataParse": tDataParse,
-							"timecost":           time.Since(begin).Seconds(),
-							"method":             "QueryUrl",
-							"QueryId":            queryId.String(),
-						}).Info()
 					}
 				case *onchain.DOSProxyLogRequestUserRandom:
 					//Check to see if this request is for node's group
 					if d.isMember(content.DispatchedGroup) {
-						t := time.Now()
 						requestId := content.RequestId
 						fmt.Println("PipeUserRandom!!", requestId)
 						submitter := d.choseSubmitter(content.LastSystemRandomness)
+						d.timeCostMap[requestId.String()] = &timeRecord{lastUpdateTime: time.Now()}
+
 						// signed message: concat(requestId, lastSystemRandom, userSeed, submitter address)
 						msgReturn := append(content.RequestId.Bytes(), content.LastSystemRandomness.Bytes()...)
 						msgReturn = append(msgReturn, content.UserSeed.Bytes()...)
@@ -302,20 +312,14 @@ func (d *DosNode) PipeQueries(queries ...<-chan interface{}) <-chan Report {
 						report.submitter = submitter
 						report.backupTask = *content
 						out <- *report
-						log.WithFields(logrus.Fields{
-							"timecost": time.Since(t).Seconds(),
-							"method":   "RequestUserRandom",
-							"QueryId":  requestId.String(),
-						}).Info()
 					}
 				case *onchain.DOSProxyLogUpdateRandom:
 					if d.isMember(content.DispatchedGroup) {
-						t := time.Now()
 						preRandom := content.LastRandomness
 						fmt.Printf("1 ) GenerateRandomNumber preRandom #%v \n", preRandom)
-						fmt.Println("1 ) GenerateRandomNumber preRandom ", preRandom)
-
 						submitter := d.choseSubmitter(preRandom)
+						d.timeCostMap[preRandom.String()] = &timeRecord{lastUpdateTime: time.Now()}
+
 						paddedRandomBytes := padOrTrim(preRandom.Bytes(), RANDOMNUMBERSIZE)
 						randomNum := append(paddedRandomBytes, submitter...)
 						fmt.Println("GenerateRandomNumber content = ", randomNum)
@@ -329,11 +333,6 @@ func (d *DosNode) PipeQueries(queries ...<-chan interface{}) <-chan Report {
 						report.selfSign = *sign
 						report.submitter = submitter
 						out <- *report
-						log.WithFields(logrus.Fields{
-							"timecost": time.Since(t).Seconds(),
-							"method":   "RequestUserRandom",
-							"QueryId":  preRandom.String(),
-						}).Info()
 					}
 				default:
 					fmt.Println("query type mismatch", msg)
@@ -369,19 +368,18 @@ func (d *DosNode) PipeSignAndBroadcast(reports <-chan Report) <-chan Report {
 		for {
 			select {
 			case report := <-reports:
-				begin := time.Now()
 				fmt.Println("2) PipeSignAndBroadcast")
 				sign := report.selfSign
-				t := time.Now()
-				sig, err := tbls.Sign(d.suite, d.p2pDkg.GetShareSecuirty(), sign.Content)
-				tBls := time.Since(t).Seconds()
+				sig, err := tbls.Sign(d.suite, d.p2pDkg.GetShareSecurity(), sign.Content)
 				if err != nil {
 					fmt.Println(err)
 					continue
 				}
+
 				sign.Signature = sig
 				report.signShares = append(report.signShares, sig)
 				out <- report
+
 				for _, member := range d.groupIds {
 					if string(member) != string((*d.network).GetId().Id) {
 						//Todo:Need to check to see if it is thread safe
@@ -389,13 +387,6 @@ func (d *DosNode) PipeSignAndBroadcast(reports <-chan Report) <-chan Report {
 						fmt.Println("send to ", member)
 					}
 				}
-				log.WithFields(logrus.Fields{
-					"timecost":     time.Since(begin).Seconds(),
-					"timecost-bls": tBls,
-					"method":       "SignAndBroadcast",
-					"QueryId":      report.selfSign.QueryId,
-				}).Info()
-
 			case <-d.quit:
 				close(out)
 				break
@@ -412,7 +403,6 @@ func (d *DosNode) PipeRecoverAndVerify(cSignatureFromPeer chan vss.Signature, fr
 	outForValidate := make(chan Report, 100)
 	reportMap := map[string]Report{}
 	signatureAwait := map[string]time.Time{}
-	startSigFromePeerTimeMap := make(map[string]time.Time)
 
 	go func() {
 		for {
@@ -421,18 +411,14 @@ func (d *DosNode) PipeRecoverAndVerify(cSignatureFromPeer chan vss.Signature, fr
 				fmt.Println("3) PipeRecoverAndVerify fromEth")
 				reportMap[report.selfSign.QueryId] = report
 			case sign := <-cSignatureFromPeer:
-				_, found := startSigFromePeerTimeMap[sign.QueryId]
-				if !found {
-					startSigFromePeerTimeMap[sign.QueryId] = time.Now()
-				}
 				var sigShares [][]byte
 				signIdentityBytes := append([]byte(sign.QueryId), sign.Signature...)
 				signIdentity := new(big.Int).SetBytes(signIdentityBytes).String()
 				if report, ok := reportMap[sign.QueryId]; ok {
 					delete(signatureAwait, signIdentity)
+
 					//TODO:Should check if content is always the same
-					r := bytes.Compare(report.selfSign.Content, sign.Content)
-					if r != 0 {
+					if r := bytes.Compare(report.selfSign.Content, sign.Content); r != 0 {
 						fmt.Println("report query id ", report.selfSign.QueryId)
 						fmt.Println("report Content ", string(report.selfSign.Content))
 						fmt.Println("sign query id ", sign.QueryId)
@@ -440,13 +426,10 @@ func (d *DosNode) PipeRecoverAndVerify(cSignatureFromPeer chan vss.Signature, fr
 					}
 
 					report.signShares = append(report.signShares, sign.Signature)
-
 					sigShares = report.signShares
 					if report.signGroup == nil && len(sigShares) >= d.nbThreshold {
 						fmt.Println("4) PipeRecoverAndVerify recover")
-						t := time.Now()
 						sig, err := tbls.Recover(d.suite, d.p2pDkg.GetGroupPublicPoly(), sign.Content, sigShares, d.nbThreshold, d.nbParticipants)
-						blsRecover := time.Since(t).Seconds()
 						if err != nil {
 							fmt.Println(err)
 							fmt.Println("recover failed!!!!!!!!!!!!!!!!! report Content ", string(report.selfSign.Content))
@@ -454,20 +437,24 @@ func (d *DosNode) PipeRecoverAndVerify(cSignatureFromPeer chan vss.Signature, fr
 							fmt.Println("recover failed!!!!!!!!!!!!!!!!!")
 							continue
 						}
-						t = time.Now()
+
 						err = bls.Verify(d.suite, d.p2pDkg.GetGroupPublicPoly().Commit(), sign.Content, sig)
-						blsVerify := time.Since(t).Seconds()
 						if err != nil {
 							fmt.Println(err)
 							fmt.Println("Verify failed!!!!!!!!!!!!!!!!!")
 							continue
 						}
+
 						x, y := onchain.DecodeSig(sig)
 						fmt.Println("5) Verify success signature ", x.String(), y.String())
 						report.signGroup = sig
 						report.timeStamp = time.Now()
-						r := bytes.Compare(d.chainConn.GetId(), report.submitter)
-						if r == 0 {
+						record := d.timeCostMap[report.selfSign.QueryId]
+						record.dataSignCost = time.Since(record.lastUpdateTime).Seconds()
+						record.lastUpdateTime = time.Now()
+						record.sendToChannelTime = time.Now()
+
+						if r := bytes.Compare(d.chainConn.GetId(), report.submitter); r == 0 {
 							fmt.Println("I'm submitter !!!!!!!!!!!!!!!!!!!", sign.QueryId)
 							fmt.Println("I'm submitter !!!!!!!!!!!!!!!!!!!", d.chainConn.GetId())
 							fmt.Println("I'm submitter !!!!!!!!!!!!!!!!!!!", report.submitter)
@@ -475,19 +462,13 @@ func (d *DosNode) PipeRecoverAndVerify(cSignatureFromPeer chan vss.Signature, fr
 							report.selfSign.Content = sign.Content
 							outForSubmit <- report
 							fmt.Println("submit to outForSubmit", sign.QueryId)
-
+						} else {
+							record.okToRemove = true
 						}
+
 						outForValidate <- report
 						fmt.Println("submit to outForValidate", sign.QueryId)
 						delete(reportMap, sign.QueryId)
-						log.WithFields(logrus.Fields{
-							"timecost":            time.Since(startSigFromePeerTimeMap[sign.QueryId]).Seconds(),
-							"timecost-blsRecover": blsRecover,
-							"timecost-blsVerify":  blsVerify,
-							"method":              "RecoverAndVerify",
-							"QueryId":             sign.QueryId,
-						}).Info()
-						delete(startSigFromePeerTimeMap, sign.QueryId)
 					} else {
 						reportMap[sign.QueryId] = report
 					}
@@ -524,30 +505,62 @@ func (d *DosNode) PipeSendToOnchain(chReport <-chan Report) {
 		for {
 			select {
 			case report := <-chReport:
+				record := d.timeCostMap[report.selfSign.QueryId]
+				record.dataChannelCost = time.Since(record.sendToChannelTime).Seconds()
 				switch report.selfSign.Index {
 				case onchain.TrafficSystemRandom:
-					begin := time.Now()
 					err := d.chainConn.SetRandomNum(report.signGroup)
 					if err != nil {
 						fmt.Println("SetRandomNum err ", err)
 					} else {
 						fmt.Println("randomNumber Set for ", report.selfSign.QueryId)
+						record.dataUploadCost = time.Since(record.sendToChannelTime).Seconds() - record.dataChannelCost
+						if record.okToRemove {
+							log.WithFields(logrus.Fields{
+								"requestId":       report.selfSign.QueryId,
+								"trafficType":     record.trafficType,
+								"pass":            record.pass,
+								"dataProcessCost": record.dataProcessCost,
+								"dataSignCost":    record.dataSignCost,
+								"dataChannelCost": record.dataChannelCost,
+								"dataUploadCost":  record.dataUploadCost,
+								"dataConfirmCost": record.dataConfirmCost,
+								"totalCost":       record.dataProcessCost + record.dataSignCost + record.dataConfirmCost,
+							}).Info("request fulfilled")
+							delete(d.timeCostMap, report.selfSign.QueryId)
+						} else {
+							record.okToRemove = true
+						}
 					}
-					log.WithFields(logrus.Fields{
-						"timecost":            time.Since(begin).Seconds(),
-						"method":              "SendToOnchain-SystemRandom",
-						"QueryId":             report.selfSign.QueryId,
-					}).Info()
 				default:
-					begin := time.Now()
-					fmt.Println("PipeSendToOnchain URL/usrRandom result = ", report.selfSign.Content)
-					qID := big.NewInt(0)
-					qID.SetString(report.selfSign.QueryId, 10)
+					fmt.Println("PipeSendToOnchain URL/usrRandom QueryId = ", report.selfSign.QueryId)
+					qID, succ := new(big.Int).SetString(report.selfSign.QueryId, 10)
+					if !succ {
+						fmt.Println("Fail to convert requestId from string to bigInt")
+					}
 
 					t := len(report.selfSign.Content) - 20
 					if t < 0 {
 						fmt.Println("Error : length of content less than 0", t)
+						record.dataUploadCost = time.Since(record.sendToChannelTime).Seconds() - record.dataChannelCost
+						if record.okToRemove {
+							log.WithFields(logrus.Fields{
+								"requestId":       report.selfSign.QueryId,
+								"trafficType":     record.trafficType,
+								"pass":            record.pass,
+								"dataProcessCost": record.dataProcessCost,
+								"dataSignCost":    record.dataSignCost,
+								"dataChannelCost": record.dataChannelCost,
+								"dataUploadCost":  record.dataUploadCost,
+								"dataConfirmCost": record.dataConfirmCost,
+								"totalCost":       record.dataProcessCost + record.dataSignCost + record.dataConfirmCost,
+							}).Info("request fulfilled")
+							delete(d.timeCostMap, report.selfSign.QueryId)
+						} else {
+							record.okToRemove = true
+						}
 					}
+
 					queryResult := make([]byte, t)
 					copy(queryResult, report.selfSign.Content)
 
@@ -564,13 +577,9 @@ func (d *DosNode) PipeSendToOnchain(chReport <-chan Report) {
 					err := d.chainConn.DataReturn(qID, uint8(report.selfSign.Index), queryResult, report.signGroup)
 					if err != nil {
 						fmt.Println("DataReturn err ", err)
+					} else {
+						fmt.Println("urlCallback Set for ", report.selfSign.QueryId)
 					}
-					fmt.Println("urlCallback Set for ", report.selfSign.QueryId)
-					log.WithFields(logrus.Fields{
-						"timecost":            time.Since(begin).Seconds(),
-						"method":              "SendToOnchain-URLorUsrRandom",
-						"QueryId":             report.selfSign.QueryId,
-					}).Info()
 				}
 			case <-d.quit:
 				break
@@ -594,18 +603,44 @@ func (d *DosNode) PipeCleanFinishMap(chValidation chan interface{}, forValidate 
 			case msg := <-chValidation:
 				switch content := msg.(type) {
 				case *onchain.DOSProxyLogValidationResult:
-					if report, match := validateMap[content.TrafficId.String()]; match {
-						fmt.Println("event DOSProxyLogValidationResult========================")
-						fmt.Println("DOSProxyLogValidationResult pass ", content.Pass)
-						fmt.Println("DOSProxyLogValidationResult TrafficType ", content.TrafficType)
-						fmt.Println("DOSProxyLogValidationResult TrafficId ", content.TrafficId)
-						fmt.Println("DOSProxyLogValidationResult Signature ", content.Signature)
-						fmt.Println("DOSProxyLogValidationResult GroupKey ", content.PubKey)
-						fmt.Println("DOSProxyLogValidationResult Message ", content.Message)
-						x, y, z, t, _ := onchain.DecodePubKey(d.p2pDkg.GetGroupPublicPoly().Commit())
-						fmt.Println("GroupKey ", x.String(), y.String(), z.String(), t.String())
+					trafficId := content.TrafficId.String()
+					if report, match := validateMap[trafficId]; match {
+						record := d.timeCostMap[trafficId]
+						record.dataConfirmCost = time.Since(record.lastUpdateTime).Seconds()
+						record.trafficType = content.TrafficType
+						record.pass = content.Pass
+						if record.okToRemove {
+							log.WithFields(logrus.Fields{
+								"requestId":       trafficId,
+								"trafficType":     record.trafficType,
+								"pass":            record.pass,
+								"dataProcessCost": record.dataProcessCost,
+								"dataSignCost":    record.dataSignCost,
+								"dataChannelCost": record.dataChannelCost,
+								"dataUploadCost":  record.dataUploadCost,
+								"dataConfirmCost": record.dataConfirmCost,
+								"totalCost":       record.dataProcessCost + record.dataSignCost + record.dataConfirmCost,
+							}).Info("request fulfilled")
+							delete(d.timeCostMap, trafficId)
+						} else {
+							record.okToRemove = true
+						}
 						delete(chValidationAwait, msg)
+
 						if !content.Pass {
+
+							fmt.Println("event DOSProxyLogValidationResult========================")
+							fmt.Println("DOSProxyLogValidationResult pass ", content.Pass)
+							fmt.Println("DOSProxyLogValidationResult TrafficType ", content.TrafficType)
+							fmt.Println("DOSProxyLogValidationResult TrafficId ", content.TrafficId)
+							fmt.Println("DOSProxyLogValidationResult Signature ", content.Signature)
+							fmt.Println("DOSProxyLogValidationResult GroupKey ", content.PubKey)
+							fmt.Println("DOSProxyLogValidationResult Message ", content.Message)
+							x, y, z, t, _ := onchain.DecodePubKey(d.p2pDkg.GetGroupPublicPoly().Commit())
+							fmt.Println("GroupKey ", x.String(), y.String(), z.String(), t.String())
+							fmt.Println("Signature", report.selfSign.Signature)
+							fmt.Println("Content", report.selfSign.Content)
+
 							//switch uint32(content.TrafficType) {
 							//case ForRandomNumber:
 							fmt.Println("Invalide Signature.........")
@@ -629,12 +664,12 @@ func (d *DosNode) PipeCleanFinishMap(chValidation chan interface{}, forValidate 
 							// }
 							//}
 						} else {
-							fmt.Println("Validated ", content.TrafficId.String())
+							fmt.Println("Validated ", trafficId)
 							if content.TrafficType == onchain.TrafficSystemRandom {
 								lastValidatedRandom = time.Now()
 							}
 						}
-						delete(validateMap, content.TrafficId.String())
+						delete(validateMap, trafficId)
 					} else {
 						if preTime, reenter := chValidationAwait[msg]; reenter {
 							if time.Since(preTime).Minutes() >= NETMSGTIMEOUT {
@@ -653,7 +688,7 @@ func (d *DosNode) PipeCleanFinishMap(chValidation chan interface{}, forValidate 
 					fmt.Println("DOSProxyLogValidationResult type mismatch")
 				}
 			case <-ticker.C:
-				if d.p2pDkg.IsCetified() {
+				if d.p2pDkg.IsCertified() {
 					dur := time.Since(lastValidatedRandom)
 					if dur.Minutes() >= WATCHDOGTIMEOUT {
 						fmt.Println("WatchDog Random timeout.........")
@@ -686,6 +721,16 @@ func (d *DosNode) PipeCleanFinishMap(chValidation chan interface{}, forValidate 
 						// }
 						//}
 						delete(validateMap, queryId)
+					}
+				}
+				for queryId, record := range d.timeCostMap {
+					if time.Since(record.lastUpdateTime).Minutes() > 30 {
+						log.WithFields(logrus.Fields{
+							"requestId":       queryId,
+							"dataProcessCost": record.dataProcessCost,
+							"dataSignCost":    record.dataSignCost,
+						}).Warn("query not fulfilled")
+						delete(d.timeCostMap, queryId)
 					}
 				}
 			case <-d.quit:

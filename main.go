@@ -3,10 +3,15 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"math/big"
 	_ "net/http/pprof"
 	"runtime/debug"
+
+	"github.com/bshuster-repo/logrus-logstash-hook"
+
+	"github.com/ethereum/go-ethereum/common"
+
+	"github.com/sirupsen/logrus"
 
 	"github.com/DOSNetwork/core/configuration"
 	dos "github.com/DOSNetwork/core/dosnode"
@@ -17,6 +22,8 @@ import (
 	"github.com/DOSNetwork/core/share/vss/pedersen"
 	"github.com/DOSNetwork/core/suites"
 )
+
+var log *logrus.Logger
 
 // main
 func main() {
@@ -30,8 +37,12 @@ func main() {
 	onChainConfig := configuration.OnChainConfig{}
 	onChainConfig.LoadConfig()
 	chainConfig := onChainConfig.GetChainConfig()
+
+	//0)initial log module
+	log = logrus.New()
+
 	//1)Connect to Eth
-	chainConn, err := onchain.AdaptTo(chainConfig.ChainType, &chainConfig)
+	chainConn, err := onchain.AdaptTo(chainConfig.ChainType, &chainConfig, log)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -42,6 +53,17 @@ func main() {
 	p, _ := p2p.CreateP2PNetwork(peerEvent, port)
 	p.SetId(chainConn.GetId())
 	p.Listen()
+
+	//2.5)Add hook to log module
+	hook, err := logrustash.NewHookWithFields("udp", "13.52.16.14:9500", "DOS_node", logrus.Fields{
+		"DOS_node_ip": p.GetId().Address,
+		"Serial":      string(common.BytesToAddress(p.GetId().Id).String()),
+	})
+	if err != nil {
+		log.Error(err)
+	}
+
+	log.Hooks.Add(hook)
 
 	//3)Dial to peers to build peerClient and Set node ID
 	if role == "BootstrapNode" {
@@ -70,7 +92,7 @@ func main() {
 	suite := suites.MustFind("bn256")
 	peerEventForDKG := make(chan p2p.P2PMessage, 1)
 	defer close(peerEventForDKG)
-	p2pDkg, _ := dkg.CreateP2PDkg(p, suite, peerEventForDKG, nbParticipants)
+	p2pDkg, _ := dkg.CreateP2PDkg(p, suite, peerEventForDKG, nbParticipants, log)
 	go p2pDkg.EventLoop()
 	dkgEvent := make(chan string, 1)
 	p2pDkg.SubscribeEvent(dkgEvent)
@@ -115,7 +137,7 @@ func main() {
 	}
 
 	//6)Set up a dosnode pipeline
-	d, _ := dos.CreateDosNode(suite, nbParticipants, p, chainConn, p2pDkg)
+	d := dos.CreateDosNode(suite, nbParticipants, p, chainConn, p2pDkg, log)
 	d.PipeGrouping(eventGrouping)
 	queriesReports := d.PipeQueries(chUrl, chUsrRandom, chRandom)
 	signedReports := d.PipeSignAndBroadcast(queriesReports)
@@ -150,12 +172,12 @@ func main() {
 				fmt.Println("unknown", content)
 			}
 		case msg := <-dkgEvent:
-			if msg == "cetified" {
+			if msg == "certified" {
 				gId := new(big.Int)
 				gId.SetBytes(p2pDkg.GetGroupId())
 				chainConn.UploadPubKey(p2pDkg.GetGroupPublicPoly().Commit())
 			}
-		//For retigger query
+		//For re-trigger query
 		case msg := <-chRetrigerUrl:
 			chUrl <- msg
 		}

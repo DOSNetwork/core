@@ -5,13 +5,19 @@ import (
 	"math/big"
 
 	"github.com/DOSNetwork/core/configuration"
+
 	"github.com/dedis/kyber"
+
 	"github.com/ethereum/go-ethereum/common"
+
+	"github.com/sirupsen/logrus"
 )
 
 const (
 	ETH = "ETH"
 )
+
+var log *logrus.Logger
 
 type ChainInterface interface {
 	Init(chainConfig *configuration.ChainConfig) (err error)
@@ -30,7 +36,8 @@ type ChainInterface interface {
 	RandomNumberTimeOut() (err error)
 }
 
-func AdaptTo(chainName string, chainConfig *configuration.ChainConfig) (conn ChainInterface, err error) {
+func AdaptTo(chainName string, chainConfig *configuration.ChainConfig, logger *logrus.Logger) (conn ChainInterface, err error) {
+	log = logger
 	switch chainConfig.ChainType {
 	case ETH:
 		conn = &EthAdaptor{}

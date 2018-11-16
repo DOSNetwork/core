@@ -147,7 +147,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	logWithId := log.WithField("Serial", userTestAdaptor.EthCommon.GetKey().Address.String())
+	logWithId := log.WithField("Serial", userTestAdaptor.GetAddress().String())
 
 	events := make(chan interface{}, 5)
 	userTestAdaptor.SubscribeToAll(events)
@@ -174,7 +174,7 @@ func main() {
 			case *eth.AskMeAnythingQueryResponseReady:
 				logToEmit := logWithId.WithFields(logrus.Fields{
 					"logEvent":    "AskMeAnythingQueryResponseReady",
-					"QueryId":     i.QueryId.String(),
+					"requestId":   i.QueryId.String(),
 					"QueryResult": i.Result,
 				})
 				logRecord, found := responseTimeMap[i.QueryId.String()]
@@ -198,7 +198,9 @@ func main() {
 				logToEmit := logWithId.WithFields(logrus.Fields{
 					"logEvent":  "AskMeAnythingRequestSent",
 					"succeed":   i.Succ,
-					"RequestId": i.RequestId.String(),
+					"requestId": i.RequestId.String(),
+					"tx":        i.Tx,
+					"blockN":    i.BlockN,
 				})
 				startingTime, found := startingTimeMap[i.InternalSerial]
 				if found {
@@ -223,7 +225,7 @@ func main() {
 			case *eth.AskMeAnythingRandomReady:
 				logToEmit := logWithId.WithFields(logrus.Fields{
 					"logEvent":        "AskMeAnythingRandomReady",
-					"RequestId":       i.RequestId.String(),
+					"requestId":       i.RequestId.String(),
 					"GeneratedRandom": i.GeneratedRandom.String(),
 				})
 				logRecord, found := responseTimeMap[i.RequestId.String()]

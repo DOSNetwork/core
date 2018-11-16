@@ -2,7 +2,6 @@ package dkg
 
 import (
 	"fmt"
-
 	"sort"
 	"time"
 
@@ -12,28 +11,34 @@ import (
 	"github.com/DOSNetwork/core/suites"
 
 	"github.com/dedis/kyber"
+
 	"github.com/golang/protobuf/proto"
 
 	"github.com/looplab/fsm"
+
+	"github.com/sirupsen/logrus"
 )
+
+var log *logrus.Logger
 
 type P2PDkgInterface interface {
 	SetGroupId([]byte)
 	GetGroupId() []byte
 	GetDKGIndex() int
 	SetGroupMembers([][]byte)
-	IsCetified() bool
+	IsCertified() bool
 	RunDKG()
 	Reset()
 	SetNbParticipants(int)
 	GetGroupPublicPoly() *share.PubPoly
-	GetShareSecuirty() *share.PriShare
+	GetShareSecurity() *share.PriShare
 	EventLoop()
 	Event(string)
 	SubscribeEvent(chan string)
 }
 
-func CreateP2PDkg(p p2p.P2PInterface, suite suites.Suite, peerEvent chan p2p.P2PMessage, nbParticipants int) (P2PDkgInterface, error) {
+func CreateP2PDkg(p p2p.P2PInterface, suite suites.Suite, peerEvent chan p2p.P2PMessage, nbParticipants int, logger *logrus.Logger) (P2PDkgInterface, error) {
+	log = logger
 	sec := suite.Scalar().Pick(suite.RandomStream())
 	d := &P2PDkg{
 		suite:       suite,
@@ -52,14 +57,15 @@ func CreateP2PDkg(p p2p.P2PInterface, suite suites.Suite, peerEvent chan p2p.P2P
 		"Init",
 		fsm.Events{
 			{Name: "reset", Src: []string{"Init"}, Dst: "Init"},
-			{Name: "receivePubkey", Src: []string{"Init"}, Dst: "Init"},
 			{Name: "grouping", Src: []string{"Init"}, Dst: "ExchangePubKey"},
+			{Name: "receivePubkey", Src: []string{"Init"}, Dst: "Init"},
 			{Name: "receivePubkey", Src: []string{"ExchangePubKey"}, Dst: "ExchangePubKey"},
 			{Name: "receiveAllPubkey", Src: []string{"ExchangePubKey"}, Dst: "NewDistKeyGenerator"},
+			{Name: "receiveDeal", Src: []string{"ExchangePubKey"}, Dst: "ExchangePubKey"},
 			{Name: "receiveDeal", Src: []string{"NewDistKeyGenerator"}, Dst: "NewDistKeyGenerator"},
 			{Name: "receiveAllDeal", Src: []string{"NewDistKeyGenerator"}, Dst: "ProcessDeal"},
 			{Name: "ReadyForResponse", Src: []string{"ProcessDeal"}, Dst: "ProcessResponse"},
-			{Name: "cetified", Src: []string{"ProcessResponse"}, Dst: "Verified"},
+			{Name: "certified", Src: []string{"ProcessResponse"}, Dst: "Verified"},
 			{Name: "checkURL", Src: []string{"Verified"}, Dst: "Verified"},
 			{Name: "receiveSignature", Src: []string{"Verified"}, Dst: "Verified"},
 			{Name: "verify", Src: []string{"Verified"}, Dst: "Verified"},
@@ -130,7 +136,7 @@ func (d *P2PDkg) SetGroupMembers(members [][]byte) {
 	}
 }
 
-func (d *P2PDkg) IsCetified() bool {
+func (d *P2PDkg) IsCertified() bool {
 	if d.FSM.Current() == "Verified" {
 		return true
 	} else {
@@ -155,7 +161,7 @@ func (d *P2PDkg) GetGroupPublicPoly() *share.PubPoly {
 	return nil
 }
 
-func (d *P2PDkg) GetShareSecuirty() *share.PriShare {
+func (d *P2PDkg) GetShareSecurity() *share.PriShare {
 	if d.FSM.Current() == "Verified" {
 		return d.partDks.Share
 	}
@@ -211,7 +217,7 @@ func (d *P2PDkg) enterExchangePubKey(e *fsm.Event) {
 	d.pubkeyIdMap[d.partPub.String()] = string(id)
 	d.publicKeys = append(d.publicKeys, d.partPub)
 
-	//send publick key to groupIds
+	//send public key to groupIds
 	public := vss.PublicKey{SenderId: id}
 	err := public.SetPoint(d.suite, d.partPub)
 	if err != nil {
@@ -253,7 +259,7 @@ func (d *P2PDkg) enterNewDistKeyGenerator(e *fsm.Event) {
 				}
 				if (*d.partDkg).Certified() && d.FSM.Current() == "ProcessResponse" {
 					fmt.Println("resp Certified ")
-					d.chFsmEvent <- "cetified"
+					d.chFsmEvent <- "certified"
 				}
 			}
 		}
@@ -312,10 +318,13 @@ func (d *P2PDkg) enterVerified(e *fsm.Event) {
 		fmt.Println(err)
 	}
 	d.groupPubPoly = share.NewPubPoly(d.suite, d.suite.Point().Base(), d.partDks.Commitments())
-	fmt.Println("DistKeyShare SUCCESS ")
-	fmt.Println(time.Since(d.groupingStart))
+	timeCost := time.Since(d.groupingStart).Seconds()
+	fmt.Println("DistKeyShare SUCCESS ", timeCost)
+	log.WithFields(logrus.Fields{
+		"timeCost": timeCost,
+	}).Info("DKG Succeed")
 	if d.subscribeEvent != nil {
-		d.subscribeEvent <- "cetified"
+		d.subscribeEvent <- "certified"
 	}
 }
 
