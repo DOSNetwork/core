@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"io/ioutil"
 	"math/rand"
 	"net/http"
@@ -172,27 +173,29 @@ func main() {
 					"previous timeout": i.PreviousTimeout.String(),
 				}).Info()
 			case *eth.AskMeAnythingQueryResponseReady:
-				logToEmit := logWithId.WithFields(logrus.Fields{
-					"logEvent":    "AskMeAnythingQueryResponseReady",
-					"requestId":   i.QueryId.String(),
-					"QueryResult": i.Result,
-				})
-				logRecord, found := responseTimeMap[i.QueryId.String()]
-				if found {
-					RspsEvtCnt++
-					timeCost = time.Since(logRecord.start).Seconds()
-					responseTime += timeCost
-					succRequest++
-					logToEmit.Data["timeCost"] = timeCost
-					logToEmit.Info()
-					delete(responseTimeMap, i.QueryId.String())
-				} else {
-					responseTimeMap[i.QueryId.String()] = &record{
-						end:       time.Now(),
-						logToEmit: logToEmit,
+				if envTypes == "url" {
+					logToEmit := logWithId.WithFields(logrus.Fields{
+						"logEvent":    "AskMeAnythingQueryResponseReady",
+						"requestId":   i.QueryId.String(),
+						"QueryResult": i.Result,
+					})
+					logRecord, found := responseTimeMap[i.QueryId.String()]
+					if found {
+						RspsEvtCnt++
+						timeCost = time.Since(logRecord.start).Seconds()
+						responseTime += timeCost
+						succRequest++
+						logToEmit.Data["timeCost"] = timeCost
+						logToEmit.Info()
+						delete(responseTimeMap, i.QueryId.String())
+					} else {
+						responseTimeMap[i.QueryId.String()] = &record{
+							end:       time.Now(),
+							logToEmit: logToEmit,
+						}
 					}
+					query()
 				}
-				query()
 			case *eth.AskMeAnythingRequestSent:
 				RqSent++
 				logToEmit := logWithId.WithFields(logrus.Fields{
@@ -217,33 +220,35 @@ func main() {
 						responseTimeMap[i.RequestId.String()] = &record{start: startingTime}
 					}
 					logToEmit.Data["startingTime"] = startingTime
-					delete(startingTimeMap, i.InternalSerial)
+					//delete(startingTimeMap, i.InternalSerial)
 				} else {
 					logToEmit.Data["startingTime"] = nil
 				}
 				logToEmit.Info()
 			case *eth.AskMeAnythingRandomReady:
-				logToEmit := logWithId.WithFields(logrus.Fields{
-					"logEvent":        "AskMeAnythingRandomReady",
-					"requestId":       i.RequestId.String(),
-					"GeneratedRandom": i.GeneratedRandom.String(),
-				})
-				logRecord, found := responseTimeMap[i.RequestId.String()]
-				if found {
-					RspsEvtCnt++
-					timeCost = time.Since(logRecord.start).Seconds()
-					responseTime += timeCost
-					succRequest++
-					logToEmit.Data["timeCost"] = timeCost
-					logToEmit.Info()
-					delete(responseTimeMap, i.RequestId.String())
-				} else {
-					responseTimeMap[i.RequestId.String()] = &record{
-						end:       time.Now(),
-						logToEmit: logToEmit,
+				if envTypes == "random" {
+					logToEmit := logWithId.WithFields(logrus.Fields{
+						"logEvent":        "AskMeAnythingRandomReady",
+						"requestId":       i.RequestId.String(),
+						"GeneratedRandom": i.GeneratedRandom.String(),
+					})
+					logRecord, found := responseTimeMap[i.RequestId.String()]
+					if found {
+						RspsEvtCnt++
+						timeCost = time.Since(logRecord.start).Seconds()
+						responseTime += timeCost
+						succRequest++
+						logToEmit.Data["timeCost"] = timeCost
+						logToEmit.Info()
+						delete(responseTimeMap, i.RequestId.String())
+					} else {
+						responseTimeMap[i.RequestId.String()] = &record{
+							end:       time.Now(),
+							logToEmit: logToEmit,
+						}
 					}
+					query()
 				}
-				query()
 			default:
 				logWithId.WithFields(logrus.Fields{
 					"logEvent": "eventTypeMismatch",
@@ -263,6 +268,13 @@ func main() {
 						"responseEventCount": RspsEvtCnt,
 						"requestSent":        RqSent,
 					}).Info()
+					for requestId := range responseTimeMap {
+						logWithId.WithFields(logrus.Fields{
+							"logEvent":  "mapContent",
+							"requestId": requestId,
+						}).Info()
+					}
+					fmt.Println(responseTimeMap)
 					os.Exit(0)
 				}
 			}

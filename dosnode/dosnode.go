@@ -59,7 +59,7 @@ type DosNode struct {
 	p2pDkg         dkg.P2PDkgInterface
 	network        *p2p.P2PInterface
 	groupIds       [][]byte
-	timeCostMap    map[string]*timeRecord
+	timeCostMap    *sync.Map
 }
 
 type Report struct {
@@ -95,7 +95,7 @@ func CreateDosNode(suite suites.Suite, nbParticipants int, p p2p.P2PInterface, c
 		network:        &p,
 		chainConn:      chainConn,
 		p2pDkg:         p2pDkg,
-		timeCostMap:    make(map[string]*timeRecord),
+		timeCostMap:    new(sync.Map),
 	}
 }
 
@@ -273,7 +273,7 @@ func (d *DosNode) PipeQueries(queries ...<-chan interface{}) <-chan Report {
 						fmt.Println("Data to return:", string(msgReturn))
 						newTimeRecord.dataProcessCost = time.Since(newTimeRecord.lastUpdateTime).Seconds()
 						newTimeRecord.lastUpdateTime = time.Now()
-						d.timeCostMap[queryId.String()] = newTimeRecord
+						d.timeCostMap.Store(queryId.String(), newTimeRecord)
 
 						// signed message = concat(msgReturn, submitter address)
 						msgReturn = append(msgReturn, submitter...)
@@ -295,7 +295,7 @@ func (d *DosNode) PipeQueries(queries ...<-chan interface{}) <-chan Report {
 						requestId := content.RequestId
 						fmt.Println("PipeUserRandom!!", requestId)
 						submitter := d.choseSubmitter(content.LastSystemRandomness)
-						d.timeCostMap[requestId.String()] = &timeRecord{lastUpdateTime: time.Now()}
+						d.timeCostMap.Store(requestId.String(), &timeRecord{lastUpdateTime: time.Now()})
 
 						// signed message: concat(requestId, lastSystemRandom, userSeed, submitter address)
 						msgReturn := append(content.RequestId.Bytes(), content.LastSystemRandomness.Bytes()...)
@@ -318,7 +318,7 @@ func (d *DosNode) PipeQueries(queries ...<-chan interface{}) <-chan Report {
 						preRandom := content.LastRandomness
 						fmt.Printf("1 ) GenerateRandomNumber preRandom #%v \n", preRandom)
 						submitter := d.choseSubmitter(preRandom)
-						d.timeCostMap[preRandom.String()] = &timeRecord{lastUpdateTime: time.Now()}
+						d.timeCostMap.Store(preRandom.String(), &timeRecord{lastUpdateTime: time.Now()})
 
 						paddedRandomBytes := padOrTrim(preRandom.Bytes(), RANDOMNUMBERSIZE)
 						randomNum := append(paddedRandomBytes, submitter...)
@@ -449,10 +449,10 @@ func (d *DosNode) PipeRecoverAndVerify(cSignatureFromPeer chan vss.Signature, fr
 						fmt.Println("5) Verify success signature ", x.String(), y.String())
 						report.signGroup = sig
 						report.timeStamp = time.Now()
-						record := d.timeCostMap[report.selfSign.QueryId]
-						record.dataSignCost = time.Since(record.lastUpdateTime).Seconds()
-						record.lastUpdateTime = time.Now()
-						record.sendToChannelTime = time.Now()
+						record, _ := d.timeCostMap.Load(report.selfSign.QueryId)
+						record.(*timeRecord).dataSignCost = time.Since(record.(*timeRecord).lastUpdateTime).Seconds()
+						record.(*timeRecord).lastUpdateTime = time.Now()
+						record.(*timeRecord).sendToChannelTime = time.Now()
 
 						if r := bytes.Compare(d.chainConn.GetId(), report.submitter); r == 0 {
 							fmt.Println("I'm submitter !!!!!!!!!!!!!!!!!!!", sign.QueryId)
@@ -463,7 +463,7 @@ func (d *DosNode) PipeRecoverAndVerify(cSignatureFromPeer chan vss.Signature, fr
 							outForSubmit <- report
 							fmt.Println("submit to outForSubmit", sign.QueryId)
 						} else {
-							record.okToRemove = true
+							record.(*timeRecord).okToRemove = true
 						}
 
 						outForValidate <- report
@@ -505,8 +505,8 @@ func (d *DosNode) PipeSendToOnchain(chReport <-chan Report) {
 		for {
 			select {
 			case report := <-chReport:
-				record := d.timeCostMap[report.selfSign.QueryId]
-				record.dataChannelCost = time.Since(record.sendToChannelTime).Seconds()
+				record, _ := d.timeCostMap.Load(report.selfSign.QueryId)
+				record.(*timeRecord).dataChannelCost = time.Since(record.(*timeRecord).sendToChannelTime).Seconds()
 				switch report.selfSign.Index {
 				case onchain.TrafficSystemRandom:
 					err := d.chainConn.SetRandomNum(report.signGroup)
@@ -514,22 +514,22 @@ func (d *DosNode) PipeSendToOnchain(chReport <-chan Report) {
 						fmt.Println("SetRandomNum err ", err)
 					} else {
 						fmt.Println("randomNumber Set for ", report.selfSign.QueryId)
-						record.dataUploadCost = time.Since(record.sendToChannelTime).Seconds() - record.dataChannelCost
-						if record.okToRemove {
+						record.(*timeRecord).dataUploadCost = time.Since(record.(*timeRecord).sendToChannelTime).Seconds() - record.(*timeRecord).dataChannelCost
+						if record.(*timeRecord).okToRemove {
 							log.WithFields(logrus.Fields{
 								"requestId":       report.selfSign.QueryId,
-								"trafficType":     record.trafficType,
-								"pass":            record.pass,
-								"dataProcessCost": record.dataProcessCost,
-								"dataSignCost":    record.dataSignCost,
-								"dataChannelCost": record.dataChannelCost,
-								"dataUploadCost":  record.dataUploadCost,
-								"dataConfirmCost": record.dataConfirmCost,
-								"totalCost":       record.dataProcessCost + record.dataSignCost + record.dataConfirmCost,
+								"trafficType":     record.(*timeRecord).trafficType,
+								"pass":            record.(*timeRecord).pass,
+								"dataProcessCost": record.(*timeRecord).dataProcessCost,
+								"dataSignCost":    record.(*timeRecord).dataSignCost,
+								"dataChannelCost": record.(*timeRecord).dataChannelCost,
+								"dataUploadCost":  record.(*timeRecord).dataUploadCost,
+								"dataConfirmCost": record.(*timeRecord).dataConfirmCost,
+								"totalCost":       record.(*timeRecord).dataProcessCost + record.(*timeRecord).dataSignCost + record.(*timeRecord).dataConfirmCost,
 							}).Info("request fulfilled")
-							delete(d.timeCostMap, report.selfSign.QueryId)
+							d.timeCostMap.Delete(report.selfSign.QueryId)
 						} else {
-							record.okToRemove = true
+							record.(*timeRecord).okToRemove = true
 						}
 					}
 				default:
@@ -542,22 +542,22 @@ func (d *DosNode) PipeSendToOnchain(chReport <-chan Report) {
 					t := len(report.selfSign.Content) - 20
 					if t < 0 {
 						fmt.Println("Error : length of content less than 0", t)
-						record.dataUploadCost = time.Since(record.sendToChannelTime).Seconds() - record.dataChannelCost
-						if record.okToRemove {
+						record.(*timeRecord).dataUploadCost = time.Since(record.(*timeRecord).sendToChannelTime).Seconds() - record.(*timeRecord).dataChannelCost
+						if record.(*timeRecord).okToRemove {
 							log.WithFields(logrus.Fields{
 								"requestId":       report.selfSign.QueryId,
-								"trafficType":     record.trafficType,
-								"pass":            record.pass,
-								"dataProcessCost": record.dataProcessCost,
-								"dataSignCost":    record.dataSignCost,
-								"dataChannelCost": record.dataChannelCost,
-								"dataUploadCost":  record.dataUploadCost,
-								"dataConfirmCost": record.dataConfirmCost,
-								"totalCost":       record.dataProcessCost + record.dataSignCost + record.dataConfirmCost,
+								"trafficType":     record.(*timeRecord).trafficType,
+								"pass":            record.(*timeRecord).pass,
+								"dataProcessCost": record.(*timeRecord).dataProcessCost,
+								"dataSignCost":    record.(*timeRecord).dataSignCost,
+								"dataChannelCost": record.(*timeRecord).dataChannelCost,
+								"dataUploadCost":  record.(*timeRecord).dataUploadCost,
+								"dataConfirmCost": record.(*timeRecord).dataConfirmCost,
+								"totalCost":       record.(*timeRecord).dataProcessCost + record.(*timeRecord).dataSignCost + record.(*timeRecord).dataConfirmCost,
 							}).Info("request fulfilled")
-							delete(d.timeCostMap, report.selfSign.QueryId)
+							d.timeCostMap.Delete(report.selfSign.QueryId)
 						} else {
-							record.okToRemove = true
+							record.(*timeRecord).okToRemove = true
 						}
 					}
 
@@ -605,25 +605,25 @@ func (d *DosNode) PipeCleanFinishMap(chValidation chan interface{}, forValidate 
 				case *onchain.DOSProxyLogValidationResult:
 					trafficId := content.TrafficId.String()
 					if report, match := validateMap[trafficId]; match {
-						record := d.timeCostMap[trafficId]
-						record.dataConfirmCost = time.Since(record.lastUpdateTime).Seconds()
-						record.trafficType = content.TrafficType
-						record.pass = content.Pass
-						if record.okToRemove {
+						record, _ := d.timeCostMap.Load(trafficId)
+						record.(*timeRecord).dataConfirmCost = time.Since(record.(*timeRecord).lastUpdateTime).Seconds()
+						record.(*timeRecord).trafficType = content.TrafficType
+						record.(*timeRecord).pass = content.Pass
+						if record.(*timeRecord).okToRemove {
 							log.WithFields(logrus.Fields{
 								"requestId":       trafficId,
-								"trafficType":     record.trafficType,
-								"pass":            record.pass,
-								"dataProcessCost": record.dataProcessCost,
-								"dataSignCost":    record.dataSignCost,
-								"dataChannelCost": record.dataChannelCost,
-								"dataUploadCost":  record.dataUploadCost,
-								"dataConfirmCost": record.dataConfirmCost,
-								"totalCost":       record.dataProcessCost + record.dataSignCost + record.dataConfirmCost,
+								"trafficType":     record.(*timeRecord).trafficType,
+								"pass":            record.(*timeRecord).pass,
+								"dataProcessCost": record.(*timeRecord).dataProcessCost,
+								"dataSignCost":    record.(*timeRecord).dataSignCost,
+								"dataChannelCost": record.(*timeRecord).dataChannelCost,
+								"dataUploadCost":  record.(*timeRecord).dataUploadCost,
+								"dataConfirmCost": record.(*timeRecord).dataConfirmCost,
+								"totalCost":       record.(*timeRecord).dataProcessCost + record.(*timeRecord).dataSignCost + record.(*timeRecord).dataConfirmCost,
 							}).Info("request fulfilled")
-							delete(d.timeCostMap, trafficId)
+							d.timeCostMap.Delete(trafficId)
 						} else {
-							record.okToRemove = true
+							record.(*timeRecord).okToRemove = true
 						}
 						delete(chValidationAwait, msg)
 
@@ -688,13 +688,13 @@ func (d *DosNode) PipeCleanFinishMap(chValidation chan interface{}, forValidate 
 					fmt.Println("DOSProxyLogValidationResult type mismatch")
 				}
 			case <-ticker.C:
-				if d.p2pDkg.IsCertified() {
-					dur := time.Since(lastValidatedRandom)
-					if dur.Minutes() >= WATCHDOGTIMEOUT {
-						fmt.Println("WatchDog Random timeout.........")
-						d.chainConn.RandomNumberTimeOut()
-					}
-				}
+				//if d.p2pDkg.IsCertified() {
+				//	dur := time.Since(lastValidatedRandom)
+				//	if dur.Minutes() >= WATCHDOGTIMEOUT {
+				//		fmt.Println("WatchDog Random timeout.........")
+				//		d.chainConn.RandomNumberTimeOut()
+				//	}
+				//}
 				for queryId, report := range validateMap {
 					fmt.Println("Time to check and clean .........")
 					dur := time.Since(report.timeStamp)
@@ -723,16 +723,7 @@ func (d *DosNode) PipeCleanFinishMap(chValidation chan interface{}, forValidate 
 						delete(validateMap, queryId)
 					}
 				}
-				for queryId, record := range d.timeCostMap {
-					if time.Since(record.lastUpdateTime).Minutes() > 30 {
-						log.WithFields(logrus.Fields{
-							"requestId":       queryId,
-							"dataProcessCost": record.dataProcessCost,
-							"dataSignCost":    record.dataSignCost,
-						}).Warn("query not fulfilled")
-						delete(d.timeCostMap, queryId)
-					}
-				}
+				d.timeCostMap.Range(d.checkLog)
 			case <-d.quit:
 				close(queries)
 				ticker.Stop()
@@ -741,4 +732,16 @@ func (d *DosNode) PipeCleanFinishMap(chValidation chan interface{}, forValidate 
 		}
 	}()
 	return queries
+}
+
+func (d *DosNode) checkLog(queryId interface{}, record interface{}) (deleted bool) {
+	if time.Since(record.(*timeRecord).lastUpdateTime).Minutes() > VALIDATIONTIMEOUT {
+		log.WithFields(logrus.Fields{
+			"requestId":       queryId.(string),
+			"dataProcessCost": record.(*timeRecord).dataProcessCost,
+			"dataSignCost":    record.(*timeRecord).dataSignCost,
+		}).Warn("query not fulfilled")
+		d.timeCostMap.Delete(queryId)
+	}
+	return true
 }
