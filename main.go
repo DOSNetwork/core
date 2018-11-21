@@ -142,7 +142,7 @@ func main() {
 	queriesReports := d.PipeQueries(chUrl, chUsrRandom, chRandom)
 	signedReports := d.PipeSignAndBroadcast(queriesReports)
 	reportsToSubmit, reportToValidate := d.PipeRecoverAndVerify(cSignatureFromPeer, signedReports)
-	d.PipeSendToOnchain(reportsToSubmit)
+	d.PipeSendToOnchain(reportsToSubmit, reportToValidate)
 	chRetrigerUrl := d.PipeCleanFinishMap(eventValidation, reportToValidate)
 
 	err = chainConn.UploadID()

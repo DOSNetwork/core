@@ -55,9 +55,9 @@ var querySets = []querySet{
 	{"https://api.coinmarketcap.com/v1/global/", "$.last_updated"},
 	{"https://api.coinmarketcap.com/v1/global/", "$.NOTVALID"},
 
-	//invalid queries
-	{"https://api.coinbase.com/v2/prices/ETH-USD/spot", "NOTVALID"},
-	{"https://api.coinmarketcap.com/v1/global/", "NOTVALID"},
+	////invalid queries
+	//{"https://api.coinbase.com/v2/prices/ETH-USD/spot", "NOTVALID"},
+	//{"https://api.coinmarketcap.com/v1/global/", "NOTVALID"},
 }
 
 var (
@@ -220,7 +220,7 @@ func main() {
 						responseTimeMap[i.RequestId.String()] = &record{start: startingTime}
 					}
 					logToEmit.Data["startingTime"] = startingTime
-					//delete(startingTimeMap, i.InternalSerial)
+					delete(startingTimeMap, i.InternalSerial)
 				} else {
 					logToEmit.Data["startingTime"] = nil
 				}
@@ -284,6 +284,7 @@ func main() {
 
 func query() {
 	if counter > 0 {
+		fmt.Println("counter:", counter)
 		switch envTypes {
 		case "url":
 			lottery := rand.Intn(len(querySets))

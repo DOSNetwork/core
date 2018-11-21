@@ -41,8 +41,8 @@ var log *logrus.Logger
 type DosNodeInterface interface {
 	PipeQueries(queries ...<-chan interface{}) <-chan Report
 	PipeSignAndBroadcast(reports <-chan Report) <-chan Report
-	PipeRecoverAndVerify(chan vss.Signature, <-chan Report) (<-chan Report, <-chan Report)
-	PipeSendToOnchain(<-chan Report)
+	PipeRecoverAndVerify(chan vss.Signature, <-chan Report) (<-chan Report, chan Report)
+	PipeSendToOnchain(chReport <-chan Report, outForValidate chan<- Report)
 	PipeCleanFinishMap(chan interface{}, <-chan Report) <-chan interface{}
 	PipeGrouping(<-chan interface{})
 	SetParticipants(int)
@@ -80,7 +80,6 @@ type timeRecord struct {
 	dataChannelCost   float64
 	dataUploadCost    float64
 	dataConfirmCost   float64
-	okToRemove        bool
 	trafficType       uint8
 	pass              bool
 }
@@ -398,7 +397,7 @@ func (d *DosNode) PipeSignAndBroadcast(reports <-chan Report) <-chan Report {
 }
 
 //receiveSignature is thread safe.
-func (d *DosNode) PipeRecoverAndVerify(cSignatureFromPeer chan vss.Signature, fromEth <-chan Report) (<-chan Report, <-chan Report) {
+func (d *DosNode) PipeRecoverAndVerify(cSignatureFromPeer chan vss.Signature, fromEth <-chan Report) (<-chan Report, chan Report) {
 	outForSubmit := make(chan Report, 100)
 	outForValidate := make(chan Report, 100)
 	reportMap := map[string]Report{}
@@ -463,11 +462,9 @@ func (d *DosNode) PipeRecoverAndVerify(cSignatureFromPeer chan vss.Signature, fr
 							outForSubmit <- report
 							fmt.Println("submit to outForSubmit", sign.QueryId)
 						} else {
-							record.(*timeRecord).okToRemove = true
+							outForValidate <- report
+							fmt.Println("submit to outForValidate", sign.QueryId)
 						}
-
-						outForValidate <- report
-						fmt.Println("submit to outForValidate", sign.QueryId)
 						delete(reportMap, sign.QueryId)
 					} else {
 						reportMap[sign.QueryId] = report
@@ -500,7 +497,7 @@ func (d *DosNode) PipeRecoverAndVerify(cSignatureFromPeer chan vss.Signature, fr
 	return outForSubmit, outForValidate
 }
 
-func (d *DosNode) PipeSendToOnchain(chReport <-chan Report) {
+func (d *DosNode) PipeSendToOnchain(chReport <-chan Report, outForValidate chan<- Report) {
 	go func() {
 		for {
 			select {
@@ -515,22 +512,8 @@ func (d *DosNode) PipeSendToOnchain(chReport <-chan Report) {
 					} else {
 						fmt.Println("randomNumber Set for ", report.selfSign.QueryId)
 						record.(*timeRecord).dataUploadCost = time.Since(record.(*timeRecord).sendToChannelTime).Seconds() - record.(*timeRecord).dataChannelCost
-						if record.(*timeRecord).okToRemove {
-							log.WithFields(logrus.Fields{
-								"requestId":       report.selfSign.QueryId,
-								"trafficType":     record.(*timeRecord).trafficType,
-								"pass":            record.(*timeRecord).pass,
-								"dataProcessCost": record.(*timeRecord).dataProcessCost,
-								"dataSignCost":    record.(*timeRecord).dataSignCost,
-								"dataChannelCost": record.(*timeRecord).dataChannelCost,
-								"dataUploadCost":  record.(*timeRecord).dataUploadCost,
-								"dataConfirmCost": record.(*timeRecord).dataConfirmCost,
-								"totalCost":       record.(*timeRecord).dataProcessCost + record.(*timeRecord).dataSignCost + record.(*timeRecord).dataConfirmCost,
-							}).Info("request fulfilled")
-							d.timeCostMap.Delete(report.selfSign.QueryId)
-						} else {
-							record.(*timeRecord).okToRemove = true
-						}
+						outForValidate <- report
+						fmt.Println("submit to outForValidate", report.selfSign.QueryId)
 					}
 				default:
 					fmt.Println("PipeSendToOnchain URL/usrRandom QueryId = ", report.selfSign.QueryId)
@@ -542,23 +525,6 @@ func (d *DosNode) PipeSendToOnchain(chReport <-chan Report) {
 					t := len(report.selfSign.Content) - 20
 					if t < 0 {
 						fmt.Println("Error : length of content less than 0", t)
-						record.(*timeRecord).dataUploadCost = time.Since(record.(*timeRecord).sendToChannelTime).Seconds() - record.(*timeRecord).dataChannelCost
-						if record.(*timeRecord).okToRemove {
-							log.WithFields(logrus.Fields{
-								"requestId":       report.selfSign.QueryId,
-								"trafficType":     record.(*timeRecord).trafficType,
-								"pass":            record.(*timeRecord).pass,
-								"dataProcessCost": record.(*timeRecord).dataProcessCost,
-								"dataSignCost":    record.(*timeRecord).dataSignCost,
-								"dataChannelCost": record.(*timeRecord).dataChannelCost,
-								"dataUploadCost":  record.(*timeRecord).dataUploadCost,
-								"dataConfirmCost": record.(*timeRecord).dataConfirmCost,
-								"totalCost":       record.(*timeRecord).dataProcessCost + record.(*timeRecord).dataSignCost + record.(*timeRecord).dataConfirmCost,
-							}).Info("request fulfilled")
-							d.timeCostMap.Delete(report.selfSign.QueryId)
-						} else {
-							record.(*timeRecord).okToRemove = true
-						}
 					}
 
 					queryResult := make([]byte, t)
@@ -579,6 +545,9 @@ func (d *DosNode) PipeSendToOnchain(chReport <-chan Report) {
 						fmt.Println("DataReturn err ", err)
 					} else {
 						fmt.Println("urlCallback Set for ", report.selfSign.QueryId)
+						record.(*timeRecord).dataUploadCost = time.Since(record.(*timeRecord).sendToChannelTime).Seconds() - record.(*timeRecord).dataChannelCost
+						outForValidate <- report
+						fmt.Println("submit to outForValidate", report.selfSign.QueryId)
 					}
 				}
 			case <-d.quit:
@@ -609,26 +578,21 @@ func (d *DosNode) PipeCleanFinishMap(chValidation chan interface{}, forValidate 
 						record.(*timeRecord).dataConfirmCost = time.Since(record.(*timeRecord).lastUpdateTime).Seconds()
 						record.(*timeRecord).trafficType = content.TrafficType
 						record.(*timeRecord).pass = content.Pass
-						if record.(*timeRecord).okToRemove {
-							log.WithFields(logrus.Fields{
-								"requestId":       trafficId,
-								"trafficType":     record.(*timeRecord).trafficType,
-								"pass":            record.(*timeRecord).pass,
-								"dataProcessCost": record.(*timeRecord).dataProcessCost,
-								"dataSignCost":    record.(*timeRecord).dataSignCost,
-								"dataChannelCost": record.(*timeRecord).dataChannelCost,
-								"dataUploadCost":  record.(*timeRecord).dataUploadCost,
-								"dataConfirmCost": record.(*timeRecord).dataConfirmCost,
-								"totalCost":       record.(*timeRecord).dataProcessCost + record.(*timeRecord).dataSignCost + record.(*timeRecord).dataConfirmCost,
-							}).Info("request fulfilled")
-							d.timeCostMap.Delete(trafficId)
-						} else {
-							record.(*timeRecord).okToRemove = true
-						}
+						log.WithFields(logrus.Fields{
+							"requestId":       trafficId,
+							"trafficType":     record.(*timeRecord).trafficType,
+							"pass":            record.(*timeRecord).pass,
+							"dataProcessCost": record.(*timeRecord).dataProcessCost,
+							"dataSignCost":    record.(*timeRecord).dataSignCost,
+							"dataChannelCost": record.(*timeRecord).dataChannelCost,
+							"dataUploadCost":  record.(*timeRecord).dataUploadCost,
+							"dataConfirmCost": record.(*timeRecord).dataConfirmCost,
+							"totalCost":       record.(*timeRecord).dataProcessCost + record.(*timeRecord).dataSignCost + record.(*timeRecord).dataConfirmCost,
+						}).Info("request fulfilled")
+						d.timeCostMap.Delete(trafficId)
 						delete(chValidationAwait, msg)
 
 						if !content.Pass {
-
 							fmt.Println("event DOSProxyLogValidationResult========================")
 							fmt.Println("DOSProxyLogValidationResult pass ", content.Pass)
 							fmt.Println("DOSProxyLogValidationResult TrafficType ", content.TrafficType)
@@ -688,13 +652,13 @@ func (d *DosNode) PipeCleanFinishMap(chValidation chan interface{}, forValidate 
 					fmt.Println("DOSProxyLogValidationResult type mismatch")
 				}
 			case <-ticker.C:
-				//if d.p2pDkg.IsCertified() {
-				//	dur := time.Since(lastValidatedRandom)
-				//	if dur.Minutes() >= WATCHDOGTIMEOUT {
-				//		fmt.Println("WatchDog Random timeout.........")
-				//		d.chainConn.RandomNumberTimeOut()
-				//	}
-				//}
+				if d.p2pDkg.IsCertified() {
+					dur := time.Since(lastValidatedRandom)
+					if dur.Minutes() >= WATCHDOGTIMEOUT {
+						fmt.Println("WatchDog Random timeout.........")
+						d.chainConn.RandomNumberTimeOut()
+					}
+				}
 				for queryId, report := range validateMap {
 					fmt.Println("Time to check and clean .........")
 					dur := time.Since(report.timeStamp)
