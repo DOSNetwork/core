@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/DOSNetwork/core/testing/dhtNode/internalMsg"
+	"github.com/DOSNetwork/core/testing/peerNode/internalMsg"
 
 	"github.com/DOSNetwork/core/configuration"
 	"github.com/DOSNetwork/core/p2p"
@@ -23,16 +23,14 @@ import (
 
 /*
 The purpose of meeting is to test findNode and sendMessageById
-1)What is the average time for findNode
-2)What is the average time for SendMessageById.
-3)How many times of cant' find node when it call SendMessageById
-4)The pass criteria for this test is that all nodes should receive check message from all members.
+
 */
 
 type node struct {
 	p         p2p.P2PInterface
 	peerEvent chan p2p.P2PMessage
 	members   [][]byte
+	allIP     []string
 	dhtSize   int
 	checkroll map[string]bool
 	done      chan bool
@@ -45,7 +43,7 @@ type bootNode struct {
 	lock    sync.Mutex
 }
 
-type dhtNode struct {
+type peerNode struct {
 	node
 	bootStrapIp string
 	nodeID      []byte
@@ -64,15 +62,6 @@ func GenerateRandomBytes(n int) ([]byte, error) {
 	return b, nil
 }
 
-func (n *node) Init(port, dhtSize int) {
-	//fmt.Println("node Init", n.members)
-	n.done = make(chan bool)
-	n.dhtSize = dhtSize
-	//Build a p2p network
-	n.peerEvent = make(chan p2p.P2PMessage, 100)
-	n.p, _ = p2p.CreateP2PNetwork(n.peerEvent, port)
-}
-
 func (n *node) EventLoop() {
 	for {
 		select {
@@ -86,9 +75,10 @@ func (n *node) EventLoop() {
 }
 
 func (b *bootNode) Init(port, dhtSize int) {
-	//Generate member ID
+	//1)Generate member ID
 	b.dhtSize = dhtSize
 	b.members = [][]byte{}
+	b.allIP = []string{}
 	bootID := []byte{1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1}
 	b.members = append(b.members, bootID)
 	b.checkroll = make(map[string]bool)
@@ -102,18 +92,18 @@ func (b *bootNode) Init(port, dhtSize int) {
 		b.members = append(b.members, id)
 		fmt.Println("i = ", i, " ", id)
 	}
-
 	fmt.Println("bootNode members ", b.members)
-	b.node.Init(port, dhtSize)
-	b.p.SetId(b.node.members[0])
-	go b.p.Listen()
 
-	//Declare a new router to handle REST API call
+	//2)Declare a new router to handle REST API call
 	r := mux.NewRouter()
 	r.HandleFunc("/getID", b.getID).Methods("POST")
 	r.HandleFunc("/getMembers", b.getMembers).Methods("GET")
 	r.HandleFunc("/post", b.postHandler)
 	go http.ListenAndServe(":8080", r)
+
+	//3)Build a p2p network
+	b.p, b.peerEvent, _ = p2p.CreateP2PNetwork(bootID, port)
+	go b.p.Listen()
 }
 
 func (b *bootNode) getMembers(w http.ResponseWriter, r *http.Request) {
@@ -125,8 +115,8 @@ func (b *bootNode) getMembers(w http.ResponseWriter, r *http.Request) {
 func (b *bootNode) getID(w http.ResponseWriter, r *http.Request) {
 	body, _ := ioutil.ReadAll(r.Body)
 	ip := string(body)
-	fmt.Println("!!!! GetID ip ", ip, " ", b.ipIdMap[ip])
 	if b.ipIdMap[ip] == nil {
+		b.allIP = append(b.allIP, ip)
 		b.count++
 		if b.count > b.dhtSize {
 			fmt.Println("getID over size error!!!")
@@ -163,80 +153,26 @@ func (b *bootNode) postHandler(w http.ResponseWriter, r *http.Request) {
 
 func (b *bootNode) requestGrouping() {
 	fmt.Println("requestGrouping ", b.members)
-	time.Sleep(5 * time.Second)
+	s := []string{}
+	for i := 0; i < len(b.allIP); i++ {
+		id, err := b.p.NewPeer(b.allIP[i])
+		if err != nil {
+			fmt.Println("bootNode err ", err)
+		} else {
+			fmt.Println("NewPeer id ", id, " address ", b.allIP[i])
+			s = append(s, b.allIP[i])
+		}
+	}
+	Ids := strings.Join(s, ",")
 	cmd := &internalMsg.Cmd{
 		Ctype: internalMsg.Cmd_FINDNODE,
-		Args:  "",
+		Args:  Ids,
 	}
 	pb := proto.Message(cmd)
-	for i, member := range b.members {
-		if i != 0 {
-			b.p.SendMessageById(member, pb)
-		}
-	}
-
+	b.p.Broadcast(pb)
 }
 
-func (d *dhtNode) Init(bootStrapIp string, port, dhtSize int) {
-	d.node.Init(port, dhtSize)
-	d.dhtSize = dhtSize
-	d.checkCount = 1
-	d.bootStrapIp = bootStrapIp
-	//Wait until bootstrap node assign an ID
-	for {
-		ip, _ := p2p.GetLocalIp()
-		ip = ip + ":44460"
-		fmt.Println("IP : ", ip)
-		r, err := d.MakeRequest(bootStrapIp, "getID", []byte(ip))
-		for err != nil {
-			time.Sleep(10 * time.Second)
-			r, err = d.MakeRequest(bootStrapIp, "getID", []byte(ip+":44460"))
-		}
-
-		//r, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			fmt.Println(err)
-		} else {
-			fmt.Println(" dhtNode getID, r ", len(r))
-			if len(r) != 0 {
-				d.nodeID = r
-				d.p.SetId(d.nodeID[:])
-				fmt.Println(" dhtNode getID, ", len(d.nodeID))
-				break
-			} else {
-				os.Exit(0)
-			}
-		}
-	}
-
-	fmt.Println("nodeID = ", d.p.GetId().Id)
-	d.checkroll = make(map[string]bool)
-	tServer := "http://" + bootStrapIp + ":8080/getMembers"
-	resp, err := http.Get(tServer)
-	if err != nil {
-		fmt.Println(err)
-	}
-	r, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		fmt.Println(err)
-	} else {
-		fmt.Println("!!!! members len ", len(r))
-		idSize := len(d.p.GetId().Id)
-		for i := 0; i < d.dhtSize; i++ {
-			d.members = append(d.members, r[i*idSize:(i+1)*idSize])
-		}
-	}
-	fmt.Println("=============================")
-	for _, member := range d.members {
-		fmt.Println(member)
-	}
-	fmt.Println("=============================")
-
-	//Start to listen incoming connection
-	go d.p.Listen()
-}
-
-func (d *dhtNode) MakeRequest(bootStrapIp, f string, args []byte) ([]byte, error) {
+func (d *peerNode) MakeRequest(bootStrapIp, f string, args []byte) ([]byte, error) {
 
 	tServer := "http://" + bootStrapIp + ":8080/" + f
 
@@ -252,7 +188,42 @@ func (d *dhtNode) MakeRequest(bootStrapIp, f string, args []byte) ([]byte, error
 	return r, err
 }
 
-func (d *dhtNode) EventLoop() {
+func (d *peerNode) Init(bootStrapIp string, port, dhtSize int) {
+
+	d.dhtSize = dhtSize
+	d.checkCount = 1
+	d.bootStrapIp = bootStrapIp
+	d.checkroll = make(map[string]bool)
+	//1)Wait until bootstrap node assign an ID
+	for {
+		ip, _ := p2p.GetLocalIp()
+		ip = ip + ":44460"
+		fmt.Println("IP : ", ip)
+		r, err := d.MakeRequest(bootStrapIp, "getID", []byte(ip))
+		for err != nil {
+			time.Sleep(10 * time.Second)
+			r, err = d.MakeRequest(bootStrapIp, "getID", []byte(ip+":44460"))
+		}
+
+		if err != nil {
+			fmt.Println(err)
+		} else {
+			if len(r) != 0 {
+				d.nodeID = r
+				break
+			} else {
+				os.Exit(0)
+			}
+		}
+	}
+	fmt.Println("nodeID = ", d.nodeID[:])
+
+	//2)Build a p2p network
+	d.p, d.peerEvent, _ = p2p.CreateP2PNetwork(d.nodeID[:], port)
+	go d.p.Listen()
+}
+
+func (d *peerNode) EventLoop() {
 	for {
 		select {
 		//event from peer
@@ -266,18 +237,22 @@ func (d *dhtNode) EventLoop() {
 						Args:  "check",
 					}
 					pb := proto.Message(cmd)
-					for i := 0; i < len(d.members); i++ {
-						member := d.members[i]
-						if string(member[:]) != string(d.p.GetId().Id) {
-							//d.p.SendMessageById(member, pb)
-							results := d.p.FindNodeById(member)
-							for _, result := range results {
-								d.p.GetRoutingTable().Update(result)
-								//fmt.Println(d.p.GetId().Address, "Update peer: ", result.Address)
-							}
-							d.p.SendMessageById(member, pb)
+					nodes := strings.Split(content.Args, ",")
+					allIP := []string{}
+					ip, _ := p2p.GetLocalIp()
+					ip = ip + ":44460"
+					for _, node := range nodes {
+						if ip != node {
+							allIP = append(allIP, node)
 						}
 					}
+					for i := 0; i < len(allIP); i++ {
+						ip := allIP[i]
+						//fmt.Println("New Peer ", ip)
+						d.p.NewPeer(ip)
+					}
+					_ = pb
+					d.p.Broadcast(pb)
 				} else {
 					sender := string(msg.Sender)
 					if !d.checkroll[sender] {
@@ -285,8 +260,7 @@ func (d *dhtNode) EventLoop() {
 						d.checkCount++
 						if d.checkCount == d.dhtSize {
 							d.MakeRequest(d.bootStrapIp, "post", d.nodeID)
-							fmt.Println("done check")
-							//os.Exit(0)
+							//fmt.Println("done check")
 						}
 					}
 
@@ -323,16 +297,8 @@ func main() {
 	} else {
 		s := strings.Split(bootStrapIP, ":")
 		ip, _ = s[0], s[1]
-		d := new(dhtNode)
+		d := new(peerNode)
 		d.Init(ip, port, dhtSize)
-		//TODO : Fix race conditation between Listen and CreatePeer
-		time.Sleep(2 * time.Second)
-		d.p.CreatePeer(bootStrapIP, nil)
-		//results := d.p.FindNode(d.p.GetId(), dht.BucketSize, 20)
-		//for _, result := range results {
-		//	d.p.GetRoutingTable().Update(result)
-		//fmt.Println(d.p.GetId().Address, "Update peer: ", result.Address)
-		//}
 		d.EventLoop()
 	}
 }
