@@ -10,7 +10,6 @@ import (
 
 	"github.com/DOSNetwork/core/p2p/dht"
 	"github.com/DOSNetwork/core/suites"
-
 	"github.com/dedis/kyber"
 )
 
@@ -22,17 +21,43 @@ func genPair() (kyber.Scalar, kyber.Point) {
 	return secret, public
 }
 
-func CreateP2PNetwork(tunnel chan P2PMessage, port int) (P2PInterface, error) {
+func CreateP2PNetwork(id []byte, port int) (P2PInterface, chan P2PMessage, error) {
 	p := &P2P{
-		peers:       new(sync.Map),
-		messageChan: tunnel,
-		suite:       suite,
-		port:        port,
+		peers:    new(sync.Map),
+		suite:    suite,
+		messages: make(chan P2PMessage, 100),
+		port:     port,
 	}
-	return p, nil
+	p.identity.Id = id
+
+	return p, p.messages, nil
+	/*
+		nodeRole := os.Getenv("NODEROLE")
+		if nodeRole != "TESTNODE" {
+			p := &TestP2P{
+				P2P{
+					peers:    new(sync.Map),
+					suite:    suite,
+					messages: make(chan P2PMessage, 100),
+					port:     port,
+				},
+			}
+			return p, p.messages, nil
+		} else {
+			p := &P2P{
+				peers:    new(sync.Map),
+				suite:    suite,
+				messages: make(chan P2PMessage, 100),
+				port:     port,
+			}
+			p.identity.Id = id
+
+			return p, p.messages, nil
+		}
+	*/
 }
 
-func getLocalIp() (string, error) {
+func GetLocalIp() (string, error) {
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {
 		return "", err
@@ -54,13 +79,12 @@ type P2PMessage struct {
 }
 
 type P2PInterface interface {
-	SetId([]byte)
 	GetId() dht.ID
 	Listen() error
 	Broadcast(proto.Message)
 	SendMessageById([]byte, proto.Message) error
-	CreatePeer(string, *net.Conn)
-	GetTunnel() chan P2PMessage
+	NewPeer(string) ([]byte, error)
+	//DHT
 	FindNodeById(id []byte) []dht.ID
 	FindNode(targetID dht.ID, alpha int, disjointPaths int) (results []dht.ID)
 	GetRoutingTable() *dht.RoutingTable
