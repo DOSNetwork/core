@@ -1,7 +1,7 @@
 package p2p
 
 import (
-	"bufio"
+	"errors"
 	"fmt"
 	"log"
 	"math/big"
@@ -27,8 +27,8 @@ type P2P struct {
 	identity dht.ID
 	//Map of connection addresses (string) <-> *p2p.PeerClient
 	peers *sync.Map
-	// Channels are thread safe
-	messageChan  chan P2PMessage
+	// Todo:Add a subscrive fucntion to send message to application
+	messages     chan P2PMessage
 	suite        suites.Suite
 	port         int
 	secKey       kyber.Scalar
@@ -39,12 +39,6 @@ type P2P struct {
 
 func (n *P2P) SetId(id []byte) {
 	n.identity.Id = id
-	//init log
-	n.log = logrus.New()
-	hook, _ := logrustash.NewHookWithFields("udp", "13.52.16.14:9500", "DOS_node", logrus.Fields{
-		"DOS_node_ip": n.identity.Address,
-	})
-	n.log.Hooks.Add(hook)
 }
 
 func (n *P2P) GetId() dht.ID {
@@ -52,7 +46,13 @@ func (n *P2P) GetId() dht.ID {
 }
 
 func (n *P2P) Listen() error {
-	ip, err := getLocalIp()
+	//init log
+	n.log = logrus.New()
+	hook, _ := logrustash.NewHookWithFields("udp", "13.52.16.14:9500", "DOS_node", logrus.Fields{
+		"DOS_node_ip": n.identity.Address,
+	})
+	n.log.Hooks.Add(hook)
+	ip, err := GetLocalIp()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -114,11 +114,10 @@ func (n *P2P) Listen() error {
 		for {
 			if conn, err := listener.Accept(); err == nil {
 				//Create a peer client
-				n.CreatePeer("", &conn)
+				NewPeerClient(n, &conn, n.messages)
 				if err != nil {
 					log.Fatal(err)
 				}
-
 			} else {
 				fmt.Println("Failed accepting a connection request:", err)
 				log.Fatal(err)
@@ -135,12 +134,13 @@ func (n *P2P) Broadcast(m proto.Message) {
 
 		prepared, err := client.PrepareMessage(m)
 		if err != nil {
-			log.Fatal(err)
+			fmt.Println("Broadcast PrepareMessage err ", err)
 		}
 
 		prepared.RequestNonce = atomic.AddUint64(&client.RequestNonce, 1)
 		if err := client.SendPackage(prepared); err != nil {
-			log.Fatal(err)
+			//TODO:Need to handle : use of closed network connection
+			fmt.Println("Broadcast  SendPackageerr ", err)
 		}
 
 		return true
@@ -164,61 +164,71 @@ func (n *P2P) SendMessageById(id []byte, m proto.Message) (err error) {
 	value, loaded = n.peers.Load(string(id))
 	if loaded {
 		client := value.(*PeerClient)
-
-		prepared, err := client.PrepareMessage(m)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		prepared.RequestNonce = atomic.AddUint64(&client.RequestNonce, 1)
-		if err := client.SendPackage(prepared); err != nil {
-			log.Fatal(err)
-		}
+		err = client.SendMessage(m)
 	} else {
 		err = fmt.Errorf("can't find node %s", string(id))
 	}
 	return
 }
 
-func (n *P2P) GetTunnel() chan P2PMessage {
-	return n.messageChan
-}
-
 func (n *P2P) GetRoutingTable() *dht.RoutingTable {
 	return n.routingTable
 }
 
-func (n *P2P) CreatePeer(addr string, c *net.Conn) {
-	//fmt.Println(n.identity.Address, "Create peer clients")
-	peer := &PeerClient{
-		conn:   c,
-		p2pnet: n,
+/*
+This is a block call
+*/
+
+func (n *P2P) NewPeer(addr string) (id []byte, err error) {
+	retryCount := 0
+retry:
+	//fmt.Println("NewPeer retryCount", retryCount)
+	retryCount++
+	if retryCount >= 10 {
+		err = errors.New("Peer : retried over 10 times")
+		return
 	}
-	if addr != "" {
-		existing := false
-		n.peers.Range(func(key, value interface{}) bool {
-			client := value.(*PeerClient)
-			if client.identity.Address == addr {
-				existing = true
-			}
-			return true
-		})
-		if existing {
-			return
+	var conn net.Conn
+	//1)Check if this address has been in peers map
+	existing := false
+	n.peers.Range(func(key, value interface{}) bool {
+		client := value.(*PeerClient)
+		if client.identity.Address == addr {
+
+			existing = true
+			id = make([]byte, len(client.identity.Id))
+			copy(id, client.identity.Id)
 		}
-
-		peer.Dial(addr)
+		return true
+	})
+	if existing {
+		fmt.Println("NewPeer existing")
+		return
 	}
-	if (*peer.conn) != nil {
-		peer.rw = bufio.NewReadWriter(bufio.NewReader(*peer.conn), bufio.NewWriter(*peer.conn))
-		//n.peers.LoadOrStore(peer.id, peer)
-		peer.messageChan = n.messageChan
 
-		peer.wg.Add(1)
-		//fmt.Println("InitClient id ", peer.id)
-		go peer.HandlePackages()
-		peer.SayHi()
+	//2)Dial to peer to get a connection
+	conn, err = net.Dial("tcp", addr)
+	if err != nil {
+		fmt.Println("Dial err ", err)
+		time.Sleep(1 * time.Second)
+		goto retry
 	}
+
+	_, err = NewPeerClient(n, &conn, n.messages)
+	if err != nil {
+		fmt.Println("NewPeerClient err ", err)
+		goto retry
+	}
+
+	n.peers.Range(func(key, value interface{}) bool {
+		client := value.(*PeerClient)
+		if client.identity.Address == addr {
+			existing = true
+			id = make([]byte, len(client.identity.Id))
+			copy(id, client.identity.Id)
+		}
+		return true
+	})
 	return
 }
 
@@ -360,12 +370,21 @@ func (n *P2P) queryPeerByID(peerID dht.ID, targetID dht.ID, responses chan []*in
 	var client *PeerClient
 	_, loaded := n.peers.Load(string(peerID.Id))
 	if !loaded {
-		n.CreatePeer(peerID.Address, nil)
+		_, err := n.NewPeer(peerID.Address)
+		if err != nil {
+			responses <- []*internal.ID{}
+			return
+		}
 	}
-	value, _ := n.peers.Load(string(peerID.Id))
+	//TODO: Need to check if it can just return
+	//panic: interface conversion: interface {} is nil, not *p2p.PeerClient
+	value, ok := n.peers.Load(string(peerID.Id))
+	if !ok {
+		fmt.Println("value not found for key: peerID.Id", peerID.Id)
+		responses <- []*internal.ID{}
+		return
+	}
 	client = value.(*PeerClient)
-
-	client.wg.Wait()
 
 	targetProtoID := internal.ID(targetID)
 
