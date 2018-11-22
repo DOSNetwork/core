@@ -1,0 +1,10 @@
+syntax = "proto3";
+package internalMsg;
+
+message Cmd{
+    enum Type {
+        FINDNODE = 0;
+    }
+    Type Ctype = 1;
+    string Args = 2;
+}
