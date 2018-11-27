@@ -3,7 +3,8 @@ package internalMsg;
 
 message Cmd{
     enum Type {
-        FINDNODE = 0;
+        ALLIP = 0;
+        SIGNIN = 1;
     }
     Type Ctype = 1;
     string Args = 2;
