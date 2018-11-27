@@ -191,12 +191,6 @@ func (n *P2P) NewPeer(addr string) (id []byte, err error) {
 			fmt.Println("Existing peer")
 			return
 		}
-		return true
-	})
-	if existing {
-		fmt.Println("NewPeer existing")
-		return
-	}
 
 		//2)Dial to peer to get a connection
 		conn, err = net.Dial("tcp", addr)
