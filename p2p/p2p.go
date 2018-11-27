@@ -9,7 +9,6 @@ import (
 	"sort"
 	"strconv"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/dedis/kyber"
@@ -131,18 +130,10 @@ func (n *P2P) Listen() error {
 func (n *P2P) Broadcast(m proto.Message) {
 	n.peers.Range(func(key, value interface{}) bool {
 		client := value.(*PeerClient)
-
-		prepared, err := client.PrepareMessage(m)
+		err := client.SendMessage(m)
 		if err != nil {
-			fmt.Println("Broadcast PrepareMessage err ", err)
+			fmt.Println("P2P Broadcast ", err)
 		}
-
-		prepared.RequestNonce = atomic.AddUint64(&client.RequestNonce, 1)
-		if err := client.SendPackage(prepared); err != nil {
-			//TODO:Need to handle : use of closed network connection
-			fmt.Println("Broadcast  SendPackageerr ", err)
-		}
-
 		return true
 	})
 }
@@ -180,55 +171,55 @@ This is a block call
 */
 
 func (n *P2P) NewPeer(addr string) (id []byte, err error) {
-	retryCount := 0
-retry:
-	//fmt.Println("NewPeer retryCount", retryCount)
-	retryCount++
-	if retryCount >= 10 {
-		err = errors.New("Peer : retried over 10 times")
-		return
-	}
+	var peer *PeerClient
 	var conn net.Conn
-	//1)Check if this address has been in peers map
-	existing := false
-	n.peers.Range(func(key, value interface{}) bool {
-		client := value.(*PeerClient)
-		if client.identity.Address == addr {
+	for retry := 0; retry < 10; retry++ {
+		//1)Check if this address has been in peers map
+		existing := false
+		n.peers.Range(func(key, value interface{}) bool {
+			client := value.(*PeerClient)
+			if client.identity.Address == addr {
 
-			existing = true
-			id = make([]byte, len(client.identity.Id))
-			copy(id, client.identity.Id)
+				existing = true
+				id = make([]byte, len(client.identity.Id))
+				copy(id, client.identity.Id)
+			}
+			return true
+		})
+		if existing {
+			fmt.Println("Existing peer")
+			return
 		}
-		return true
-	})
-	if existing {
-		fmt.Println("NewPeer existing")
+
+		//2)Dial to peer to get a connection
+		conn, err = net.Dial("tcp", addr)
+		if err != nil {
+			fmt.Println("Dial err ", err)
+			time.Sleep(1 * time.Second)
+			continue
+		}
+
+		peer, err = NewPeerClient(n, &conn, n.messages)
+		if err != nil {
+			fmt.Println("NewPeerClient err ", err)
+			continue
+		}
+		n.peers.LoadOrStore(string(peer.identity.Id), peer)
+		n.routingTable.Update(peer.identity)
+
+		n.peers.Range(func(key, value interface{}) bool {
+			client := value.(*PeerClient)
+			if client.identity.Address == addr {
+				existing = true
+				id = make([]byte, len(client.identity.Id))
+				copy(id, client.identity.Id)
+			}
+			return true
+		})
 		return
 	}
+	err = errors.New("Peer : retried over 10 times")
 
-	//2)Dial to peer to get a connection
-	conn, err = net.Dial("tcp", addr)
-	if err != nil {
-		fmt.Println("Dial err ", err)
-		time.Sleep(1 * time.Second)
-		goto retry
-	}
-
-	_, err = NewPeerClient(n, &conn, n.messages)
-	if err != nil {
-		fmt.Println("NewPeerClient err ", err)
-		goto retry
-	}
-
-	n.peers.Range(func(key, value interface{}) bool {
-		client := value.(*PeerClient)
-		if client.identity.Address == addr {
-			existing = true
-			id = make([]byte, len(client.identity.Id))
-			copy(id, client.identity.Id)
-		}
-		return true
-	})
 	return
 }
 

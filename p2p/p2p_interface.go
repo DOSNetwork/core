@@ -3,6 +3,7 @@ package p2p
 import (
 	"errors"
 	"net"
+	"os"
 	"sync"
 
 	"github.com/golang/protobuf/proto"
@@ -22,39 +23,30 @@ func genPair() (kyber.Scalar, kyber.Point) {
 }
 
 func CreateP2PNetwork(id []byte, port int) (P2PInterface, chan P2PMessage, error) {
-	p := &P2P{
-		peers:    new(sync.Map),
-		suite:    suite,
-		messages: make(chan P2PMessage, 100),
-		port:     port,
-	}
-	p.identity.Id = id
-
-	return p, p.messages, nil
-	/*
-		nodeRole := os.Getenv("NODEROLE")
-		if nodeRole != "TESTNODE" {
-			p := &TestP2P{
-				P2P{
-					peers:    new(sync.Map),
-					suite:    suite,
-					messages: make(chan P2PMessage, 100),
-					port:     port,
-				},
-			}
-			return p, p.messages, nil
-		} else {
-			p := &P2P{
+	testStrategy := os.Getenv("TESTSTRATEGY")
+	if testStrategy == "DELAY_BEFORE_RECEIVELOOP" {
+		p := &TestP2P{
+			P2P{
 				peers:    new(sync.Map),
 				suite:    suite,
 				messages: make(chan P2PMessage, 100),
 				port:     port,
-			}
-			p.identity.Id = id
-
-			return p, p.messages, nil
+			},
+			testStrategy,
 		}
-	*/
+		return p, p.messages, nil
+	} else {
+		p := &P2P{
+			peers:    new(sync.Map),
+			suite:    suite,
+			messages: make(chan P2PMessage, 100),
+			port:     port,
+		}
+		p.identity.Id = id
+
+		return p, p.messages, nil
+	}
+
 }
 
 func GetLocalIp() (string, error) {

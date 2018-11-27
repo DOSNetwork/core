@@ -1,0 +1,22 @@
+version: '3'
+services:
+ bootstrap:
+   image: peernode
+   deploy:
+     replicas: 1
+   environment:
+     - NODEROLE=boot
+     - PEERSIZE=1
+     - TESTSTRATEGY=DELAY_BEFORE_RECEIVELOOP
+ peernode:
+   image: peernode
+   depends_on:
+     - bootstrap
+   deploy:
+     replicas: 1
+   environment:
+     - BOOTSTRAPIP=bootstrap:44460
+     - NODEROLE=TESTNODE
+     - PEERSIZE=1
+     - NUMOFMESSAGS=10
+     - TESTSTRATEGY=DELAY_BEFORE_RECEIVELOOP
