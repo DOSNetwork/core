@@ -57,20 +57,25 @@ func NewPeerClient(p2pnet *P2P, conn *net.Conn, rxMessage chan P2PMessage) (peer
 		done:      make(chan bool, 2),
 		rw:        bufio.NewReadWriter(bufio.NewReader(*conn), bufio.NewWriter(*conn)),
 	}
-	go peer.receiveLoop()
-	err = peer.SayHi()
+	err = peer.Start()
 	if err != nil {
-		close(peer.txMessage)
-		//close(peer.waitForHi)
-		//close(peer.done)
 		peer = nil
+	}
+	return
+}
+
+func (p *PeerClient) Start() (err error) {
+	go p.receiveLoop()
+	err = p.SayHi()
+	if err != nil {
+		close(p.txMessage)
 	}
 	return
 }
 
 func (p *PeerClient) SendMessage(msg proto.Message) (err error) {
 	var prepared *internal.Package
-	prepared, err = p.PrepareMessage(msg)
+	prepared, err = p.prepareMessage(msg)
 	if err != nil {
 		fmt.Println("PeerClient sendLoop err ", err)
 		return
@@ -129,8 +134,8 @@ L:
 						fmt.Println("PeerClient UnmarshalBinary err ", err)
 					}
 					p.pubKey = pub
-					p.p2pnet.peers.LoadOrStore(string(p.identity.Id), p)
-					p.p2pnet.routingTable.Update(p.identity)
+					//p.p2pnet.peers.LoadOrStore(string(p.identity.Id), p)
+					//p.p2pnet.routingTable.Update(p.identity)
 					p.waitForHi <- true
 				} else {
 					fmt.Println("Ignore Hi")
@@ -291,7 +296,7 @@ func (p *PeerClient) SendPackage(msg proto.Message) error {
 	return nil
 }
 
-func (p *PeerClient) PrepareMessage(msg proto.Message) (*internal.Package, error) {
+func (p *PeerClient) prepareMessage(msg proto.Message) (*internal.Package, error) {
 	if msg == nil {
 		return nil, errors.New("network: message is null")
 	}
@@ -313,7 +318,7 @@ func (p *PeerClient) PrepareMessage(msg proto.Message) (*internal.Package, error
 
 // Request requests for a response for a request sent to a given peer.
 func (p *PeerClient) Request(req *Request) (proto.Message, error) {
-	prepared, err := p.PrepareMessage(req.Message)
+	prepared, err := p.prepareMessage(req.Message)
 	if err != nil {
 		return nil, err
 	}
@@ -347,7 +352,7 @@ func (p *PeerClient) Request(req *Request) (proto.Message, error) {
 
 // Reply is equivalent to Write() with an appended nonce to signal a reply.
 func (p *PeerClient) Reply(nonce uint64, message proto.Message) error {
-	prepared, err := p.PrepareMessage(message)
+	prepared, err := p.prepareMessage(message)
 	if err != nil {
 		return err
 	}

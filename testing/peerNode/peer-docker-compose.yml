@@ -1,0 +1,19 @@
+version: '3'
+services:
+ bootstrap:
+   image: peernode
+   deploy:
+     replicas: 1
+   environment:
+     - NODEROLE=boot
+     - DHTSIZE=5
+ peernode:
+   image: peernode
+   depends_on:
+     - bootstrap
+   deploy:
+     replicas: 5
+   environment:
+     - BOOTSTRAPIP=bootstrap:44460
+     - DHTSIZE=5
+     - NUMOFMESSAGS=1000
