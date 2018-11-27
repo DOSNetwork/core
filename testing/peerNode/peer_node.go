@@ -7,6 +7,8 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"runtime"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync"
@@ -25,22 +27,34 @@ import (
 The purpose of meeting is to test findNode and sendMessageById
 
 */
+func bToMb(b uint64) uint64 {
+	return b / 1024 / 1024
+}
+func PrintMemUsage() {
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+	// For info on each, see: https://golang.org/pkg/runtime/#MemStats
+	fmt.Printf("Alloc = %v MiB", bToMb(m.Alloc))
+	fmt.Printf("\tTotalAlloc = %v MiB", bToMb(m.TotalAlloc))
+	fmt.Printf("\tSys = %v MiB", bToMb(m.Sys))
+	fmt.Printf("\tNumGC = %v\n", m.NumGC)
+}
 
 type node struct {
 	p         p2p.P2PInterface
 	peerEvent chan p2p.P2PMessage
 	members   [][]byte
 	allIP     []string
-	dhtSize   int
-	checkroll map[string]bool
+	peerSize  int
 	done      chan bool
 }
 
 type bootNode struct {
 	node
-	count   int
-	ipIdMap map[string][]byte
-	lock    sync.Mutex
+	count     int
+	ipIdMap   map[string][]byte
+	lock      sync.Mutex
+	checkroll map[string]bool
 }
 
 type peerNode struct {
@@ -49,6 +63,8 @@ type peerNode struct {
 	nodeID      []byte
 	checkCount  int
 	findNodeDur time.Duration
+	checkroll   map[string]int
+	numMessages int
 }
 
 func GenerateRandomBytes(n int) ([]byte, error) {
@@ -63,8 +79,11 @@ func GenerateRandomBytes(n int) ([]byte, error) {
 }
 
 func (n *node) EventLoop() {
+	ticker := time.NewTicker(5 * time.Second)
 	for {
 		select {
+		case <-ticker.C:
+			//PrintMemUsage()
 		//event from peer
 		case _ = <-n.peerEvent:
 		case <-n.done:
@@ -74,25 +93,23 @@ func (n *node) EventLoop() {
 	}
 }
 
-func (b *bootNode) Init(port, dhtSize int) {
+func (b *bootNode) Init(port, peerSize int) {
 	//1)Generate member ID
-	b.dhtSize = dhtSize
+	b.peerSize = peerSize
 	b.members = [][]byte{}
 	b.allIP = []string{}
 	bootID := []byte{1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1}
 	b.members = append(b.members, bootID)
 	b.checkroll = make(map[string]bool)
 	b.ipIdMap = make(map[string][]byte)
-	for i := 1; i <= b.dhtSize; i++ {
+	for i := 1; i <= b.peerSize; i++ {
 		id, _ := GenerateRandomBytes(len(bootID))
 		for b.checkroll[string(id)] {
 			id, _ = GenerateRandomBytes(len(bootID))
 		}
 		b.checkroll[string(id)] = true
 		b.members = append(b.members, id)
-		fmt.Println("i = ", i, " ", id)
 	}
-	fmt.Println("bootNode members ", b.members)
 
 	//2)Declare a new router to handle REST API call
 	r := mux.NewRouter()
@@ -107,7 +124,7 @@ func (b *bootNode) Init(port, dhtSize int) {
 }
 
 func (b *bootNode) getMembers(w http.ResponseWriter, r *http.Request) {
-	for i := 1; i <= b.dhtSize; i++ {
+	for i := 1; i <= b.peerSize; i++ {
 		w.Write(b.members[i])
 	}
 }
@@ -115,14 +132,15 @@ func (b *bootNode) getMembers(w http.ResponseWriter, r *http.Request) {
 func (b *bootNode) getID(w http.ResponseWriter, r *http.Request) {
 	body, _ := ioutil.ReadAll(r.Body)
 	ip := string(body)
+	fmt.Println("getID count ", b.count, " ip", ip, " members", b.ipIdMap[ip])
 	if b.ipIdMap[ip] == nil {
 		b.allIP = append(b.allIP, ip)
 		b.count++
-		if b.count > b.dhtSize {
+		if b.count > b.peerSize {
 			fmt.Println("getID over size error!!!")
 			return
 		}
-		fmt.Println("getID count ", b.count, " dhtSize", b.dhtSize, " members", b.node.members[b.count])
+		fmt.Println("getID count ", b.count, " peerSize", b.peerSize, " members", b.node.members[b.count])
 		b.ipIdMap[ip] = b.node.members[b.count]
 	}
 
@@ -131,8 +149,8 @@ func (b *bootNode) getID(w http.ResponseWriter, r *http.Request) {
 	} else {
 		fmt.Println(b.node.members)
 	}
-	if b.count == b.dhtSize {
-		go b.requestGrouping()
+	if b.count == b.peerSize {
+		go b.sendPeerAddresses()
 	}
 }
 
@@ -151,8 +169,8 @@ func (b *bootNode) postHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (b *bootNode) requestGrouping() {
-	fmt.Println("requestGrouping ", b.members)
+func (b *bootNode) sendPeerAddresses() {
+	fmt.Println("sendPeerAddresses ", b.members)
 	s := []string{}
 	for i := 0; i < len(b.allIP); i++ {
 		id, err := b.p.NewPeer(b.allIP[i])
@@ -163,10 +181,10 @@ func (b *bootNode) requestGrouping() {
 			s = append(s, b.allIP[i])
 		}
 	}
-	Ids := strings.Join(s, ",")
+	allIP := strings.Join(s, ",")
 	cmd := &internalMsg.Cmd{
-		Ctype: internalMsg.Cmd_FINDNODE,
-		Args:  Ids,
+		Ctype: internalMsg.Cmd_ALLIP,
+		Args:  allIP,
 	}
 	pb := proto.Message(cmd)
 	b.p.Broadcast(pb)
@@ -188,12 +206,17 @@ func (d *peerNode) MakeRequest(bootStrapIp, f string, args []byte) ([]byte, erro
 	return r, err
 }
 
-func (d *peerNode) Init(bootStrapIp string, port, dhtSize int) {
-
-	d.dhtSize = dhtSize
+func (d *peerNode) Init(bootStrapIp string, port, peerSize int) {
+	var err error
+	d.peerSize = peerSize
 	d.checkCount = 1
 	d.bootStrapIp = bootStrapIp
-	d.checkroll = make(map[string]bool)
+	d.checkroll = make(map[string]int)
+	d.numMessages, err = strconv.Atoi(os.Getenv("NUMOFMESSAGS"))
+	fmt.Println("!!!!!! d.numMessages ", d.numMessages)
+	if err != nil {
+		fmt.Println(err)
+	}
 	//1)Wait until bootstrap node assign an ID
 	for {
 		ip, _ := p2p.GetLocalIp()
@@ -202,7 +225,7 @@ func (d *peerNode) Init(bootStrapIp string, port, dhtSize int) {
 		r, err := d.MakeRequest(bootStrapIp, "getID", []byte(ip))
 		for err != nil {
 			time.Sleep(10 * time.Second)
-			r, err = d.MakeRequest(bootStrapIp, "getID", []byte(ip+":44460"))
+			r, err = d.MakeRequest(bootStrapIp, "getID", []byte(ip))
 		}
 
 		if err != nil {
@@ -224,16 +247,19 @@ func (d *peerNode) Init(bootStrapIp string, port, dhtSize int) {
 }
 
 func (d *peerNode) EventLoop() {
+	ticker := time.NewTicker(5 * time.Second)
 	for {
 		select {
+		case <-ticker.C:
+			//PrintMemUsage()
 		//event from peer
 		case msg := <-d.peerEvent:
 			switch content := msg.Msg.Message.(type) {
 			case *internalMsg.Cmd:
-				if content.Ctype == internalMsg.Cmd_FINDNODE {
+				if content.Ctype == internalMsg.Cmd_ALLIP {
 					//msg.Sender
 					cmd := &internalMsg.Cmd{
-						Ctype: 2,
+						Ctype: internalMsg.Cmd_SIGNIN,
 						Args:  "check",
 					}
 					pb := proto.Message(cmd)
@@ -248,22 +274,25 @@ func (d *peerNode) EventLoop() {
 					}
 					for i := 0; i < len(allIP); i++ {
 						ip := allIP[i]
-						//fmt.Println("New Peer ", ip)
-						d.p.NewPeer(ip)
+						id, _ := d.p.NewPeer(ip)
+						d.checkroll[string(id)] = 0
 					}
-					_ = pb
-					d.p.Broadcast(pb)
-				} else {
-					sender := string(msg.Sender)
-					if !d.checkroll[sender] {
-						d.checkroll[sender] = true
-						d.checkCount++
-						if d.checkCount == d.dhtSize {
-							d.MakeRequest(d.bootStrapIp, "post", d.nodeID)
-							//fmt.Println("done check")
+					for i := 0; i < d.numMessages; i++ {
+						for id, _ := range d.checkroll {
+							go d.p.SendMessageById([]byte(id), pb)
 						}
 					}
+				} else if content.Ctype == internalMsg.Cmd_SIGNIN {
+					sender := string(msg.Sender)
+					d.checkroll[sender] = d.checkroll[sender] + 1
+					fmt.Println("sender", []byte(sender), "  ", d.checkroll[sender], content.Ctype, " ", len(d.checkroll))
+					if d.checkroll[sender] == d.numMessages {
+						delete(d.checkroll, sender)
+					}
 
+					if len(d.checkroll) == 0 {
+						d.MakeRequest(d.bootStrapIp, "post", d.nodeID)
+					}
 				}
 			default:
 				fmt.Println(content)
@@ -276,7 +305,8 @@ func (d *peerNode) EventLoop() {
 func main() {
 	var ip string
 	var err error
-	var dhtSize int
+	var peerSize int
+	debug.FreeOSMemory()
 	//1)Load config
 	offChainConfig := configuration.OffChainConfig{}
 	offChainConfig.LoadConfig()
@@ -284,7 +314,7 @@ func main() {
 	//It also need to connect to bootstrape node to get crential
 	bootStrapIP := os.Getenv("BOOTSTRAPIP")
 	noderole := os.Getenv("NODEROLE")
-	dhtSize, err = strconv.Atoi(os.Getenv("DHTSIZE"))
+	peerSize, err = strconv.Atoi(os.Getenv("PEERSIZE"))
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -292,13 +322,13 @@ func main() {
 	//boot node
 	if noderole == "boot" {
 		b := new(bootNode)
-		b.Init(port, dhtSize)
+		b.Init(port, peerSize)
 		b.EventLoop()
 	} else {
 		s := strings.Split(bootStrapIP, ":")
 		ip, _ = s[0], s[1]
 		d := new(peerNode)
-		d.Init(ip, port, dhtSize)
+		d.Init(ip, port, peerSize)
 		d.EventLoop()
 	}
 }
