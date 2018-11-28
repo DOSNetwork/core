@@ -3,7 +3,6 @@ package dht
 import (
 	"bytes"
 	"encoding/hex"
-	"fmt"
 	"math/bits"
 
 	"golang.org/x/crypto/blake2b"
@@ -11,64 +10,56 @@ import (
 	"github.com/DOSNetwork/core/p2p/internal"
 )
 
-// ID is an identity of nodes, using its public key hash and network address.
-type ID internal.ID
+// internal.ID is an identity of nodes, using its public key hash and network address.
+//type internal.ID internal.internal.ID
 
-// CreateID is a factory function creating ID.
-func CreateID(address string, publicKey []byte) ID {
+// Createinternal.ID is a factory function creating internal.ID.
+func CreateID(address string, publicKey []byte) internal.ID {
 	id := blake2b.Sum256(publicKey)
-	return ID{Address: address, PublicKey: publicKey, Id: id[:]}
+	return internal.ID{Address: address, PublicKey: publicKey, Id: id[:]}
 }
 
-// String returns the identity address and public key.
-func (id ID) String() string {
-	return fmt.Sprintf("ID{Address: %v, Id: %v}", id.Address, id.Id)
+// Equals determines if two peer internal.IDs are equal to each other based on the contents of their public keys.
+func Equals(a, b internal.ID) bool {
+	return bytes.Equal(a.Id, b.Id)
 }
 
-// Equals determines if two peer IDs are equal to each other based on the contents of their public keys.
-func (id ID) Equals(other ID) bool {
-	return bytes.Equal(id.Id, other.Id)
+// Less determines if this peer internal.ID's public key is less than other internal.ID's public key.
+func Less(a, b internal.ID) bool {
+	return bytes.Compare(a.Id, b.Id) == -1
 }
 
-// Less determines if this peer ID's public key is less than other ID's public key.
-func (id ID) Less(other interface{}) bool {
-	if other, is := other.(ID); is {
-		return bytes.Compare(id.Id, other.Id) == -1
+// PublicKeyHex generates a hex-encoded string of public key hash of this given peer internal.ID.
+func PublicKeyHex(a internal.ID) string {
+	return hex.EncodeToString(a.PublicKey)
+}
+
+// Xor performs XOR (^) over another peer internal.ID's public key.
+func Xor(a, b internal.ID) internal.ID {
+	result := make([]byte, len(a.PublicKey))
+
+	for i := 0; i < len(a.PublicKey) && i < len(b.PublicKey); i++ {
+		result[i] = a.PublicKey[i] ^ b.PublicKey[i]
 	}
-	return false
+	return internal.ID{Address: a.Address, PublicKey: result}
 }
 
-// PublicKeyHex generates a hex-encoded string of public key hash of this given peer ID.
-func (id ID) PublicKeyHex() string {
-	return hex.EncodeToString(id.PublicKey)
-}
+// Xorinternal.ID performs XOR (^) over another peer internal.ID's public key hash.
+func XorID(a, b internal.ID) internal.ID {
+	result := make([]byte, len(a.Id))
 
-// Xor performs XOR (^) over another peer ID's public key.
-func (id ID) Xor(other ID) ID {
-	result := make([]byte, len(id.PublicKey))
-
-	for i := 0; i < len(id.PublicKey) && i < len(other.PublicKey); i++ {
-		result[i] = id.PublicKey[i] ^ other.PublicKey[i]
+	for i := 0; i < len(a.Id) && i < len(b.Id); i++ {
+		result[i] = a.Id[i] ^ b.Id[i]
 	}
-	return ID{Address: id.Address, PublicKey: result}
+	return internal.ID{Address: a.Address, Id: result}
 }
 
-// XorID performs XOR (^) over another peer ID's public key hash.
-func (id ID) XorID(other ID) ID {
-	result := make([]byte, len(id.Id))
-
-	for i := 0; i < len(id.Id) && i < len(other.Id); i++ {
-		result[i] = id.Id[i] ^ other.Id[i]
-	}
-	return ID{Address: id.Address, Id: result}
-}
-
-// PrefixLen returns the number of prefixed zeros in a peer ID.
-func (id ID) PrefixLen() int {
-	for i, b := range id.Id {
+// PrefixLen returns the number of prefixed zeros in a peer internal.ID.
+func PrefixLen(a internal.ID) int {
+	for i, b := range a.Id {
 		if b != 0 {
 			return i*8 + bits.LeadingZeros8(uint8(b))
 		}
 	}
-	return len(id.Id)*8 - 1
+	return len(a.Id)*8 - 1
 }
