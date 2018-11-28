@@ -6,12 +6,12 @@ import (
 	"os"
 	"sync"
 
-	"github.com/golang/protobuf/proto"
-	"github.com/golang/protobuf/ptypes"
-
 	"github.com/DOSNetwork/core/p2p/dht"
+	"github.com/DOSNetwork/core/p2p/internal"
 	"github.com/DOSNetwork/core/suites"
 	"github.com/dedis/kyber"
+	"github.com/golang/protobuf/proto"
+	"github.com/golang/protobuf/ptypes"
 )
 
 var suite = suites.MustFind("bn256")
@@ -71,13 +71,13 @@ type P2PMessage struct {
 }
 
 type P2PInterface interface {
-	GetId() dht.ID
+	GetId() internal.ID
 	Listen() error
 	Broadcast(proto.Message)
 	SendMessageById([]byte, proto.Message) error
 	NewPeer(string) ([]byte, error)
 	//DHT
-	FindNodeById(id []byte) []dht.ID
-	FindNode(targetID dht.ID, alpha int, disjointPaths int) (results []dht.ID)
+	FindNodeById(id []byte) []internal.ID
+	FindNode(targetID internal.ID, alpha int, disjointPaths int) (results []internal.ID)
 	GetRoutingTable() *dht.RoutingTable
 }
