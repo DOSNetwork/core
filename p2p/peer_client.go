@@ -34,7 +34,7 @@ type PeerClient struct {
 	waitForHi    chan bool
 	done         chan bool
 	status       int
-	identity     dht.ID
+	identity     internal.ID
 	pubKey       kyber.Point
 	RequestNonce uint64
 	Requests     sync.Map
@@ -159,7 +159,7 @@ L:
 				response := &internal.LookupNodeResponse{}
 
 				// Respond back with closest peers to a provided target.
-				for _, peerID := range p.p2pnet.routingTable.FindClosestPeers(dht.ID(*content.GetTarget()), dht.BucketSize) {
+				for _, peerID := range p.p2pnet.routingTable.FindClosestPeers(internal.ID(*content.GetTarget()), dht.BucketSize) {
 					id := internal.ID(peerID)
 					response.Peers = append(response.Peers, &id)
 				}
@@ -297,13 +297,17 @@ func (p *PeerClient) SendPackage(msg proto.Message) error {
 }
 
 func (p *PeerClient) prepareMessage(msg proto.Message) (*internal.Package, error) {
+	var err error
 	if msg == nil {
 		return nil, errors.New("network: message is null")
 	}
 
 	id := internal.ID(p.p2pnet.identity)
 	anything, _ := ptypes.MarshalAny(msg)
-	sig, _ := bls.Sign(p.p2pnet.suite, p.p2pnet.secKey, anything.Value)
+	sig, err := bls.Sign(p.p2pnet.suite, p.p2pnet.secKey, anything.Value)
+	if err != nil {
+		fmt.Println("prepareMessage ", err)
+	}
 	pub, _ := p.p2pnet.pubKey.MarshalBinary()
 
 	pa := &internal.Package{
@@ -369,12 +373,12 @@ func (p *PeerClient) Reply(nonce uint64, message proto.Message) error {
 	return nil
 }
 
-func (p *PeerClient) FindMe(alpha int) (results []dht.ID) {
+func (p *PeerClient) FindMe(alpha int) (results []internal.ID) {
 	lookup := lookupBucket{}
 	lookup.queue = append(lookup.queue, p.identity)
 
 	visited := new(sync.Map)
-	visited.Store(p.identity.PublicKeyHex(), struct{}{})
+	visited.Store(dht.PublicKeyHex(p.identity), struct{}{})
 
 	targetId := p.p2pnet.identity
 
@@ -383,9 +387,9 @@ func (p *PeerClient) FindMe(alpha int) (results []dht.ID) {
 
 	// Sort resulting peers by XOR distance.
 	sort.Slice(results, func(i, j int) bool {
-		left := results[i].Xor(targetId)
-		right := results[j].Xor(targetId)
-		return left.Less(right)
+		left := dht.Xor(results[i], targetId)
+		right := dht.Xor(results[j], targetId)
+		return dht.Less(left, right)
 	})
 
 	// Cut off list of results to only have the routing table focus on the
