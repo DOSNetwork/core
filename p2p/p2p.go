@@ -23,8 +23,8 @@ import (
 )
 
 type P2P struct {
-	identity dht.ID
-	//Map of connection addresses (string) <-> *p2p.PeerClient
+	identity internal.ID
+	//Map of ID (string) <-> *p2p.PeerClient
 	peers *sync.Map
 	// Todo:Add a subscrive fucntion to send message to application
 	messages     chan P2PMessage
@@ -40,7 +40,7 @@ func (n *P2P) SetId(id []byte) {
 	n.identity.Id = id
 }
 
-func (n *P2P) GetId() dht.ID {
+func (n *P2P) GetId() internal.ID {
 	return n.identity
 }
 
@@ -130,6 +130,7 @@ func (n *P2P) Listen() error {
 func (n *P2P) Broadcast(m proto.Message) {
 	n.peers.Range(func(key, value interface{}) bool {
 		client := value.(*PeerClient)
+		fmt.Println("send message ,", client.identity.Id)
 		err := client.SendMessage(m)
 		if err != nil {
 			fmt.Println("P2P Broadcast ", err)
@@ -223,20 +224,20 @@ func (n *P2P) NewPeer(addr string) (id []byte, err error) {
 	return
 }
 
-func (n *P2P) FindNodeById(id []byte) []dht.ID {
-	targetId := dht.ID{
+func (n *P2P) FindNodeById(id []byte) []internal.ID {
+	targetId := internal.ID{
 		Id: id,
 	}
 	return n.findNode(targetId, dht.BucketSize, 8)
 }
 
-func (n *P2P) FindNode(targetID dht.ID, alpha int, disjointPaths int) (results []dht.ID) {
+func (n *P2P) FindNode(targetID internal.ID, alpha int, disjointPaths int) (results []internal.ID) {
 	return n.findNode(targetID, alpha, disjointPaths)
 }
 
 type lookupBucket struct {
 	pending int
-	queue   []dht.ID
+	queue   []internal.ID
 }
 
 // FindNode queries all peers this current node acknowledges for the closest peers
@@ -245,7 +246,7 @@ type lookupBucket struct {
 // All lookups are done under a number of disjoint lookups in parallel.
 //
 // Queries at most #ALPHA nodes at a time per lookup, and returns all peer IDs closest to a target peer ID.
-func (n *P2P) findNode(targetID dht.ID, alpha int, disjointPaths int) (results []dht.ID) {
+func (n *P2P) findNode(targetID internal.ID, alpha int, disjointPaths int) (results []internal.ID) {
 	start := time.Now()
 	visited := new(sync.Map)
 
@@ -255,7 +256,7 @@ func (n *P2P) findNode(targetID dht.ID, alpha int, disjointPaths int) (results [
 	// them up and marking them as visited.
 	for i, peerID := range n.routingTable.FindClosestPeers(targetID, alpha) {
 
-		visited.Store(peerID.PublicKeyHex(), struct{}{})
+		visited.Store(dht.PublicKeyHex(peerID), struct{}{})
 
 		if len(lookups) < disjointPaths {
 			lookups = append(lookups, new(lookupBucket))
@@ -286,9 +287,9 @@ func (n *P2P) findNode(targetID dht.ID, alpha int, disjointPaths int) (results [
 
 	// Sort resulting peers by XOR distance.
 	sort.Slice(results, func(i, j int) bool {
-		left := results[i].Xor(targetID)
-		right := results[j].Xor(targetID)
-		return left.Less(right)
+		left := dht.Xor(results[i], targetID)
+		right := dht.Xor(results[j], targetID)
+		return dht.Less(left, right)
 	})
 
 	// Cut off list of results to only have the routing table focus on the
@@ -298,7 +299,7 @@ func (n *P2P) findNode(targetID dht.ID, alpha int, disjointPaths int) (results [
 	}
 	fmt.Println("===================================================")
 	tFindNode := time.Since(start).Seconds()
-	fmt.Println("FINDNODE ", targetID, tFindNode)
+	fmt.Println("FINDNODE n.GetId().Id", n.GetId().Id, "  targetID = ", targetID, " tFindNode = ", tFindNode, " Second")
 	fmt.Println("===================================================")
 
 	a := new(big.Int).SetBytes(n.GetId().Id).String()
@@ -312,7 +313,7 @@ func (n *P2P) findNode(targetID dht.ID, alpha int, disjointPaths int) (results [
 	return
 }
 
-func (lookup *lookupBucket) performLookup(n *P2P, targetID dht.ID, alpha int, visited *sync.Map) (results []dht.ID) {
+func (lookup *lookupBucket) performLookup(n *P2P, targetID internal.ID, alpha int, visited *sync.Map) (results []internal.ID) {
 	responses := make(chan []*internal.ID)
 
 	// Go through every peer in the entire queue and queue up what peers believe
@@ -335,9 +336,9 @@ func (lookup *lookupBucket) performLookup(n *P2P, targetID dht.ID, alpha int, vi
 
 		// Expand responses containing a peer's belief on the closest peers to target ID.
 		for _, id := range response {
-			peerID := dht.ID(*id)
+			peerID := internal.ID(*id)
 
-			if _, seen := visited.LoadOrStore(peerID.PublicKeyHex(), struct{}{}); !seen && targetID.PublicKeyHex() != peerID.PublicKeyHex() {
+			if _, seen := visited.LoadOrStore(dht.PublicKeyHex(peerID), struct{}{}); !seen && dht.PublicKeyHex(targetID) != dht.PublicKeyHex(peerID) {
 				// Append new peer to be queued by the routing table.
 				results = append(results, peerID)
 				lookup.queue = append(lookup.queue, peerID)
@@ -357,7 +358,7 @@ func (lookup *lookupBucket) performLookup(n *P2P, targetID dht.ID, alpha int, vi
 	return
 }
 
-func (n *P2P) queryPeerByID(peerID dht.ID, targetID dht.ID, responses chan []*internal.ID) {
+func (n *P2P) queryPeerByID(peerID internal.ID, targetID internal.ID, responses chan []*internal.ID) {
 	var client *PeerClient
 	_, loaded := n.peers.Load(string(peerID.Id))
 	if !loaded {
