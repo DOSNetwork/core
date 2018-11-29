@@ -23,11 +23,16 @@ const (
 	ENVQUERYTYPE  = "QUERYTYPE"
 )
 
-const INVALIDQUERYINDEX = 17
+const (
+	INVALIDQUERYINDEX = 17
+	CHECKINTERVAL     = 3
+	FINALREPORTDUE    = 10
+)
 
 type record struct {
 	start     time.Time
 	end       time.Time
+	version   uint8
 	logToEmit *logrus.Entry
 }
 
@@ -160,7 +165,7 @@ func main() {
 	timeCost := float64(0)
 	RspsEvtCnt := 0
 	RqSent := 0
-	responseTimeMap := make(map[string]*record)
+	responseTimeMap := make(map[string][]*record)
 	ticker := time.NewTicker(3 * time.Minute)
 	for {
 		select {
@@ -178,21 +183,24 @@ func main() {
 						"logEvent":    "AskMeAnythingQueryResponseReady",
 						"requestId":   i.QueryId.String(),
 						"QueryResult": i.Result,
+						"tx":          i.Tx,
+						"blockN":      i.BlockN,
 					})
 					logRecord, found := responseTimeMap[i.QueryId.String()]
 					if found {
 						RspsEvtCnt++
-						timeCost = time.Since(logRecord.start).Seconds()
+						timeCost = time.Since(logRecord[0].start).Seconds()
 						responseTime += timeCost
 						succRequest++
 						logToEmit.Data["timeCost"] = timeCost
+						logToEmit.Data["version"] = logRecord[0].version
 						logToEmit.Info()
-						delete(responseTimeMap, i.QueryId.String())
-					} else {
-						responseTimeMap[i.QueryId.String()] = &record{
-							end:       time.Now(),
-							logToEmit: logToEmit,
+						logRecord = logRecord[1:]
+						if len(logRecord) < 1 {
+							delete(responseTimeMap, i.QueryId.String())
 						}
+					} else {
+						logToEmit.Warn("Response before sent")
 					}
 					query()
 				}
@@ -209,18 +217,11 @@ func main() {
 				if found {
 					logRecord, found := responseTimeMap[i.RequestId.String()]
 					if found {
-						RspsEvtCnt++
-						timeCost = logRecord.end.Sub(startingTime).Seconds()
-						responseTime += timeCost
-						succRequest++
-						logRecord.logToEmit.Data["timeCost"] = timeCost
-						logRecord.logToEmit.Info()
-						delete(responseTimeMap, i.RequestId.String())
+						logRecord = append(logRecord, &record{start: startingTime, version: uint8(len(logRecord))})
 					} else {
-						responseTimeMap[i.RequestId.String()] = &record{start: startingTime}
+						responseTimeMap[i.RequestId.String()] = []*record{{start: startingTime, version: 0}}
 					}
 					logToEmit.Data["startingTime"] = startingTime
-					delete(startingTimeMap, i.InternalSerial)
 				} else {
 					logToEmit.Data["startingTime"] = nil
 				}
@@ -231,21 +232,24 @@ func main() {
 						"logEvent":        "AskMeAnythingRandomReady",
 						"requestId":       i.RequestId.String(),
 						"GeneratedRandom": i.GeneratedRandom.String(),
+						"tx":              i.Tx,
+						"blockN":          i.BlockN,
 					})
 					logRecord, found := responseTimeMap[i.RequestId.String()]
 					if found {
 						RspsEvtCnt++
-						timeCost = time.Since(logRecord.start).Seconds()
+						timeCost = time.Since(logRecord[0].start).Seconds()
 						responseTime += timeCost
 						succRequest++
 						logToEmit.Data["timeCost"] = timeCost
+						logToEmit.Data["version"] = logRecord[0].version
 						logToEmit.Info()
-						delete(responseTimeMap, i.RequestId.String())
-					} else {
-						responseTimeMap[i.RequestId.String()] = &record{
-							end:       time.Now(),
-							logToEmit: logToEmit,
+						logRecord = logRecord[1:]
+						if len(logRecord) < 1 {
+							delete(responseTimeMap, i.RequestId.String())
 						}
+					} else {
+						logToEmit.Warn("Response before sent")
 					}
 					query()
 				}
@@ -255,10 +259,10 @@ func main() {
 				}).Info()
 			}
 		case <-ticker.C:
-			if time.Since(lastQuery).Minutes() > 3 {
+			if time.Since(lastQuery).Minutes() > CHECKINTERVAL {
 				if counter > 0 {
 					query()
-				} else if time.Since(lastQuery).Minutes() > 10 {
+				} else if time.Since(lastQuery).Minutes() > FINALREPORTDUE {
 					logWithId.WithFields(logrus.Fields{
 						"logEvent":           "FinalReport",
 						"averageQueryTime":   responseTime / succRequest,

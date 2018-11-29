@@ -14,6 +14,8 @@ type AskMeAnythingSetTimeout struct {
 type AskMeAnythingQueryResponseReady struct {
 	QueryId *big.Int
 	Result  string
+	Tx      string
+	BlockN  uint64
 }
 
 type AskMeAnythingRequestSent struct {
@@ -27,4 +29,6 @@ type AskMeAnythingRequestSent struct {
 type AskMeAnythingRandomReady struct {
 	RequestId       *big.Int
 	GeneratedRandom *big.Int
+	Tx              string
+	BlockN          uint64
 }
