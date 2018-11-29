@@ -113,10 +113,14 @@ func (n *P2P) Listen() error {
 		for {
 			if conn, err := listener.Accept(); err == nil {
 				//Create a peer client
-				NewPeerClient(n, &conn, n.messages)
+				var peer *PeerClient
+				peer, err = NewPeerClient(n, &conn, n.messages)
 				if err != nil {
 					log.Fatal(err)
 				}
+				n.peers.LoadOrStore(string(peer.identity.Id), peer)
+				n.routingTable.Update(peer.identity)
+
 			} else {
 				fmt.Println("Failed accepting a connection request:", err)
 				log.Fatal(err)

@@ -1,6 +1,7 @@
 package node
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/DOSNetwork/core/testing/peerNode/internalMsg"
@@ -13,7 +14,7 @@ type test1 struct{}
 func (r test1) StartTest(content *internalMsg.Cmd, d *PeerNode) {
 	cmd := &internalMsg.Cmd{
 		Ctype: internalMsg.Cmd_SIGNIN,
-		Args:  "check",
+		Args:  []byte{},
 	}
 	pb := proto.Message(cmd)
 	for i := 0; i < len(d.nodeIPs); i++ {
@@ -46,24 +47,21 @@ func (r test1) CheckResult(sender string, content *internalMsg.Cmd, d *PeerNode)
 type test2 struct{}
 
 func (r test2) StartTest(content *internalMsg.Cmd, d *PeerNode) {
-	id := d.p.GetId()
-	results := d.p.FindNodeById(id.GetId())
-	for _, result := range results {
-		d.p.GetRoutingTable().Update(result)
-		fmt.Println(d.p.GetId().Address, "Update peer: ", result.Address)
-	}
-	fmt.Println("len(d.nodeIDs) ", len(d.nodeIDs))
+	hostid := d.p.GetId()
+	fmt.Println("!!!!StartTest ", hostid.GetId())
+
 	for i := 0; i < len(d.nodeIDs); i++ {
-		id := d.nodeIDs[i]
-		fmt.Println("id", id)
-		d.checkroll[string(id)] = 0
+		if !bytes.Equal(hostid.GetId(), d.nodeIDs[i]) {
+			d.checkroll[string(d.nodeIDs[i])] = 0
+		}
 	}
 
 	cmd := &internalMsg.Cmd{
 		Ctype: internalMsg.Cmd_SIGNIN,
-		Args:  "check",
+		Args:  []byte{},
 	}
 	pb := proto.Message(cmd)
+
 	for i := 0; i < d.numMessages; i++ {
 		for id, _ := range d.checkroll {
 			go d.p.SendMessageById([]byte(id), pb)

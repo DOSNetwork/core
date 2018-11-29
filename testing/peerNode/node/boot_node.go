@@ -11,6 +11,7 @@ import (
 	"github.com/DOSNetwork/core/testing/peerNode/internalMsg"
 
 	"github.com/DOSNetwork/core/p2p"
+	//	"github.com/DOSNetwork/core/p2p/dht"
 	"github.com/golang/protobuf/proto"
 
 	"github.com/gorilla/mux"
@@ -41,6 +42,7 @@ func (b *BootNode) Init(port, peerSize int) {
 	b.members = [][]byte{}
 	b.allIP = []string{}
 	bootID := []byte{1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1}
+	//bootID := []byte{152, 37, 111, 123, 113, 163, 23, 27, 114, 171, 254, 13, 147, 217, 232, 54, 148, 166, 46, 131}
 	b.members = append(b.members, bootID)
 	b.checkroll = make(map[string]bool)
 	b.ipIdMap = make(map[string][]byte)
@@ -94,6 +96,7 @@ func (b *BootNode) getID(w http.ResponseWriter, r *http.Request) {
 	//TODO:Send addresses and IDs after all peer node already build p2p connection to boot node
 	if b.count == b.peerSize {
 		go b.sendPeerAddresses()
+		go b.sendPeerIDs()
 	}
 }
 
@@ -115,7 +118,17 @@ func (b *BootNode) postHandler(w http.ResponseWriter, r *http.Request) {
 func (b *BootNode) sendPeerAddresses() {
 	s := []string{}
 	for i := 0; i < len(b.allIP); i++ {
+
 		id, err := b.p.NewPeer(b.allIP[i])
+		/*
+			results := b.p.FindNode(b.p.GetId(), dht.BucketSize, 20)
+			for _, result := range results {
+				b.p.GetRoutingTable().Update(result)
+				fmt.Println(b.p.GetId().Address, "Update peer: ", result.Address)
+			}
+			peers := b.p.GetRoutingTable().GetPeerAddresses()
+			fmt.Println("!!!!GetPeerAddresses  ", peers)
+		*/
 		if err != nil {
 			fmt.Println("BootNode err ", err)
 		} else {
@@ -123,12 +136,36 @@ func (b *BootNode) sendPeerAddresses() {
 			s = append(s, b.allIP[i])
 		}
 	}
-	fmt.Println("sendPeerAddresses ", s)
 
 	allIP := strings.Join(s, ",")
 	cmd := &internalMsg.Cmd{
 		Ctype: internalMsg.Cmd_ALLIP,
-		Args:  allIP,
+		Args:  []byte(allIP),
+	}
+	pb := proto.Message(cmd)
+	b.p.Broadcast(pb)
+
+	b.sendPeerIDs()
+}
+func (b *BootNode) sendPeerIDs() {
+
+	s := []byte{}
+	for i := 1; i < len(b.members); i++ {
+		s = append(s, b.members[i]...)
+	}
+	cmd := &internalMsg.Cmd{
+		Ctype: internalMsg.Cmd_ALLID,
+		Args:  s,
+	}
+	pb := proto.Message(cmd)
+	b.p.Broadcast(pb)
+	b.startTest()
+}
+
+func (b *BootNode) startTest() {
+	cmd := &internalMsg.Cmd{
+		Ctype: internalMsg.Cmd_STARTTEST,
+		Args:  []byte{},
 	}
 	pb := proto.Message(cmd)
 	b.p.Broadcast(pb)
