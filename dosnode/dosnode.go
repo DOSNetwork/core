@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"math/big"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -60,6 +61,7 @@ type DosNode struct {
 	network        *p2p.P2PInterface
 	groupIds       [][]byte
 	timeCostMap    *sync.Map
+	requestTracker *sync.Map
 }
 
 type Report struct {
@@ -82,6 +84,15 @@ type timeRecord struct {
 	dataConfirmCost   float64
 	trafficType       uint8
 	pass              bool
+	requestTx         string
+	requestBlkNb      uint64
+	replyTx           string
+	replyBlkNb        uint64
+}
+
+type request struct {
+	lastUpdateTime time.Time
+	version        uint8
 }
 
 func CreateDosNode(suite suites.Suite, nbParticipants int, p p2p.P2PInterface, chainConn onchain.ChainInterface, p2pDkg dkg.P2PDkgInterface, logger *logrus.Logger) (dosNode DosNodeInterface) {
@@ -95,6 +106,7 @@ func CreateDosNode(suite suites.Suite, nbParticipants int, p p2p.P2PInterface, c
 		chainConn:      chainConn,
 		p2pDkg:         p2pDkg,
 		timeCostMap:    new(sync.Map),
+		requestTracker: new(sync.Map),
 	}
 }
 
@@ -253,10 +265,19 @@ func (d *DosNode) PipeQueries(queries ...<-chan interface{}) <-chan Report {
 				case *onchain.DOSProxyLogUrl:
 					//Check to see if this request is for node's group
 					if d.isMember(content.DispatchedGroup) {
-						queryId := content.QueryId
+						preVersion, loaded := d.requestTracker.LoadOrStore(content.QueryId.String(), &request{lastUpdateTime: time.Now(), version: 0})
+						if loaded {
+							preVersion.(*request).version++
+							preVersion.(*request).lastUpdateTime = time.Now()
+						}
+						queryId := content.QueryId.String() + ":" + strconv.Itoa(int(preVersion.(*request).version))
 						fmt.Println("PipeCheckURL!!", queryId)
 						submitter := d.choseSubmitter(content.Randomness)
-						newTimeRecord := &timeRecord{lastUpdateTime: time.Now()}
+						newTimeRecord := &timeRecord{
+							lastUpdateTime: time.Now(),
+							requestTx:      content.Tx,
+							requestBlkNb:   content.BlockN,
+						}
 
 						url := content.DataSource
 						rawMsg, err := dataFetch(url)
@@ -272,14 +293,14 @@ func (d *DosNode) PipeQueries(queries ...<-chan interface{}) <-chan Report {
 						fmt.Println("Data to return:", string(msgReturn))
 						newTimeRecord.dataProcessCost = time.Since(newTimeRecord.lastUpdateTime).Seconds()
 						newTimeRecord.lastUpdateTime = time.Now()
-						d.timeCostMap.Store(queryId.String(), newTimeRecord)
+						d.timeCostMap.Store(queryId, newTimeRecord)
 
 						// signed message = concat(msgReturn, submitter address)
 						msgReturn = append(msgReturn, submitter...)
 						//combine result with submitter
 						sign := &vss.Signature{
 							Index:   uint32(onchain.TrafficUserQuery),
-							QueryId: queryId.String(),
+							QueryId: queryId,
 							Content: msgReturn,
 						}
 						report := &Report{}
@@ -291,10 +312,19 @@ func (d *DosNode) PipeQueries(queries ...<-chan interface{}) <-chan Report {
 				case *onchain.DOSProxyLogRequestUserRandom:
 					//Check to see if this request is for node's group
 					if d.isMember(content.DispatchedGroup) {
-						requestId := content.RequestId
+						preVersion, loaded := d.requestTracker.LoadOrStore(content.RequestId.String(), &request{lastUpdateTime: time.Now(), version: 0})
+						if loaded {
+							preVersion.(*request).version++
+							preVersion.(*request).lastUpdateTime = time.Now()
+						}
+						requestId := content.RequestId.String() + ":" + strconv.Itoa(int(preVersion.(*request).version))
 						fmt.Println("PipeUserRandom!!", requestId)
 						submitter := d.choseSubmitter(content.LastSystemRandomness)
-						d.timeCostMap.Store(requestId.String(), &timeRecord{lastUpdateTime: time.Now()})
+						d.timeCostMap.Store(requestId, &timeRecord{
+							lastUpdateTime: time.Now(),
+							requestTx:      content.Tx,
+							requestBlkNb:   content.BlockN,
+						})
 
 						// signed message: concat(requestId, lastSystemRandom, userSeed, submitter address)
 						msgReturn := append(content.RequestId.Bytes(), content.LastSystemRandomness.Bytes()...)
@@ -303,7 +333,7 @@ func (d *DosNode) PipeQueries(queries ...<-chan interface{}) <-chan Report {
 						//combine result with submitter
 						sign := &vss.Signature{
 							Index:   uint32(onchain.TrafficUserRandom),
-							QueryId: requestId.String(),
+							QueryId: requestId,
 							Content: msgReturn,
 						}
 						report := &Report{}
@@ -317,7 +347,11 @@ func (d *DosNode) PipeQueries(queries ...<-chan interface{}) <-chan Report {
 						preRandom := content.LastRandomness
 						fmt.Printf("1 ) GenerateRandomNumber preRandom #%v \n", preRandom)
 						submitter := d.choseSubmitter(preRandom)
-						d.timeCostMap.Store(preRandom.String(), &timeRecord{lastUpdateTime: time.Now()})
+						d.timeCostMap.Store(preRandom.String(), &timeRecord{
+							lastUpdateTime: time.Now(),
+							requestTx:      content.Tx,
+							requestBlkNb:   content.BlockN,
+						})
 
 						paddedRandomBytes := padOrTrim(preRandom.Bytes(), RANDOMNUMBERSIZE)
 						randomNum := append(paddedRandomBytes, submitter...)
@@ -517,9 +551,15 @@ func (d *DosNode) PipeSendToOnchain(chReport <-chan Report, outForValidate chan<
 					}
 				default:
 					fmt.Println("PipeSendToOnchain URL/usrRandom QueryId = ", report.selfSign.QueryId)
-					qID, succ := new(big.Int).SetString(report.selfSign.QueryId, 10)
+					qIDArray := strings.Split(report.selfSign.QueryId, ":")
+					qID, succ := new(big.Int).SetString(qIDArray[0], 10)
 					if !succ {
 						fmt.Println("Fail to convert requestId from string to bigInt")
+					}
+
+					qVersion, err := strconv.Atoi(qIDArray[1])
+					if err != nil {
+						fmt.Println(err)
 					}
 
 					t := len(report.selfSign.Content) - 20
@@ -540,7 +580,7 @@ func (d *DosNode) PipeSendToOnchain(chReport <-chan Report, outForValidate chan<
 
 					//TODO:chainCoo should use a sendToOnChain(protobuf message) instead of DataReturn with mutex
 					//sendToOnChain receive a message from channel then call the corresponding function
-					err := d.chainConn.DataReturn(qID, uint8(report.selfSign.Index), queryResult, report.signGroup)
+					err = d.chainConn.DataReturn(qID, uint8(report.selfSign.Index), queryResult, report.signGroup, uint8(qVersion))
 					if err != nil {
 						fmt.Println("DataReturn err ", err)
 					} else {
@@ -572,7 +612,7 @@ func (d *DosNode) PipeCleanFinishMap(chValidation chan interface{}, forValidate 
 			case msg := <-chValidation:
 				switch content := msg.(type) {
 				case *onchain.DOSProxyLogValidationResult:
-					trafficId := content.TrafficId.String()
+					trafficId := content.TrafficId.String() + ":" + strconv.Itoa(int(content.Version))
 					if report, match := validateMap[trafficId]; match {
 						record, _ := d.timeCostMap.Load(trafficId)
 						record.(*timeRecord).dataConfirmCost = time.Since(record.(*timeRecord).lastUpdateTime).Seconds()
@@ -588,6 +628,10 @@ func (d *DosNode) PipeCleanFinishMap(chValidation chan interface{}, forValidate 
 							"dataUploadCost":  record.(*timeRecord).dataUploadCost,
 							"dataConfirmCost": record.(*timeRecord).dataConfirmCost,
 							"totalCost":       record.(*timeRecord).dataProcessCost + record.(*timeRecord).dataSignCost + record.(*timeRecord).dataConfirmCost,
+							"requestTx":       record.(*timeRecord).requestTx,
+							"requestBlkNb":    record.(*timeRecord).requestBlkNb,
+							"replyTx":         content.Tx,
+							"replyBlkNb":      content.BlockN,
 						}).Info("request fulfilled")
 						d.timeCostMap.Delete(trafficId)
 						delete(chValidationAwait, msg)
@@ -600,6 +644,7 @@ func (d *DosNode) PipeCleanFinishMap(chValidation chan interface{}, forValidate 
 							fmt.Println("DOSProxyLogValidationResult Signature ", content.Signature)
 							fmt.Println("DOSProxyLogValidationResult GroupKey ", content.PubKey)
 							fmt.Println("DOSProxyLogValidationResult Message ", content.Message)
+							fmt.Println("DOSProxyLogValidationResult Version ", content.Version)
 							x, y, z, t, _ := onchain.DecodePubKey(d.p2pDkg.GetGroupPublicPoly().Commit())
 							fmt.Println("GroupKey ", x.String(), y.String(), z.String(), t.String())
 							fmt.Println("Signature", report.selfSign.Signature)
@@ -688,6 +733,7 @@ func (d *DosNode) PipeCleanFinishMap(chValidation chan interface{}, forValidate 
 					}
 				}
 				d.timeCostMap.Range(d.checkLog)
+				d.requestTracker.Range(d.checkLog)
 			case <-d.quit:
 				close(queries)
 				ticker.Stop()
@@ -698,14 +744,27 @@ func (d *DosNode) PipeCleanFinishMap(chValidation chan interface{}, forValidate 
 	return queries
 }
 
-func (d *DosNode) checkLog(queryId interface{}, record interface{}) (deleted bool) {
-	if time.Since(record.(*timeRecord).lastUpdateTime).Minutes() > VALIDATIONTIMEOUT {
-		log.WithFields(logrus.Fields{
-			"requestId":       queryId.(string),
-			"dataProcessCost": record.(*timeRecord).dataProcessCost,
-			"dataSignCost":    record.(*timeRecord).dataSignCost,
-		}).Warn("query not fulfilled")
-		d.timeCostMap.Delete(queryId)
+func (d *DosNode) checkLog(key interface{}, record interface{}) (deleted bool) {
+	switch record.(type) {
+	case *timeRecord:
+		if time.Since(record.(*timeRecord).lastUpdateTime).Minutes() > VALIDATIONTIMEOUT {
+			log.WithFields(logrus.Fields{
+				"requestId":       key.(string),
+				"dataProcessCost": record.(*timeRecord).dataProcessCost,
+				"dataSignCost":    record.(*timeRecord).dataSignCost,
+				"requestTx":       record.(*timeRecord).requestTx,
+				"requestBlkNb":    record.(*timeRecord).requestBlkNb,
+			}).Warn("query not fulfilled")
+			d.timeCostMap.Delete(key)
+		}
+	case *request:
+		if time.Since(record.(*request).lastUpdateTime).Minutes() > VALIDATIONTIMEOUT {
+			log.WithFields(logrus.Fields{
+				"requestId": key.(string),
+				"version":   record.(*request).version,
+			}).Info("version timeout")
+			d.requestTracker.Delete(key)
+		}
 	}
 	return true
 }

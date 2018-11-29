@@ -142,14 +142,7 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 			case err := <-sub.Err():
 				log.Fatal(err)
 			case i := <-transitChan:
-				if !e.filterLog(i.Raw) {
-					log.WithFields(logrus.Fields{
-						"logEvent":   "LogUrl",
-						"requestId":  i.QueryId.String(),
-						"DataSource": i.DataSource,
-						"Selector":   i.Selector,
-						"Randomness": i.Randomness.String(),
-					}).Info()
+				if i.Raw.Removed == false {
 					ch <- &DOSProxyLogUrl{
 						QueryId:         i.QueryId,
 						Timeout:         i.Timeout,
@@ -157,6 +150,8 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 						Selector:        i.Selector,
 						Randomness:      i.Randomness,
 						DispatchedGroup: i.DispatchedGroup,
+						Tx:              i.Raw.TxHash.Hex(),
+						BlockN:          i.Raw.BlockNumber,
 					}
 				}
 			}
@@ -179,18 +174,14 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 			case err := <-sub.Err():
 				log.Fatal(err)
 			case i := <-transitChan:
-				if !e.filterLog(i.Raw) {
-					log.WithFields(logrus.Fields{
-						"logEvent":             "RequestUserRandom",
-						"requestId":            i.RequestId.String(),
-						"LastSystemRandomness": i.LastSystemRandomness.String(),
-						"UserSeed":             i.UserSeed.String(),
-					}).Info()
+				if i.Raw.Removed == false {
 					ch <- &DOSProxyLogRequestUserRandom{
 						RequestId:            i.RequestId,
 						LastSystemRandomness: i.LastSystemRandomness,
 						UserSeed:             i.UserSeed,
 						DispatchedGroup:      i.DispatchedGroup,
+						Tx:                   i.Raw.TxHash.Hex(),
+						BlockN:               i.Raw.BlockNumber,
 					}
 				}
 			}
@@ -213,13 +204,11 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 				log.Fatal(err)
 			case i := <-transitChan:
 				if !e.filterLog(i.Raw) {
-					log.WithFields(logrus.Fields{
-						"logEvent":       "UpdateRandom",
-						"LastRandomness": i.LastRandomness.String(),
-					}).Info()
 					ch <- &DOSProxyLogUpdateRandom{
 						LastRandomness:  i.LastRandomness,
 						DispatchedGroup: i.DispatchedGroup,
+						Tx:              i.Raw.TxHash.Hex(),
+						BlockN:          i.Raw.BlockNumber,
 					}
 				}
 			}
@@ -242,12 +231,6 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 				log.Fatal(err)
 			case i := <-transitChan:
 				if !e.filterLog(i.Raw) {
-					log.WithFields(logrus.Fields{
-						"logEvent":    "ValidationResultEvent",
-						"TrafficType": i.TrafficType,
-						"requestId":   i.TrafficId.String(),
-						"pass":        i.Pass,
-					}).Info()
 					ch <- &DOSProxyLogValidationResult{
 						TrafficType: i.TrafficType,
 						TrafficId:   i.TrafficId,
@@ -255,6 +238,9 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 						Signature:   i.Signature,
 						PubKey:      i.PubKey,
 						Pass:        i.Pass,
+						Version:     i.Version,
+						Tx:          i.Raw.TxHash.Hex(),
+						BlockN:      i.Raw.BlockNumber,
 					}
 				}
 			}
@@ -633,7 +619,7 @@ func DecodePubKey(pubKey kyber.Point) (*big.Int, *big.Int, *big.Int, *big.Int, e
 	return x0, x1, y0, y1, nil
 }
 
-func (e *EthAdaptor) DataReturn(requestId *big.Int, trafficType uint8, data, sig []byte) (err error) {
+func (e *EthAdaptor) DataReturn(requestId *big.Int, trafficType uint8, data, sig []byte, version uint8) (err error) {
 	startingTime := time.Now()
 
 	auth, err := e.GetAuth()
@@ -643,7 +629,7 @@ func (e *EthAdaptor) DataReturn(requestId *big.Int, trafficType uint8, data, sig
 
 	x, y := DecodeSig(sig)
 
-	tx, err := e.proxy.TriggerCallback(auth, requestId, trafficType, data, [2]*big.Int{x, y})
+	tx, err := e.proxy.TriggerCallback(auth, requestId, trafficType, data, [2]*big.Int{x, y}, version)
 	if err != nil {
 		return
 	}
