@@ -25,16 +25,20 @@ import (
 const TIMEOUTFORHI = 60
 
 type PeerClient struct {
-	p2pnet       *P2P
-	conn         *net.Conn
-	rw           *bufio.ReadWriter
-	rxMessage    chan P2PMessage
-	txMessage    chan proto.Message
+	//TODO:remove *P2P and use sync map to manage the lifecycle of PeerClient
+	p2pnet *P2P
+	//TODO:
+	rxMessage chan P2PMessage
+	//TODO:
+	pubKey    kyber.Point
+	conn      *net.Conn
+	rw        *bufio.ReadWriter
+	txMessage chan proto.Message
+	//TODO:Need to be refactored
 	waitForHi    chan bool
 	done         chan bool
 	status       int
 	identity     internal.ID
-	pubKey       kyber.Point
 	RequestNonce uint64
 	Requests     sync.Map
 	mux          sync.Mutex
@@ -123,6 +127,7 @@ L:
 			}
 
 			switch content := ptr.Message.(type) {
+			//TODO:Refactor this to use request/reply and move out of this loop
 			case *internal.Hi:
 				if len(p.identity.Id) == 0 {
 					p.identity.Id = content.GetId()
@@ -137,7 +142,7 @@ L:
 				} else {
 					fmt.Println("Ignore Hi")
 				}
-
+				//TODO:move this to routing
 			case *internal.LookupNodeRequest:
 				// Prepare response.
 				response := &internal.LookupNodeResponse{}
@@ -154,6 +159,7 @@ L:
 				}
 
 			default:
+				//TODO
 				msg := P2PMessage{Msg: *ptr, Sender: p.identity.Id}
 				p.rxMessage <- msg
 			}
@@ -292,6 +298,7 @@ func (p *PeerClient) prepareMessage(msg proto.Message) (*internal.Package, error
 		fmt.Println("ptypes.MarshalAny ", err)
 		return nil, err
 	}
+	//TODO:change to AES256-GCM
 	sig, err := bls.Sign(p.p2pnet.suite, p.p2pnet.secKey, anything.Value)
 	if err != nil {
 		fmt.Println("prepareMessage ", err)
