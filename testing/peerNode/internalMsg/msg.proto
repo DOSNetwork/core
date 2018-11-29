@@ -5,8 +5,9 @@ message Cmd{
     enum Type {
         ALLIP = 0;
 		ALLID = 1;
-        SIGNIN = 2;
+		STARTTEST = 2;
+        SIGNIN = 3;
     }
     Type Ctype = 1;
-    string Args = 2;
+    bytes Args = 2;
 }

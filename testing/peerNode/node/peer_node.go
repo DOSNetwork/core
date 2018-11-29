@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	//"github.com/DOSNetwork/core/p2p/dht"
 	"github.com/DOSNetwork/core/testing/peerNode/internalMsg"
 
 	"github.com/DOSNetwork/core/p2p"
@@ -82,6 +83,18 @@ func (d *PeerNode) Init(bootStrapIp string, port, peerSize int, numMessages int,
 	//2)Build a p2p network
 	d.p, d.peerEvent, _ = p2p.CreateP2PNetwork(d.nodeID[:], port)
 	go d.p.Listen()
+	//3)
+	/*
+		_, _ = d.p.NewPeer(bootStrapIp + ":44460")
+		results := d.p.FindNode(d.p.GetId(), dht.BucketSize, 20)
+		for _, result := range results {
+			d.p.GetRoutingTable().Update(result)
+			fmt.Println(d.p.GetId().Address, "Update peer: ", result.Address)
+		}
+	*/
+	//peers := d.p.GetRoutingTable().GetPeerAddresses()
+	//fmt.Println("!!!!GetPeerAddresses  ", peers)
+
 }
 
 func (d *PeerNode) EventLoop() {
@@ -96,7 +109,7 @@ func (d *PeerNode) EventLoop() {
 			case *internalMsg.Cmd:
 				fmt.Println("!! content.Ctype ", content.Ctype)
 				if content.Ctype == internalMsg.Cmd_ALLIP {
-					nodes := strings.Split(content.Args, ",")
+					nodes := strings.Split(string(content.Args), ",")
 					allIP := []string{}
 					ip, _ := p2p.GetLocalIp()
 					ip = ip + ":44460"
@@ -106,18 +119,19 @@ func (d *PeerNode) EventLoop() {
 						}
 					}
 					d.nodeIPs = allIP
-					d.tStrategy.StartTest(content, d)
 				} else if content.Ctype == internalMsg.Cmd_ALLID {
-					nodes := strings.Split(content.Args, ",")
-					fmt.Println("!! Cmd_ALLID ", nodes)
+					buf := []byte(content.Args)
+					//fmt.Println("!! Cmd_ALLID ", nodes)
 					allID := [][]byte{}
-					for _, node := range nodes {
-						id := []byte(node)
-						if !bytes.Equal(d.nodeID, id) {
-							allID = append(allID, id)
-						}
+					var chunk []byte
+					lim := 20
+					for len(buf) >= lim {
+						chunk, buf = buf[:lim], buf[lim:]
+						allID = append(allID, chunk)
+						fmt.Println(chunk)
 					}
 					d.nodeIDs = allID
+				} else if content.Ctype == internalMsg.Cmd_STARTTEST {
 					d.tStrategy.StartTest(content, d)
 				} else {
 					sender := string(msg.Sender)
