@@ -1,7 +1,7 @@
 version: '3'
 services:
  bootstrap:
-   image: peernode
+   image: nien0223/dhttest:peernodev1
    deploy:
      replicas: 1
    environment:
@@ -9,7 +9,7 @@ services:
      - PEERSIZE=5
      - NUMOFMESSAGS=10
  peernode:
-   image: peernode
+   image: nien0223/dhttest:peernodev1
    depends_on:
      - bootstrap
    deploy:
