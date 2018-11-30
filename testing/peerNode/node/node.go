@@ -6,6 +6,7 @@ import (
 	"github.com/DOSNetwork/core/testing/peerNode/internalMsg"
 
 	"github.com/DOSNetwork/core/p2p"
+	"github.com/sirupsen/logrus"
 )
 
 type TestStrategy interface {
@@ -20,6 +21,7 @@ type node struct {
 	allIP     []string
 	peerSize  int
 	done      chan bool
+	log       *logrus.Logger
 }
 
 func (n *node) EventLoop() {
