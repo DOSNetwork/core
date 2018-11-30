@@ -77,8 +77,11 @@ func (e *EthAdaptor) SubscribeEvent(ch chan interface{}, subscribeType int) (err
 			//Todo:This will cause multiple event from eth
 		case <-time.After(60 * time.Second):
 			fmt.Println("retry...")
-			e.dialToEth()
-			go e.subscribeEventAttempt(ch, opt, subscribeType, done)
+			if err = e.dialToEth(); err != nil {
+				fmt.Println(err)
+			} else {
+				go e.subscribeEventAttempt(ch, opt, subscribeType, done)
+			}
 
 		}
 	}
@@ -86,7 +89,9 @@ func (e *EthAdaptor) SubscribeEvent(ch chan interface{}, subscribeType int) (err
 
 func (e *EthAdaptor) dialToEth() (err error) {
 	e.lock.Lock()
-	e.EthCommon.DialToEth()
+	if err = e.EthCommon.DialToEth(); err != nil {
+		return
+	}
 	addr := common.HexToAddress(e.config.DOSProxyAddress)
 	e.proxy, err = dosproxy.NewDOSProxy(addr, e.Client)
 	for err != nil {
