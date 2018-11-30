@@ -8,7 +8,6 @@ import (
 	"io"
 	"log"
 	"net"
-	"sort"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -26,16 +25,20 @@ import (
 const TIMEOUTFORHI = 60
 
 type PeerClient struct {
-	p2pnet       *P2P
-	conn         *net.Conn
-	rw           *bufio.ReadWriter
-	rxMessage    chan P2PMessage
-	txMessage    chan proto.Message
+	//TODO:remove *P2P and use sync map to manage the lifecycle of PeerClient
+	p2pnet *P2P
+	//TODO:
+	rxMessage chan P2PMessage
+	//TODO:
+	pubKey    kyber.Point
+	conn      *net.Conn
+	rw        *bufio.ReadWriter
+	txMessage chan proto.Message
+	//TODO:Need to be refactored
 	waitForHi    chan bool
 	done         chan bool
 	status       int
 	identity     internal.ID
-	pubKey       kyber.Point
 	RequestNonce uint64
 	Requests     sync.Map
 	mux          sync.Mutex
@@ -124,6 +127,7 @@ L:
 			}
 
 			switch content := ptr.Message.(type) {
+			//TODO:Refactor this to use request/reply and move out of this loop
 			case *internal.Hi:
 				if len(p.identity.Id) == 0 {
 					p.identity.Id = content.GetId()
@@ -134,26 +138,11 @@ L:
 						fmt.Println("PeerClient UnmarshalBinary err ", err)
 					}
 					p.pubKey = pub
-					//p.p2pnet.peers.LoadOrStore(string(p.identity.Id), p)
-					//p.p2pnet.routingTable.Update(p.identity)
 					p.waitForHi <- true
 				} else {
 					fmt.Println("Ignore Hi")
 				}
-			case *internal.Ping:
-				// Send pong to peer.
-				err := p.Reply(pa.GetRequestNonce(), &internal.Pong{})
-				if err != nil {
-					log.Fatal(err)
-				}
-			case *internal.Pong:
-				peers := p.p2pnet.findNode(p.identity, dht.BucketSize, 8)
-
-				// Update routing table w/ closest peers to self.
-				for _, peerID := range peers {
-					p.p2pnet.routingTable.Update(peerID)
-				}
-
+				//TODO:move this to routing
 			case *internal.LookupNodeRequest:
 				// Prepare response.
 				response := &internal.LookupNodeResponse{}
@@ -170,6 +159,7 @@ L:
 				}
 
 			default:
+				//TODO
 				msg := P2PMessage{Msg: *ptr, Sender: p.identity.Id}
 				p.rxMessage <- msg
 			}
@@ -303,7 +293,12 @@ func (p *PeerClient) prepareMessage(msg proto.Message) (*internal.Package, error
 	}
 
 	id := internal.ID(p.p2pnet.identity)
-	anything, _ := ptypes.MarshalAny(msg)
+	anything, err := ptypes.MarshalAny(msg)
+	if err != nil {
+		fmt.Println("ptypes.MarshalAny ", err)
+		return nil, err
+	}
+	//TODO:change to AES256-GCM
 	sig, err := bls.Sign(p.p2pnet.suite, p.p2pnet.secKey, anything.Value)
 	if err != nil {
 		fmt.Println("prepareMessage ", err)
@@ -371,36 +366,4 @@ func (p *PeerClient) Reply(nonce uint64, message proto.Message) error {
 	}
 
 	return nil
-}
-
-func (p *PeerClient) FindMe(alpha int) (results []internal.ID) {
-	lookup := lookupBucket{}
-	lookup.queue = append(lookup.queue, p.identity)
-
-	visited := new(sync.Map)
-	visited.Store(dht.PublicKeyHex(p.identity), struct{}{})
-
-	targetId := p.p2pnet.identity
-
-	results = append(results, p.identity)
-	results = append(results, lookup.performLookup(p.p2pnet, targetId, alpha, visited)...)
-
-	// Sort resulting peers by XOR distance.
-	sort.Slice(results, func(i, j int) bool {
-		left := dht.Xor(results[i], targetId)
-		right := dht.Xor(results[j], targetId)
-		return dht.Less(left, right)
-	})
-
-	// Cut off list of results to only have the routing table focus on the
-	// #dht.BucketSize closest peers to the current node.
-	if len(results) > dht.BucketSize {
-		results = results[:dht.BucketSize]
-	}
-
-	for _, result := range results {
-		p.p2pnet.routingTable.Update(result)
-		fmt.Println("Update peer: ", result.Address)
-	}
-	return
 }

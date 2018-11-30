@@ -15,6 +15,8 @@ type DOSProxyLogUrl struct {
 	Selector        string
 	Randomness      *big.Int
 	DispatchedGroup [4]*big.Int
+	Tx              string
+	BlockN          uint64
 }
 
 type DOSProxyLogRequestUserRandom struct {
@@ -22,6 +24,8 @@ type DOSProxyLogRequestUserRandom struct {
 	LastSystemRandomness *big.Int
 	UserSeed             *big.Int
 	DispatchedGroup      [4]*big.Int
+	Tx                   string
+	BlockN               uint64
 }
 
 type DOSProxyLogNonSupportedType struct {
@@ -41,6 +45,8 @@ type DOSProxyLogRequestFromNonExistentUC struct{}
 type DOSProxyLogUpdateRandom struct {
 	LastRandomness  *big.Int
 	DispatchedGroup [4]*big.Int
+	Tx              string
+	BlockN          uint64
 }
 
 type DOSProxyLogValidationResult struct {
@@ -50,6 +56,9 @@ type DOSProxyLogValidationResult struct {
 	Signature   [2]*big.Int
 	PubKey      [4]*big.Int
 	Pass        bool
+	Version     uint8
+	Tx          string
+	BlockN      uint64
 }
 
 type DOSProxyLogInsufficientGroupNumber struct{}

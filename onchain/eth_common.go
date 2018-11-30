@@ -11,15 +11,16 @@ import (
 	"time"
 
 	"github.com/DOSNetwork/core/configuration"
+
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 )
 
 type EthCommon struct {
-	id       *big.Int
 	key      *keystore.Key
 	Client   *ethclient.Client
 	lock     *sync.Mutex
@@ -39,13 +40,13 @@ func (e *EthCommon) DialToEth() (err error) {
 }
 
 func (e *EthCommon) Init(credentialPath string, config *configuration.ChainConfig) (err error) {
-
 	e.config = config
+	e.lock = new(sync.Mutex)
 
 	fmt.Println("start initial onChainConn...", config.DOSProxyAddress)
 
 	e.DialToEth()
-	e.setAccount(credentialPath)
+	err = e.setAccount(credentialPath)
 	return
 }
 
@@ -79,8 +80,6 @@ func (e *EthCommon) setAccount(credentialPath string) (err error) {
 	}
 
 	e.key = usrKey
-	e.id = new(big.Int)
-	e.id.SetBytes(e.key.Address.Bytes())
 	e.ethNonce, err = e.Client.PendingNonceAt(context.Background(), e.key.Address)
 	if err != nil {
 		return
@@ -102,21 +101,25 @@ func (e *EthCommon) GetAuth() (auth *bind.TransactOpts, err error) {
 		return
 	}
 
+	//e.lock.Lock()
 	e.ethNonce++
 	if automatedNonce > e.ethNonce {
 		e.ethNonce = automatedNonce
 	}
-	auth.Nonce = big.NewInt(int64(e.ethNonce))
+
+	nonceToUse := e.ethNonce
+	auth.Nonce = big.NewInt(int64(nonceToUse))
+	fmt.Println(nonceToUse)
+	//e.lock.Unlock()
 
 	_, err = e.Client.SuggestGasPrice(context.Background())
 	if err != nil {
 		return
 	}
 
-	auth.GasLimit = uint64(6000000)
+	auth.GasLimit = uint64(3000000)
 	//set gasPrice
 	//auth.GasPrice = big.NewInt(10000000000)
-
 	return
 }
 
@@ -134,8 +137,8 @@ func (e *EthCommon) getKey(keyPath, passPrase string) (key *keystore.Key, err er
 	return
 }
 
-func (e *EthCommon) GetKey() (key *keystore.Key) {
-	return e.key
+func (e *EthCommon) GetAddress() (key common.Address) {
+	return e.key.Address
 }
 
 func (e *EthCommon) BalanceMaintain(rootKeyPath, usrKeyPath, rPassPhrase, uPassPhrase string) (err error) {

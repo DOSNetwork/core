@@ -28,8 +28,6 @@ type AMAConfig struct {
 	AskMeAnythingAddress string
 }
 
-var workingDir string
-
 type EthUserAdaptor struct {
 	onchain.EthCommon
 	proxy     *dosUser.AskMeAnything
@@ -131,10 +129,12 @@ func (e *EthUserAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.Wa
 			case err := <-sub.Err():
 				log.Fatal(err)
 			case i := <-transitChan:
-				if !e.filterLog(i.Raw) {
+				if !i.Raw.Removed {
 					ch <- &AskMeAnythingQueryResponseReady{
 						QueryId: i.QueryId,
 						Result:  i.Result,
+						Tx:      i.Raw.TxHash.Hex(),
+						BlockN:  i.Raw.BlockNumber,
 					}
 				}
 			}
@@ -142,7 +142,7 @@ func (e *EthUserAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.Wa
 	case SubscribeAskMeAnythingRequestSent:
 		fmt.Println("subscribing AskMeAnythingRequestSent event...")
 		transitChan := make(chan *dosUser.AskMeAnythingRequestSent)
-		sub, err := e.proxy.AskMeAnythingFilterer.WatchRequestSent(opt, transitChan, []common.Address{e.EthCommon.GetKey().Address})
+		sub, err := e.proxy.AskMeAnythingFilterer.WatchRequestSent(opt, transitChan, []common.Address{e.GetAddress()})
 		if err != nil {
 			fmt.Println(err)
 			fmt.Println("Network fail, will retry shortly")
@@ -156,11 +156,13 @@ func (e *EthUserAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.Wa
 			case err := <-sub.Err():
 				log.Fatal(err)
 			case i := <-transitChan:
-				if !e.filterLog(i.Raw) {
+				if !i.Raw.Removed {
 					ch <- &AskMeAnythingRequestSent{
 						InternalSerial: i.InternalSerial,
 						Succ:           i.Succ,
 						RequestId:      i.RequestId,
+						Tx:             i.Raw.TxHash.Hex(),
+						BlockN:         i.Raw.BlockNumber,
 					}
 				}
 			}
@@ -182,10 +184,12 @@ func (e *EthUserAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.Wa
 			case err := <-sub.Err():
 				log.Fatal(err)
 			case i := <-transitChan:
-				if !e.filterLog(i.Raw) {
+				if !i.Raw.Removed {
 					ch <- &AskMeAnythingRandomReady{
 						GeneratedRandom: i.GeneratedRandom,
 						RequestId:       i.RequestId,
+						Tx:              i.Raw.TxHash.Hex(),
+						BlockN:          i.Raw.BlockNumber,
 					}
 				}
 			}

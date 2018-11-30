@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"io/ioutil"
 	"math/rand"
 	"net/http"
@@ -22,11 +23,16 @@ const (
 	ENVQUERYTYPE  = "QUERYTYPE"
 )
 
-const INVALIDQUERYINDEX = 13
+const (
+	INVALIDQUERYINDEX = 17
+	CHECKINTERVAL     = 3
+	FINALREPORTDUE    = 10
+)
 
 type record struct {
 	start     time.Time
 	end       time.Time
+	version   uint8
 	logToEmit *logrus.Entry
 }
 
@@ -37,11 +43,14 @@ type querySet struct {
 
 var querySets = []querySet{
 	{"https://api.coinbase.com/v2/prices/ETH-USD/spot", ""},
+	{"https://api.coinbase.com/v2/prices/ETH-USD/spot", "$"},
 	{"https://api.coinbase.com/v2/prices/ETH-USD/spot", "$.data"},
 	{"https://api.coinbase.com/v2/prices/ETH-USD/spot", "$.data.base"},
 	{"https://api.coinbase.com/v2/prices/ETH-USD/spot", "$.data.currency"},
 	{"https://api.coinbase.com/v2/prices/ETH-USD/spot", "$.data.amount"},
+	{"https://api.coinbase.com/v2/prices/ETH-USD/spot", "$.data.NOTVALID"},
 	{"https://api.coinmarketcap.com/v1/global/", ""},
+	{"https://api.coinmarketcap.com/v1/global/", "$"},
 	{"https://api.coinmarketcap.com/v1/global/", "$.total_market_cap_usd"},
 	{"https://api.coinmarketcap.com/v1/global/", "$.total_24h_volume_usd"},
 	{"https://api.coinmarketcap.com/v1/global/", "$.bitcoin_percentage_of_market_cap"},
@@ -49,14 +58,11 @@ var querySets = []querySet{
 	{"https://api.coinmarketcap.com/v1/global/", "$.active_assets"},
 	{"https://api.coinmarketcap.com/v1/global/", "$.active_markets"},
 	{"https://api.coinmarketcap.com/v1/global/", "$.last_updated"},
-
-	//invalid queries
-	{"https://api.coinbase.com/v2/prices/ETH-USD/spot", "$"},
-	{"https://api.coinbase.com/v2/prices/ETH-USD/spot", "$.data.NOTVALID"},
-	{"https://api.coinbase.com/v2/prices/ETH-USD/spot", "NOTVALID"},
-	{"https://api.coinmarketcap.com/v1/global/", "$"},
 	{"https://api.coinmarketcap.com/v1/global/", "$.NOTVALID"},
-	{"https://api.coinmarketcap.com/v1/global/", "NOTVALID"},
+
+	////invalid queries
+	//{"https://api.coinbase.com/v2/prices/ETH-USD/spot", "NOTVALID"},
+	//{"https://api.coinmarketcap.com/v1/global/", "NOTVALID"},
 }
 
 var (
@@ -77,7 +83,7 @@ func main() {
 	}
 
 	log := logrus.New()
-	hook, err := logrustash.NewHookWithFields("udp", "13.52.16.14:9500", "DOS_uer", logrus.Fields{
+	hook, err := logrustash.NewHookWithFields("tcp", "13.52.16.14:9500", "DOS_uer", logrus.Fields{
 		"queryType":         envTypes,
 		"startingTimestamp": time.Now(),
 	})
@@ -147,19 +153,20 @@ func main() {
 		log.Fatal(err)
 	}
 
-	logWithId := log.WithField("Serial", userTestAdaptor.EthCommon.GetKey().Address.String())
+	logWithId := log.WithField("Serial", userTestAdaptor.GetAddress().Hex())
 
 	events := make(chan interface{}, 5)
-	userTestAdaptor.SubscribeToAll(events)
+	if err = userTestAdaptor.SubscribeToAll(events); err != nil {
+		log.Fatal(err)
+	}
 
 	query()
 
 	responseTime := float64(0)
 	succRequest := float64(0)
 	timeCost := float64(0)
-	RspsEvtCnt := 0
 	RqSent := 0
-	responseTimeMap := make(map[string]*record)
+	responseTimeMap := make(map[string][]*record)
 	ticker := time.NewTicker(3 * time.Minute)
 	for {
 		select {
@@ -172,95 +179,105 @@ func main() {
 					"previous timeout": i.PreviousTimeout.String(),
 				}).Info()
 			case *eth.AskMeAnythingQueryResponseReady:
-				logToEmit := logWithId.WithFields(logrus.Fields{
-					"logEvent":    "AskMeAnythingQueryResponseReady",
-					"QueryId":     i.QueryId.String(),
-					"QueryResult": i.Result,
-				})
-				logRecord, found := responseTimeMap[i.QueryId.String()]
-				if found {
-					RspsEvtCnt++
-					timeCost = time.Since(logRecord.start).Seconds()
-					responseTime += timeCost
-					succRequest++
-					logToEmit.Data["timeCost"] = timeCost
-					logToEmit.Info()
-					delete(responseTimeMap, i.QueryId.String())
-				} else {
-					responseTimeMap[i.QueryId.String()] = &record{
-						end:       time.Now(),
-						logToEmit: logToEmit,
+				if envTypes == "url" {
+					logToEmit := logWithId.WithFields(logrus.Fields{
+						"logEvent":    "AskMeAnythingQueryResponseReady",
+						"requestId":   i.QueryId.String(),
+						"QueryResult": i.Result,
+						"tx":          i.Tx,
+						"blockN":      i.BlockN,
+					})
+					logRecord, found := responseTimeMap[i.QueryId.String()]
+					if found {
+						timeCost = time.Since(logRecord[0].start).Seconds()
+						responseTime += timeCost
+						succRequest++
+						logToEmit.Data["timeCost"] = timeCost
+						logToEmit.Data["version"] = logRecord[0].version
+						logToEmit.Info()
+						logRecord = logRecord[1:]
+						if len(logRecord) < 1 {
+							delete(responseTimeMap, i.QueryId.String())
+						}
+					} else {
+						logToEmit.Warn("Response before sent")
 					}
+					query()
 				}
-				query()
 			case *eth.AskMeAnythingRequestSent:
 				RqSent++
 				logToEmit := logWithId.WithFields(logrus.Fields{
 					"logEvent":  "AskMeAnythingRequestSent",
 					"succeed":   i.Succ,
-					"RequestId": i.RequestId.String(),
+					"requestId": i.RequestId.String(),
+					"tx":        i.Tx,
+					"blockN":    i.BlockN,
 				})
 				startingTime, found := startingTimeMap[i.InternalSerial]
 				if found {
 					logRecord, found := responseTimeMap[i.RequestId.String()]
 					if found {
-						RspsEvtCnt++
-						timeCost = logRecord.end.Sub(startingTime).Seconds()
-						responseTime += timeCost
-						succRequest++
-						logRecord.logToEmit.Data["timeCost"] = timeCost
-						logRecord.logToEmit.Info()
-						delete(responseTimeMap, i.RequestId.String())
+						logRecord = append(logRecord, &record{start: startingTime, version: uint8(len(logRecord))})
 					} else {
-						responseTimeMap[i.RequestId.String()] = &record{start: startingTime}
+						responseTimeMap[i.RequestId.String()] = []*record{{start: startingTime, version: 0}}
 					}
 					logToEmit.Data["startingTime"] = startingTime
-					delete(startingTimeMap, i.InternalSerial)
 				} else {
 					logToEmit.Data["startingTime"] = nil
 				}
 				logToEmit.Info()
 			case *eth.AskMeAnythingRandomReady:
-				logToEmit := logWithId.WithFields(logrus.Fields{
-					"logEvent":        "AskMeAnythingRandomReady",
-					"RequestId":       i.RequestId.String(),
-					"GeneratedRandom": i.GeneratedRandom.String(),
-				})
-				logRecord, found := responseTimeMap[i.RequestId.String()]
-				if found {
-					RspsEvtCnt++
-					timeCost = time.Since(logRecord.start).Seconds()
-					responseTime += timeCost
-					succRequest++
-					logToEmit.Data["timeCost"] = timeCost
-					logToEmit.Info()
-					delete(responseTimeMap, i.RequestId.String())
-				} else {
-					responseTimeMap[i.RequestId.String()] = &record{
-						end:       time.Now(),
-						logToEmit: logToEmit,
+				if envTypes == "random" {
+					logToEmit := logWithId.WithFields(logrus.Fields{
+						"logEvent":        "AskMeAnythingRandomReady",
+						"requestId":       i.RequestId.String(),
+						"GeneratedRandom": i.GeneratedRandom.String(),
+						"tx":              i.Tx,
+						"blockN":          i.BlockN,
+					})
+					logRecord, found := responseTimeMap[i.RequestId.String()]
+					if found {
+						timeCost = time.Since(logRecord[0].start).Seconds()
+						responseTime += timeCost
+						succRequest++
+						logToEmit.Data["timeCost"] = timeCost
+						logToEmit.Data["version"] = logRecord[0].version
+						logToEmit.Info()
+						logRecord = logRecord[1:]
+						if len(logRecord) < 1 {
+							delete(responseTimeMap, i.RequestId.String())
+						}
+					} else {
+						logToEmit.Warn("Response before sent")
 					}
+					query()
 				}
-				query()
 			default:
 				logWithId.WithFields(logrus.Fields{
 					"logEvent": "eventTypeMismatch",
 				}).Info()
 			}
 		case <-ticker.C:
-			if time.Since(lastQuery).Minutes() > 3 {
+			if time.Since(lastQuery).Minutes() > CHECKINTERVAL {
 				if counter > 0 {
 					query()
-				} else if time.Since(lastQuery).Minutes() > 10 {
+				} else if time.Since(lastQuery).Minutes() > FINALREPORTDUE {
 					logWithId.WithFields(logrus.Fields{
-						"logEvent":           "FinalReport",
-						"averageQueryTime":   responseTime / succRequest,
-						"succRequest":        succRequest,
-						"failRequest":        totalQuery - int(succRequest),
-						"invalidQuery":       invalidQuery,
-						"responseEventCount": RspsEvtCnt,
-						"requestSent":        RqSent,
+						"logEvent":         "FinalReport",
+						"averageQueryTime": responseTime / succRequest,
+						"succRequest":      succRequest,
+						"failRequest":      totalQuery - int(succRequest),
+						"invalidQuery":     invalidQuery,
+						"requestSent":      RqSent,
+						"totalQuery":       totalQuery,
 					}).Info()
+					for requestId := range responseTimeMap {
+						logWithId.WithFields(logrus.Fields{
+							"logEvent":  "mapContent",
+							"requestId": requestId,
+						}).Info()
+					}
+					fmt.Println(responseTimeMap)
 					os.Exit(0)
 				}
 			}
@@ -270,28 +287,41 @@ func main() {
 
 func query() {
 	if counter > 0 {
+		fmt.Println("counter:", counter)
 		switch envTypes {
 		case "url":
 			lottery := rand.Intn(len(querySets))
-			userTestAdaptor.Query(uint8(counter), querySets[lottery].url, querySets[lottery].selector)
+			if err := userTestAdaptor.Query(uint8(counter), querySets[lottery].url, querySets[lottery].selector); err != nil {
+				fmt.Println(err)
+				return
+			}
 			if lottery >= INVALIDQUERYINDEX {
 				invalidQuery++
 			}
 		case "random":
-			userTestAdaptor.GetSafeRandom(uint8(counter))
+			if err := userTestAdaptor.GetSafeRandom(uint8(counter)); err != nil {
+				fmt.Println(err)
+				return
+			}
 		default:
 			if counter%2 == 0 {
 				lottery := rand.Intn(len(querySets))
-				userTestAdaptor.Query(uint8(counter), querySets[lottery].url, querySets[lottery].selector)
+				if err := userTestAdaptor.Query(uint8(counter), querySets[lottery].url, querySets[lottery].selector); err != nil {
+					fmt.Println(err)
+					return
+				}
 				if lottery >= INVALIDQUERYINDEX {
 					invalidQuery++
 				}
 			} else {
-				userTestAdaptor.GetSafeRandom(uint8(counter))
+				if err := userTestAdaptor.GetSafeRandom(uint8(counter)); err != nil {
+					fmt.Println(err)
+					return
+				}
 			}
 		}
 		lastQuery = time.Now()
-		startingTimeMap[uint8(counter)] = lastQuery
+		startingTimeMap[uint8(counter)] = time.Now()
 		counter--
 		totalQuery++
 	}
