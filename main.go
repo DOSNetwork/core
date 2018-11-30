@@ -19,7 +19,6 @@ import (
 	dos "github.com/DOSNetwork/core/dosnode"
 	"github.com/DOSNetwork/core/onchain"
 	"github.com/DOSNetwork/core/p2p"
-	"github.com/DOSNetwork/core/p2p/dht"
 	"github.com/DOSNetwork/core/share/dkg/pedersen"
 	"github.com/DOSNetwork/core/share/vss/pedersen"
 	"github.com/DOSNetwork/core/suites"
@@ -40,7 +39,6 @@ func main() {
 
 	onChainConfig := configuration.OnChainConfig{}
 	if err := onChainConfig.LoadConfig(); err != nil {
-		fmt.Println(err)
 		log.Fatal(err)
 	}
 	chainConfig := onChainConfig.GetChainConfig()
@@ -55,10 +53,10 @@ func main() {
 	}
 
 	//2)Build a p2p network
-	peerEvent := make(chan p2p.P2PMessage, 100)
-	defer close(peerEvent)
-	p, _ := p2p.CreateP2PNetwork(peerEvent, port)
-	p.SetId(chainConn.GetId())
+	p, peerEvent, err := p2p.CreateP2PNetwork(chainConn.GetId(), port, log)
+	if err != nil {
+		log.Fatal(err)
+	}
 	if err := p.Listen(); err != nil {
 		log.Error(err)
 	}
@@ -106,13 +104,7 @@ func main() {
 			}
 		}
 	} else {
-		fmt.Println(bootstrapIp)
-		p.CreatePeer(bootstrapIp, nil)
-		results := p.FindNode(p.GetId(), dht.BucketSize, 20)
-		for _, result := range results {
-			p.GetRoutingTable().Update(result)
-			fmt.Println(p.GetId().Address, "Update peer: ", result.Address)
-		}
+		err = p.BootStrap(bootstrapIp)
 	}
 
 	//4)Build a p2pDKG

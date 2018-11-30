@@ -12,6 +12,7 @@ import (
 	"github.com/dedis/kyber"
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes"
+	"github.com/sirupsen/logrus"
 )
 
 var suite = suites.MustFind("bn256")
@@ -22,7 +23,7 @@ func genPair() (kyber.Scalar, kyber.Point) {
 	return secret, public
 }
 
-func CreateP2PNetwork(id []byte, port int) (P2PInterface, chan P2PMessage, error) {
+func CreateP2PNetwork(id []byte, port int, logger *logrus.Logger) (P2PInterface, chan P2PMessage, error) {
 	testStrategy := os.Getenv("TESTSTRATEGY")
 	if testStrategy == "DELAY_BEFORE_RECEIVELOOP" {
 		p := &TestP2P{
@@ -31,6 +32,7 @@ func CreateP2PNetwork(id []byte, port int) (P2PInterface, chan P2PMessage, error
 				suite:    suite,
 				messages: make(chan P2PMessage, 100),
 				port:     port,
+				log:      logger,
 			},
 			testStrategy,
 		}
@@ -41,9 +43,9 @@ func CreateP2PNetwork(id []byte, port int) (P2PInterface, chan P2PMessage, error
 			suite:    suite,
 			messages: make(chan P2PMessage, 100),
 			port:     port,
+			log:      logger,
 		}
 		p.identity.Id = id
-
 		return p, p.messages, nil
 	}
 
@@ -74,6 +76,7 @@ type P2PInterface interface {
 	GetId() internal.ID
 	Listen() error
 	Broadcast(proto.Message)
+	BootStrap(bootstrapIp string) error
 	SendMessageById([]byte, proto.Message) error
 	NewPeer(string) ([]byte, error)
 	//DHT
