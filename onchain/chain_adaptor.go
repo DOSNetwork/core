@@ -5,13 +5,19 @@ import (
 	"math/big"
 
 	"github.com/DOSNetwork/core/configuration"
+
 	"github.com/dedis/kyber"
+
 	"github.com/ethereum/go-ethereum/common"
+
+	"github.com/sirupsen/logrus"
 )
 
 const (
 	ETH = "ETH"
 )
+
+var log *logrus.Logger
 
 type ChainInterface interface {
 	Init(chainConfig *configuration.ChainConfig) (err error)
@@ -23,14 +29,15 @@ type ChainInterface interface {
 	GetId() (id []byte)
 	GetBlockHashByNumber(blknum *big.Int) (hash common.Hash, err error)
 	SetRandomNum(sig []byte) (err error)
-	DataReturn(requestId *big.Int, trafficType uint8, data, sig []byte) (err error)
+	DataReturn(requestId *big.Int, trafficType uint8, data, sig []byte, version uint8) (err error)
 	SubscribeToAll(msgChan chan interface{}) (err error)
 	//For test
 	ResetNodeIDs() (err error)
 	RandomNumberTimeOut() (err error)
 }
 
-func AdaptTo(chainName string, chainConfig *configuration.ChainConfig) (conn ChainInterface, err error) {
+func AdaptTo(chainName string, chainConfig *configuration.ChainConfig, logger *logrus.Logger) (conn ChainInterface, err error) {
+	log = logger
 	switch chainConfig.ChainType {
 	case ETH:
 		conn = &EthAdaptor{}
