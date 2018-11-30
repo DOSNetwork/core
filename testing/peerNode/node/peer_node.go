@@ -13,6 +13,7 @@ import (
 	"github.com/DOSNetwork/core/testing/peerNode/internalMsg"
 
 	"github.com/DOSNetwork/core/p2p"
+	"github.com/sirupsen/logrus"
 )
 
 type PeerNode struct {
@@ -44,12 +45,13 @@ func (d *PeerNode) MakeRequest(bootStrapIp, f string, args []byte) ([]byte, erro
 	return r, err
 }
 
-func (d *PeerNode) Init(bootStrapIp string, port, peerSize int, numMessages int, tStrategy string) {
+func (d *PeerNode) Init(bootStrapIp string, port, peerSize int, numMessages int, tStrategy string, logger *logrus.Logger) {
 	d.peerSize = peerSize
 	d.checkCount = 1
 	d.bootStrapIp = bootStrapIp
 	d.checkroll = make(map[string]int)
 	d.numMessages = numMessages
+	d.log = logger
 	if tStrategy == "SENDMESSAGE" {
 		d.tStrategy = &test1{}
 	} else {
@@ -81,7 +83,7 @@ func (d *PeerNode) Init(bootStrapIp string, port, peerSize int, numMessages int,
 	fmt.Println("nodeID = ", d.nodeID[:])
 
 	//2)Build a p2p network
-	d.p, d.peerEvent, _ = p2p.CreateP2PNetwork(d.nodeID[:], port)
+	d.p, d.peerEvent, _ = p2p.CreateP2PNetwork(d.nodeID[:], port, d.log)
 	go d.p.Listen()
 	//3)
 	/*

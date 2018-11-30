@@ -15,6 +15,7 @@ import (
 	"github.com/golang/protobuf/proto"
 
 	"github.com/gorilla/mux"
+	"github.com/sirupsen/logrus"
 )
 
 type BootNode struct {
@@ -36,7 +37,7 @@ func GenerateRandomBytes(n int) ([]byte, error) {
 	return b, nil
 }
 
-func (b *BootNode) Init(port, peerSize int) {
+func (b *BootNode) Init(port, peerSize int, logger *logrus.Logger) {
 	//1)Generate member ID
 	b.peerSize = peerSize
 	b.members = [][]byte{}
@@ -46,6 +47,7 @@ func (b *BootNode) Init(port, peerSize int) {
 	b.members = append(b.members, bootID)
 	b.checkroll = make(map[string]bool)
 	b.ipIdMap = make(map[string][]byte)
+	b.log = logger
 	for i := 1; i <= b.peerSize; i++ {
 		id, _ := GenerateRandomBytes(len(bootID))
 		for b.checkroll[string(id)] {
@@ -63,7 +65,7 @@ func (b *BootNode) Init(port, peerSize int) {
 	go http.ListenAndServe(":8080", r)
 
 	//3)Build a p2p network
-	b.p, b.peerEvent, _ = p2p.CreateP2PNetwork(bootID, port)
+	b.p, b.peerEvent, _ = p2p.CreateP2PNetwork(bootID, port, b.log)
 	go b.p.Listen()
 }
 

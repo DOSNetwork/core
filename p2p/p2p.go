@@ -18,7 +18,6 @@ import (
 	"github.com/DOSNetwork/core/p2p/dht"
 	"github.com/DOSNetwork/core/p2p/internal"
 	"github.com/DOSNetwork/core/suites"
-	"github.com/bshuster-repo/logrus-logstash-hook"
 	"github.com/sirupsen/logrus"
 )
 
@@ -45,12 +44,6 @@ func (n *P2P) GetId() internal.ID {
 }
 
 func (n *P2P) Listen() error {
-	//init log
-	n.log = logrus.New()
-	hook, _ := logrustash.NewHookWithFields("udp", "13.52.16.14:9500", "DOS_node", logrus.Fields{
-		"DOS_node_ip": n.identity.Address,
-	})
-	n.log.Hooks.Add(hook)
 	ip, err := GetLocalIp()
 	if err != nil {
 		log.Fatal(err)
@@ -131,10 +124,19 @@ func (n *P2P) Listen() error {
 	return nil
 }
 
+func (n *P2P) BootStrap(bootstrapIp string) (err error) {
+	_, err = n.NewPeer(bootstrapIp)
+	results := n.FindNode(n.GetId(), dht.BucketSize, 20)
+	for _, result := range results {
+		n.GetRoutingTable().Update(result)
+		fmt.Println(n.GetId().Address, "Update peer: ", result.Address)
+	}
+	return
+}
+
 func (n *P2P) Broadcast(m proto.Message) {
 	n.peers.Range(func(key, value interface{}) bool {
 		client := value.(*PeerClient)
-		fmt.Println("send message ,", client.identity.Id)
 		err := client.SendMessage(m)
 		if err != nil {
 			fmt.Println("P2P Broadcast ", err)
@@ -142,6 +144,7 @@ func (n *P2P) Broadcast(m proto.Message) {
 		return true
 	})
 }
+
 func (n *P2P) CheckPeers() {
 	n.peers.Range(func(key, value interface{}) bool {
 		client := value.(*PeerClient)
