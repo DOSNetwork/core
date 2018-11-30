@@ -8,6 +8,10 @@ import (
 	"strconv"
 	"sync"
 
+	"github.com/bshuster-repo/logrus-logstash-hook"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/sirupsen/logrus"
+
 	"github.com/DOSNetwork/core/p2p"
 	"github.com/gorilla/mux"
 
@@ -20,11 +24,16 @@ var lock sync.Mutex
 var credentialIndex int
 
 var adaptor *onchain.EthAdaptor
+var log *logrus.Logger
 
 // main
 func main() {
 	var err error
 	credentialIndex = 0
+	id := []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20}
+
+	//0)initial log module
+	log = logrus.New()
 
 	//1) Connect to Ethereum to reset contract
 	offChainConfig := configuration.OffChainConfig{}
@@ -40,18 +49,27 @@ func main() {
 	if err != nil {
 		fmt.Println(err)
 	}
+
 	(*adaptor).ResetNodeIDs()
 	(*adaptor).Grouping(offChainConfig.RandomGroupSize)
 
 	//2)Build a p2p network
-	peerEvent := make(chan p2p.P2PMessage, 100)
-	p, _ := p2p.CreateP2PNetwork(peerEvent, port)
-	defer close(peerEvent)
-	//2-1)Set node ID
-	id := []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20}
-	p.SetId(id[:])
-	//2-2)Start to listen incoming connection
-	go p.Listen()
+	p, peerEvent, err := p2p.CreateP2PNetwork(id[:], port, log)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if err := p.Listen(); err != nil {
+		log.Fatal(err)
+	}
+	hook, err := logrustash.NewHookWithFields("tcp", "13.52.16.14:9500", "DOS_node", logrus.Fields{
+		"DOS_node_ip": p.GetId().Address,
+		"Serial":      string(common.BytesToAddress(p.GetId().Id).String()),
+	})
+	if err != nil {
+		log.Error(err)
+	}
+
+	log.Hooks.Add(hook)
 	//2-3)To ignore peer event to avoid channel blocking
 	go func() {
 		for {

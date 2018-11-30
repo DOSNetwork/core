@@ -26,6 +26,14 @@
   revision = "5bb443fba8e05f4a819301a63af91fe3cbadcc17"
 
 [[projects]]
+  digest = "1:4193e2871b655bdfc423d23d309bf45a97ff75399c2fe923e79cb15eefb985d7"
+  name = "github.com/bshuster-repo/logrus-logstash-hook"
+  packages = ["."]
+  pruneopts = ""
+  revision = "dbc1e22735aa6ed7bd9579a407c17bc7c4a4e046"
+  version = "v0.4.1"
+
+[[projects]]
   branch = "master"
   digest = "1:83160035e81a0d248a1379f71b12e94c26b0cc8dab22994663af7e2e9ff9611b"
   name = "github.com/btcsuite/btcd"
@@ -215,6 +223,14 @@
   version = "v1.0.1"
 
 [[projects]]
+  digest = "1:6a874e3ddfb9db2b42bd8c85b6875407c702fa868eed20634ff489bc896ccfd3"
+  name = "github.com/konsorten/go-windows-terminal-sequences"
+  packages = ["."]
+  pruneopts = ""
+  revision = "5c8c8bd35d3832f5d134ae1e1e375b69a4d25242"
+  version = "v1.0.1"
+
+[[projects]]
   branch = "master"
   digest = "1:915c56ca290fa3512d4bdc6cc958e5da5c8be0f3f5ca87f98a5f520c122ed3c6"
   name = "github.com/looplab/fsm"
@@ -263,6 +279,14 @@
   version = "v1.6.0"
 
 [[projects]]
+  digest = "1:9d57e200ef5ccc4217fe0a34287308bac652435e7c6513f6263e0493d2245c56"
+  name = "github.com/sirupsen/logrus"
+  packages = ["."]
+  pruneopts = ""
+  revision = "bcd833dfe83d3cebad139e4a29ed79cb2318bf95"
+  version = "v1.2.0"
+
+[[projects]]
   digest = "1:c587772fb8ad29ad4db67575dad25ba17a51f072ff18a22b4f0257a4d9c24f75"
   name = "github.com/stretchr/testify"
   packages = [
@@ -303,6 +327,7 @@
     "hkdf",
     "pbkdf2",
     "scrypt",
+    "ssh/terminal",
   ]
   pruneopts = ""
   revision = "e4dc69e5b2fd71dcaf8bd5d054eb936deb78d1fa"
@@ -327,6 +352,7 @@
   packages = [
     "cpu",
     "unix",
+    "windows",
   ]
   pruneopts = ""
   revision = "66b7b1311ac80bbafcd2daeef9a5e6e2cd1e2399"
@@ -370,6 +396,7 @@
   analyzer-version = 1
   input-imports = [
     "github.com/antchfx/xmlquery",
+    "github.com/bshuster-repo/logrus-logstash-hook",
     "github.com/dedis/fixbuf",
     "github.com/dedis/kyber",
     "github.com/dedis/kyber/group/edwards25519",
@@ -406,6 +433,7 @@
     "github.com/jackpal/go-nat-pmp",
     "github.com/looplab/fsm",
     "github.com/oliveagle/jsonpath",
+    "github.com/sirupsen/logrus",
     "github.com/stretchr/testify/assert",
     "github.com/stretchr/testify/require",
     "golang.org/x/crypto/blake2b",
