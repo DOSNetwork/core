@@ -14,6 +14,8 @@ import (
 
 	"github.com/antchfx/xmlquery"
 
+	"github.com/ethereum/go-ethereum/common"
+
 	"github.com/oliveagle/jsonpath"
 
 	"github.com/sirupsen/logrus"
@@ -40,12 +42,12 @@ const (
 var log *logrus.Logger
 
 type DosNodeInterface interface {
-	PipeQueries(queries ...<-chan interface{}) <-chan Report
-	PipeSignAndBroadcast(reports <-chan Report) <-chan Report
-	PipeRecoverAndVerify(chan vss.Signature, <-chan Report) (<-chan Report, chan Report)
-	PipeSendToOnchain(chReport <-chan Report, outForValidate chan<- Report)
-	PipeCleanFinishMap(chan interface{}, <-chan Report) <-chan interface{}
 	PipeGrouping(<-chan interface{})
+	PipeQueries(queries ...<-chan interface{}) <-chan Report
+	PipeSignAndBroadcast(reports <-chan Report) (<-chan Report, <-chan Report)
+	PipeRecoverAndVerify(chan vss.Signature, <-chan Report) <-chan Report
+	PipeSendToOnchain(chReport <-chan Report) <-chan Report
+	PipeCleanFinishMap(chValidation chan interface{}, request ...<-chan Report) <-chan interface{}
 	SetParticipants(int)
 }
 
@@ -127,7 +129,7 @@ func dataFetch(url string) (body []byte, err error) {
 		return
 	}
 
-	r.Body.Close()
+	err = r.Body.Close()
 	fmt.Println("fetched data: ", string(body))
 	return
 }
@@ -137,21 +139,18 @@ func dataParse(rawMsg []byte, pathStr string) (msg []byte, err error) {
 		msg = rawMsg
 	} else if strings.HasPrefix(pathStr, "$") {
 		var rawMsgJson, msgJson interface{}
-		err = json.Unmarshal(rawMsg, &rawMsgJson)
-		if err != nil {
+		if err = json.Unmarshal(rawMsg, &rawMsgJson); err != nil {
 			return
 		}
 
-		msgJson, err = jsonpath.JsonPathLookup(rawMsgJson, pathStr)
-		if err != nil {
+		if msgJson, err = jsonpath.JsonPathLookup(rawMsgJson, pathStr); err != nil {
 			return
 		}
 
 		msg, err = json.Marshal(msgJson)
 	} else if strings.HasPrefix(pathStr, "/") {
 		var rawMsgXml *xmlquery.Node
-		rawMsgXml, err = xmlquery.Parse(bytes.NewReader(rawMsg))
-		if err != nil {
+		if rawMsgXml, err = xmlquery.Parse(bytes.NewReader(rawMsg)); err != nil {
 			return
 		}
 
@@ -237,7 +236,6 @@ func (d *DosNode) PipeGrouping(chGroup <-chan interface{}) {
 			}
 		}
 	}()
-	return
 }
 
 // TODO: error handling and logging
@@ -394,8 +392,9 @@ func padOrTrim(bb []byte, size int) []byte {
 	return tmp
 }
 
-func (d *DosNode) PipeSignAndBroadcast(reports <-chan Report) <-chan Report {
-	out := make(chan Report)
+func (d *DosNode) PipeSignAndBroadcast(reports <-chan Report) (<-chan Report, <-chan Report) {
+	outForRecover := make(chan Report, 100)
+	outForValidate := make(chan Report, 100)
 
 	go func() {
 		for {
@@ -411,29 +410,40 @@ func (d *DosNode) PipeSignAndBroadcast(reports <-chan Report) <-chan Report {
 
 				sign.Signature = sig
 				report.signShares = append(report.signShares, sig)
-				out <- report
-
-				for _, member := range d.groupIds {
-					if string(member) != string((*d.network).GetId().Id) {
-						//Todo:Need to check to see if it is thread safe
-						(*d.network).SendMessageById(member, &sign)
-						fmt.Println("send to ", member)
+				if r := bytes.Compare(d.chainConn.GetId(), report.submitter); r == 0 {
+					outForRecover <- report
+				} else {
+					for _, member := range d.groupIds {
+						if r := bytes.Compare(member, report.submitter); r == 0 {
+							//Todo:Need to check to see if it is thread safe
+							memberAddress := common.BytesToAddress(member).Hex()
+							if err = (*d.network).SendMessageById(member, &sign); err != nil {
+								log.WithFields(logrus.Fields{
+									"requestId": report.selfSign.QueryId,
+									"receiver":  memberAddress,
+								}).Warn(err)
+							} else {
+								fmt.Println("send to ", memberAddress)
+							}
+							break
+						}
 					}
+					outForValidate <- report
 				}
 			case <-d.quit:
-				close(out)
+				close(outForValidate)
+				close(outForRecover)
 				break
 			}
 		}
 	}()
 
-	return out
+	return outForRecover, outForValidate
 }
 
 //receiveSignature is thread safe.
-func (d *DosNode) PipeRecoverAndVerify(cSignatureFromPeer chan vss.Signature, fromEth <-chan Report) (<-chan Report, chan Report) {
+func (d *DosNode) PipeRecoverAndVerify(cSignatureFromPeer chan vss.Signature, fromEth <-chan Report) <-chan Report {
 	outForSubmit := make(chan Report, 100)
-	outForValidate := make(chan Report, 100)
 	reportMap := map[string]Report{}
 	signatureAwait := map[string]time.Time{}
 
@@ -445,10 +455,8 @@ func (d *DosNode) PipeRecoverAndVerify(cSignatureFromPeer chan vss.Signature, fr
 				reportMap[report.selfSign.QueryId] = report
 			case sign := <-cSignatureFromPeer:
 				var sigShares [][]byte
-				signIdentityBytes := append([]byte(sign.QueryId), sign.Signature...)
-				signIdentity := new(big.Int).SetBytes(signIdentityBytes).String()
 				if report, ok := reportMap[sign.QueryId]; ok {
-					delete(signatureAwait, signIdentity)
+					delete(signatureAwait, sign.QueryId)
 
 					//TODO:Should check if content is always the same
 					if r := bytes.Compare(report.selfSign.Content, sign.Content); r != 0 {
@@ -471,8 +479,7 @@ func (d *DosNode) PipeRecoverAndVerify(cSignatureFromPeer chan vss.Signature, fr
 							continue
 						}
 
-						err = bls.Verify(d.suite, d.p2pDkg.GetGroupPublicPoly().Commit(), sign.Content, sig)
-						if err != nil {
+						if err = bls.Verify(d.suite, d.p2pDkg.GetGroupPublicPoly().Commit(), sign.Content, sig); err != nil {
 							fmt.Println(err)
 							fmt.Println("Verify failed!!!!!!!!!!!!!!!!!")
 							continue
@@ -481,24 +488,18 @@ func (d *DosNode) PipeRecoverAndVerify(cSignatureFromPeer chan vss.Signature, fr
 						x, y := onchain.DecodeSig(sig)
 						fmt.Println("5) Verify success signature ", x.String(), y.String())
 						report.signGroup = sig
-						report.timeStamp = time.Now()
 						record, _ := d.timeCostMap.Load(report.selfSign.QueryId)
 						record.(*timeRecord).dataSignCost = time.Since(record.(*timeRecord).lastUpdateTime).Seconds()
 						record.(*timeRecord).lastUpdateTime = time.Now()
 						record.(*timeRecord).sendToChannelTime = time.Now()
 
-						if r := bytes.Compare(d.chainConn.GetId(), report.submitter); r == 0 {
-							fmt.Println("I'm submitter !!!!!!!!!!!!!!!!!!!", sign.QueryId)
-							fmt.Println("I'm submitter !!!!!!!!!!!!!!!!!!!", d.chainConn.GetId())
-							fmt.Println("I'm submitter !!!!!!!!!!!!!!!!!!!", report.submitter)
+						fmt.Println("I'm submitter !!!!!!!!!!!!!!!!!!!", sign.QueryId)
+						fmt.Println("I'm submitter !!!!!!!!!!!!!!!!!!!", d.chainConn.GetId())
+						fmt.Println("I'm submitter !!!!!!!!!!!!!!!!!!!", report.submitter)
 
-							report.selfSign.Content = sign.Content
-							outForSubmit <- report
-							fmt.Println("submit to outForSubmit", sign.QueryId)
-						} else {
-							outForValidate <- report
-							fmt.Println("submit to outForValidate", sign.QueryId)
-						}
+						report.selfSign.Content = sign.Content
+						outForSubmit <- report
+						fmt.Println("submit to outForSubmit", sign.QueryId)
 						delete(reportMap, sign.QueryId)
 					} else {
 						reportMap[sign.QueryId] = report
@@ -507,14 +508,14 @@ func (d *DosNode) PipeRecoverAndVerify(cSignatureFromPeer chan vss.Signature, fr
 					//Other nodes has received blockchain event and send signature to other nodes
 					//Node put back these signatures until it received blockchain event.
 					//TODO:It should use a timeStamp that can be used to see if it is a stale signature
-					if preTime, reenter := signatureAwait[signIdentity]; reenter {
+					if preTime, reenter := signatureAwait[sign.QueryId]; reenter {
 						if time.Since(preTime).Minutes() >= NETMSGTIMEOUT {
 							fmt.Println("remove stale signature")
-							delete(signatureAwait, signIdentity)
+							delete(signatureAwait, sign.QueryId)
 							continue
 						}
 					} else {
-						signatureAwait[signIdentity] = time.Now()
+						signatureAwait[sign.QueryId] = time.Now()
 					}
 
 					go func() {
@@ -523,15 +524,16 @@ func (d *DosNode) PipeRecoverAndVerify(cSignatureFromPeer chan vss.Signature, fr
 				}
 			case <-d.quit:
 				close(outForSubmit)
-				close(outForValidate)
 				break
 			}
 		}
 	}()
-	return outForSubmit, outForValidate
+	return outForSubmit
 }
 
-func (d *DosNode) PipeSendToOnchain(chReport <-chan Report, outForValidate chan<- Report) {
+func (d *DosNode) PipeSendToOnchain(chReport <-chan Report) <-chan Report {
+	outForValidate := make(chan Report, 100)
+
 	go func() {
 		for {
 			select {
@@ -540,8 +542,7 @@ func (d *DosNode) PipeSendToOnchain(chReport <-chan Report, outForValidate chan<
 				record.(*timeRecord).dataChannelCost = time.Since(record.(*timeRecord).sendToChannelTime).Seconds()
 				switch report.selfSign.Index {
 				case onchain.TrafficSystemRandom:
-					err := d.chainConn.SetRandomNum(report.signGroup)
-					if err != nil {
+					if err := d.chainConn.SetRandomNum(report.signGroup); err != nil {
 						fmt.Println("SetRandomNum err ", err)
 					} else {
 						fmt.Println("randomNumber Set for ", report.selfSign.QueryId)
@@ -580,8 +581,7 @@ func (d *DosNode) PipeSendToOnchain(chReport <-chan Report, outForValidate chan<
 
 					//TODO:chainCoo should use a sendToOnChain(protobuf message) instead of DataReturn with mutex
 					//sendToOnChain receive a message from channel then call the corresponding function
-					err = d.chainConn.DataReturn(qID, uint8(report.selfSign.Index), queryResult, report.signGroup, uint8(qVersion))
-					if err != nil {
+					if err = d.chainConn.DataReturn(qID, uint8(report.selfSign.Index), queryResult, report.signGroup, uint8(qVersion)); err != nil {
 						fmt.Println("DataReturn err ", err)
 					} else {
 						fmt.Println("urlCallback Set for ", report.selfSign.QueryId)
@@ -595,19 +595,33 @@ func (d *DosNode) PipeSendToOnchain(chReport <-chan Report, outForValidate chan<
 			}
 		}
 	}()
-	return
+
+	return outForValidate
 }
 
-func (d *DosNode) PipeCleanFinishMap(chValidation chan interface{}, forValidate <-chan Report) <-chan interface{} {
+func (d *DosNode) PipeCleanFinishMap(chValidation chan interface{}, request ...<-chan Report) <-chan interface{} {
+	forValidate := make(chan Report)
+	var wg sync.WaitGroup
+	wg.Add(len(request))
+	for _, c := range request {
+		go func(c <-chan Report) {
+			for v := range c {
+				forValidate <- v
+			}
+			wg.Done()
+		}(c)
+	}
+
 	ticker := time.NewTicker(2 * time.Minute)
 	validateMap := map[string]Report{}
-	chValidationAwait := map[interface{}]time.Time{}
+	chValidationAwait := map[string]time.Time{}
 	lastValidatedRandom := time.Now()
 	queries := make(chan interface{})
 	go func() {
 		for {
 			select {
 			case report := <-forValidate:
+				report.timeStamp = time.Now()
 				validateMap[report.selfSign.QueryId] = report
 			case msg := <-chValidation:
 				switch content := msg.(type) {
@@ -634,7 +648,7 @@ func (d *DosNode) PipeCleanFinishMap(chValidation chan interface{}, forValidate 
 							"replyBlkNb":      content.BlockN,
 						}).Info("request fulfilled")
 						d.timeCostMap.Delete(trafficId)
-						delete(chValidationAwait, msg)
+						delete(chValidationAwait, trafficId)
 
 						if !content.Pass {
 							fmt.Println("event DOSProxyLogValidationResult========================")
@@ -680,14 +694,14 @@ func (d *DosNode) PipeCleanFinishMap(chValidation chan interface{}, forValidate 
 						}
 						delete(validateMap, trafficId)
 					} else {
-						if preTime, reenter := chValidationAwait[msg]; reenter {
+						if preTime, reenter := chValidationAwait[trafficId]; reenter {
 							if time.Since(preTime).Minutes() >= NETMSGTIMEOUT {
-								fmt.Println("remove stale chValidation")
-								delete(chValidationAwait, msg)
+								fmt.Println("remove stale chValidation", trafficId)
+								delete(chValidationAwait, trafficId)
 								continue
 							}
 						} else {
-							chValidationAwait[msg] = time.Now()
+							chValidationAwait[trafficId] = time.Now()
 						}
 						go func() {
 							chValidation <- msg
@@ -701,7 +715,11 @@ func (d *DosNode) PipeCleanFinishMap(chValidation chan interface{}, forValidate 
 					dur := time.Since(lastValidatedRandom)
 					if dur.Minutes() >= WATCHDOGTIMEOUT {
 						fmt.Println("WatchDog Random timeout.........")
-						d.chainConn.RandomNumberTimeOut()
+						if err := d.chainConn.RandomNumberTimeOut(); err != nil {
+							log.WithFields(logrus.Fields{
+								"logEvent": "randomTimeOut",
+							}).Warn(err)
+						}
 					}
 				}
 				for queryId, report := range validateMap {

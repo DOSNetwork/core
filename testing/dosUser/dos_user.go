@@ -83,7 +83,7 @@ func main() {
 	}
 
 	log := logrus.New()
-	hook, err := logrustash.NewHookWithFields("udp", "13.52.16.14:9500", "DOS_uer", logrus.Fields{
+	hook, err := logrustash.NewHookWithFields("tcp", "13.52.16.14:9500", "DOS_uer", logrus.Fields{
 		"queryType":         envTypes,
 		"startingTimestamp": time.Now(),
 	})
@@ -153,17 +153,18 @@ func main() {
 		log.Fatal(err)
 	}
 
-	logWithId := log.WithField("Serial", userTestAdaptor.GetAddress().String())
+	logWithId := log.WithField("Serial", userTestAdaptor.GetAddress().Hex())
 
 	events := make(chan interface{}, 5)
-	userTestAdaptor.SubscribeToAll(events)
+	if err = userTestAdaptor.SubscribeToAll(events); err != nil {
+		log.Fatal(err)
+	}
 
 	query()
 
 	responseTime := float64(0)
 	succRequest := float64(0)
 	timeCost := float64(0)
-	RspsEvtCnt := 0
 	RqSent := 0
 	responseTimeMap := make(map[string][]*record)
 	ticker := time.NewTicker(3 * time.Minute)
@@ -188,7 +189,6 @@ func main() {
 					})
 					logRecord, found := responseTimeMap[i.QueryId.String()]
 					if found {
-						RspsEvtCnt++
 						timeCost = time.Since(logRecord[0].start).Seconds()
 						responseTime += timeCost
 						succRequest++
@@ -237,7 +237,6 @@ func main() {
 					})
 					logRecord, found := responseTimeMap[i.RequestId.String()]
 					if found {
-						RspsEvtCnt++
 						timeCost = time.Since(logRecord[0].start).Seconds()
 						responseTime += timeCost
 						succRequest++
@@ -264,13 +263,13 @@ func main() {
 					query()
 				} else if time.Since(lastQuery).Minutes() > FINALREPORTDUE {
 					logWithId.WithFields(logrus.Fields{
-						"logEvent":           "FinalReport",
-						"averageQueryTime":   responseTime / succRequest,
-						"succRequest":        succRequest,
-						"failRequest":        totalQuery - int(succRequest),
-						"invalidQuery":       invalidQuery,
-						"responseEventCount": RspsEvtCnt,
-						"requestSent":        RqSent,
+						"logEvent":         "FinalReport",
+						"averageQueryTime": responseTime / succRequest,
+						"succRequest":      succRequest,
+						"failRequest":      totalQuery - int(succRequest),
+						"invalidQuery":     invalidQuery,
+						"requestSent":      RqSent,
+						"totalQuery":       totalQuery,
 					}).Info()
 					for requestId := range responseTimeMap {
 						logWithId.WithFields(logrus.Fields{
@@ -292,21 +291,33 @@ func query() {
 		switch envTypes {
 		case "url":
 			lottery := rand.Intn(len(querySets))
-			userTestAdaptor.Query(uint8(counter), querySets[lottery].url, querySets[lottery].selector)
+			if err := userTestAdaptor.Query(uint8(counter), querySets[lottery].url, querySets[lottery].selector); err != nil {
+				fmt.Println(err)
+				return
+			}
 			if lottery >= INVALIDQUERYINDEX {
 				invalidQuery++
 			}
 		case "random":
-			userTestAdaptor.GetSafeRandom(uint8(counter))
+			if err := userTestAdaptor.GetSafeRandom(uint8(counter)); err != nil {
+				fmt.Println(err)
+				return
+			}
 		default:
 			if counter%2 == 0 {
 				lottery := rand.Intn(len(querySets))
-				userTestAdaptor.Query(uint8(counter), querySets[lottery].url, querySets[lottery].selector)
+				if err := userTestAdaptor.Query(uint8(counter), querySets[lottery].url, querySets[lottery].selector); err != nil {
+					fmt.Println(err)
+					return
+				}
 				if lottery >= INVALIDQUERYINDEX {
 					invalidQuery++
 				}
 			} else {
-				userTestAdaptor.GetSafeRandom(uint8(counter))
+				if err := userTestAdaptor.GetSafeRandom(uint8(counter)); err != nil {
+					fmt.Println(err)
+					return
+				}
 			}
 		}
 		lastQuery = time.Now()

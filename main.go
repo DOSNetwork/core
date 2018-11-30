@@ -28,14 +28,19 @@ var log *logrus.Logger
 // main
 func main() {
 	offChainConfig := configuration.OffChainConfig{}
-	offChainConfig.LoadConfig()
+	if err := offChainConfig.LoadConfig(); err != nil {
+		log.Fatal(err)
+	}
 	role := offChainConfig.NodeRole
 	nbParticipants := offChainConfig.RandomGroupSize
 	port := offChainConfig.Port
 	bootstrapIp := offChainConfig.BootStrapIp
 
 	onChainConfig := configuration.OnChainConfig{}
-	onChainConfig.LoadConfig()
+	if err := onChainConfig.LoadConfig(); err != nil {
+		fmt.Println(err)
+		log.Fatal(err)
+	}
 	chainConfig := onChainConfig.GetChainConfig()
 
 	//0)initial log module
@@ -52,10 +57,12 @@ func main() {
 	defer close(peerEvent)
 	p, _ := p2p.CreateP2PNetwork(peerEvent, port)
 	p.SetId(chainConn.GetId())
-	p.Listen()
+	if err := p.Listen(); err != nil {
+		log.Fatal(err)
+	}
 
 	//2.5)Add hook to log module
-	hook, err := logrustash.NewHookWithFields("udp", "13.52.16.14:9500", "DOS_node", logrus.Fields{
+	hook, err := logrustash.NewHookWithFields("tcp", "13.52.16.14:9500", "DOS_node", logrus.Fields{
 		"DOS_node_ip": p.GetId().Address,
 		"Serial":      string(common.BytesToAddress(p.GetId().Id).String()),
 	})
@@ -111,28 +118,23 @@ func main() {
 	defer close(cSignatureFromPeer)
 	eventValidation := make(chan interface{}, 20)
 	defer close(eventValidation)
-	err = chainConn.SubscribeEvent(eventGrouping, onchain.SubscribeDOSProxyLogGrouping)
-	if err != nil {
+	if err = chainConn.SubscribeEvent(eventGrouping, onchain.SubscribeDOSProxyLogGrouping); err != nil {
 		log.Fatal(err)
 	}
 
-	err = chainConn.SubscribeEvent(chUrl, onchain.SubscribeDOSProxyLogUrl)
-	if err != nil {
+	if err = chainConn.SubscribeEvent(chUrl, onchain.SubscribeDOSProxyLogUrl); err != nil {
 		log.Fatal(err)
 	}
 
-	err = chainConn.SubscribeEvent(chRandom, onchain.SubscribeDOSProxyLogUpdateRandom)
-	if err != nil {
+	if err = chainConn.SubscribeEvent(chRandom, onchain.SubscribeDOSProxyLogUpdateRandom); err != nil {
 		log.Fatal(err)
 	}
 
-	err = chainConn.SubscribeEvent(chUsrRandom, onchain.SubscribeDOSProxyLogRequestUserRandom)
-	if err != nil {
+	if err = chainConn.SubscribeEvent(chUsrRandom, onchain.SubscribeDOSProxyLogRequestUserRandom); err != nil {
 		log.Fatal(err)
 	}
 
-	err = chainConn.SubscribeEvent(eventValidation, onchain.SubscribeDOSProxyLogValidationResult)
-	if err != nil {
+	if err = chainConn.SubscribeEvent(eventValidation, onchain.SubscribeDOSProxyLogValidationResult); err != nil {
 		log.Fatal(err)
 	}
 
@@ -140,10 +142,10 @@ func main() {
 	d := dos.CreateDosNode(suite, nbParticipants, p, chainConn, p2pDkg, log)
 	d.PipeGrouping(eventGrouping)
 	queriesReports := d.PipeQueries(chUrl, chUsrRandom, chRandom)
-	signedReports := d.PipeSignAndBroadcast(queriesReports)
-	reportsToSubmit, reportToValidate := d.PipeRecoverAndVerify(cSignatureFromPeer, signedReports)
-	d.PipeSendToOnchain(reportsToSubmit, reportToValidate)
-	chRetrigerUrl := d.PipeCleanFinishMap(eventValidation, reportToValidate)
+	outForRecover, outForValidate := d.PipeSignAndBroadcast(queriesReports)
+	reportsToSubmit := d.PipeRecoverAndVerify(cSignatureFromPeer, outForRecover)
+	submitForValidate := d.PipeSendToOnchain(reportsToSubmit)
+	chRetrigerUrl := d.PipeCleanFinishMap(eventValidation, outForValidate, submitForValidate)
 
 	err = chainConn.UploadID()
 	if err != nil {
@@ -175,7 +177,9 @@ func main() {
 			if msg == "certified" {
 				gId := new(big.Int)
 				gId.SetBytes(p2pDkg.GetGroupId())
-				chainConn.UploadPubKey(p2pDkg.GetGroupPublicPoly().Commit())
+				if err := chainConn.UploadPubKey(p2pDkg.GetGroupPublicPoly().Commit()); err != nil {
+					fmt.Println(err)
+				}
 			}
 		//For re-trigger query
 		case msg := <-chRetrigerUrl:
