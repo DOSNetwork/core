@@ -42,5 +42,10 @@ docker-usernode:docker-prepare
 	cd ../;docker build -t usernode -f Dockerfile.usernode  .
 	rm ../Dockerfile.usernode
 
-docker-all: docker-bootnode docker-dosnode docker-usernode
+docker-peernode:docker-prepare
+	cp peerNode/Dockerfile ../Dockerfile.peernode
+	cd ../;docker build -t peernode -f Dockerfile.peernode  .
+	rm ../Dockerfile.peernode
+
+docker-all: docker-bootnode docker-dosnode docker-usernode docker-peernode
 	docker image prune -f
