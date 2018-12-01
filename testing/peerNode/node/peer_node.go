@@ -50,6 +50,7 @@ func (d *PeerNode) Init(bootStrapIp string, port, peerSize int, numMessages int,
 	d.checkCount = 1
 	d.bootStrapIp = bootStrapIp
 	d.checkroll = make(map[string]int)
+	d.done = make(chan bool)
 	d.numMessages = numMessages
 	d.log = logger
 	if tStrategy == "SENDMESSAGE" {
@@ -101,10 +102,14 @@ func (d *PeerNode) Init(bootStrapIp string, port, peerSize int, numMessages int,
 
 func (d *PeerNode) EventLoop() {
 	ticker := time.NewTicker(5 * time.Second)
+L:
 	for {
 		select {
 		case <-ticker.C:
 			//PrintMemUsage()
+		case <-d.done:
+			fmt.Println("EventLoop done")
+			break L
 		//event from peer
 		case msg := <-d.peerEvent:
 			switch content := msg.Msg.Message.(type) {
@@ -123,18 +128,20 @@ func (d *PeerNode) EventLoop() {
 					d.nodeIPs = allIP
 				} else if content.Ctype == internalMsg.Cmd_ALLID {
 					buf := []byte(content.Args)
-					//fmt.Println("!! Cmd_ALLID ", nodes)
 					allID := [][]byte{}
 					var chunk []byte
 					lim := 20
 					for len(buf) >= lim {
 						chunk, buf = buf[:lim], buf[lim:]
 						allID = append(allID, chunk)
-						fmt.Println(chunk)
 					}
 					d.nodeIDs = allID
 				} else if content.Ctype == internalMsg.Cmd_STARTTEST {
 					d.tStrategy.StartTest(content, d)
+				} else if content.Ctype == internalMsg.Cmd_TESTDONE {
+					go func() {
+						d.done <- true
+					}()
 				} else {
 					sender := string(msg.Sender)
 					d.tStrategy.CheckResult(sender, content, d)
@@ -142,6 +149,8 @@ func (d *PeerNode) EventLoop() {
 			default:
 				fmt.Println(content)
 			}
+		default:
 		}
 	}
+	os.Exit(0)
 }
