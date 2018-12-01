@@ -25,7 +25,7 @@ func (r test1) StartTest(content *internalMsg.Cmd, d *PeerNode) {
 
 	for i := 0; i < d.numMessages; i++ {
 		for id, _ := range d.checkroll {
-			go d.p.SendMessageById([]byte(id), pb)
+			d.p.SendMessageById([]byte(id), pb)
 		}
 	}
 }
@@ -39,6 +39,7 @@ func (r test1) CheckResult(sender string, content *internalMsg.Cmd, d *PeerNode)
 		}
 
 		if len(d.checkroll) == 0 {
+			fmt.Println("test done")
 			d.MakeRequest(d.bootStrapIp, "post", d.nodeID)
 		}
 	}

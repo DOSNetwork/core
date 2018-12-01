@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 
@@ -47,6 +48,7 @@ func (b *BootNode) Init(port, peerSize int, logger *logrus.Logger) {
 	b.members = append(b.members, bootID)
 	b.checkroll = make(map[string]bool)
 	b.ipIdMap = make(map[string][]byte)
+	b.done = make(chan bool)
 	b.log = logger
 	for i := 1; i <= b.peerSize; i++ {
 		id, _ := GenerateRandomBytes(len(bootID))
@@ -54,7 +56,9 @@ func (b *BootNode) Init(port, peerSize int, logger *logrus.Logger) {
 			id, _ = GenerateRandomBytes(len(bootID))
 		}
 		b.checkroll[string(id)] = true
+		b.lock.Lock()
 		b.members = append(b.members, id)
+		b.lock.Unlock()
 	}
 
 	//2)Declare a new router to handle REST API call
@@ -113,6 +117,7 @@ func (b *BootNode) postHandler(w http.ResponseWriter, r *http.Request) {
 	b.lock.Unlock()
 	fmt.Println("check done ", len(b.checkroll))
 	if len(b.checkroll) == 0 {
+		b.finishTest()
 		b.done <- true
 	}
 }
@@ -149,6 +154,7 @@ func (b *BootNode) sendPeerAddresses() {
 
 	b.sendPeerIDs()
 }
+
 func (b *BootNode) sendPeerIDs() {
 
 	s := []byte{}
@@ -171,4 +177,28 @@ func (b *BootNode) startTest() {
 	}
 	pb := proto.Message(cmd)
 	b.p.Broadcast(pb)
+}
+
+func (b *BootNode) finishTest() {
+	cmd := &internalMsg.Cmd{
+		Ctype: internalMsg.Cmd_TESTDONE,
+		Args:  []byte{},
+	}
+	pb := proto.Message(cmd)
+	b.p.Broadcast(pb)
+}
+
+func (b *BootNode) EventLoop() {
+L:
+	for {
+		select {
+		//event from peer
+		case _ = <-b.peerEvent:
+		case <-b.done:
+			fmt.Println("EventLoop done")
+			break L
+		default:
+		}
+	}
+	os.Exit(0)
 }

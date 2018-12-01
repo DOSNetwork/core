@@ -1,11 +1,8 @@
 package node
 
 import (
-	"time"
-
-	"github.com/DOSNetwork/core/testing/peerNode/internalMsg"
-
 	"github.com/DOSNetwork/core/p2p"
+	"github.com/DOSNetwork/core/testing/peerNode/internalMsg"
 	"github.com/sirupsen/logrus"
 )
 
@@ -22,19 +19,4 @@ type node struct {
 	peerSize  int
 	done      chan bool
 	log       *logrus.Logger
-}
-
-func (n *node) EventLoop() {
-	ticker := time.NewTicker(5 * time.Second)
-	for {
-		select {
-		case <-ticker.C:
-			//PrintMemUsage()
-		//event from peer
-		case _ = <-n.peerEvent:
-		case <-n.done:
-			//os.Exit(0)
-			break
-		}
-	}
 }
