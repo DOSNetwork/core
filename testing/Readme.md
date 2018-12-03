@@ -17,26 +17,26 @@
 
 - Build all docker testing images
 
-  1 ) Set ENVIRONMENT variable CHAINNODE to indicate which eth full node we want to access
+  - Set ENVIRONMENT variable CHAINNODE to indicate which eth full node we want to access
  
- `DOSNetwork/core/testing$export CHAINNODE="rinkebyInfura"`
+    `DOSNetwork/core/testing$export CHAINNODE="rinkebyInfura"`
 
-  2 )Build go files from .sol ,deploy contracts to test net and update onChain.json
+  - Build go files from .sol ,deploy contracts to test net and update onChain.json
   
- `DOSNetwork/core/testing$make deploy`
+    `DOSNetwork/core/testing$make deploy`
  
-  3 )Build all testing docker images
+  - Build all testing docker images
   
- `DOSNetwork/core/testing$make dock-all`
+    `DOSNetwork/core/testing$make dock-all`
  
-- Run all unit test
+- Run all test
 
-  1 )Run all unit test
+  - Run all unit test
   
- `DOSNetwork/core/$go test -v ./...`
+    `DOSNetwork/core/$go test -v ./...`
 
-  2 )Run all unit test and integration test 
+  - Run all unit test and integration test 
   
- `DOSNetwork/core$alias gtest="go test \$(go list ./... | grep -v /vendor/) -tags=integration"`
+    `DOSNetwork/core$alias gtest="go test \$(go list ./... | grep -v /vendor/) -tags=integration"`
  
- `DOSNetwork/core$alias gtest -v`
+    `DOSNetwork/core$alias gtest -v`
