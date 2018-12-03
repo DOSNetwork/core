@@ -1,44 +1,42 @@
-1)Check if dosenv is existing.
-  Only rm dosenv when project has new dependency
-$docker image ls | grep dosenv
-$docker image rm dosenv
+### Build and run test:
+- Only remove dosenv when the project has new dependency
 
-2)Get code from github
+  `$docker image ls | grep dosenv`
+  
+  `$docker image rm dosenv`
 
-DOSNetwork$
-DOSNetwork$git clone https://github.com/DOSNetwork/core.git
-DOSNetwork$git checkout grouping_xxx
-DOSNetwork$cd core
+- Set up the test accounts.
 
-3)Set up the test accounts
-  Add passPhrase and move testAccounts under core
+  `DOSNetwork/core$vi credential/passPhrase`
+  
+  `DOSNetwork/core$mv Downloads/testAccounts .`
 
-DOSNetwork/core$vi credential/passPhrase
-DOSNetwork/core$mv ../testAccounts .
+- Build client node
 
-4)Build client node
-  Use maek build to update dependency ,generate DOSAddressBridge.go and DOSProxy.go and build  client node
-DOSNetwork/core$make build
+  `DOSNetwork/core$make build`
 
-5)Build docker testing images
-  Set ENVIRONMENT variable CHAINNODE to indicate which eth full node we want to access
-  fish shell use set and export to set ENVIRONMENT variable
-#For fish shell
-DOSNetwork/core$cd testing
-DOSNetwork/core/testing$set CHAINNODE rinkebyInfura
-DOSNetwork/core/testing$export CHAINNODE
+- Build all docker testing images
 
-#For bash shell
-DOSNetwork/core/testing$export CHAINNODE="rinkebyInfura"
+  1 ) Set ENVIRONMENT variable CHAINNODE to indicate which eth full node we want to access
+ 
+ `DOSNetwork/core/testing$export CHAINNODE="rinkebyInfura"`
 
-#Make deploy build go files from .sol ,deploy it to test net and update onChain.json
-DOSNetwork/core/testing$make deploy
-#Make dock-all build all testing docker images
-DOSNetwork/core/testing$make dock-all
+  2 )Build go files from .sol ,deploy contracts to test net and update onChain.json
+  
+ `DOSNetwork/core/testing$make deploy`
+ 
+  3 )Build all testing docker images
+  
+ `DOSNetwork/core/testing$make dock-all`
+ 
+- Run all unit test
 
-6)Run unit test
-DOSNetwork/core/$go test -v ./...
+  1 )Run all unit test
+  
+ `DOSNetwork/core/$go test -v ./...`
 
-7)Run all unit test and integration test 
-DOSNetwork/core$alias gtest="go test \$(go list ./... | grep -v /vendor/) -tags=integration"
-DOSNetwork/core$alias gtest -v
+  2 )Run all unit test and integration test 
+  
+ `DOSNetwork/core$alias gtest="go test \$(go list ./... | grep -v /vendor/) -tags=integration"`
+ 
+ `DOSNetwork/core$alias gtest -v`
