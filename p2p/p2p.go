@@ -43,6 +43,10 @@ func (n *P2P) GetId() internal.ID {
 	return n.identity
 }
 
+func (n *P2P) GetIPAddress() string {
+	return n.GetId().Address
+}
+
 func (n *P2P) Listen() error {
 	ip, err := GetLocalIp()
 	if err != nil {
@@ -125,8 +129,11 @@ func (n *P2P) Listen() error {
 }
 
 func (n *P2P) BootStrap(bootstrapIp string) (err error) {
+	//it inserts the value of some known node c into the appropriate bucket as its first contact
 	_, err = n.NewPeer(bootstrapIp)
-	results := n.FindNode(n.GetId(), dht.BucketSize, 20)
+	//it does an iterativeFindNode for self
+	id := n.GetId()
+	results := n.FindNodeById(id.GetId())
 	for _, result := range results {
 		n.GetRoutingTable().Update(result)
 		fmt.Println(n.GetId().Address, "Update peer: ", result.Address)
@@ -148,25 +155,53 @@ func (n *P2P) Broadcast(m proto.Message) {
 func (n *P2P) CheckPeers() {
 	n.peers.Range(func(key, value interface{}) bool {
 		client := value.(*PeerClient)
-		fmt.Println(client.identity.Address)
+		fmt.Println("CheckPeers:", client.identity.Address)
 		return true
 	})
 }
 
+func (n *P2P) GetPeers() (r map[string]string) {
+	r = make(map[string]string)
+	n.peers.Range(func(key, value interface{}) bool {
+		client := value.(*PeerClient)
+		r[string(client.identity.Id)] = client.identity.Address
+		return true
+	})
+	return
+}
+
 func (n *P2P) SendMessageById(id []byte, m proto.Message) (err error) {
+	var sendResult bool
+	var tSendMessage float64
+	var tFindNode float64
+	start := time.Now()
 	value, loaded := n.peers.Load(string(id))
 	if !loaded {
-		//TODO : This is a sync call.It should be optimized to async call
-		fmt.Println("Can't find node ", id)
+		tFindNodeStart := time.Now()
 		n.FindNodeById(id)
+		tFindNode = time.Since(tFindNodeStart).Seconds()
 	}
 	value, loaded = n.peers.Load(string(id))
 	if loaded {
 		client := value.(*PeerClient)
 		err = client.SendMessage(m)
+		sendResult = true
 	} else {
 		err = fmt.Errorf("can't find node %s", string(id))
+		sendResult = false
 	}
+	tSendMessage = time.Since(start).Seconds()
+
+	a := new(big.Int).SetBytes(n.GetId().Id).String()
+	b := new(big.Int).SetBytes(id).String()
+
+	n.log.WithFields(logrus.Fields{
+		"time-sendMessage": tSendMessage,
+		"time-findNode":    tFindNode,
+		"targetID":         b,
+		"nodeID":           a,
+		"send-result":      sendResult,
+	}).Info()
 	return
 }
 
@@ -235,11 +270,7 @@ func (n *P2P) FindNodeById(id []byte) []internal.ID {
 	targetId := internal.ID{
 		Id: id,
 	}
-	return n.findNode(targetId, dht.BucketSize, 8)
-}
-
-func (n *P2P) FindNode(targetID internal.ID, alpha int, disjointPaths int) (results []internal.ID) {
-	return n.findNode(targetID, alpha, disjointPaths)
+	return n.findNode(targetId, dht.BucketSize, 20)
 }
 
 type lookupBucket struct {
@@ -254,7 +285,6 @@ type lookupBucket struct {
 //
 // Queries at most #ALPHA nodes at a time per lookup, and returns all peer IDs closest to a target peer ID.
 func (n *P2P) findNode(targetID internal.ID, alpha int, disjointPaths int) (results []internal.ID) {
-	start := time.Now()
 	visited := new(sync.Map)
 
 	var lookups []*lookupBucket
@@ -304,19 +334,21 @@ func (n *P2P) findNode(targetID internal.ID, alpha int, disjointPaths int) (resu
 	if len(results) > dht.BucketSize {
 		results = results[:dht.BucketSize]
 	}
-	fmt.Println("===================================================")
-	tFindNode := time.Since(start).Seconds()
-	fmt.Println("FINDNODE n.GetId().Id", n.GetId().Id, "  targetID = ", targetID, " tFindNode = ", tFindNode, " Second")
-	fmt.Println("===================================================")
+	/*
+		fmt.Println("===================================================")
+		tFindNode := time.Since(start).Seconds()
+		fmt.Println("FINDNODE n.GetId().Id", n.GetId().Id, "  targetID = ", targetID, " tFindNode = ", tFindNode, " Second")
+		fmt.Println("===================================================")
 
-	a := new(big.Int).SetBytes(n.GetId().Id).String()
-	b := new(big.Int).SetBytes(targetID.Id).String()
+		a := new(big.Int).SetBytes(n.GetId().Id).String()
+		b := new(big.Int).SetBytes(targetID.Id).String()
 
-	n.log.WithFields(logrus.Fields{
-		"timecost-findnode": tFindNode,
-		"targetID":          b,
-		"nodeID":            a,
-	}).Info()
+		n.log.WithFields(logrus.Fields{
+			"time-findnode": tFindNode,
+			"targetID":      b,
+			"nodeID":        a,
+		}).Info()*/
+
 	return
 }
 

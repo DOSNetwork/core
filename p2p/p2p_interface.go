@@ -73,6 +73,7 @@ type P2PMessage struct {
 }
 
 type P2PInterface interface {
+	GetIPAddress() string
 	GetId() internal.ID
 	Listen() error
 	Broadcast(proto.Message)
@@ -80,7 +81,7 @@ type P2PInterface interface {
 	SendMessageById([]byte, proto.Message) error
 	NewPeer(string) ([]byte, error)
 	//DHT
+	GetPeers() map[string]string
 	FindNodeById(id []byte) []internal.ID
-	FindNode(targetID internal.ID, alpha int, disjointPaths int) (results []internal.ID)
 	GetRoutingTable() *dht.RoutingTable
 }
