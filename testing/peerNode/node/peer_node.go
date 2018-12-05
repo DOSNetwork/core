@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/bshuster-repo/logrus-logstash-hook"
+	"github.com/ethereum/go-ethereum/common"
 	//"github.com/DOSNetwork/core/p2p/dht"
 	"github.com/DOSNetwork/core/testing/peerNode/internalMsg"
 
@@ -85,7 +87,18 @@ func (d *PeerNode) Init(bootStrapIp string, port, peerSize int, numMessages int,
 
 	//2)Build a p2p network
 	d.p, d.peerEvent, _ = p2p.CreateP2PNetwork(d.nodeID[:], port, d.log)
+	hook, err := logrustash.NewHookWithFields("tcp", "13.52.16.14:9500", "DOS_node", logrus.Fields{
+		"DOS_node_ip": d.p.GetId().Address,
+		"Serial":      string(common.BytesToAddress(d.p.GetId().Id).String()),
+	})
+	if err != nil {
+		//log.Error(err)
+	}
+
+	d.log.Hooks.Add(hook)
 	go d.p.Listen()
+
+	fmt.Println("nodeIP = ", d.p.GetIPAddress())
 	//3)
 	/*
 		_, _ = d.p.NewPeer(bootStrapIp + ":44460")
@@ -114,7 +127,6 @@ L:
 		case msg := <-d.peerEvent:
 			switch content := msg.Msg.Message.(type) {
 			case *internalMsg.Cmd:
-				fmt.Println("!! content.Ctype ", content.Ctype)
 				if content.Ctype == internalMsg.Cmd_ALLIP {
 					nodes := strings.Split(string(content.Args), ",")
 					allIP := []string{}
@@ -147,7 +159,6 @@ L:
 					d.tStrategy.CheckResult(sender, content, d)
 				}
 			default:
-				fmt.Println(content)
 			}
 		default:
 		}
