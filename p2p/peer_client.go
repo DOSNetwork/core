@@ -169,7 +169,7 @@ L:
 	if ok {
 		p.p2pnet.peers.Delete(string(p.identity.Id))
 	}
-	(*p.conn).Close()
+	//(*p.conn).Close()
 	close(p.done)
 	close(p.waitForHi)
 	fmt.Println("PeerClient receiveLoop done")
