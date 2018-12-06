@@ -5,6 +5,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -12,6 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 const ErrorCode = "[ERROR]"
@@ -32,13 +34,21 @@ func isTestFail(test string) (error, bool) {
 }
 
 func TestNewPeerAndSendMessage(test *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+	defer cancel() // The cancel should be deferred so resources are cleaned up
 	cmdOutput := &bytes.Buffer{}
-	cmd := exec.Command("docker-compose", "-f", "peer-docker-compose.yml", "up", "--scale", "peernode=5")
+	cmd := exec.CommandContext(ctx, "docker-compose", "-f", "peer-docker-compose.yml", "up", "--scale", "peernode=5")
 	cmd.Stdout = cmdOutput
 	cmd.Stderr = os.Stderr
 	cmd.Dir = peerNodeDir()
 
 	err := cmd.Run()
+
+	if ctx.Err() == context.DeadlineExceeded {
+		fmt.Println("Command timed out")
+		return
+	}
+
 	if err != nil {
 		os.Stderr.WriteString(err.Error())
 		test.Fail()
@@ -72,8 +82,10 @@ func TestNewPeerAndSendMessage(test *testing.T) {
 }
 
 func TestFindNode(test *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+	defer cancel() // The cancel should be deferred so resources are cleaned up
 	cmdOutput := &bytes.Buffer{}
-	cmd := exec.Command("docker-compose", "-f", "findnode-docker-compose.yml", "up", "--scale", "peernode=5")
+	cmd := exec.CommandContext(ctx, "docker-compose", "-f", "findnode-docker-compose.yml", "up", "--scale", "peernode=5")
 	cmd.Stdout = cmdOutput
 	cmd.Stderr = os.Stderr
 	cmd.Dir = filepath.Join(os.Getenv("GOPATH"), "src", "github.com", "DOSNetwork", "core", "testing", "peerNode")
@@ -82,6 +94,10 @@ func TestFindNode(test *testing.T) {
 	if err != nil {
 		os.Stderr.WriteString(err.Error())
 		test.Fail()
+	}
+	if ctx.Err() == context.DeadlineExceeded {
+		fmt.Println("Command timed out")
+		return
 	}
 	f, err := os.Create(cmd.Dir + "/FindNode.log")
 	if err != nil {
