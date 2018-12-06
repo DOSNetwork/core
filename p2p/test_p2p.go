@@ -28,7 +28,7 @@ retry:
 	//1)Check if this address has been in peers map
 	existing := false
 	n.peers.Range(func(key, value interface{}) bool {
-		client := value.(*PeerClient)
+		client := value.(*PeerConn)
 		if client.identity.Address == addr {
 
 			existing = true
@@ -49,14 +49,14 @@ retry:
 		goto retry
 	}
 
-	_, err = NewTestPeerClient(n, &conn, n.messages)
+	_, err = NewTestPeerConn(n, &conn, n.messages)
 	if err != nil {
-		fmt.Println("NewPeerClient err ", err)
+		fmt.Println("NewPeerConn err ", err)
 		goto retry
 	}
 
 	n.peers.Range(func(key, value interface{}) bool {
-		client := value.(*PeerClient)
+		client := value.(*PeerConn)
 		if client.identity.Address == addr {
 			existing = true
 			id = make([]byte, len(client.identity.Id))
