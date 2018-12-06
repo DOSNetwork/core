@@ -104,7 +104,7 @@ func main() {
 			}
 		}
 	} else {
-		err = p.BootStrap(bootstrapIp)
+		err = p.Join(bootstrapIp)
 	}
 
 	//4)Build a p2pDKG

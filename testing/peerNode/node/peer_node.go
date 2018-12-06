@@ -11,6 +11,7 @@ import (
 
 	"github.com/bshuster-repo/logrus-logstash-hook"
 	"github.com/ethereum/go-ethereum/common"
+
 	//"github.com/DOSNetwork/core/p2p/dht"
 	"github.com/DOSNetwork/core/testing/peerNode/internalMsg"
 
@@ -88,8 +89,8 @@ func (d *PeerNode) Init(bootStrapIp string, port, peerSize int, numMessages int,
 	//2)Build a p2p network
 	d.p, d.peerEvent, _ = p2p.CreateP2PNetwork(d.nodeID[:], port, d.log)
 	hook, err := logrustash.NewHookWithFields("tcp", "13.52.16.14:9500", "DOS_node", logrus.Fields{
-		"DOS_node_ip": d.p.GetId().Address,
-		"Serial":      string(common.BytesToAddress(d.p.GetId().Id).String()),
+		"DOS_node_ip": d.p.GetIP(),
+		"Serial":      string(common.BytesToAddress(d.p.GetID()).String()),
 	})
 	if err != nil {
 		//log.Error(err)
@@ -98,7 +99,7 @@ func (d *PeerNode) Init(bootStrapIp string, port, peerSize int, numMessages int,
 	d.log.Hooks.Add(hook)
 	go d.p.Listen()
 
-	fmt.Println("nodeIP = ", d.p.GetIPAddress())
+	fmt.Println("nodeIP = ", d.p.GetIP())
 	//3)
 	/*
 		_, _ = d.p.NewPeer(bootStrapIp + ":44460")

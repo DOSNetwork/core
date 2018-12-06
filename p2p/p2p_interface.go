@@ -6,8 +6,6 @@ import (
 	"os"
 	"sync"
 
-	"github.com/DOSNetwork/core/p2p/dht"
-	"github.com/DOSNetwork/core/p2p/internal"
 	"github.com/DOSNetwork/core/suites"
 	"github.com/dedis/kyber"
 	"github.com/golang/protobuf/proto"
@@ -73,14 +71,11 @@ type P2PMessage struct {
 }
 
 type P2PInterface interface {
-	GetIPAddress() string
-	GetId() internal.ID
+	GetIP() string
+	GetID() []byte
 	Listen() error
 	Broadcast(proto.Message)
-	BootStrap(bootstrapIp string) error
-	SendMessageById([]byte, proto.Message) error
-	NewPeer(string) ([]byte, error)
-	//DHT
-	FindNodeById(id []byte) []internal.ID
-	GetRoutingTable() *dht.RoutingTable
+	Join(bootstrapIp string) error
+	SendMessage(id []byte, msg proto.Message) error
+	NewPeer(ip string) ([]byte, error)
 }
