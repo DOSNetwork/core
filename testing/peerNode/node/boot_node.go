@@ -76,8 +76,8 @@ func (b *BootNode) Init(port, peerSize int, logger *logrus.Logger) {
 	b.p, b.peerEvent, _ = p2p.CreateP2PNetwork(bootID, port, b.log)
 
 	hook, err := logrustash.NewHookWithFields("tcp", "13.52.16.14:9500", "DOS_node", logrus.Fields{
-		"DOS_node_ip": b.p.GetId().Address,
-		"Serial":      string(common.BytesToAddress(b.p.GetId().Id).String()),
+		"DOS_node_ip": b.p.GetIP(),
+		"Serial":      string(common.BytesToAddress(b.p.GetID()).String()),
 	})
 	if err != nil {
 		//log.Error(err)

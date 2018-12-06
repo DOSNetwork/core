@@ -22,10 +22,9 @@ import (
 	"github.com/dedis/kyber"
 )
 
-const TIMEOUTFORHI = 60
 
-type PeerClient struct {
-	//TODO:remove *P2P and use sync map to manage the lifecycle of PeerClient
+type PeerConn struct {
+	//TODO:remove *P2P and use sync map to manage the lifecycle of PeerConn
 	p2pnet *P2P
 	//TODO:
 	rxMessage chan P2PMessage
@@ -50,8 +49,8 @@ type RequestState struct {
 	closeSignal chan struct{}
 }
 
-func NewPeerClient(p2pnet *P2P, conn *net.Conn, rxMessage chan P2PMessage) (peer *PeerClient, err error) {
-	peer = &PeerClient{
+func NewPeerConn(p2pnet *P2P, conn *net.Conn, rxMessage chan P2PMessage) (peer *PeerConn, err error) {
+	peer = &PeerConn{
 		p2pnet:    p2pnet,
 		conn:      conn,
 		rxMessage: rxMessage,
@@ -67,7 +66,7 @@ func NewPeerClient(p2pnet *P2P, conn *net.Conn, rxMessage chan P2PMessage) (peer
 	return
 }
 
-func (p *PeerClient) Start() (err error) {
+func (p *PeerConn) Start() (err error) {
 	go p.receiveLoop()
 	err = p.SayHi()
 	if err != nil {
@@ -76,22 +75,22 @@ func (p *PeerClient) Start() (err error) {
 	return
 }
 
-func (p *PeerClient) SendMessage(msg proto.Message) (err error) {
+func (p *PeerConn) SendMessage(msg proto.Message) (err error) {
 	var prepared *internal.Package
 	prepared, err = p.prepareMessage(msg)
 	if err != nil {
-		fmt.Println("PeerClient sendLoop err ", err)
+		fmt.Println("PeerConn sendLoop err ", err)
 		return
 	}
 
 	prepared.RequestNonce = atomic.AddUint64(&p.RequestNonce, 1)
 	if err = p.SendPackage(prepared); err != nil {
-		fmt.Println("PeerClient sendLoop SendPackage ", err)
+		fmt.Println("PeerConn sendLoop SendPackage ", err)
 	}
 	return
 }
 
-func (p *PeerClient) receiveLoop() {
+func (p *PeerConn) receiveLoop() {
 	//time.Sleep(TIMEOUTFORHI * time.Second)
 L:
 	for {
@@ -102,16 +101,16 @@ L:
 			buf, err := p.receivePackage()
 			switch {
 			case err == io.EOF:
-				fmt.Println("PeerClient ", p.identity.Id, " EOF")
+				fmt.Println("PeerConn ", p.identity.Id, " EOF")
 				break L
 			case err != nil:
-				fmt.Println("PeerClient ", p.identity.Id, " err ", err)
+				fmt.Println("PeerConn ", p.identity.Id, " err ", err)
 				break L
 			}
 
 			pa, ptr, err := p.decodePackage(buf)
 			if err != nil {
-				fmt.Println("PeerClient decodePackage err ", err)
+				fmt.Println("PeerConn decodePackage err ", err)
 				continue
 			}
 
@@ -135,7 +134,7 @@ L:
 					p.identity.PublicKey = content.GetPublicKey()
 					pub := suite.G2().Point()
 					if err = pub.UnmarshalBinary(content.GetPublicKey()); err != nil {
-						fmt.Println("PeerClient UnmarshalBinary err ", err)
+						fmt.Println("PeerConn UnmarshalBinary err ", err)
 					}
 					p.pubKey = pub
 					p.waitForHi <- true
@@ -172,10 +171,10 @@ L:
 	//(*p.conn).Close()
 	close(p.done)
 	close(p.waitForHi)
-	fmt.Println("PeerClient receiveLoop done")
+	fmt.Println("PeerConn receiveLoop done")
 }
 
-func (p *PeerClient) receivePackage() ([]byte, error) {
+func (p *PeerConn) receivePackage() ([]byte, error) {
 	var err error
 
 	// Read until all header bytes have been read.
@@ -209,7 +208,7 @@ func (p *PeerClient) receivePackage() ([]byte, error) {
 	return buffer, nil
 }
 
-func (p *PeerClient) decodePackage(bytes []byte) (*internal.Package, *ptypes.DynamicAny, error) {
+func (p *PeerConn) decodePackage(bytes []byte) (*internal.Package, *ptypes.DynamicAny, error) {
 	pa := new(internal.Package)
 	if err := proto.Unmarshal(bytes, pa); err != nil {
 		return nil, nil, err
@@ -230,7 +229,7 @@ func (p *PeerClient) decodePackage(bytes []byte) (*internal.Package, *ptypes.Dyn
 	return pa, &ptr, nil
 }
 
-func (p *PeerClient) SayHi() (err error) {
+func (p *PeerConn) SayHi() (err error) {
 	pa := &internal.Hi{
 		PublicKey: p.p2pnet.identity.PublicKey,
 		Address:   p.p2pnet.identity.Address,
@@ -240,14 +239,14 @@ func (p *PeerClient) SayHi() (err error) {
 	err = p.SendMessage(pa)
 
 	//Add a timer to avoid wait for Hi forever
-	timer := time.NewTimer(TIMEOUTFORHI * time.Second)
+	timer := time.NewTimer(60 * time.Second)
 L:
 	for {
 		select {
 		case <-timer.C:
 			p.done <- true
 			fmt.Println("Time expire")
-			err = errors.New("PeerClient: Time expire")
+			err = errors.New("PeerConn: Time expire")
 			break L
 		case <-p.waitForHi:
 			_ = timer.Stop()
@@ -258,7 +257,7 @@ L:
 	return
 }
 
-func (p *PeerClient) SendPackage(msg proto.Message) error {
+func (p *PeerConn) SendPackage(msg proto.Message) error {
 	if msg == nil {
 		return errors.New("network: message is null")
 	}
@@ -286,7 +285,7 @@ func (p *PeerClient) SendPackage(msg proto.Message) error {
 	return nil
 }
 
-func (p *PeerClient) prepareMessage(msg proto.Message) (*internal.Package, error) {
+func (p *PeerConn) prepareMessage(msg proto.Message) (*internal.Package, error) {
 	var err error
 	if msg == nil {
 		return nil, errors.New("network: message is null")
@@ -316,7 +315,7 @@ func (p *PeerClient) prepareMessage(msg proto.Message) (*internal.Package, error
 }
 
 // Request requests for a response for a request sent to a given peer.
-func (p *PeerClient) Request(req *Request) (proto.Message, error) {
+func (p *PeerConn) Request(req *Request) (proto.Message, error) {
 	prepared, err := p.prepareMessage(req.Message)
 	if err != nil {
 		return nil, err
@@ -324,7 +323,7 @@ func (p *PeerClient) Request(req *Request) (proto.Message, error) {
 
 	prepared.RequestNonce = atomic.AddUint64(&p.RequestNonce, 1)
 	if err := p.SendPackage(prepared); err != nil {
-		fmt.Println("PeerClient Request err ", err)
+		fmt.Println("PeerConn Request err ", err)
 		return nil, err
 	}
 
@@ -350,7 +349,7 @@ func (p *PeerClient) Request(req *Request) (proto.Message, error) {
 }
 
 // Reply is equivalent to Write() with an appended nonce to signal a reply.
-func (p *PeerClient) Reply(nonce uint64, message proto.Message) error {
+func (p *PeerConn) Reply(nonce uint64, message proto.Message) error {
 	prepared, err := p.prepareMessage(message)
 	if err != nil {
 		return err
@@ -361,7 +360,7 @@ func (p *PeerClient) Reply(nonce uint64, message proto.Message) error {
 	prepared.ReplyFlag = true
 
 	if err := p.SendPackage(prepared); err != nil {
-		fmt.Println("PeerClient Reply err ", err)
+		fmt.Println("PeerConn Reply err ", err)
 		return err
 	}
 
