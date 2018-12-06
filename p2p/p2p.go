@@ -35,16 +35,16 @@ type P2P struct {
 	log          *logrus.Logger
 }
 
-func (n *P2P) SetId(id []byte) {
+func (n *P2P) SetID(id []byte) {
 	n.identity.Id = id
 }
 
-func (n *P2P) GetId() internal.ID {
+func (n *P2P) GetID() internal.ID {
 	return n.identity
 }
 
-func (n *P2P) GetIPAddress() string {
-	return n.GetId().Address
+func (n *P2P) GetIP() string {
+	return n.GetID().Address
 }
 
 func (n *P2P) Listen() error {
@@ -128,15 +128,15 @@ func (n *P2P) Listen() error {
 	return nil
 }
 
-func (n *P2P) BootStrap(bootstrapIp string) (err error) {
+func (n *P2P) Join(bootstrapIp string) (err error) {
 	//it inserts the value of some known node c into the appropriate bucket as its first contact
 	_, err = n.NewPeer(bootstrapIp)
 	//it does an iterativeFindNode for self
-	id := n.GetId()
+	id := n.GetID()
 	results := n.FindNodeById(id.GetId())
 	for _, result := range results {
 		n.GetRoutingTable().Update(result)
-		fmt.Println(n.GetId().Address, "Update peer: ", result.Address)
+		fmt.Println(n.GetID().Address, "Update peer: ", result.Address)
 	}
 	return
 }
@@ -160,7 +160,7 @@ func (n *P2P) CheckPeers() {
 	})
 }
 
-func (n *P2P) SendMessageById(id []byte, m proto.Message) (err error) {
+func (n *P2P) SendMessage(id []byte, m proto.Message) (err error) {
 	var sendResult bool
 	var tSendMessage float64
 	var tFindNode float64
@@ -182,7 +182,7 @@ func (n *P2P) SendMessageById(id []byte, m proto.Message) (err error) {
 	}
 	tSendMessage = time.Since(start).Seconds()
 
-	a := new(big.Int).SetBytes(n.GetId().Id).String()
+	a := new(big.Int).SetBytes(n.GetID().Id).String()
 	b := new(big.Int).SetBytes(id).String()
 
 	n.log.WithFields(logrus.Fields{
