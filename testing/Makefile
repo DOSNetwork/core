@@ -5,6 +5,7 @@
 
 .DEFAULT_GOAL := deploy
 ETH_CONTRACTS := ../onchain/eth/contracts
+REMOTE_USER_CONTRACT := ../onchain/eth/contracts/examples
 USER_CONTRACTS := dosUser/contract
 BOOT_CREDENTIAL := ../testAccounts/bootCredential
 AMA_CONFIGPATH := dosUser/ama.json
@@ -19,6 +20,7 @@ deploy:contract-prepare
 	cp $(ETH_CONTRACTS)/Ownable.sol $(USER_CONTRACTS)/
 	mkdir -p $(USER_CONTRACTS)/lib/
 	cp $(ETH_CONTRACTS)/lib/utils.sol $(USER_CONTRACTS)/lib/
+	cp $(REMOTE_USER_CONTRACT)/AskMeAnything.sol $(USER_CONTRACTS)/
 	abigen -sol $(USER_CONTRACTS)/AskMeAnything.sol --pkg dosUser --out $(USER_CONTRACTS)/AskMeAnything.go
 	rm $(USER_CONTRACTS)/DOSOnChainSDK.sol
 	rm $(USER_CONTRACTS)/Ownable.sol
