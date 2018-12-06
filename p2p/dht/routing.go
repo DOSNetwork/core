@@ -88,18 +88,18 @@ func (t *RoutingTable) Update(target internal.ID) {
 }
 
 // GetPeers returns a randomly-ordered, unique list of all peers within the routing network (excluding itself).
-func (t *RoutingTable) GetPeers() (peers []internal.ID) {
+func (t *RoutingTable) GetPeers() (peers map[string]string) {
 	visited := make(map[string]struct{})
-	visited[PublicKeyHex(t.self)] = struct{}{}
-
+	visited[string(t.self.Id)] = struct{}{}
+	peers = make(map[string]string)
 	for _, bucket := range t.buckets {
 		bucket.mutex.RLock()
 
 		for e := bucket.Front(); e != nil; e = e.Next() {
 			id := e.Value.(internal.ID)
-			if _, seen := visited[PublicKeyHex(id)]; !seen {
-				peers = append(peers, id)
-				visited[PublicKeyHex(id)] = struct{}{}
+			if _, seen := visited[string(id.Id)]; !seen {
+				peers[string(id.Id)] = id.Address
+				visited[string(id.Id)] = struct{}{}
 			}
 		}
 
@@ -112,16 +112,16 @@ func (t *RoutingTable) GetPeers() (peers []internal.ID) {
 // GetPeerAddresses returns a unique list of all peer addresses within the routing network.
 func (t *RoutingTable) GetPeerAddresses() (peers []string) {
 	visited := make(map[string]struct{})
-	visited[PublicKeyHex(t.self)] = struct{}{}
+	visited[string(t.self.Id)] = struct{}{}
 
 	for _, bucket := range t.buckets {
 		bucket.mutex.RLock()
 
 		for e := bucket.Front(); e != nil; e = e.Next() {
 			id := e.Value.(internal.ID)
-			if _, seen := visited[PublicKeyHex(id)]; !seen {
+			if _, seen := visited[string(id.Id)]; !seen {
 				peers = append(peers, id.Address)
-				visited[PublicKeyHex(id)] = struct{}{}
+				visited[string(id.Id)] = struct{}{}
 			}
 		}
 

@@ -160,16 +160,6 @@ func (n *P2P) CheckPeers() {
 	})
 }
 
-func (n *P2P) GetPeers() (r map[string]string) {
-	r = make(map[string]string)
-	n.peers.Range(func(key, value interface{}) bool {
-		client := value.(*PeerClient)
-		r[string(client.identity.Id)] = client.identity.Address
-		return true
-	})
-	return
-}
-
 func (n *P2P) SendMessageById(id []byte, m proto.Message) (err error) {
 	var sendResult bool
 	var tSendMessage float64
