@@ -81,7 +81,6 @@ type P2PInterface interface {
 	SendMessageById([]byte, proto.Message) error
 	NewPeer(string) ([]byte, error)
 	//DHT
-	GetPeers() map[string]string
 	FindNodeById(id []byte) []internal.ID
 	GetRoutingTable() *dht.RoutingTable
 }
