@@ -11,8 +11,8 @@
             "RemoteNodeType": "rinkebyPrivateNode",
             "RemoteNodeAddress": "ws://51.15.0.157:8546",
             "ChainType": "ETH",
-            "DOSProxyAddress": "",
-            "DOSAddressBridgeAddress": "0xf00bB7BDbe42b96d05a5DBe2b12716f154744534"
+            "DOSProxyAddress": "0xdD03D694A3AE92daF036A68dA6Ca48D65135e9b3",
+            "DOSAddressBridgeAddress": "0xEbC1AeDf2622bB044eFc7dB14B53cb3d05bCBc99"
         },
         {
             "RemoteNodeType": "privateNode",

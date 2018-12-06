@@ -21,13 +21,15 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 )
-
+const ALLNODEREADY = 1
+const ALLNODENOTREADY = 0
 type BootNode struct {
 	node
 	count     int
 	ipIdMap   map[string][]byte
 	lock      sync.Mutex
 	checkroll map[string]bool
+	readynode map[string]bool
 }
 
 func GenerateRandomBytes(n int) ([]byte, error) {
@@ -69,6 +71,9 @@ func (b *BootNode) Init(port, peerSize int, logger *logrus.Logger) {
 	r := mux.NewRouter()
 	r.HandleFunc("/getID", b.getID).Methods("POST")
 	r.HandleFunc("/getMembers", b.getMembers).Methods("GET")
+	r.HandleFunc("/getAllIDs", b.getAllIDs).Methods("GET")
+	r.HandleFunc("/getAllIPs", b.getAllIPs).Methods("GET")
+	r.HandleFunc("/isTestReady", b.isTestReady).Methods("GET")
 	r.HandleFunc("/post", b.postHandler)
 	go http.ListenAndServe(":8080", r)
 
@@ -76,8 +81,8 @@ func (b *BootNode) Init(port, peerSize int, logger *logrus.Logger) {
 	b.p, b.peerEvent, _ = p2p.CreateP2PNetwork(bootID, port, b.log)
 
 	hook, err := logrustash.NewHookWithFields("tcp", "13.52.16.14:9500", "DOS_node", logrus.Fields{
-		"DOS_node_ip": b.p.GetId().Address,
-		"Serial":      string(common.BytesToAddress(b.p.GetId().Id).String()),
+		"DOS_node_ip": b.p.GetID().Address,
+		"Serial":      string(common.BytesToAddress(b.p.GetID().Id).String()),
 	})
 	if err != nil {
 		//log.Error(err)
@@ -121,15 +126,32 @@ func (b *BootNode) getID(w http.ResponseWriter, r *http.Request) {
 }
 
 func (b *BootNode) getAllIDs(w http.ResponseWriter, r *http.Request) {
-
+	for i := 1; i <= b.peerSize; i++ {
+		w.Write(b.members[i])
+	}
 }
 
 func (b *BootNode) getAllIPs(w http.ResponseWriter, r *http.Request) {
+	if b.count == b.peerSize {
+		for i := 0; i < len(b.allIP); i++ {
+			w.Write([]byte(b.allIP[i]+","))
+		}
+	}
+}
 
+func (b *BootNode) isAllnodeready() bool{
+	return len(b.readynode) == (b.peerSize - 1)
 }
 
 func (b *BootNode) isTestReady(w http.ResponseWriter, r *http.Request) {
-
+	body, _ := ioutil.ReadAll(r.Body)
+	ip := string(body)
+	b.readynode[ip] = true
+	if b.isAllnodeready() {
+		w.Write([]byte{ALLNODEREADY})
+	} else {
+		w.Write([]byte{ALLNODENOTREADY})
+	}
 }
 
 type Result struct {

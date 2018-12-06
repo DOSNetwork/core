@@ -73,14 +73,16 @@ type P2PMessage struct {
 }
 
 type P2PInterface interface {
-	GetIPAddress() string
-	GetId() internal.ID
+	GetIP() string
+	GetID() internal.ID
 	Listen() error
 	Broadcast(proto.Message)
-	BootStrap(bootstrapIp string) error
-	SendMessageById([]byte, proto.Message) error
-	NewPeer(string) ([]byte, error)
+	Join(bootstrapIp string) error
+	SendMessage(id []byte, msg proto.Message) error
+	NewPeer(ip string) ([]byte, error)
 	//DHT
 	FindNodeById(id []byte) []internal.ID
 	GetRoutingTable() *dht.RoutingTable
 }
+
+

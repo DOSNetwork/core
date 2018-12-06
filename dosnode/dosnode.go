@@ -214,7 +214,7 @@ func (d *DosNode) PipeGrouping(chGroup <-chan interface{}) {
 					var groupIds [][]byte
 					for i, node := range content.NodeId {
 						id := node.Bytes()
-						if string(id) == string((*d.network).GetId().Id) {
+						if string(id) == string((*d.network).GetID().Id) {
 							isMember = true
 						}
 						fmt.Println("DOSProxyLogGrouping member i= ", i, " id ", id, " ", isMember)
@@ -417,7 +417,7 @@ func (d *DosNode) PipeSignAndBroadcast(reports <-chan Report) (<-chan Report, <-
 						if r := bytes.Compare(member, report.submitter); r == 0 {
 							//Todo:Need to check to see if it is thread safe
 							memberAddress := common.BytesToAddress(member).Hex()
-							if err = (*d.network).SendMessageById(member, &sign); err != nil {
+							if err = (*d.network).SendMessage(member, &sign); err != nil {
 								log.WithFields(logrus.Fields{
 									"requestId": report.selfSign.QueryId,
 									"receiver":  memberAddress,

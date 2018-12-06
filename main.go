@@ -61,8 +61,8 @@ func main() {
 
 	//2.5)Add hook to log module
 	hook, err := logrustash.NewHookWithFields("tcp", "13.52.16.14:9500", "DOS_node", logrus.Fields{
-		"DOS_node_ip": p.GetId().Address,
-		"Serial":      string(common.BytesToAddress(p.GetId().Id).String()),
+		"DOS_node_ip": p.GetID().Address,
+		"Serial":      string(common.BytesToAddress(p.GetID().Id).String()),
 	})
 	if err != nil {
 		log.Error(err)
@@ -84,7 +84,7 @@ func main() {
 			}
 		}
 	} else {
-		err = p.BootStrap(bootstrapIp)
+		err = p.Join(bootstrapIp)
 	}
 
 	//4)Build a p2pDKG
