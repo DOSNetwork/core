@@ -23,7 +23,7 @@ import (
 
 type P2P struct {
 	identity internal.ID
-	//Map of ID (string) <-> *p2p.PeerClient
+	//Map of ID (string) <-> *p2p.PeerConn
 	peers *sync.Map
 	// Todo:Add a subscrive fucntion to send message to application
 	messages     chan P2PMessage
@@ -110,8 +110,8 @@ func (n *P2P) Listen() error {
 		for {
 			if conn, err := listener.Accept(); err == nil {
 				//Create a peer client
-				var peer *PeerClient
-				peer, err = NewPeerClient(n, &conn, n.messages)
+				var peer *PeerConn
+				peer, err = NewPeerConn(n, &conn, n.messages)
 				if err != nil {
 					log.Fatal(err)
 				}
@@ -143,7 +143,7 @@ func (n *P2P) Join(bootstrapIp string) (err error) {
 
 func (n *P2P) Broadcast(m proto.Message) {
 	n.peers.Range(func(key, value interface{}) bool {
-		client := value.(*PeerClient)
+		client := value.(*PeerConn)
 		err := client.SendMessage(m)
 		if err != nil {
 			fmt.Println("P2P Broadcast ", err)
@@ -154,7 +154,7 @@ func (n *P2P) Broadcast(m proto.Message) {
 
 func (n *P2P) CheckPeers() {
 	n.peers.Range(func(key, value interface{}) bool {
-		client := value.(*PeerClient)
+		client := value.(*PeerConn)
 		fmt.Println("CheckPeers:", client.identity.Address)
 		return true
 	})
@@ -173,7 +173,7 @@ func (n *P2P) SendMessage(id []byte, m proto.Message) (err error) {
 	}
 	value, loaded = n.peers.Load(string(id))
 	if loaded {
-		client := value.(*PeerClient)
+		client := value.(*PeerConn)
 		err = client.SendMessage(m)
 		sendResult = true
 	} else {
@@ -204,13 +204,13 @@ This is a block call
 */
 
 func (n *P2P) NewPeer(addr string) (id []byte, err error) {
-	var peer *PeerClient
+	var peer *PeerConn
 	var conn net.Conn
 	for retry := 0; retry < 10; retry++ {
 		//1)Check if this address has been in peers map
 		existing := false
 		n.peers.Range(func(key, value interface{}) bool {
-			client := value.(*PeerClient)
+			client := value.(*PeerConn)
 			if client.identity.Address == addr {
 
 				existing = true
@@ -232,16 +232,16 @@ func (n *P2P) NewPeer(addr string) (id []byte, err error) {
 			continue
 		}
 
-		peer, err = NewPeerClient(n, &conn, n.messages)
+		peer, err = NewPeerConn(n, &conn, n.messages)
 		if err != nil {
-			fmt.Println("NewPeerClient err ", err)
+			fmt.Println("NewPeerConn err ", err)
 			continue
 		}
 		n.peers.LoadOrStore(string(peer.identity.Id), peer)
 		n.routingTable.Update(peer.identity)
 
 		n.peers.Range(func(key, value interface{}) bool {
-			client := value.(*PeerClient)
+			client := value.(*PeerConn)
 			if client.identity.Address == addr {
 				existing = true
 				id = make([]byte, len(client.identity.Id))
@@ -388,7 +388,7 @@ func (lookup *lookupBucket) performLookup(n *P2P, targetID internal.ID, alpha in
 }
 
 func (n *P2P) queryPeerByID(peerID internal.ID, targetID internal.ID, responses chan []*internal.ID) {
-	var client *PeerClient
+	var client *PeerConn
 	_, loaded := n.peers.Load(string(peerID.Id))
 	if !loaded {
 		_, err := n.NewPeer(peerID.Address)
@@ -398,14 +398,14 @@ func (n *P2P) queryPeerByID(peerID internal.ID, targetID internal.ID, responses 
 		}
 	}
 	//TODO: Need to check if it can just return
-	//panic: interface conversion: interface {} is nil, not *p2p.PeerClient
+	//panic: interface conversion: interface {} is nil, not *p2p.PeerConn
 	value, ok := n.peers.Load(string(peerID.Id))
 	if !ok {
 		fmt.Println("value not found for key: peerID.Id", peerID.Id)
 		responses <- []*internal.ID{}
 		return
 	}
-	client = value.(*PeerClient)
+	client = value.(*PeerConn)
 
 	targetProtoID := internal.ID(targetID)
 

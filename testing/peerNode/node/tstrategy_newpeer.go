@@ -25,7 +25,7 @@ func (r test1) StartTest(content *internalMsg.Cmd, d *PeerNode) {
 
 	for i := 0; i < d.numMessages; i++ {
 		for id, _ := range d.checkroll {
-			d.p.SendMessageById([]byte(id), pb)
+			d.p.SendMessage([]byte(id), pb)
 		}
 	}
 }
@@ -48,7 +48,7 @@ func (r test1) CheckResult(sender string, content *internalMsg.Cmd, d *PeerNode)
 type test2 struct{}
 
 func (r test2) StartTest(content *internalMsg.Cmd, d *PeerNode) {
-	hostid := d.p.GetId()
+	hostid := d.p.GetID()
 	fmt.Println("!!!!StartTest ", hostid.GetId())
 
 	for i := 0; i < len(d.nodeIDs); i++ {
@@ -65,7 +65,7 @@ func (r test2) StartTest(content *internalMsg.Cmd, d *PeerNode) {
 
 	for i := 0; i < d.numMessages; i++ {
 		for id, _ := range d.checkroll {
-			go d.p.SendMessageById([]byte(id), pb)
+			go d.p.SendMessage([]byte(id), pb)
 		}
 	}
 }

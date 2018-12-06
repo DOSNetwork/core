@@ -77,7 +77,7 @@ func (b *BootNode) Init(port, peerSize int, logger *logrus.Logger) {
 
 	hook, err := logrustash.NewHookWithFields("tcp", "13.52.16.14:9500", "DOS_node", logrus.Fields{
 		"DOS_node_ip": b.p.GetID().Address,
-		"Serial":      string(common.BytesToAddress(b.p.GetId().Id).String()),
+		"Serial":      string(common.BytesToAddress(b.p.GetID().Id).String()),
 	})
 	if err != nil {
 		//log.Error(err)

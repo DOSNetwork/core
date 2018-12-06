@@ -88,8 +88,8 @@ func (d *PeerNode) Init(bootStrapIp string, port, peerSize int, numMessages int,
 	//2)Build a p2p network
 	d.p, d.peerEvent, _ = p2p.CreateP2PNetwork(d.nodeID[:], port, d.log)
 	hook, err := logrustash.NewHookWithFields("tcp", "13.52.16.14:9500", "DOS_node", logrus.Fields{
-		"DOS_node_ip": d.p.GetId().Address,
-		"Serial":      string(common.BytesToAddress(d.p.GetId().Id).String()),
+		"DOS_node_ip": d.p.GetID().Address,
+		"Serial":      string(common.BytesToAddress(d.p.GetID().Id).String()),
 	})
 	if err != nil {
 		//log.Error(err)
@@ -98,7 +98,7 @@ func (d *PeerNode) Init(bootStrapIp string, port, peerSize int, numMessages int,
 	d.log.Hooks.Add(hook)
 	go d.p.Listen()
 
-	fmt.Println("nodeIP = ", d.p.GetIPAddress())
+	fmt.Println("nodeIP = ", d.p.GetIP())
 	//3)
 	/*
 		_, _ = d.p.NewPeer(bootStrapIp + ":44460")

@@ -11,21 +11,16 @@ import (
 	"github.com/golang/protobuf/proto"
 )
 
-type TestPeerClient struct {
-	PeerClient
+type TestPeerConn struct {
+	PeerConn
 	testStrategy string
 }
 
-const (
-	DELAY_BEFORE_RECEIVELOOP = "DELAY_BEFORE_RECEIVELOOP"
-)
 
-const TESTTIMEOUTFORHI = 10
-
-func NewTestPeerClient(p2pnet *TestP2P, conn *net.Conn, rxMessage chan P2PMessage) (peer *TestPeerClient, err error) {
-	//fmt.Println("TestPeerClient receiveLoop !!! ", p.testStrategy)
-	peer = &TestPeerClient{
-		PeerClient{
+func NewTestPeerConn(p2pnet *TestP2P, conn *net.Conn, rxMessage chan P2PMessage) (peer *TestPeerConn, err error) {
+	//fmt.Println("TestPeerConn receiveLoop !!! ", p.testStrategy)
+	peer = &TestPeerConn{
+		PeerConn{
 			p2pnet:    &p2pnet.P2P,
 			conn:      conn,
 			rxMessage: rxMessage,
@@ -36,7 +31,7 @@ func NewTestPeerClient(p2pnet *TestP2P, conn *net.Conn, rxMessage chan P2PMessag
 		},
 		p2pnet.testStrategy,
 	}
-	fmt.Println("!!!! NewTestPeerClient ", TESTTIMEOUTFORHI)
+	fmt.Println("!!!! NewTestPeerConn ", 10)
 	go peer.receiveLoop()
 	err = peer.sayHi()
 	if err != nil {
@@ -46,16 +41,16 @@ func NewTestPeerClient(p2pnet *TestP2P, conn *net.Conn, rxMessage chan P2PMessag
 	return
 }
 
-func (p *TestPeerClient) receiveLoop() {
-	if p.testStrategy == DELAY_BEFORE_RECEIVELOOP {
-		time.Sleep(TESTTIMEOUTFORHI * time.Second)
+func (p *TestPeerConn) receiveLoop() {
+	if p.testStrategy == "DELAY_BEFORE_RECEIVELOOP" {
+		time.Sleep(10 * time.Second)
 	}
-	//fmt.Println("TestPeerClient receiveLoop !!! ", p.testStrategy)
-	p.PeerClient.receiveLoop()
+	//fmt.Println("TestPeerConn receiveLoop !!! ", p.testStrategy)
+	p.PeerConn.receiveLoop()
 }
 
-func (p *TestPeerClient) sayHi() (err error) {
-	fmt.Println("!!!! TestPeerClient sayHi")
+func (p *TestPeerConn) sayHi() (err error) {
+	fmt.Println("!!!! TestPeerConn sayHi")
 	pa := &internal.Hi{
 		PublicKey: p.p2pnet.identity.PublicKey,
 		Address:   p.p2pnet.identity.Address,
@@ -65,14 +60,14 @@ func (p *TestPeerClient) sayHi() (err error) {
 	err = p.SendMessage(pa)
 
 	//Add a timer to avoid wait for Hi forever
-	timer := time.NewTimer(TESTTIMEOUTFORHI * time.Second)
+	timer := time.NewTimer(10 * time.Second)
 L:
 	for {
 		select {
 		case <-timer.C:
 			p.done <- true
 			fmt.Println("Time expire")
-			err = errors.New("PeerClient: Time expire")
+			err = errors.New("PeerConn: Time expire")
 			break L
 		case <-p.waitForHi:
 			_ = timer.Stop()
