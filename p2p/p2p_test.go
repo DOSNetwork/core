@@ -3,6 +3,7 @@ package p2p
 import (
 	"testing"
 
+	"github.com/DOSNetwork/core/p2p/dht"
 	"github.com/sirupsen/logrus"
 )
 
@@ -57,65 +58,71 @@ func TestBootStrap(t *testing.T) {
 	}
 	if len(pContactsAfter) != 1 || pContactsAfter[string(bootid)] != boot.GetIP() {
 		t.Errorf("peer contacts(%d) : peer contact %s peer ip %s", len(pContactsAfter), pContactsAfter[string(bootid)], boot.GetIP())
-
 	}
+
+	//TODO:Implement Leave function to turn off connection
+
 }
 
-//TODO
-func TestBootStrapWithMultipleNode1(t *testing.T) {
-	/*
-		bootid := []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20}
-		bootPort := 44460
-		log := logrus.New()
-		boot, _, err := CreateP2PNetwork(bootid[:], bootPort, log)
+//test scenario:numOfNodes is dht.BucketSize ,so any of nodeID should existing in every routing table.
+func TestBootStrapWithMultipleNode(t *testing.T) {
+	numOfNodes := dht.BucketSize
+	log := logrus.New()
+	var ok bool
+	peerPort := 55550
+	peers := make([]*P2P, numOfNodes)
+	peerIDs := make([][]byte, numOfNodes)
+
+	peerIDs[0] = []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20}
+	peer, _, err := CreateP2PNetwork(peerIDs[0][:], peerPort, log)
+	if err := peer.Listen(); err != nil {
+		t.Error("Test Failed: Listen failed ", err)
+	}
+	peers[0], ok = peer.(*P2P)
+	if err != nil {
+		t.Error("Test Failed: CreateP2PNetwork failed ", err)
+	}
+	if !ok {
+		t.Error("Test Failed: ")
+	}
+	for i := 1; i < numOfNodes; i++ {
+		peerIDs[i] = []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 + byte(i), 13, 14, 15, 16, 17, 18, 19, 21 + byte(i)}
+		peerPort := 55550 + i
+		peer, _, err := CreateP2PNetwork(peerIDs[i][:], peerPort, log)
+		if err := peer.Listen(); err != nil {
+			t.Error("Test Failed: Listen failed ", err)
+		}
+		peers[i], ok = peer.(*P2P)
 		if err != nil {
 			t.Error("Test Failed: CreateP2PNetwork failed ", err)
 		}
-
-		if err := boot.Listen(); err != nil {
-			t.Error("Test Failed: Listen failed ", err)
-
+		if !ok {
+			t.Error("Test Failed: ")
 		}
-
-			for i := 0; i < 10; i++ {
-				peerid := []byte{......}
-				peerPort := ...
-
-				peer, _, err := CreateP2PNetwork(peerid[:], peerPort, log)
-				...
-
-				peer.BootStrap(boot.GetIPAddress())
+		peer.Join(peers[0].GetIP())
+		count := 0
+		for j := 0; j < i; j++ {
+			pContactsAfter := peers[j].routingTable.GetPeers()
+			if pContactsAfter[string(peerIDs[i])] == peers[i].GetIP() {
+				count++
 			}
-	*/
-}
-
-//TODO
-func TestBootStrapWithMultipleNode2(t *testing.T) {
-	/*
-		bootid := []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20}
-		bootPort := 44460
-		log := logrus.New()
-		boot, _, err := CreateP2PNetwork(bootid[:], bootPort, log)
-		if err != nil {
-			t.Error("Test Failed: CreateP2PNetwork failed ", err)
 		}
-
-		if err := boot.Listen(); err != nil {
-			t.Error("Test Failed: Listen failed ", err)
-
+		if count == 0 {
+			t.Errorf("Can't find %s", peers[i].GetIP())
 		}
-		pre := boot
-
-			for i := 0; i < 10; i++ {
-				peerid := []byte{......}
-				peerPort := ...
-
-				peer, _, err := CreateP2PNetwork(peerid[:], peerPort, log)
-
-				.....
-
-				peer.BootStrap(pre.GetIPAddress())
-				pre = peer
+	}
+	for i := 0; i < numOfNodes; i++ {
+		count := 0
+		for j := 0; j < numOfNodes; j++ {
+			if i != j {
+				pContactsAfter := peers[j].routingTable.GetPeers()
+				if pContactsAfter[string(peerIDs[i])] == peers[i].GetIP() {
+					count++
+				}
 			}
-	*/
+		}
+		if count != (numOfNodes - 1) {
+			t.Errorf("Can't find %s in all routing table, %d", peers[i].GetIP(), count)
+		}
+	}
 }
