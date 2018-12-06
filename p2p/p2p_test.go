@@ -42,19 +42,21 @@ func TestBootStrap(t *testing.T) {
 	}
 	bContactsBefore := boot_p2p.routingTable.GetPeers()
 	pContactsBefore := peer_p2p.routingTable.GetPeers()
+
 	if len(pContactsBefore) != 0 || len(pContactsBefore) != 0 {
 		t.Errorf("Test Failed: Routing Table should be empty boot(%d) peer(%d)", len(bContactsBefore), len(pContactsBefore))
 	}
 
-	peer.BootStrap(boot.GetIPAddress())
+	peer.Join(boot.GetIP())
 
 	bContactsAfter := boot_p2p.routingTable.GetPeers()
 	pContactsAfter := peer_p2p.routingTable.GetPeers()
-	if len(bContactsAfter) != 1 || bContactsAfter[string(peerid)] != peer.GetIPAddress() {
-		t.Errorf("boot contacts(%d) : peer contact %s peer ip %s", len(bContactsAfter), bContactsAfter[string(peerid)], peer.GetIPAddress())
+
+	if len(bContactsAfter) != 1 || bContactsAfter[string(peerid)] != peer.GetIP() {
+		t.Errorf("boot contacts(%d) : peer contact %s peer ip %s", len(bContactsAfter), bContactsAfter[string(peerid)], peer.GetIP())
 	}
-	if len(pContactsAfter) != 1 || pContactsAfter[string(bootid)] != boot.GetIPAddress() {
-		t.Errorf("peer contacts(%d) : peer contact %s peer ip %s", len(pContactsAfter), pContactsAfter[string(bootid)], boot.GetIPAddress())
+	if len(pContactsAfter) != 1 || pContactsAfter[string(bootid)] != boot.GetIP() {
+		t.Errorf("peer contacts(%d) : peer contact %s peer ip %s", len(pContactsAfter), pContactsAfter[string(bootid)], boot.GetIP())
 
 	}
 }
