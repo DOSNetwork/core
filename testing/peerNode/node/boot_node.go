@@ -120,6 +120,18 @@ func (b *BootNode) getID(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (b *BootNode) getAllIDs(w http.ResponseWriter, r *http.Request) {
+
+}
+
+func (b *BootNode) getAllIPs(w http.ResponseWriter, r *http.Request) {
+
+}
+
+func (b *BootNode) isTestReady(w http.ResponseWriter, r *http.Request) {
+
+}
+
 type Result struct {
 	id string
 }
