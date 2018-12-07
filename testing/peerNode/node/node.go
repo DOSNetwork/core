@@ -7,7 +7,7 @@ import (
 )
 
 type TestStrategy interface {
-	StartTest(*internalMsg.Cmd, *PeerNode)
+	StartTest(*PeerNode)
 	CheckResult(string, *internalMsg.Cmd, *PeerNode)
 }
 

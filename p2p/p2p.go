@@ -135,7 +135,7 @@ func (n *P2P) Join(bootstrapIp string) (err error) {
 	results := n.FindNodeById(n.GetID())
 	for _, result := range results {
 		n.GetRoutingTable().Update(result)
-		fmt.Println(n.GetIP(), "Update peer: ", result.Address)
+		//fmt.Println(n.GetIP(), "Update peer: ", result.Address)
 	}
 	return
 }
@@ -178,6 +178,11 @@ func (n *P2P) SendMessage(id []byte, m proto.Message) (err error) {
 	} else {
 		err = fmt.Errorf("can't find node %s", string(id))
 		sendResult = false
+		contactsAfter := n.routingTable.GetPeers()
+		fmt.Println("[ERROR] can't find node", id)
+		for k, v := range contactsAfter {
+			fmt.Println("[ERROR] ", []byte(k), " - ", v)
+		}
 	}
 	tSendMessage = time.Since(start).Seconds()
 
