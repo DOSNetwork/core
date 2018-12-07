@@ -4,12 +4,15 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/DOSNetwork/core/configuration"
 	"github.com/DOSNetwork/core/onchain"
 	"github.com/DOSNetwork/core/testing/dosUser/contract"
 	"github.com/DOSNetwork/core/testing/dosUser/eth"
+
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
@@ -20,6 +23,12 @@ func deployAMAContract(ethComm *onchain.EthCommon) string {
 
 	fmt.Println("Starting deploy AskMeAnyThing.sol...")
 	address, tx, _, err = dosUser.DeployAskMeAnything(auth, ethComm.Client)
+	for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
+		fmt.Println(err)
+		time.Sleep(time.Second)
+		fmt.Println("transaction retry...")
+		address, tx, _, err = dosUser.DeployAskMeAnything(auth, ethComm.Client)
+	}
 	if err != nil {
 		fmt.Println(err)
 		return ""

@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"fmt"
 	"math/big"
+	"net"
 	_ "net/http/pprof"
 	"runtime/debug"
+	"time"
 
 	"github.com/bshuster-repo/logrus-logstash-hook"
 
@@ -58,11 +60,29 @@ func main() {
 	p, _ := p2p.CreateP2PNetwork(peerEvent, port)
 	p.SetId(chainConn.GetId())
 	if err := p.Listen(); err != nil {
-		log.Fatal(err)
+		log.Error(err)
 	}
 
 	//2.5)Add hook to log module
-	hook, err := logrustash.NewHookWithFields("tcp", "13.52.16.14:9500", "DOS_node", logrus.Fields{
+	tcpAddr, err := net.ResolveTCPAddr("tcp", "163.172.36.173:9500")
+	if err != nil {
+		log.Error(err)
+	}
+
+	conn, err := net.DialTCP("tcp", nil, tcpAddr)
+	if err != nil {
+		log.Error(err)
+	}
+
+	if err = conn.SetKeepAlivePeriod(time.Minute); err != nil {
+		log.Warn(err)
+	}
+
+	if err = conn.SetKeepAlive(true); err != nil {
+		log.Warn(err)
+	}
+
+	hook, err := logrustash.NewHookWithFieldsAndConn(conn, "DOS_node", logrus.Fields{
 		"DOS_node_ip": p.GetId().Address,
 		"Serial":      string(common.BytesToAddress(p.GetId().Id).String()),
 	})
@@ -108,11 +128,11 @@ func main() {
 	//5)Subscribe Event from Eth
 	eventGrouping := make(chan interface{}, 1)
 	defer close(eventGrouping)
-	chUrl := make(chan interface{}, 20)
+	chUrl := make(chan interface{}, 100)
 	defer close(chUrl)
-	chRandom := make(chan interface{}, 20)
+	chRandom := make(chan interface{}, 100)
 	defer close(chRandom)
-	chUsrRandom := make(chan interface{}, 20)
+	chUsrRandom := make(chan interface{}, 100)
 	defer close(chUsrRandom)
 	cSignatureFromPeer := make(chan vss.Signature, 100)
 	defer close(cSignatureFromPeer)

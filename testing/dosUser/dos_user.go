@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math/rand"
+	"net"
 	"net/http"
 	"os"
 	"strconv"
@@ -60,7 +61,10 @@ var querySets = []querySet{
 	{"https://api.coinmarketcap.com/v1/global/", "$.last_updated"},
 	{"https://api.coinmarketcap.com/v1/global/", "$.NOTVALID"},
 
-	////invalid queries
+	//frequent-update queries
+	//{"https://min-api.cryptocompare.com/data/price?fsym=BTC&tsyms=USD,JPY,EUR", "$"},
+
+	//invalid queries
 	//{"https://api.coinbase.com/v2/prices/ETH-USD/spot", "NOTVALID"},
 	//{"https://api.coinmarketcap.com/v1/global/", "NOTVALID"},
 }
@@ -83,10 +87,33 @@ func main() {
 	}
 
 	log := logrus.New()
-	hook, err := logrustash.NewHookWithFields("tcp", "13.52.16.14:9500", "DOS_uer", logrus.Fields{
+
+	tcpAddr, err := net.ResolveTCPAddr("tcp", "163.172.36.173:9500")
+	if err != nil {
+		log.Error(err)
+	}
+
+	conn, err := net.DialTCP("tcp", nil, tcpAddr)
+	if err != nil {
+		log.Error(err)
+	}
+
+	if err = conn.SetKeepAlivePeriod(time.Minute); err != nil {
+		log.Warn(err)
+	}
+
+	if err = conn.SetKeepAlive(true); err != nil {
+		log.Warn(err)
+	}
+
+	hook, err := logrustash.NewHookWithFieldsAndConn(conn, "DOS_uer", logrus.Fields{
 		"queryType":         envTypes,
 		"startingTimestamp": time.Now(),
 	})
+	if err != nil {
+		log.Error(err)
+	}
+
 	log.Hooks.Add(hook)
 
 	envTimes = os.Getenv(ENVQUERYTIMES)

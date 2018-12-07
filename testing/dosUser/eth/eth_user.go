@@ -13,6 +13,7 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
@@ -205,6 +206,12 @@ func (e *EthUserAdaptor) Query(internalSerial uint8, url, selector string) (err 
 	}
 
 	tx, err := e.proxy.AMA(auth, internalSerial, url, selector)
+	for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
+		fmt.Println(err)
+		time.Sleep(time.Second)
+		fmt.Println("transaction retry...")
+		tx, err = e.proxy.AMA(auth, internalSerial, url, selector)
+	}
 	if err != nil {
 		fmt.Println(" Query AMAerr ", err)
 		return
@@ -225,6 +232,12 @@ func (e *EthUserAdaptor) GetSafeRandom(internalSerial uint8) (err error) {
 	}
 
 	tx, err := e.proxy.RequestSafeRandom(auth, internalSerial)
+	for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
+		fmt.Println(err)
+		time.Sleep(time.Second)
+		fmt.Println("transaction retry...")
+		tx, err = e.proxy.RequestSafeRandom(auth, internalSerial)
+	}
 	if err != nil {
 		return
 	}
@@ -244,6 +257,12 @@ func (e *EthUserAdaptor) GetFastRandom() (err error) {
 	}
 
 	tx, err := e.proxy.RequestFastRandom(auth)
+	for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
+		fmt.Println(err)
+		time.Sleep(time.Second)
+		fmt.Println("transaction retry...")
+		tx, err = e.proxy.RequestFastRandom(auth)
+	}
 	if err != nil {
 		return
 	}

@@ -34,6 +34,8 @@ type ChainInterface interface {
 	//For test
 	ResetNodeIDs() (err error)
 	RandomNumberTimeOut() (err error)
+	EnoughBalance(address common.Address) (isEnough bool)
+	WhitelistInitialized() (initialized bool, err error)
 }
 
 func AdaptTo(chainName string, chainConfig *configuration.ChainConfig, logger *logrus.Logger) (conn ChainInterface, err error) {
