@@ -19,7 +19,10 @@ func (r test1) StartTest(d *PeerNode) {
 	pb := proto.Message(cmd)
 	for i := 0; i < len(d.nodeIPs); i++ {
 		ip := d.nodeIPs[i]
-		id, _ := d.p.NewPeer(ip)
+		id, err := d.p.NewPeer(ip)
+		if err != nil {
+			fmt.Println("NewPeer err", err)
+		}
 		d.checkroll[string(id)] = 0
 	}
 
