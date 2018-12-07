@@ -22,12 +22,16 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+const ALLNODEREADY = 1
+const ALLNODENOTREADY = 0
+
 type BootNode struct {
 	node
 	count     int
 	ipIdMap   map[string][]byte
 	lock      sync.Mutex
 	checkroll map[string]bool
+	readynode map[string]bool
 }
 
 func GenerateRandomBytes(n int) ([]byte, error) {
@@ -52,6 +56,7 @@ func (b *BootNode) Init(port, peerSize int, logger *logrus.Logger) {
 	b.checkroll = make(map[string]bool)
 	b.ipIdMap = make(map[string][]byte)
 	b.done = make(chan bool)
+	b.readynode = make(map[string]bool)
 	b.log = logger
 
 	for i := 1; i <= b.peerSize; i++ {
@@ -69,6 +74,9 @@ func (b *BootNode) Init(port, peerSize int, logger *logrus.Logger) {
 	r := mux.NewRouter()
 	r.HandleFunc("/getID", b.getID).Methods("POST")
 	r.HandleFunc("/getMembers", b.getMembers).Methods("GET")
+	r.HandleFunc("/getAllIDs", b.getAllIDs).Methods("POST")
+	r.HandleFunc("/getAllIPs", b.getAllIPs).Methods("POST")
+	r.HandleFunc("/isTestReady", b.isTestReady).Methods("POST")
 	r.HandleFunc("/post", b.postHandler)
 	go http.ListenAndServe(":8080", r)
 
@@ -114,9 +122,44 @@ func (b *BootNode) getID(w http.ResponseWriter, r *http.Request) {
 
 	}
 	//TODO:Send addresses and IDs after all peer node already build p2p connection to boot node
+	//if b.count == b.peerSize {
+	//	go b.sendPeerAddresses()
+	//	go b.sendPeerIDs()
+	//}
+}
+
+func (b *BootNode) getAllIDs(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("getAllIDs ,", b.peerSize)
+	for i := 1; i <= b.peerSize; i++ {
+		w.Write(b.members[i])
+	}
+}
+
+func (b *BootNode) getAllIPs(w http.ResponseWriter, r *http.Request) {
 	if b.count == b.peerSize {
-		go b.sendPeerAddresses()
-		go b.sendPeerIDs()
+		for i := 0; i < len(b.allIP); i++ {
+			w.Write([]byte(b.allIP[i] + ","))
+		}
+	}
+}
+
+func (b *BootNode) isAllnodeready() bool {
+	fmt.Println("isAllnodeready ", len(b.readynode) == b.peerSize, "", len(b.readynode))
+	return len(b.readynode) == b.peerSize
+}
+
+func (b *BootNode) isTestReady(w http.ResponseWriter, r *http.Request) {
+	body, _ := ioutil.ReadAll(r.Body)
+	ip := string(body)
+	b.lock.Lock()
+	if b.readynode[ip] == false {
+		b.readynode[ip] = true
+	}
+	b.lock.Unlock()
+	if b.isAllnodeready() {
+		w.Write([]byte{ALLNODEREADY})
+	} else {
+		w.Write([]byte{ALLNODENOTREADY})
 	}
 }
 
