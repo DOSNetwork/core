@@ -4,54 +4,79 @@ import (
 	// Import the gorilla/mux library we just installed
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"strconv"
 	"sync"
+	"time"
 
-	"github.com/DOSNetwork/core/p2p"
 	"github.com/gorilla/mux"
 
 	"github.com/DOSNetwork/core/configuration"
-
 	"github.com/DOSNetwork/core/onchain"
+	"github.com/DOSNetwork/core/p2p"
 )
 
-var lock sync.Mutex
-var credentialIndex int
-
-var adaptor *onchain.EthAdaptor
+var (
+	adaptor         *onchain.EthAdaptor
+	passPhrase      string
+	userKeyArr      []string
+	lock            sync.Mutex
+	credentialIndex = 0
+	rootKeyPath     = "testAccounts/bootCredential/fundKey/fundKey"
+)
 
 // main
 func main() {
-	var err error
-	credentialIndex = 0
+	passPhraseBytes, err := ioutil.ReadFile("testAccounts/bootCredential/passPhrase")
+	if err != nil {
+		log.Fatal(err)
+	}
+	passPhrase = string(passPhraseBytes)
 
 	//1) Connect to Ethereum to reset contract
 	offChainConfig := configuration.OffChainConfig{}
-	offChainConfig.LoadConfig()
+	if err = offChainConfig.LoadConfig(); err != nil {
+		log.Fatal(err)
+	}
 
 	onChainConfig := configuration.OnChainConfig{}
-	onChainConfig.LoadConfig()
+	if err = onChainConfig.LoadConfig(); err != nil {
+		log.Fatal(err)
+	}
 	chainConfig := onChainConfig.GetChainConfig()
 
-	port := offChainConfig.Port
 	adaptor = &onchain.EthAdaptor{}
-	err = adaptor.Init(&chainConfig)
-	if err != nil {
-		fmt.Println(err)
+	if err = adaptor.Init(&chainConfig); err != nil {
+		log.Fatal(err)
 	}
-	(*adaptor).ResetNodeIDs()
-	(*adaptor).Grouping(offChainConfig.RandomGroupSize)
+
+	if wlInitialized, err := (*adaptor).WhitelistInitialized(); (err == nil) && !wlInitialized {
+		err = (*adaptor).InitialWhiteList()
+	}
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if err = (*adaptor).ResetNodeIDs(); err != nil {
+		log.Fatal(err)
+	}
+
+	if err = (*adaptor).Grouping(offChainConfig.RandomGroupSize); err != nil {
+		log.Fatal(err)
+	}
 
 	//2)Build a p2p network
 	peerEvent := make(chan p2p.P2PMessage, 100)
-	p, _ := p2p.CreateP2PNetwork(peerEvent, port)
+	p, _ := p2p.CreateP2PNetwork(peerEvent, offChainConfig.Port)
 	defer close(peerEvent)
 	//2-1)Set node ID
 	id := []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20}
 	p.SetId(id[:])
 	//2-2)Start to listen incoming connection
-	go p.Listen()
+	if err = p.Listen(); err != nil {
+		log.Fatal(err)
+	}
 	//2-3)To ignore peer event to avoid channel blocking
 	go func() {
 		for {
@@ -61,6 +86,8 @@ func main() {
 			}
 		}
 	}()
+	//2-4) regularly check balance of each node and replenish if needed
+	go balanceMaintain()
 
 	//3) Declare a new router to handle REST API call
 	r := mux.NewRouter()
@@ -70,33 +97,30 @@ func main() {
 	r.HandleFunc("/hasGroupPubkey", hasGroupPubkey).Methods("GET")
 	r.HandleFunc("/reset", reset).Methods("GET")
 
-	http.ListenAndServe(":8080", r)
+	if err = http.ListenAndServe(":8080", r); err != nil {
+		log.Fatal(err)
+	}
 }
 
 func getCredential(w http.ResponseWriter, r *http.Request) {
 	lock.Lock()
 	fmt.Println("getCredential")
 	credentialIndex++
-	if credentialIndex > 21 {
-		credentialIndex = 1
-	}
 	credentialPath := "testAccounts/" + strconv.Itoa(credentialIndex) + "/credential"
-
 	usrKeyPath := credentialPath + "/usrKey"
-	rootKeyPath := "testAccounts/bootCredential/useKey"
-
-	passPhraseBytes, err := ioutil.ReadFile(credentialPath + "/passPhrase")
-	if err != nil {
-		return
+	userKeyArr = append(userKeyArr, usrKeyPath)
+	if err := (*adaptor).BalanceMaintain(rootKeyPath, usrKeyPath, passPhrase, passPhrase); err != nil {
+		fmt.Println(err)
 	}
-	passPhrase := string(passPhraseBytes)
-	(*adaptor).BalanceMaintain(rootKeyPath, usrKeyPath, passPhrase, passPhrase)
 
 	credential, err := ioutil.ReadFile(usrKeyPath)
 	if err != nil {
 		fmt.Println(err)
 	}
-	fmt.Fprintf(w, string(credential))
+
+	if _, err = fmt.Fprintf(w, string(credential)); err != nil {
+		fmt.Println(err)
+	}
 	lock.Unlock()
 }
 
@@ -106,9 +130,13 @@ func hasGroupPubkey(w http.ResponseWriter, r *http.Request) {
 		//TODO: Need to check why it has err : abi: improperly formatted output
 	}
 	if key[0] == nil {
-		fmt.Fprintf(w, "false")
+		if _, err = fmt.Fprintf(w, "false"); err != nil {
+			fmt.Println(err)
+		}
 	} else {
-		fmt.Fprintf(w, "yes")
+		if _, err = fmt.Fprintf(w, "yes"); err != nil {
+			fmt.Println(err)
+		}
 	}
 }
 
@@ -116,4 +144,16 @@ func reset(w http.ResponseWriter, r *http.Request) {
 	lock.Lock()
 	credentialIndex = 0
 	lock.Unlock()
+}
+
+func balanceMaintain() {
+	fmt.Println("balanceMaintain started")
+	ticker := time.NewTicker(time.Hour * 8)
+	for range ticker.C {
+		for _, usrKeyPath := range userKeyArr {
+			if err := (*adaptor).BalanceMaintain(rootKeyPath, usrKeyPath, passPhrase, passPhrase); err != nil {
+				fmt.Println(err)
+			}
+		}
+	}
 }

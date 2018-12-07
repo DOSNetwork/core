@@ -130,7 +130,6 @@ func dataFetch(url string) (body []byte, err error) {
 	}
 
 	err = r.Body.Close()
-	fmt.Println("fetched data: ", string(body))
 	return
 }
 
@@ -196,6 +195,10 @@ func (d *DosNode) choseSubmitter(r *big.Int) (id []byte) {
 	y := len(d.groupIds)
 	submitter := x % y
 	//TODO:Check to see if submitter is alive
+	for !d.chainConn.EnoughBalance(common.BytesToAddress(d.groupIds[submitter])) {
+		fmt.Println("choose next submitter due to balance low")
+		submitter = (submitter + 1) % y
+	}
 	id = d.groupIds[submitter]
 	fmt.Println("choseSubmitter ", id)
 	return
@@ -282,13 +285,14 @@ func (d *DosNode) PipeQueries(queries ...<-chan interface{}) <-chan Report {
 						if err != nil {
 							fmt.Println(err)
 						}
+						fmt.Println("fetched data: ", rawMsg, string(rawMsg))
 
 						msgReturn, err := dataParse(rawMsg, content.Selector)
 						if err != nil {
 							fmt.Println(err)
 						}
+						fmt.Println("Data to return:", msgReturn, string(msgReturn))
 
-						fmt.Println("Data to return:", string(msgReturn))
 						newTimeRecord.dataProcessCost = time.Since(newTimeRecord.lastUpdateTime).Seconds()
 						newTimeRecord.lastUpdateTime = time.Now()
 						d.timeCostMap.Store(queryId, newTimeRecord)
@@ -461,9 +465,9 @@ func (d *DosNode) PipeRecoverAndVerify(cSignatureFromPeer chan vss.Signature, fr
 					//TODO:Should check if content is always the same
 					if r := bytes.Compare(report.selfSign.Content, sign.Content); r != 0 {
 						fmt.Println("report query id ", report.selfSign.QueryId)
-						fmt.Println("report Content ", string(report.selfSign.Content))
+						fmt.Println("report Content ", report.selfSign.Content, string(report.selfSign.Content))
 						fmt.Println("sign query id ", sign.QueryId)
-						fmt.Println("sign Content ", string(sign.Content))
+						fmt.Println("sign Content ", sign.Content, string(sign.Content))
 					}
 
 					report.signShares = append(report.signShares, sign.Signature)
@@ -473,8 +477,8 @@ func (d *DosNode) PipeRecoverAndVerify(cSignatureFromPeer chan vss.Signature, fr
 						sig, err := tbls.Recover(d.suite, d.p2pDkg.GetGroupPublicPoly(), sign.Content, sigShares, d.nbThreshold, d.nbParticipants)
 						if err != nil {
 							fmt.Println(err)
-							fmt.Println("recover failed!!!!!!!!!!!!!!!!! report Content ", string(report.selfSign.Content))
-							fmt.Println("recover failed!!!!!!!!!!!!!!!!! len(sigShares) = ", len(sigShares), " Content ", string(sign.Content))
+							fmt.Println("recover failed!!!!!!!!!!!!!!!!! report Content ", report.selfSign.Content, string(report.selfSign.Content))
+							fmt.Println("recover failed!!!!!!!!!!!!!!!!! len(sigShares) = ", len(sigShares), " Content ", sign.Content, string(sign.Content))
 							fmt.Println("recover failed!!!!!!!!!!!!!!!!!")
 							continue
 						}
@@ -578,7 +582,6 @@ func (d *DosNode) PipeSendToOnchain(chReport <-chan Report) <-chan Report {
 					   queryResult[0] ^= 0x01
 					}
 					*/
-
 					//TODO:chainCoo should use a sendToOnChain(protobuf message) instead of DataReturn with mutex
 					//sendToOnChain receive a message from channel then call the corresponding function
 					if err = d.chainConn.DataReturn(qID, uint8(report.selfSign.Index), queryResult, report.signGroup, uint8(qVersion)); err != nil {

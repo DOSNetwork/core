@@ -11,11 +11,12 @@ import (
 	"github.com/DOSNetwork/core/group/bn256"
 	"github.com/DOSNetwork/core/onchain/dosproxy"
 
-	"github.com/dedis/kyber"
-
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
+
+	"github.com/dedis/kyber"
 
 	"github.com/sirupsen/logrus"
 )
@@ -452,6 +453,11 @@ func (e *EthAdaptor) InitialWhiteList() (err error) {
 		common.HexToAddress("0x96272c390ae674d3a3e3f1d636f3ae4128afd688")}
 
 	tx, err := e.proxy.InitWhitelist(auth, addresses)
+	for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
+		fmt.Println(err)
+		time.Sleep(time.Second)
+		tx, err = e.proxy.InitWhitelist(auth, addresses)
+	}
 	if err != nil {
 		return
 	}
@@ -463,6 +469,10 @@ func (e *EthAdaptor) InitialWhiteList() (err error) {
 
 	return
 
+}
+
+func (e *EthAdaptor) WhitelistInitialized() (initialized bool, err error) {
+	return e.proxy.WhitelistInitialized(&bind.CallOpts{})
 }
 
 func (e *EthAdaptor) GetGroupPubKey(idx int) (groupPubKeys [4]*big.Int, err error) {
@@ -477,6 +487,12 @@ func (e *EthAdaptor) Grouping(size int) (err error) {
 	}
 
 	tx, err := e.proxy.Grouping(auth, big.NewInt(int64(size)))
+	for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
+		fmt.Println(err)
+		time.Sleep(time.Second)
+		fmt.Println("transaction retry...")
+		tx, err = e.proxy.Grouping(auth, big.NewInt(int64(size)))
+	}
 	if err != nil {
 		return
 	}
@@ -497,6 +513,12 @@ func (e *EthAdaptor) UploadID() (err error) {
 	}
 
 	tx, err := e.proxy.UploadNodeId(auth, new(big.Int).SetBytes(e.GetId()))
+	for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
+		fmt.Println(err)
+		time.Sleep(time.Second)
+		fmt.Println("transaction retry...")
+		tx, err = e.proxy.UploadNodeId(auth, new(big.Int).SetBytes(e.GetId()))
+	}
 	if err != nil {
 		return
 	}
@@ -534,6 +556,12 @@ func (e *EthAdaptor) SetRandomNum(sig []byte) (err error) {
 	x, y := DecodeSig(sig)
 
 	tx, err := e.proxy.UpdateRandomness(auth, [2]*big.Int{x, y})
+	for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
+		fmt.Println(err)
+		time.Sleep(time.Second)
+		fmt.Println("transaction retry...")
+		tx, err = e.proxy.UpdateRandomness(auth, [2]*big.Int{x, y})
+	}
 	if err != nil {
 		return
 	}
@@ -559,6 +587,12 @@ func (e *EthAdaptor) UploadPubKey(pubKey kyber.Point) (err error) {
 	}
 
 	tx, err := e.proxy.SetPublicKey(auth, x0, x1, y0, y1)
+	for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
+		fmt.Println(err)
+		time.Sleep(time.Second)
+		fmt.Println("transaction retry...")
+		tx, err = e.proxy.SetPublicKey(auth, x0, x1, y0, y1)
+	}
 	if err != nil {
 		return
 	}
@@ -583,6 +617,12 @@ func (e *EthAdaptor) ResetNodeIDs() (err error) {
 	}
 
 	tx, err := e.proxy.ResetContract(auth)
+	for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
+		fmt.Println(err)
+		time.Sleep(time.Second)
+		fmt.Println("transaction retry...")
+		tx, err = e.proxy.ResetContract(auth)
+	}
 	if err != nil {
 		return
 	}
@@ -599,6 +639,12 @@ func (e *EthAdaptor) RandomNumberTimeOut() (err error) {
 	}
 
 	_, err = e.proxy.HandleTimeout(auth)
+	for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
+		fmt.Println(err)
+		time.Sleep(time.Second)
+		fmt.Println("transaction retry...")
+		_, err = e.proxy.HandleTimeout(auth)
+	}
 	if err != nil {
 		return
 	}
@@ -635,6 +681,12 @@ func (e *EthAdaptor) DataReturn(requestId *big.Int, trafficType uint8, data, sig
 	x, y := DecodeSig(sig)
 
 	tx, err := e.proxy.TriggerCallback(auth, requestId, trafficType, data, [2]*big.Int{x, y}, version)
+	for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
+		fmt.Println(err)
+		time.Sleep(time.Second)
+		fmt.Println("transaction retry...")
+		tx, err = e.proxy.TriggerCallback(auth, requestId, trafficType, data, [2]*big.Int{x, y}, version)
+	}
 	if err != nil {
 		return
 	}
@@ -664,7 +716,7 @@ func DecodeSig(sig []byte) (x, y *big.Int) {
 		return big.NewInt(0), big.NewInt(0)
 	}
 
-	y = big.NewInt(0).Sub(bn256.P, big.NewInt(0).Mod(y, bn256.P))
+	y.Sub(bn256.P, y.Mod(y, bn256.P))
 
 	return
 }

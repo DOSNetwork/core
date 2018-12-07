@@ -7,12 +7,15 @@ import (
 	"log"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/DOSNetwork/core/configuration"
 	"github.com/DOSNetwork/core/onchain"
 	"github.com/DOSNetwork/core/onchain/dosproxy"
+
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
@@ -76,9 +79,21 @@ func deployContract(ethComm *onchain.EthCommon, contractName int) string {
 	case DOSAddressBridge:
 		fmt.Println("Starting deploy DOSAddressBridge.sol...")
 		address, tx, _, err = dosproxy.DeployDOSAddressBridge(auth, ethComm.Client)
+		for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
+			fmt.Println(err)
+			time.Sleep(time.Second)
+			fmt.Println("transaction retry...")
+			address, tx, _, err = dosproxy.DeployDOSAddressBridge(auth, ethComm.Client)
+		}
 	case DOSProxy:
 		fmt.Println("Starting deploy DOSProxy.sol...")
 		address, tx, _, err = dosproxy.DeployDOSProxy(auth, ethComm.Client)
+		for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
+			fmt.Println(err)
+			time.Sleep(time.Second)
+			fmt.Println("transaction retry...")
+			address, tx, _, err = dosproxy.DeployDOSProxy(auth, ethComm.Client)
+		}
 	}
 	if err != nil {
 		fmt.Println(err)
@@ -110,6 +125,12 @@ func updateBridge(ethComm *onchain.EthCommon, bridgeAddress, proxyAddress common
 	}
 
 	tx, err := bridge.SetProxyAddress(auth, proxyAddress)
+	for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
+		fmt.Println(err)
+		time.Sleep(time.Second)
+		fmt.Println("transaction retry...")
+		tx, err = bridge.SetProxyAddress(auth, proxyAddress)
+	}
 	if err != nil {
 		return
 	}
