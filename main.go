@@ -81,8 +81,8 @@ func main() {
 	}
 
 	hook, err := logrustash.NewHookWithFieldsAndConn(conn, "DOS_node", logrus.Fields{
-		"DOS_node_ip": p.GetId().Address,
-		"Serial":      string(common.BytesToAddress(p.GetId().Id).String()),
+		"DOS_node_ip": p.GetIP(),
+		"Serial":      string(common.BytesToAddress(p.GetID()).String()),
 	})
 	if err != nil {
 		log.Error(err)
