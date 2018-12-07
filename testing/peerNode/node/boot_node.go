@@ -4,13 +4,16 @@ import (
 	"crypto/rand"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"os"
 	"strings"
 	"sync"
 
+	"time"
+
 	"github.com/bshuster-repo/logrus-logstash-hook"
-	"github.com/ethereum/go-ethereum/common"
+	//	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/DOSNetwork/core/testing/peerNode/internalMsg"
 
@@ -82,13 +85,30 @@ func (b *BootNode) Init(port, peerSize int, logger *logrus.Logger) {
 
 	//3)Build a p2p network
 	b.p, b.peerEvent, _ = p2p.CreateP2PNetwork(bootID, port, b.log)
+	tcpAddr, err := net.ResolveTCPAddr("tcp", "163.172.36.173:9500")
+	if err != nil {
+		b.log.Error(err)
+	}
 
-	hook, err := logrustash.NewHookWithFields("tcp", "13.52.16.14:9500", "DOS_node", logrus.Fields{
-		"DOS_node_ip": b.p.GetIP(),
-		"Serial":      string(common.BytesToAddress(b.p.GetID()).String()),
+	conn, err := net.DialTCP("tcp", nil, tcpAddr)
+	if err != nil {
+		b.log.Error(err)
+	}
+
+	if err = conn.SetKeepAlivePeriod(time.Minute); err != nil {
+		b.log.Warn(err)
+	}
+
+	if err = conn.SetKeepAlive(true); err != nil {
+		b.log.Warn(err)
+	}
+
+	hook, err := logrustash.NewHookWithFieldsAndConn(conn, "peer_node", logrus.Fields{
+		"queryType":         "peer_node",
+		"startingTimestamp": time.Now(),
 	})
 	if err != nil {
-		//log.Error(err)
+		b.log.Error(err)
 	}
 
 	b.log.Hooks.Add(hook)

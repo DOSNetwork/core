@@ -4,13 +4,14 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/bshuster-repo/logrus-logstash-hook"
-	"github.com/ethereum/go-ethereum/common"
+	//	"github.com/ethereum/go-ethereum/common"
 
 	//"github.com/DOSNetwork/core/p2p/dht"
 	"github.com/DOSNetwork/core/testing/peerNode/internalMsg"
@@ -90,8 +91,8 @@ func (d *PeerNode) requestAllIPs() {
 			if len(r) != 0 {
 				str := string(r)
 				strlist := strings.Split(str, ",")
-				d.nodeIPs = make([]string, len(strlist))
-				for i := 0; i < len(strlist); i++ {
+				d.nodeIPs = make([]string, len(strlist)-1)
+				for i := 0; i < len(strlist)-1; i++ {
 					d.nodeIPs[i] = strlist[i]
 				}
 				break
@@ -172,15 +173,35 @@ func (d *PeerNode) Init(bootStrapIp string, port, peerSize int, numMessages int,
 
 	//2)Build a p2p network
 	d.p, d.peerEvent, _ = p2p.CreateP2PNetwork(d.nodeID[:], port, d.log)
-	hook, err := logrustash.NewHookWithFields("tcp", "13.52.16.14:9500", "DOS_node", logrus.Fields{
-		"DOS_node_ip": d.p.GetIP(),
-		"Serial":      string(common.BytesToAddress(d.p.GetID()).String()),
+
+	tcpAddr, err := net.ResolveTCPAddr("tcp", "163.172.36.173:9500")
+	if err != nil {
+		d.log.Error(err)
+	}
+
+	conn, err := net.DialTCP("tcp", nil, tcpAddr)
+	if err != nil {
+		d.log.Error(err)
+	}
+
+	if err = conn.SetKeepAlivePeriod(time.Minute); err != nil {
+		d.log.Warn(err)
+	}
+
+	if err = conn.SetKeepAlive(true); err != nil {
+		d.log.Warn(err)
+	}
+
+	hook, err := logrustash.NewHookWithFieldsAndConn(conn, "peer_node", logrus.Fields{
+		"queryType":         "peer_node",
+		"startingTimestamp": time.Now(),
 	})
 	if err != nil {
-		//log.Error(err)
+		d.log.Error(err)
 	}
 
 	d.log.Hooks.Add(hook)
+
 	d.p.Listen()
 	d.p.Join(bootStrapIp + ":44460")
 	fmt.Println("nodeIP = ", d.p.GetIP())
