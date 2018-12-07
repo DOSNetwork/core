@@ -210,6 +210,7 @@ This is a block call
 func (n *P2P) NewPeer(addr string) (id []byte, err error) {
 	var peer *PeerConn
 	var conn net.Conn
+	//TODO Check if addr is a valid addr
 	for retry := 0; retry < 10; retry++ {
 		//1)Check if this address has been in peers map
 		existing := false
@@ -231,7 +232,7 @@ func (n *P2P) NewPeer(addr string) (id []byte, err error) {
 		//2)Dial to peer to get a connection
 		conn, err = net.Dial("tcp", addr)
 		if err != nil {
-			fmt.Println("Dial err ", err)
+			fmt.Println("NewPeer Dial err ", err, " addr ", addr)
 			time.Sleep(1 * time.Second)
 			continue
 		}
