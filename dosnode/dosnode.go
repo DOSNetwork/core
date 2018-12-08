@@ -629,7 +629,10 @@ func (d *DosNode) PipeCleanFinishMap(chValidation chan interface{}, request ...<
 			case msg := <-chValidation:
 				switch content := msg.(type) {
 				case *onchain.DOSProxyLogValidationResult:
-					trafficId := content.TrafficId.String() + ":" + strconv.Itoa(int(content.Version))
+					trafficId := content.TrafficId.String()
+					if content.TrafficType != onchain.TrafficSystemRandom {
+						trafficId += ":" + strconv.Itoa(int(content.Version))
+					}
 					if report, match := validateMap[trafficId]; match {
 						record, _ := d.timeCostMap.Load(trafficId)
 						record.(*timeRecord).dataConfirmCost = time.Since(record.(*timeRecord).lastUpdateTime).Seconds()
