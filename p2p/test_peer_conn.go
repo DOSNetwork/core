@@ -8,14 +8,12 @@ import (
 	"time"
 
 	"github.com/DOSNetwork/core/p2p/internal"
-	"github.com/golang/protobuf/proto"
 )
 
 type TestPeerConn struct {
 	PeerConn
 	testStrategy string
 }
-
 
 func NewTestPeerConn(p2pnet *TestP2P, conn *net.Conn, rxMessage chan P2PMessage) (peer *TestPeerConn, err error) {
 	//fmt.Println("TestPeerConn receiveLoop !!! ", p.testStrategy)
@@ -24,20 +22,22 @@ func NewTestPeerConn(p2pnet *TestP2P, conn *net.Conn, rxMessage chan P2PMessage)
 			p2pnet:    &p2pnet.P2P,
 			conn:      conn,
 			rxMessage: rxMessage,
-			txMessage: make(chan proto.Message, 100),
 			waitForHi: make(chan bool, 2),
-			done:      make(chan bool, 2),
 			rw:        bufio.NewReadWriter(bufio.NewReader(*conn), bufio.NewWriter(*conn)),
 		},
 		p2pnet.testStrategy,
 	}
 	fmt.Println("!!!! NewTestPeerConn ", 10)
 	go peer.receiveLoop()
-	err = peer.sayHi()
-	if err != nil {
-		close(peer.txMessage)
-		peer = nil
+	if err = peer.sayHi(); err != nil {
+		return
 	}
+
+	if err = peer.heardHi(); err != nil {
+		return
+	}
+
+	go peer.heartBeat()
 	return
 }
 
@@ -58,22 +58,21 @@ func (p *TestPeerConn) sayHi() (err error) {
 	}
 
 	err = p.SendMessage(pa)
+	return
+}
 
-	//Add a timer to avoid wait for Hi forever
+//Add a timer to avoid wait for Hi forever
+func (p *TestPeerConn) heardHi() (err error) {
 	timer := time.NewTimer(10 * time.Second)
-L:
-	for {
-		select {
-		case <-timer.C:
-			p.done <- true
-			fmt.Println("Time expire")
-			err = errors.New("PeerConn: Time expire")
-			break L
-		case <-p.waitForHi:
-			_ = timer.Stop()
-			break L
-		}
+
+	select {
+	case <-timer.C:
+		fmt.Println("Time expire")
+		err = errors.New("PeerConn: Waiting for hi time expire")
+	case <-p.waitForHi:
+		timer.Stop()
 	}
 
+	close(p.waitForHi)
 	return
 }
