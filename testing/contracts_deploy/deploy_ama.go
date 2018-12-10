@@ -61,7 +61,6 @@ func main() {
 	conn := &onchain.EthCommon{}
 	_ = conn.Init(credentialPath, &chainConfig)
 	amaConfig := eth.AMAConfig{}
-	fmt.Println("Starting deploy AskMeAnyThing.sol...")
 	amaConfig.AskMeAnythingAddress = deployAMAContract(conn)
 	configuration.UpdateConfig(amaConfigPath, amaConfig)
 }

@@ -25,7 +25,7 @@ deploy:contract-prepare
 	rm $(USER_CONTRACTS)/DOSOnChainSDK.sol
 	rm $(USER_CONTRACTS)/Ownable.sol
 	rm -r $(USER_CONTRACTS)/lib/
-	go run contracts_deploy/depoy_ama.go -AMAPath $(AMA_CONFIGPATH) -credentialPath $(BOOT_CREDENTIAL)
+	go run contracts_deploy/deploy_ama.go -AMAPath $(AMA_CONFIGPATH) -credentialPath $(BOOT_CREDENTIAL)
 
 
 docker-prepare:
