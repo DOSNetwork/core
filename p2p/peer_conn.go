@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"net"
 	"sync"
@@ -22,6 +21,13 @@ import (
 	"github.com/dedis/kyber"
 )
 
+const (
+	HEARTBEATINTERVAL = 60 //In seconds
+	HEARTBEATMAXWAIT  = 10 //In seconds
+	HEARTBEATMAXCOUNT = 6
+	CONNIDLETIMEOUT   = 5
+	HITIMEOUT         = 60 //In seconds
+)
 
 type PeerConn struct {
 	//TODO:remove *P2P and use sync map to manage the lifecycle of PeerConn
@@ -29,18 +35,17 @@ type PeerConn struct {
 	//TODO:
 	rxMessage chan P2PMessage
 	//TODO:
-	pubKey    kyber.Point
-	conn      *net.Conn
-	rw        *bufio.ReadWriter
-	txMessage chan proto.Message
+	pubKey kyber.Point
+	conn   *net.Conn
+	rw     *bufio.ReadWriter
 	//TODO:Need to be refactored
-	waitForHi    chan bool
-	done         chan bool
-	status       int
-	identity     internal.ID
-	RequestNonce uint64
-	Requests     sync.Map
-	mux          sync.Mutex
+	waitForHi       chan bool
+	identity        internal.ID
+	RequestNonce    uint64
+	Requests        sync.Map
+	mux             sync.Mutex
+	readWriteCount  uint64
+	idelPeriodCount uint8
 }
 
 // RequestState represents a state of a request.
@@ -54,24 +59,24 @@ func NewPeerConn(p2pnet *P2P, conn *net.Conn, rxMessage chan P2PMessage) (peer *
 		p2pnet:    p2pnet,
 		conn:      conn,
 		rxMessage: rxMessage,
-		txMessage: make(chan proto.Message, 100),
 		waitForHi: make(chan bool, 2),
-		done:      make(chan bool, 2),
 		rw:        bufio.NewReadWriter(bufio.NewReader(*conn), bufio.NewWriter(*conn)),
 	}
-	err = peer.Start()
-	if err != nil {
-		peer = nil
+	if err = peer.Start(); err != nil {
+		return
 	}
+
+	go peer.heartBeat()
 	return
 }
 
 func (p *PeerConn) Start() (err error) {
 	go p.receiveLoop()
-	err = p.SayHi()
-	if err != nil {
-		close(p.txMessage)
+	if err = p.SayHi(); err != nil {
+		return
 	}
+
+	err = p.heardHi()
 	return
 }
 
@@ -87,90 +92,85 @@ func (p *PeerConn) SendMessage(msg proto.Message) (err error) {
 	if err = p.SendPackage(prepared); err != nil {
 		fmt.Println("PeerConn sendLoop SendPackage ", err)
 	}
+
+	atomic.AddUint64(&p.readWriteCount, 1)
 	return
 }
 
 func (p *PeerConn) receiveLoop() {
-	//time.Sleep(TIMEOUTFORHI * time.Second)
-L:
 	for {
-		select {
-		case <-p.done:
-			break L
-		default:
-			buf, err := p.receivePackage()
-			switch {
-			case err == io.EOF:
-				fmt.Println("PeerConn ", p.identity.Id, " EOF")
-				break L
-			case err != nil:
-				fmt.Println("PeerConn ", p.identity.Id, " err ", err)
-				break L
-			}
+		buf, err := p.receivePackage()
+		if err != nil {
+			fmt.Println("PeerConn ", p.identity.Id, " err ", err)
+			break
+		}
 
-			pa, ptr, err := p.decodePackage(buf)
-			if err != nil {
-				fmt.Println("PeerConn decodePackage err ", err)
+		pa, ptr, err := p.decodePackage(buf)
+		if err != nil {
+			fmt.Println("PeerConn decodePackage err ", err)
+			continue
+		}
+
+		if pa.GetRequestNonce() > 0 && pa.GetReplyFlag() {
+			if _state, exists := p.Requests.Load(pa.GetRequestNonce()); exists {
+				state := _state.(*RequestState)
+				select {
+				case state.data <- ptr.Message:
+				case <-state.closeSignal:
+				}
 				continue
 			}
+		}
 
-			if pa.GetRequestNonce() > 0 && pa.GetReplyFlag() {
-				if _state, exists := p.Requests.Load(pa.GetRequestNonce()); exists {
-					state := _state.(*RequestState)
-					select {
-					case state.data <- ptr.Message:
-					case <-state.closeSignal:
-					}
-					continue
+		switch content := ptr.Message.(type) {
+		//TODO:Refactor this to use request/reply and move out of this loop
+		case *internal.Hi:
+			if len(p.identity.Id) == 0 {
+				p.identity.Id = content.GetId()
+				p.identity.Address = content.GetAddress()
+				p.identity.PublicKey = content.GetPublicKey()
+				pub := suite.G2().Point()
+				if err = pub.UnmarshalBinary(content.GetPublicKey()); err != nil {
+					fmt.Println("PeerConn UnmarshalBinary err ", err)
 				}
+				p.pubKey = pub
+				p.waitForHi <- true
+			} else {
+				fmt.Println("Ignore Hi")
+			}
+			//TODO:move this to routing
+		case *internal.LookupNodeRequest:
+			// Prepare response.
+			response := &internal.LookupNodeResponse{}
+
+			// Respond back with closest peers to a provided target.
+			for _, peerID := range p.p2pnet.routingTable.FindClosestPeers(internal.ID(*content.GetTarget()), dht.BucketSize) {
+				id := internal.ID(peerID)
+				response.Peers = append(response.Peers, &id)
 			}
 
-			switch content := ptr.Message.(type) {
-			//TODO:Refactor this to use request/reply and move out of this loop
-			case *internal.Hi:
-				if len(p.identity.Id) == 0 {
-					p.identity.Id = content.GetId()
-					p.identity.Address = content.GetAddress()
-					p.identity.PublicKey = content.GetPublicKey()
-					pub := suite.G2().Point()
-					if err = pub.UnmarshalBinary(content.GetPublicKey()); err != nil {
-						fmt.Println("PeerConn UnmarshalBinary err ", err)
-					}
-					p.pubKey = pub
-					p.waitForHi <- true
-				} else {
-					fmt.Println("Ignore Hi")
-				}
-				//TODO:move this to routing
-			case *internal.LookupNodeRequest:
-				// Prepare response.
-				response := &internal.LookupNodeResponse{}
-
-				// Respond back with closest peers to a provided target.
-				for _, peerID := range p.p2pnet.routingTable.FindClosestPeers(internal.ID(*content.GetTarget()), dht.BucketSize) {
-					id := internal.ID(peerID)
-					response.Peers = append(response.Peers, &id)
-				}
-
-				err := p.Reply(pa.GetRequestNonce(), response)
-				if err != nil {
-					log.Fatal(err)
-				}
-
-			default:
-				//TODO
-				msg := P2PMessage{Msg: *ptr, Sender: p.identity.Id}
-				p.rxMessage <- msg
+			if err := p.Reply(pa.GetRequestNonce(), response); err != nil {
+				log.Fatal(err)
 			}
+		case *internal.Ping:
+			response := &internal.Pong{}
+			if err := p.Reply(pa.GetRequestNonce(), response); err != nil {
+				log.Fatal(err)
+			}
+		default:
+			//TODO
+			msg := P2PMessage{Msg: *ptr, Sender: p.identity.Id}
+			p.rxMessage <- msg
 		}
 	}
-	_, ok := p.p2pnet.peers.Load(string(p.identity.Id))
-	if ok {
+
+	if _, loaded := p.p2pnet.peers.Load(string(p.identity.Id)); loaded {
 		p.p2pnet.peers.Delete(string(p.identity.Id))
 	}
-	//(*p.conn).Close()
-	close(p.done)
-	close(p.waitForHi)
+
+	if err := (*p.conn).Close(); err != nil {
+		fmt.Println(err)
+	}
 	fmt.Println("PeerConn receiveLoop done")
 }
 
@@ -205,6 +205,7 @@ func (p *PeerConn) receivePackage() ([]byte, error) {
 		bytesRead, err = c.Read(buffer[totalBytesRead:])
 		totalBytesRead += bytesRead
 	}
+
 	return buffer, nil
 }
 
@@ -226,6 +227,14 @@ func (p *PeerConn) decodePackage(bytes []byte) (*internal.Package, *ptypes.Dynam
 	if err := ptypes.UnmarshalAny(pa.GetAnything(), &ptr); err != nil {
 		return nil, nil, err
 	}
+
+	switch ptr.Message.(type) {
+	case *internal.Ping:
+	case *internal.Pong:
+	default:
+		atomic.AddUint64(&p.readWriteCount, 1)
+	}
+
 	return pa, &ptr, nil
 }
 
@@ -237,23 +246,22 @@ func (p *PeerConn) SayHi() (err error) {
 	}
 
 	err = p.SendMessage(pa)
+	return
+}
 
-	//Add a timer to avoid wait for Hi forever
-	timer := time.NewTimer(60 * time.Second)
-L:
-	for {
-		select {
-		case <-timer.C:
-			p.done <- true
-			fmt.Println("Time expire")
-			err = errors.New("PeerConn: Time expire")
-			break L
-		case <-p.waitForHi:
-			_ = timer.Stop()
-			break L
-		}
+//Add a timer to avoid wait for Hi forever
+func (p *PeerConn) heardHi() (err error) {
+	timer := time.NewTimer(HITIMEOUT * time.Second)
+
+	select {
+	case <-timer.C:
+		fmt.Println("Time expire")
+		err = errors.New("PeerConn: Waiting for hi time expire")
+	case <-p.waitForHi:
+		timer.Stop()
 	}
 
+	close(p.waitForHi)
 	return
 }
 
@@ -269,9 +277,9 @@ func (p *PeerConn) SendPackage(msg proto.Message) error {
 	// Serialize size.
 	prefix := make([]byte, 4)
 	binary.BigEndian.PutUint32(prefix, uint32(len(bytes)))
+	bytes = append(prefix, bytes...)
 	p.mux.Lock()
 	defer p.mux.Unlock()
-	bytes = append(prefix, bytes...)
 
 	if _, err := p.rw.Write(bytes); err != nil {
 		fmt.Println("SendPackage Write err ", err)
@@ -327,6 +335,12 @@ func (p *PeerConn) Request(req *Request) (proto.Message, error) {
 		return nil, err
 	}
 
+	switch req.Message.(type) {
+	case *internal.Ping:
+	default:
+		atomic.AddUint64(&p.readWriteCount, 1)
+	}
+
 	// Start tracking the request.
 	channel := make(chan proto.Message, 1)
 	closeSignal := make(chan struct{})
@@ -364,5 +378,57 @@ func (p *PeerConn) Reply(nonce uint64, message proto.Message) error {
 		return err
 	}
 
+	switch message.(type) {
+	case *internal.Pong:
+	default:
+		atomic.AddUint64(&p.readWriteCount, 1)
+	}
+
 	return nil
+}
+
+func (p *PeerConn) heartBeat() {
+	fmt.Println("heartbeat started")
+	ticker := time.NewTicker(HEARTBEATINTERVAL * time.Second)
+	for {
+		select {
+		case <-ticker.C:
+			fmt.Println(p.idelPeriodCount, p.readWriteCount, CONNIDLETIMEOUT)
+			if p.readWriteCount == 0 {
+				p.idelPeriodCount++
+			} else {
+				p.idelPeriodCount = 0
+			}
+
+			if p.idelPeriodCount == CONNIDLETIMEOUT {
+				if err := (*p.conn).Close(); err != nil {
+					log.Println(err)
+				}
+				return
+			}
+
+			timeout := false
+			for i := 0; i < HEARTBEATMAXCOUNT; i++ {
+				request := new(Request)
+				request.SetMessage(&internal.Ping{})
+				request.SetTimeout(HEARTBEATMAXWAIT * time.Second)
+				fmt.Println("send ping")
+				if _, err := p.Request(request); err != nil {
+					timeout = true
+				} else {
+					fmt.Println("received pong")
+					timeout = false
+					break
+				}
+			}
+			if timeout {
+				if err := (*p.conn).Close(); err != nil {
+					log.Println(err)
+				}
+				return
+			} else {
+				atomic.StoreUint64(&p.readWriteCount, 0)
+			}
+		}
+	}
 }
