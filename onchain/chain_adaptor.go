@@ -28,7 +28,7 @@ type ChainInterface interface {
 	UploadPubKey(pubKey kyber.Point) (err error)
 	GetId() (id []byte)
 	GetBlockHashByNumber(blknum *big.Int) (hash common.Hash, err error)
-	SetRandomNum(sig []byte) (err error)
+	SetRandomNum(sig []byte, version uint8) (err error)
 	DataReturn(requestId *big.Int, trafficType uint8, data, sig []byte, version uint8) (err error)
 	SubscribeToAll(msgChan chan interface{}) (err error)
 	//For test

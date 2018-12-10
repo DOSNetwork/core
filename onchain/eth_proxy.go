@@ -209,7 +209,7 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 			case err := <-sub.Err():
 				log.Fatal(err)
 			case i := <-transitChan:
-				if !e.filterLog(i.Raw) {
+				if i.Raw.Removed == false {
 					ch <- &DOSProxyLogUpdateRandom{
 						LastRandomness:  i.LastRandomness,
 						DispatchedGroup: i.DispatchedGroup,
@@ -545,7 +545,7 @@ func (e *EthAdaptor) GetBlockHashByNumber(blknum *big.Int) (hash common.Hash, er
 	return
 }
 
-func (e *EthAdaptor) SetRandomNum(sig []byte) (err error) {
+func (e *EthAdaptor) SetRandomNum(sig []byte, version uint8) (err error) {
 
 	fmt.Println("Starting submitting random number...")
 	auth, err := e.GetAuth()
@@ -555,12 +555,12 @@ func (e *EthAdaptor) SetRandomNum(sig []byte) (err error) {
 
 	x, y := DecodeSig(sig)
 
-	tx, err := e.proxy.UpdateRandomness(auth, [2]*big.Int{x, y})
+	tx, err := e.proxy.UpdateRandomness(auth, [2]*big.Int{x, y}, version)
 	for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
 		fmt.Println(err)
 		time.Sleep(time.Second)
 		fmt.Println("transaction retry...")
-		tx, err = e.proxy.UpdateRandomness(auth, [2]*big.Int{x, y})
+		tx, err = e.proxy.UpdateRandomness(auth, [2]*big.Int{x, y}, version)
 	}
 	if err != nil {
 		return
@@ -742,6 +742,12 @@ func (e *EthAdaptor) filterLog(raw types.Log) (duplicates bool) {
 	var record interface{}
 	if record, duplicates = e.logFilter.Load(identity); duplicates {
 		fmt.Println("got duplicate event", record, "\n", raw)
+		log.WithFields(logrus.Fields{
+			"logEvent":     "chainReOrg",
+			"contractAddr": raw.Address.Hex(),
+			"blkNb":        raw.BlockNumber,
+			"tx":           raw.TxHash.String(),
+		}).Info()
 	}
 	e.logFilter.Store(identity, logRecord{raw, time.Now()})
 
