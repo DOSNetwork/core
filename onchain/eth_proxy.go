@@ -747,6 +747,7 @@ func (e *EthAdaptor) filterLog(raw types.Log) (duplicates bool) {
 			"contractAddr": raw.Address.Hex(),
 			"blkNb":        raw.BlockNumber,
 			"tx":           raw.TxHash.String(),
+			"removed":      raw.Removed,
 		}).Info()
 	}
 	e.logFilter.Store(identity, logRecord{raw, time.Now()})
