@@ -348,20 +348,27 @@ func (d *DosNode) PipeQueries(queries ...<-chan interface{}) <-chan Report {
 					if d.isMember(content.DispatchedGroup) {
 						preRandom := content.LastRandomness
 						fmt.Printf("1 ) GenerateRandomNumber preRandom #%v \n", preRandom)
-						submitter := d.choseSubmitter(preRandom)
-						d.timeCostMap.Store(preRandom.String(), &timeRecord{
+
+						preVersion, loaded := d.requestTracker.LoadOrStore(preRandom.String(), &request{lastUpdateTime: time.Now(), version: 0})
+						if loaded {
+							preVersion.(*request).version++
+							preVersion.(*request).lastUpdateTime = time.Now()
+						}
+						requestId := preRandom.String() + ":" + strconv.Itoa(int(preVersion.(*request).version))
+						d.timeCostMap.Store(requestId, &timeRecord{
 							lastUpdateTime: time.Now(),
 							requestTx:      content.Tx,
 							requestBlkNb:   content.BlockN,
 						})
 
+						submitter := d.choseSubmitter(preRandom)
 						paddedRandomBytes := padOrTrim(preRandom.Bytes(), RANDOMNUMBERSIZE)
 						randomNum := append(paddedRandomBytes, submitter...)
 						fmt.Println("GenerateRandomNumber content = ", randomNum)
 
 						sign := &vss.Signature{
 							Index:   uint32(onchain.TrafficSystemRandom),
-							QueryId: preRandom.String(),
+							QueryId: requestId,
 							Content: randomNum,
 						}
 						report := &Report{}
@@ -544,9 +551,21 @@ func (d *DosNode) PipeSendToOnchain(chReport <-chan Report) <-chan Report {
 			case report := <-chReport:
 				record, _ := d.timeCostMap.Load(report.selfSign.QueryId)
 				record.(*timeRecord).dataChannelCost = time.Since(record.(*timeRecord).sendToChannelTime).Seconds()
+
+				qIDArray := strings.Split(report.selfSign.QueryId, ":")
+				qID, succ := new(big.Int).SetString(qIDArray[0], 10)
+				if !succ {
+					fmt.Println("Fail to convert requestId from string to bigInt")
+				}
+				qVersion, err := strconv.Atoi(qIDArray[1])
+				if err != nil {
+					fmt.Println(err)
+				}
+
 				switch report.selfSign.Index {
 				case onchain.TrafficSystemRandom:
-					if err := d.chainConn.SetRandomNum(report.signGroup); err != nil {
+					fmt.Println("PipeSendToOnchain sysRandom QueryId = ", report.selfSign.QueryId)
+					if err := d.chainConn.SetRandomNum(report.signGroup, uint8(qVersion)); err != nil {
 						fmt.Println("SetRandomNum err ", err)
 					} else {
 						fmt.Println("randomNumber Set for ", report.selfSign.QueryId)
@@ -556,16 +575,6 @@ func (d *DosNode) PipeSendToOnchain(chReport <-chan Report) <-chan Report {
 					}
 				default:
 					fmt.Println("PipeSendToOnchain URL/usrRandom QueryId = ", report.selfSign.QueryId)
-					qIDArray := strings.Split(report.selfSign.QueryId, ":")
-					qID, succ := new(big.Int).SetString(qIDArray[0], 10)
-					if !succ {
-						fmt.Println("Fail to convert requestId from string to bigInt")
-					}
-
-					qVersion, err := strconv.Atoi(qIDArray[1])
-					if err != nil {
-						fmt.Println(err)
-					}
 
 					t := len(report.selfSign.Content) - 20
 					if t < 0 {
@@ -629,10 +638,7 @@ func (d *DosNode) PipeCleanFinishMap(chValidation chan interface{}, request ...<
 			case msg := <-chValidation:
 				switch content := msg.(type) {
 				case *onchain.DOSProxyLogValidationResult:
-					trafficId := content.TrafficId.String()
-					if content.TrafficType != onchain.TrafficSystemRandom {
-						trafficId += ":" + strconv.Itoa(int(content.Version))
-					}
+					trafficId := content.TrafficId.String() + ":" + strconv.Itoa(int(content.Version))
 					if report, match := validateMap[trafficId]; match {
 						record, _ := d.timeCostMap.Load(trafficId)
 						record.(*timeRecord).dataConfirmCost = time.Since(record.(*timeRecord).lastUpdateTime).Seconds()
