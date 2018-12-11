@@ -40,12 +40,14 @@ type PeerConn struct {
 	rw     *bufio.ReadWriter
 	//TODO:Need to be refactored
 	waitForHi       chan bool
+	done            chan bool
 	identity        internal.ID
 	RequestNonce    uint64
 	Requests        sync.Map
 	mux             sync.Mutex
 	readWriteCount  uint64
 	idelPeriodCount uint8
+	wg              sync.WaitGroup
 }
 
 // RequestState represents a state of a request.
@@ -60,13 +62,14 @@ func NewPeerConn(p2pnet *P2P, conn *net.Conn, rxMessage chan P2PMessage) (peer *
 		conn:      conn,
 		rxMessage: rxMessage,
 		waitForHi: make(chan bool, 2),
+		done:      make(chan bool, 1),
 		rw:        bufio.NewReadWriter(bufio.NewReader(*conn), bufio.NewWriter(*conn)),
 	}
 	if err = peer.Start(); err != nil {
 		return
 	}
 
-	go peer.heartBeat()
+	//go peer.heartBeat()
 	return
 }
 
@@ -171,7 +174,13 @@ func (p *PeerConn) receiveLoop() {
 	if err := (*p.conn).Close(); err != nil {
 		fmt.Println(err)
 	}
-	fmt.Println("PeerConn receiveLoop done")
+}
+
+func (p *PeerConn) End() {
+	if err := (*p.conn).Close(); err != nil {
+		fmt.Println("!!!!! End", err)
+	}
+	fmt.Println("End")
 }
 
 func (p *PeerConn) receivePackage() ([]byte, error) {

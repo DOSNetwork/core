@@ -76,6 +76,6 @@ type P2PInterface interface {
 	Listen() error
 	Broadcast(proto.Message)
 	Join(bootstrapIp string) error
+	Leave()
 	SendMessage(id []byte, msg proto.Message) error
-	NewPeer(ip string) ([]byte, error)
 }
