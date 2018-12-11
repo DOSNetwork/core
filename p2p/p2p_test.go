@@ -1,11 +1,100 @@
 package p2p
 
 import (
+	"fmt"
+	"strconv"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/DOSNetwork/core/p2p/dht"
+
+	"github.com/DOSNetwork/core/p2p/internal"
+
 	"github.com/sirupsen/logrus"
 )
+
+func TestPeerConnEnd(t *testing.T) {
+	var wg sync.WaitGroup
+
+	var err error
+	var a, b P2PInterface
+	var aP2P, bP2P *P2P
+	var ok bool
+	aId := []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20}
+	bId := []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 19}
+	aPort := 44457
+	bPoer := 44458
+	log := logrus.New()
+
+	if a, _, err = CreateP2PNetwork(aId[:], aPort, log); err != nil {
+		t.Error("Test Failed: CreateP2PNetwork failed ", err)
+	}
+
+	if err = a.Listen(); err != nil {
+		t.Error("Test Failed: Listen failed ", err)
+
+	}
+
+	if b, _, err = CreateP2PNetwork(bId[:], bPoer, log); err != nil {
+		t.Error("Test Failed: CreateP2PNetwork failed ", err)
+	}
+
+	if err = b.Listen(); err != nil {
+		t.Error("Test Failed: Listen failed ", err)
+	}
+
+	if aP2P, ok = a.(*P2P); !ok {
+		t.Error("Test Failed: ")
+	}
+
+	if bP2P, ok = b.(*P2P); !ok {
+		t.Error("Test Failed: ")
+	}
+
+	aPeerConn, err := aP2P.ConnectTo("localhost:" + strconv.Itoa(bPoer))
+	timeout := false
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		request := new(Request)
+		request.SetMessage(&internal.Ping{})
+		request.SetTimeout(HEARTBEATMAXWAIT * time.Second)
+		if _, err := aPeerConn.Request(request); err != nil {
+			timeout = true
+		} else {
+			timeout = false
+		}
+	}()
+	wg.Wait()
+	if timeout {
+		t.Errorf("ConnectTo time-out")
+	}
+
+	aPeerConn.End()
+
+	result := make(chan bool, 1)
+	go func() {
+		for aP2P.LenOfPeers() > 0 ||
+			bP2P.LenOfPeers() > 0 {
+			time.Sleep(1 * time.Second)
+		}
+		result <- true
+	}()
+
+	select {
+	case res := <-result:
+		fmt.Println(res)
+		timeout = false
+	case <-time.After(30 * time.Second):
+		timeout = true
+	}
+
+	if aP2P.LenOfPeers() > 0 ||
+		bP2P.LenOfPeers() > 0 {
+		t.Errorf("ConnectTo aP2P.LenOfPeers %d bP2P.LenOfPeers() %d", aP2P.LenOfPeers(), bP2P.LenOfPeers())
+	}
+}
 
 //test scenario:
 func TestBootStrap(t *testing.T) {
@@ -59,6 +148,8 @@ func TestBootStrap(t *testing.T) {
 	if len(pContactsAfter) != 1 || pContactsAfter[string(bootid)] != boot.GetIP() {
 		t.Errorf("peer contacts(%d) : peer contact %s peer ip %s", len(pContactsAfter), pContactsAfter[string(bootid)], boot.GetIP())
 	}
+	boot.Leave()
+	peer.Leave()
 
 	//TODO:Implement Leave function to turn off connection
 

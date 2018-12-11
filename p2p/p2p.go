@@ -130,13 +130,22 @@ func (n *P2P) Listen() error {
 
 func (n *P2P) Join(bootstrapIp string) (err error) {
 	//it inserts the value of some known node c into the appropriate bucket as its first contact
-	_, err = n.NewPeer(bootstrapIp)
+	_, err = n.ConnectTo(bootstrapIp)
 	//it does an iterativeFindNode for self
 	results := n.FindNodeById(n.GetID())
 	for _, result := range results {
 		n.GetRoutingTable().Update(result)
 		//fmt.Println(n.GetIP(), "Update peer: ", result.Address)
 	}
+	return
+}
+
+func (n *P2P) Leave() {
+	n.peers.Range(func(key, value interface{}) bool {
+		peer := value.(*PeerConn)
+		peer.End()
+		return true
+	})
 	return
 }
 
@@ -151,12 +160,12 @@ func (n *P2P) Broadcast(m proto.Message) {
 	})
 }
 
-func (n *P2P) CheckPeers() {
+func (n *P2P) LenOfPeers() (count int) {
 	n.peers.Range(func(key, value interface{}) bool {
-		client := value.(*PeerConn)
-		fmt.Println("CheckPeers:", client.identity.Address)
+		count++
 		return true
 	})
+	return
 }
 
 func (n *P2P) SendMessage(id []byte, m proto.Message) (err error) {
@@ -207,9 +216,9 @@ func (n *P2P) GetRoutingTable() *dht.RoutingTable {
 This is a block call
 */
 
-func (n *P2P) NewPeer(addr string) (id []byte, err error) {
-	var peer *PeerConn
+func (n *P2P) ConnectTo(addr string) (peer *PeerConn, err error) {
 	var conn net.Conn
+	var id []byte
 	//TODO Check if addr is a valid addr
 	for retry := 0; retry < 10; retry++ {
 		//1)Check if this address has been in peers map
@@ -245,15 +254,6 @@ func (n *P2P) NewPeer(addr string) (id []byte, err error) {
 		n.peers.LoadOrStore(string(peer.identity.Id), peer)
 		n.routingTable.Update(peer.identity)
 
-		n.peers.Range(func(key, value interface{}) bool {
-			client := value.(*PeerConn)
-			if client.identity.Address == addr {
-				existing = true
-				id = make([]byte, len(client.identity.Id))
-				copy(id, client.identity.Id)
-			}
-			return true
-		})
 		return
 	}
 	err = errors.New("Peer : retried over 10 times")
@@ -396,7 +396,7 @@ func (n *P2P) queryPeerByID(peerID internal.ID, targetID internal.ID, responses 
 	var client *PeerConn
 	_, loaded := n.peers.Load(string(peerID.Id))
 	if !loaded {
-		_, err := n.NewPeer(peerID.Address)
+		_, err := n.ConnectTo(peerID.Address)
 		if err != nil {
 			responses <- []*internal.ID{}
 			return
