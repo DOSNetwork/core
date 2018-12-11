@@ -1,0 +1,39 @@
+version: '3'
+services:
+ bootstrap:
+   image: bootstrap
+   deploy:
+     replicas: 1
+   environment:
+     - CHAINNODE=rinkebyPrivateNode
+     - GROUPSIZE=3
+ dosnode:
+   image: dosnode
+   depends_on:
+     - bootstrap
+   deploy:
+     replicas: 3
+   environment:
+     - NODEROLE=testNode
+     - CHAINNODE=rinkebyPrivateNode
+     - BOOTSTRAPIP=bootstrap:44460
+ randomnode:
+   image: usernode
+   deploy:
+     replicas: 1
+   environment:
+     - NODEROLE=testNode
+     - CHAINNODE=rinkebyPrivateNode
+     - BOOTSTRAPIP=bootstrap:44460
+     - QUERYTIMES=50
+     - QUERYTYPE=random
+ urlnode:
+   image: usernode
+   deploy:
+     replicas: 1
+   environment:
+     - NODEROLE=testNode
+     - CHAINNODE=rinkebyPrivateNode
+     - BOOTSTRAPIP=bootstrap:44460
+     - QUERYTIMES=50
+     - QUERYTYPE=url
