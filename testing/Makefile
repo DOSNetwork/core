@@ -27,27 +27,30 @@ deploy:contract-prepare
 	rm -r $(USER_CONTRACTS)/lib/
 	go run contracts_deploy/deploy_ama.go -AMAPath $(AMA_CONFIGPATH) -credentialPath $(BOOT_CREDENTIAL)
 
-
-docker-prepare:
-	cd ../;$(MAKE) docker-prepare
-
-docker-bootnode:docker-prepare
+docker-bootnode:
 	cp bootStrapNode/Dockerfile  ../Dockerfile.bootstrap	
 	cd ../;docker build -t bootstrap -f Dockerfile.bootstrap  .
 	rm ../Dockerfile.bootstrap
 
-docker-dosnode:docker-prepare
+docker-dosnode:
 	cd ../;$(MAKE) client-docker
 
-docker-usernode:docker-prepare
+docker-usernode:
 	cp dosUser/Dockerfile ../Dockerfile.usernode
 	cd ../;docker build -t usernode -f Dockerfile.usernode  .
 	rm ../Dockerfile.usernode
 
-docker-peernode:docker-prepare
+docker-peernode:
 	cp peerNode/Dockerfile ../Dockerfile.peernode
 	cd ../;docker build -t peernode -f Dockerfile.peernode  .
 	rm ../Dockerfile.peernode
 
 docker-all: docker-bootnode docker-dosnode docker-usernode docker-peernode
 	docker image prune -f
+
+update-dosenv:
+	-docker rmi dosenv
+	-docker rmi xiaorui89/dosenv
+	cd ../;docker build -t dosenv -f Dockerfile.env  .
+	docker tag dosenv xiaorui89/dosenv:latest
+	docker push xiaorui89/dosenv:latest
