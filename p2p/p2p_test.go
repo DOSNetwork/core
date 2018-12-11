@@ -75,8 +75,8 @@ func TestPeerConnEnd(t *testing.T) {
 
 	result := make(chan bool, 1)
 	go func() {
-		for aP2P.LenOfPeers() > 0 ||
-			bP2P.LenOfPeers() > 0 {
+		for aP2P.lenOfPeers() > 0 ||
+			bP2P.lenOfPeers() > 0 {
 			time.Sleep(1 * time.Second)
 		}
 		result <- true
@@ -90,9 +90,9 @@ func TestPeerConnEnd(t *testing.T) {
 		timeout = true
 	}
 
-	if aP2P.LenOfPeers() > 0 ||
-		bP2P.LenOfPeers() > 0 {
-		t.Errorf("ConnectTo aP2P.LenOfPeers %d bP2P.LenOfPeers() %d", aP2P.LenOfPeers(), bP2P.LenOfPeers())
+	if aP2P.lenOfPeers() > 0 ||
+		bP2P.lenOfPeers() > 0 {
+		t.Errorf("ConnectTo aP2P.lenOfPeers %d bP2P.lenOfPeers() %d", aP2P.lenOfPeers(), bP2P.lenOfPeers())
 	}
 }
 

@@ -7,7 +7,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"strings"
 	"sync"
 
 	"time"
@@ -134,7 +133,9 @@ func (b *BootNode) getID(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("getID count ", b.count, " peerSize", b.peerSize, " members", b.node.members[b.count])
 		b.ipIdMap[ip] = b.node.members[b.count]
 	}
-
+	b.log.WithFields(logrus.Fields{
+		"bootGetID": true,
+	}).Info()
 	if len(b.node.members) > b.count {
 		w.Write(b.ipIdMap[ip])
 	} else {
@@ -149,7 +150,7 @@ func (b *BootNode) getID(w http.ResponseWriter, r *http.Request) {
 }
 
 func (b *BootNode) getAllIDs(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("getAllIDs ,", b.peerSize)
+	//fmt.Println("getAllIDs ,", b.peerSize)
 	for i := 1; i <= b.peerSize; i++ {
 		w.Write(b.members[i])
 	}
@@ -164,7 +165,7 @@ func (b *BootNode) getAllIPs(w http.ResponseWriter, r *http.Request) {
 }
 
 func (b *BootNode) isAllnodeready() bool {
-	fmt.Println("isAllnodeready ", len(b.readynode) == b.peerSize, "", len(b.readynode))
+	//fmt.Println("isAllnodeready ", len(b.readynode) == b.peerSize, "", len(b.readynode))
 	return len(b.readynode) == b.peerSize
 }
 
@@ -178,6 +179,9 @@ func (b *BootNode) isTestReady(w http.ResponseWriter, r *http.Request) {
 	b.lock.Unlock()
 	if b.isAllnodeready() {
 		w.Write([]byte{ALLNODEREADY})
+		b.log.WithFields(logrus.Fields{
+			"bootTestReady": true,
+		}).Info()
 	} else {
 		w.Write([]byte{ALLNODENOTREADY})
 	}
@@ -193,58 +197,15 @@ func (b *BootNode) postHandler(w http.ResponseWriter, r *http.Request) {
 	delete(b.checkroll, string(body))
 	b.lock.Unlock()
 	fmt.Println("check done ", len(b.checkroll))
+
+	b.log.WithFields(logrus.Fields{
+		"bootTestDone": true,
+	}).Info()
+
 	if len(b.checkroll) == 0 {
 		b.finishTest()
 		b.done <- true
 	}
-}
-
-func (b *BootNode) sendPeerAddresses() {
-	s := []string{}
-	for i := 0; i < len(b.allIP); i++ {
-
-		id, err := b.p.NewPeer(b.allIP[i])
-		/*
-			results := b.p.FindNode(b.p.GetId(), dht.BucketSize, 20)
-			for _, result := range results {
-				b.p.GetRoutingTable().Update(result)
-				fmt.Println(b.p.GetId().Address, "Update peer: ", result.Address)
-			}
-			peers := b.p.GetRoutingTable().GetPeerAddresses()
-			fmt.Println("!!!!GetPeerAddresses  ", peers)
-		*/
-		if err != nil {
-			fmt.Println("BootNode err ", err)
-		} else {
-			fmt.Println("NewPeer id ", id, " address ", b.allIP[i])
-			s = append(s, b.allIP[i])
-		}
-	}
-
-	allIP := strings.Join(s, ",")
-	cmd := &internalMsg.Cmd{
-		Ctype: internalMsg.Cmd_ALLIP,
-		Args:  []byte(allIP),
-	}
-	pb := proto.Message(cmd)
-	b.p.Broadcast(pb)
-
-	b.sendPeerIDs()
-}
-
-func (b *BootNode) sendPeerIDs() {
-
-	s := []byte{}
-	for i := 1; i < len(b.members); i++ {
-		s = append(s, b.members[i]...)
-	}
-	cmd := &internalMsg.Cmd{
-		Ctype: internalMsg.Cmd_ALLID,
-		Args:  s,
-	}
-	pb := proto.Message(cmd)
-	b.p.Broadcast(pb)
-	b.startTest()
 }
 
 func (b *BootNode) startTest() {
@@ -253,7 +214,9 @@ func (b *BootNode) startTest() {
 		Args:  []byte{},
 	}
 	pb := proto.Message(cmd)
-	b.p.Broadcast(pb)
+	for i := 1; i <= b.peerSize; i++ {
+		b.p.SendMessage(b.members[i], pb)
+	}
 }
 
 func (b *BootNode) finishTest() {
@@ -262,7 +225,9 @@ func (b *BootNode) finishTest() {
 		Args:  []byte{},
 	}
 	pb := proto.Message(cmd)
-	b.p.Broadcast(pb)
+	for i := 1; i <= b.peerSize; i++ {
+		b.p.SendMessage(b.members[i], pb)
+	}
 }
 
 func (b *BootNode) EventLoop() {

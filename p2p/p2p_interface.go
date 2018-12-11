@@ -74,8 +74,8 @@ type P2PInterface interface {
 	GetIP() string
 	GetID() []byte
 	Listen() error
-	Broadcast(proto.Message)
 	Join(bootstrapIp string) error
+	ConnectTo(IpAddr string) (id []byte, err error)
 	Leave()
 	SendMessage(id []byte, msg proto.Message) error
 }
