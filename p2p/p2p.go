@@ -177,6 +177,7 @@ func (n *P2P) findPeer(id []byte, localOnly bool) (peer *PeerConn, found bool) {
 			return
 		}
 	}
+	fmt.Println("!!! Can't find node ", id)
 	if !localOnly {
 		// Updating Routing table to find peer
 		results := n.findNode(internal.ID{Id: id}, dht.BucketSize, 20)
@@ -228,29 +229,11 @@ func (n *P2P) ConnectTo(addr string) (id []byte, err error) {
 
 func (n *P2P) connectTo(addr string) (peer *PeerConn, err error) {
 	var conn net.Conn
-	var id []byte
 	//TODO CALL lenOfPeers() and rm some peerConn
 
 	//TODO Check if addr is a valid addr
 	for retry := 0; retry < 10; retry++ {
-		//1)Check if this address has been in peers map
-		existing := false
-		n.peers.Range(func(key, value interface{}) bool {
-			client := value.(*PeerConn)
-			if client.identity.Address == addr {
-
-				existing = true
-				id = make([]byte, len(client.identity.Id))
-				peer = client
-			}
-			return true
-		})
-		if existing {
-			fmt.Println("Existing peer")
-			return
-		}
-
-		//2)Dial to peer to get a connection
+		//1)Dial to peer to get a connection
 		conn, err = net.Dial("tcp", addr)
 		if err != nil {
 			fmt.Println("NewPeer Dial err ", err, " addr ", addr)
@@ -385,13 +368,17 @@ func (lookup *lookupBucket) performLookup(n *P2P, targetID internal.ID, alpha in
 
 func (n *P2P) queryPeerByID(peerID internal.ID, targetID internal.ID, responses chan []*internal.ID) {
 	var client *PeerConn
-	var found bool
-	localOnly := true
 
-	if client, found = n.findPeer(peerID.Id, localOnly); !found {
-		responses <- []*internal.ID{}
-		return
+	targetPeer, loaded := n.peers.Load(string(peerID.Id))
+	if !loaded {
+		var err error
+		targetPeer, err = n.connectTo(peerID.Address)
+		if err != nil {
+			responses <- []*internal.ID{}
+			return
+		}
 	}
+	client = targetPeer.(*PeerConn)
 
 	targetProtoID := internal.ID(targetID)
 

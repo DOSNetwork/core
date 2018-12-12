@@ -69,7 +69,7 @@ func NewPeerConn(p2pnet *P2P, conn *net.Conn, rxMessage chan P2PMessage) (peer *
 		return
 	}
 
-	//go peer.heartBeat()
+	go peer.heartBeat()
 	return
 }
 

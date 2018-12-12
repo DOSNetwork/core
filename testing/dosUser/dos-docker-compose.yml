@@ -25,7 +25,7 @@ services:
      - NODEROLE=testNode
      - CHAINNODE=rinkebyPrivateNode
      - BOOTSTRAPIP=bootstrap:44460
-     - QUERYTIMES=50
+     - QUERYTIMES=2
      - QUERYTYPE=random
  urlnode:
    image: usernode
@@ -35,5 +35,5 @@ services:
      - NODEROLE=testNode
      - CHAINNODE=rinkebyPrivateNode
      - BOOTSTRAPIP=bootstrap:44460
-     - QUERYTIMES=50
+     - QUERYTIMES=2
      - QUERYTYPE=url
