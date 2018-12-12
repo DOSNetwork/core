@@ -5,7 +5,12 @@ import (
 
 	"github.com/DOSNetwork/core/p2p/dht"
 	"github.com/sirupsen/logrus"
+	"math/rand"
+	"fmt"
 )
+
+const peerSize =105
+const connSize =100
 
 //test scenario:
 func TestBootStrap(t *testing.T) {
@@ -124,5 +129,56 @@ func TestBootStrapWithMultipleNode(t *testing.T) {
 		if count != (numOfNodes - 1) {
 			t.Errorf("Can't find %s in all routing table, %d", peers[i].GetIP(), count)
 		}
+	}
+}
+
+
+
+//test scenario: test max connection for single node
+func TestMaxConnectionBySingleNode (t *testing.T){
+	bootId := []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20}
+	bootPort := 33333
+	log := logrus.New()
+	//peers := make([]*P2P, peerSize)
+	peerIds := make([][]byte, peerSize)
+
+	boot, _, err := CreateP2PNetwork(bootId[:], bootPort, log)
+	if err != nil {
+		t.Error("Test Failed: CreateP2PNetwork failed ", err)
+	}
+	boot_p2p, _ := boot.(*P2P)
+
+	if err := boot.Listen(); err != nil {
+		t.Error("Test Failed: Listen failed ", err)
+
+	}
+
+	peerIds[0] = []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20}
+
+	for i:=1;i<peerSize;i++{
+		peerIds[i] = []byte{1+byte(i), 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 , 13, 14, 15, 16, 17, 18, 19, 21 + byte(rand.Intn(10))}
+		peerport := 22222+i
+
+		peer,_,err := CreateP2PNetwork(peerIds[i],peerport,log)
+		if err != nil{
+			t.Error("Test Failed: CreateP2PNetwork failed",err)
+		}
+
+		if err:=peer.Listen();err !=nil{
+			t.Error("Test Failed: Listen failed",err)
+		}
+
+		peer.Join(boot.GetIP())
+
+		fmt.Println("aaaaaaaa------>")
+
+		if i>connSize  && boot_p2p.peers.PeerNum() > connSize{
+			boot_p2p.peers.DeletePeer(boot_p2p.peers.parray[0].identity.Address)
+			break
+		}
+	}
+
+	if boot_p2p.peers.PeerNum() >= connSize{
+		t.Fatal("test failed ,connection out of indicated range")
 	}
 }

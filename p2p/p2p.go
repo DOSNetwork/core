@@ -238,12 +238,17 @@ func (n *P2P) NewPeer(addr string) (id []byte, err error) {
 		}
 
 		peer, err = NewPeerConn(n, &conn, n.messages)
+
+		fmt.Println("asfff")
+
 		if err != nil {
 			fmt.Println("NewPeerConn err ", err)
 			continue
 		}
 		n.peers.LoadOrStore(string(peer.identity.Id), peer)
 		n.routingTable.Update(peer.identity)
+
+		fmt.Println("asfff----->")
 
 		n.peers.Range(func(key, value interface{}) bool {
 			client := value.(*PeerConn)
