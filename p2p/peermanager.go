@@ -3,6 +3,7 @@ package p2p
 import (
 	"sync"
 	"container/heap"
+	"fmt"
 )
 const MAXPEERCOUNT = 21
 
@@ -15,10 +16,9 @@ type PeerManager struct {
 func (pm *PeerManager) LoadOrStore(id string, peer *PeerConn) (actual *PeerConn, loaded bool){
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
-	ac, l := pm.peers.LoadOrStore(string(peer.identity.Id), peer)
+	ac, l := pm.peers.LoadOrStore(id, peer)
 	loaded = l
 	if !l {
-		pm.mu.Lock()
 		heap.Push(&pm.parray, peer)
 		if len(pm.parray) > MAXPEERCOUNT {
 			p := heap.Pop(&pm.parray).(*PeerConn)
@@ -29,6 +29,7 @@ func (pm *PeerManager) LoadOrStore(id string, peer *PeerConn) (actual *PeerConn,
 		actual = peer
 	}else {
 		actual = ac.(*PeerConn)
+		fmt.Println(actual.identity.Address)
 	}
 	return
 }
