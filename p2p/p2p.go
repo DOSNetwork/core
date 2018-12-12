@@ -25,7 +25,7 @@ import (
 type P2P struct {
 	identity internal.ID
 	//Map of ID (string) <-> *p2p.PeerConn
-	peers *sync.Map
+	peers *PeerManager //*sync.Map
 	// Todo:Add a subscrive fucntion to send message to application
 	messages     chan P2PMessage
 	suite        suites.Suite
@@ -164,7 +164,7 @@ func (n *P2P) findPeer(id []byte, localOnly bool) (peer *PeerConn, found bool) {
 	var err error
 
 	// Find Peer from existing peerConn
-	if value, found = n.peers.Load(string(id)); found {
+	if value, found = n.peers.GetPeerByID(string(id)); found {
 		peer = value.(*PeerConn)
 		return
 	}
@@ -186,7 +186,7 @@ func (n *P2P) findPeer(id []byte, localOnly bool) (peer *PeerConn, found bool) {
 		}
 
 		// Find Peer from existing peerConn
-		if value, found = n.peers.Load(string(id)); found {
+		if value, found = n.peers.GetPeerByID(string(id)); found {
 			peer = value.(*PeerConn)
 			found = true
 			return
@@ -369,7 +369,7 @@ func (lookup *lookupBucket) performLookup(n *P2P, targetID internal.ID, alpha in
 func (n *P2P) queryPeerByID(peerID internal.ID, targetID internal.ID, responses chan []*internal.ID) {
 	var client *PeerConn
 
-	targetPeer, loaded := n.peers.Load(string(peerID.Id))
+	targetPeer, loaded := n.peers.GetPeerByID(string(peerID.Id))
 	if !loaded {
 		var err error
 		targetPeer, err = n.connectTo(peerID.Address)
