@@ -338,7 +338,9 @@ func (d *P2PDkg) Event(event string) {
 func (d *P2PDkg) broadcast(m proto.Message) {
 	for _, member := range d.groupIds {
 		if string(member) != string((*d.network).GetID()) {
-			go (*d.network).SendMessage(member, m)
+			if err := (*d.network).SendMessage(member, m); err != nil {
+				fmt.Println("DKG SendMessage err ", err)
+			}
 		}
 	}
 }

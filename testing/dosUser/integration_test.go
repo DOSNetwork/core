@@ -39,7 +39,7 @@ func TestDosNodeStart(test *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel() // The cancel should be deferred so resources are cleaned up
 	cmdOutput := &bytes.Buffer{}
-	cmd := exec.CommandContext(ctx, "docker-compose", "-f", "dos-docker-compose.yml", "up", "--scale", "dosnode=6")
+	cmd := exec.CommandContext(ctx, "docker-compose", "-f", "dos-docker-compose.yml", "up", "--scale", "dosnode=3")
 	cmd.Stdout = cmdOutput
 	cmd.Stderr = os.Stderr
 	cmd.Dir = dosNodeDir()
