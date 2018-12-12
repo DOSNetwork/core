@@ -29,7 +29,7 @@ func (pm *PeerManager) LoadOrStore(id string, peer *PeerConn) (actual *PeerConn,
 		actual = peer
 	}else {
 		actual = ac.(*PeerConn)
-		fmt.Println(actual.identity.Address)
+		fmt.Println("Load Peerconn:"+actual.identity.Address)
 	}
 	return
 }
