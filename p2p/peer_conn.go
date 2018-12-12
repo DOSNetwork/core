@@ -47,7 +47,7 @@ type PeerConn struct {
 	mux             sync.Mutex
 	readWriteCount  uint64
 	idelPeriodCount uint8
-	wg              sync.WaitGroup
+	lastusedtime time.Time
 }
 
 // RequestState represents a state of a request.
@@ -64,6 +64,7 @@ func NewPeerConn(p2pnet *P2P, conn *net.Conn, rxMessage chan P2PMessage) (peer *
 		waitForHi: make(chan bool, 2),
 		done:      make(chan bool, 1),
 		rw:        bufio.NewReadWriter(bufio.NewReader(*conn), bufio.NewWriter(*conn)),
+		lastusedtime: time.Now(),
 	}
 	if err = peer.Start(); err != nil {
 		return
@@ -167,8 +168,8 @@ func (p *PeerConn) receiveLoop() {
 		}
 	}
 
-	if _, loaded := p.p2pnet.peers.Load(string(p.identity.Id)); loaded {
-		p.p2pnet.peers.Delete(string(p.identity.Id))
+	if _, loaded := p.p2pnet.peers.GetPeerByID(string(p.identity.Id)); loaded {
+		p.p2pnet.peers.DeletePeer(string(p.identity.Id))
 	}
 
 	if err := (*p.conn).Close(); err != nil {
