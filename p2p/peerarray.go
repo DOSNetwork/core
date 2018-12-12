@@ -1,23 +1,24 @@
 package p2p
 
-type IntHeap []int  // 定义一个类型
+type PeerArray []*PeerConn
 
-func (h IntHeap) Len() int { return len(h) }  // 绑定len方法,返回长度
-func (h IntHeap) Less(i, j int) bool {  // 绑定less方法
-	return h[i] < h[j]  // 如果h[i]<h[j]生成的就是小根堆，如果h[i]>h[j]生成的就是大根堆
+func (pa PeerArray) Len() int { return len(pa) }
+func (pa PeerArray) Less(i, j int) bool {  // 绑定less方法
+	//return pa[i] < pa[j]  // 如果pa[i]<pa[j]生成的就是小根堆，如果pa[i]>pa[j]生成的就是大根堆
+	return pa[i].lastusedtime.Unix() < pa[j].lastusedtime.Unix()
 }
-func (h IntHeap) Swap(i, j int) {  // 绑定swap方法，交换两个元素位置
-	h[i], h[j] = h[j], h[i]
+func (pa PeerArray) Swap(i, j int) {  // 绑定swap方法，交换两个元素位置
+	pa[i], pa[j] = pa[j], pa[i]
 }
 
-func (h *IntHeap) Pop() interface{} {  // 绑定pop方法，从最后拿出一个元素并返回
-	old := *h
+func (pa *PeerArray) Pop() interface{} {
+	old := *pa
 	n := len(old)
 	x := old[n-1]
-	*h = old[0 : n-1]
+	*pa = old[0 : n-1]
 	return x
 }
 
-func (h *IntHeap) Push(x interface{}) {  // 绑定push方法，插入新元素
-	*h = append(*h, x.(int))
+func (pa *PeerArray) Push(x interface{}) {  // 绑定push方法，插入新元素
+	*pa = append(*pa, x.(*PeerConn))
 }
