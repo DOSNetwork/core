@@ -555,12 +555,12 @@ func (e *EthAdaptor) SetRandomNum(sig []byte, version uint8) (err error) {
 
 	x, y := DecodeSig(sig)
 
-	tx, err := e.proxy.UpdateRandomness(auth, [2]*big.Int{x, y}, version)
+	tx, err := e.proxy.UpdateRandomness(auth, [2]*big.Int{x, y})
 	for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
 		fmt.Println(err)
 		time.Sleep(time.Second)
 		fmt.Println("transaction retry...")
-		tx, err = e.proxy.UpdateRandomness(auth, [2]*big.Int{x, y}, version)
+		tx, err = e.proxy.UpdateRandomness(auth, [2]*big.Int{x, y})
 	}
 	if err != nil {
 		return

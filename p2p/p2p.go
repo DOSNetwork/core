@@ -24,7 +24,7 @@ import (
 type P2P struct {
 	identity internal.ID
 	//Map of ID (string) <-> *p2p.PeerConn
-	peers *sync.Map
+	peers *PeerManager//*sync.Map
 	// Todo:Add a subscrive fucntion to send message to application
 	messages     chan P2PMessage
 	suite        suites.Suite
@@ -164,15 +164,15 @@ func (n *P2P) SendMessage(id []byte, m proto.Message) (err error) {
 	var tSendMessage float64
 	var tFindNode float64
 	start := time.Now()
-	value, loaded := n.peers.Load(string(id))
+	value, loaded := n.peers.GetPeerByID(string(id))
 	if !loaded {
 		tFindNodeStart := time.Now()
 		n.FindNodeById(id)
 		tFindNode = time.Since(tFindNodeStart).Seconds()
 	}
-	value, loaded = n.peers.Load(string(id))
+	value, loaded = n.peers.GetPeerByID(string(id))
 	if loaded {
-		client := value.(*PeerConn)
+		client := value
 		err = client.SendMessage(m)
 		sendResult = true
 	} else {
@@ -394,7 +394,7 @@ func (lookup *lookupBucket) performLookup(n *P2P, targetID internal.ID, alpha in
 
 func (n *P2P) queryPeerByID(peerID internal.ID, targetID internal.ID, responses chan []*internal.ID) {
 	var client *PeerConn
-	_, loaded := n.peers.Load(string(peerID.Id))
+	_, loaded := n.peers.GetPeerByID(string(peerID.Id))
 	if !loaded {
 		_, err := n.NewPeer(peerID.Address)
 		if err != nil {
@@ -404,13 +404,13 @@ func (n *P2P) queryPeerByID(peerID internal.ID, targetID internal.ID, responses 
 	}
 	//TODO: Need to check if it can just return
 	//panic: interface conversion: interface {} is nil, not *p2p.PeerConn
-	value, ok := n.peers.Load(string(peerID.Id))
+	value, ok := n.peers.GetPeerByID(string(peerID.Id))
 	if !ok {
 		fmt.Println("value not found for key: peerID.Id", peerID.Id)
 		responses <- []*internal.ID{}
 		return
 	}
-	client = value.(*PeerConn)
+	client = value
 
 	targetProtoID := internal.ID(targetID)
 
