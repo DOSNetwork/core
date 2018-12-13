@@ -11,11 +11,11 @@ import (
 
 	//	"github.com/ethereum/go-ethereum/common"
 
-	"github.com/DOSNetwork/core/testing/peerNode/internalMsg"
+	//	"github.com/DOSNetwork/core/testing/peerNode/internalMsg"
 
 	"github.com/DOSNetwork/core/p2p"
 	//	"github.com/DOSNetwork/core/p2p/dht"
-	"github.com/golang/protobuf/proto"
+	//	"github.com/golang/protobuf/proto"
 
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
@@ -176,11 +176,12 @@ func (b *BootNode) postHandler(w http.ResponseWriter, r *http.Request) {
 	}).Info()
 
 	if len(b.checkroll) == 0 {
-		b.finishTest()
+		//		b.finishTest()
 		b.done <- true
 	}
 }
 
+/*
 func (b *BootNode) startTest() {
 	cmd := &internalMsg.Cmd{
 		Ctype: internalMsg.Cmd_STARTTEST,
@@ -201,7 +202,7 @@ func (b *BootNode) finishTest() {
 	for i := 1; i <= b.peerSize; i++ {
 		b.p.SendMessage(b.members[i], pb)
 	}
-}
+}*/
 
 func (b *BootNode) EventLoop() {
 L:

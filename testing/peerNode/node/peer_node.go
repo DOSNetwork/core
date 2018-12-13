@@ -178,7 +178,7 @@ func (d *PeerNode) Init(bootStrapIp string, port, peerSize int, numMessages int,
 	d.p, d.peerEvent, _ = p2p.CreateP2PNetwork(d.nodeID[:], port, d.log)
 
 	d.p.Listen()
-	d.p.Join(bootStrapIp + ":44460")
+	//d.p.Join(bootStrapIp + ":44460")
 	fmt.Println("nodeIP = ", d.p.GetIP())
 }
 
