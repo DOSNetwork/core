@@ -3,6 +3,7 @@ package node
 import (
 	"bytes"
 	"fmt"
+	"math/big"
 
 	"github.com/DOSNetwork/core/testing/peerNode/internalMsg"
 
@@ -22,6 +23,7 @@ func (r test1) StartTest(d *PeerNode) {
 		id, err := d.p.ConnectTo(ip)
 		if err != nil {
 			fmt.Println("NewPeer err", err)
+			d.log.WithField("event", "NewPeer err").Warn(ip)
 		}
 		d.checkroll[string(id)] = 0
 	}
@@ -40,8 +42,11 @@ func (r test1) CheckResult(sender string, content *internalMsg.Cmd, d *PeerNode)
 			delete(d.checkroll, sender)
 		}
 
+		d.log.WithField("event", "peer remain").Info(len(d.checkroll))
+
 		if len(d.checkroll) == 0 {
 			fmt.Println("test done")
+			d.log.WithField("event", "test done").Info()
 			d.MakeRequest(d.bootStrapIp, "post", d.nodeID)
 		}
 	}
@@ -76,6 +81,7 @@ func (r test2) StartTest(d *PeerNode) {
 			err := d.p.SendMessage([]byte(id), pb)
 			if err != nil {
 				fmt.Println("SendMessage err ", err)
+				d.log.WithField("event", "SendMessage err").Warn(new(big.Int).SetBytes([]byte(id)).String())
 			}
 		}
 	}
@@ -89,7 +95,10 @@ func (r test2) CheckResult(sender string, content *internalMsg.Cmd, d *PeerNode)
 			delete(d.checkroll, sender)
 		}
 
+		d.log.WithField("event", "peer remain").Info(len(d.checkroll))
+
 		if len(d.checkroll) == 0 {
+			d.log.WithField("event", "test done").Info()
 			d.MakeRequest(d.bootStrapIp, "post", d.nodeID)
 		}
 	}

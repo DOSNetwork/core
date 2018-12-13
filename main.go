@@ -53,7 +53,7 @@ func main() {
 	}
 
 	//2)Build a p2p network
-	p, peerEvent, err := p2p.CreateP2PNetwork(chainConn.GetId(), port, log)
+	p, peerEvent, err := p2p.CreateP2PNetwork(chainConn.GetId(), port, log.WithFields(logrus.Fields{}))
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -4,14 +4,11 @@ import (
 	"crypto/rand"
 	"fmt"
 	"io/ioutil"
-	"net"
+	"math/big"
 	"net/http"
 	"os"
 	"sync"
 
-	"time"
-
-	"github.com/bshuster-repo/logrus-logstash-hook"
 	//	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/DOSNetwork/core/testing/peerNode/internalMsg"
@@ -47,7 +44,7 @@ func GenerateRandomBytes(n int) ([]byte, error) {
 	return b, nil
 }
 
-func (b *BootNode) Init(port, peerSize int, logger *logrus.Logger) {
+func (b *BootNode) Init(port, peerSize int, logger *logrus.Entry) {
 	//1)Generate member ID
 	b.peerSize = peerSize
 	b.members = [][]byte{}
@@ -60,6 +57,7 @@ func (b *BootNode) Init(port, peerSize int, logger *logrus.Logger) {
 	b.done = make(chan bool)
 	b.readynode = make(map[string]bool)
 	b.log = logger
+	b.log.Data["role"] = "bootstrap"
 
 	for i := 1; i <= b.peerSize; i++ {
 		id, _ := GenerateRandomBytes(len(bootID))
@@ -84,33 +82,7 @@ func (b *BootNode) Init(port, peerSize int, logger *logrus.Logger) {
 
 	//3)Build a p2p network
 	b.p, b.peerEvent, _ = p2p.CreateP2PNetwork(bootID, port, b.log)
-	tcpAddr, err := net.ResolveTCPAddr("tcp", "163.172.36.173:9500")
-	if err != nil {
-		b.log.Error(err)
-	}
 
-	conn, err := net.DialTCP("tcp", nil, tcpAddr)
-	if err != nil {
-		b.log.Error(err)
-	}
-
-	if err = conn.SetKeepAlivePeriod(time.Minute); err != nil {
-		b.log.Warn(err)
-	}
-
-	if err = conn.SetKeepAlive(true); err != nil {
-		b.log.Warn(err)
-	}
-
-	hook, err := logrustash.NewHookWithFieldsAndConn(conn, "peer_node", logrus.Fields{
-		"queryType":         "peer_node",
-		"startingTimestamp": time.Now(),
-	})
-	if err != nil {
-		b.log.Error(err)
-	}
-
-	b.log.Hooks.Add(hook)
 	go b.p.Listen()
 }
 
@@ -140,7 +112,6 @@ func (b *BootNode) getID(w http.ResponseWriter, r *http.Request) {
 		w.Write(b.ipIdMap[ip])
 	} else {
 		fmt.Println(b.node.members)
-
 	}
 	//TODO:Send addresses and IDs after all peer node already build p2p connection to boot node
 	//if b.count == b.peerSize {
@@ -199,7 +170,9 @@ func (b *BootNode) postHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("check done ", len(b.checkroll))
 
 	b.log.WithFields(logrus.Fields{
-		"bootTestDone": true,
+		"event": "check done",
+		"len":   len(b.checkroll),
+		"id":    new(big.Int).SetBytes(body).String(),
 	}).Info()
 
 	if len(b.checkroll) == 0 {
@@ -238,6 +211,7 @@ L:
 		case _ = <-b.peerEvent:
 		case <-b.done:
 			fmt.Println("EventLoop done")
+			b.log.WithField("event", "EventLoop done").Info()
 			break L
 		default:
 		}

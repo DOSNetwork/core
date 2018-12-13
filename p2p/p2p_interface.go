@@ -21,7 +21,7 @@ func genPair() (kyber.Scalar, kyber.Point) {
 	return secret, public
 }
 
-func CreateP2PNetwork(id []byte, port int, logger *logrus.Logger) (P2PInterface, chan P2PMessage, error) {
+func CreateP2PNetwork(id []byte, port int, logger *logrus.Entry) (P2PInterface, chan P2PMessage, error) {
 	testStrategy := os.Getenv("TESTSTRATEGY")
 	if testStrategy == "DELAY_BEFORE_RECEIVELOOP" {
 		p := &TestP2P{

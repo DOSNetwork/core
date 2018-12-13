@@ -33,7 +33,10 @@ type P2P struct {
 	secKey       kyber.Scalar
 	pubKey       kyber.Point
 	routingTable *dht.RoutingTable
-	log          *logrus.Logger
+	log          *logrus.Entry
+	fromLocal    int
+	fromDht      int
+	fromRemote   int
 }
 
 func (n *P2P) SetID(id []byte) {
@@ -166,6 +169,16 @@ func (n *P2P) findPeer(id []byte, localOnly bool) (peer *PeerConn, found bool) {
 	// Find Peer from existing peerConn
 	if value, found = n.peers.Load(string(id)); found {
 		peer = value.(*PeerConn)
+
+		n.fromLocal++
+		n.log.WithFields(logrus.Fields{
+			"event":      "findPeer",
+			"id":         new(big.Int).SetBytes(id).String(),
+			"fromLocal":  n.fromLocal,
+			"fromDht":    n.fromDht,
+			"fromRemote": n.fromRemote,
+		}).Info("fromLocal")
+
 		return
 	}
 
@@ -174,6 +187,16 @@ func (n *P2P) findPeer(id []byte, localOnly bool) (peer *PeerConn, found bool) {
 	if ip, ok := peers[string(id)]; ok {
 		if peer, err = n.connectTo(ip); err == nil {
 			found = true
+
+			n.fromDht++
+			n.log.WithFields(logrus.Fields{
+				"event":      "findPeer",
+				"id":         new(big.Int).SetBytes(id).String(),
+				"fromLocal":  n.fromLocal,
+				"fromDht":    n.fromDht,
+				"fromRemote": n.fromRemote,
+			}).Info("fromDht")
+
 			return
 		}
 	}
@@ -188,9 +211,28 @@ func (n *P2P) findPeer(id []byte, localOnly bool) (peer *PeerConn, found bool) {
 		if value, found = n.peers.Load(string(id)); found {
 			peer = value.(*PeerConn)
 			found = true
+
+			n.fromRemote++
+			n.log.WithFields(logrus.Fields{
+				"event":      "findPeer",
+				"id":         new(big.Int).SetBytes(id).String(),
+				"fromLocal":  n.fromLocal,
+				"fromDht":    n.fromDht,
+				"fromRemote": n.fromRemote,
+			}).Info("fromRemote")
+
 			return
 		}
 	}
+
+	n.log.WithFields(logrus.Fields{
+		"event":      "findPeer",
+		"id":         new(big.Int).SetBytes(id).String(),
+		"fromLocal":  n.fromLocal,
+		"fromDht":    n.fromDht,
+		"fromRemote": n.fromRemote,
+	}).Info("miss")
+
 	return
 }
 
@@ -210,7 +252,7 @@ func (n *P2P) SendMessage(id []byte, m proto.Message) (err error) {
 		"nodeID":           new(big.Int).SetBytes(n.GetID()).String(),
 		"targetID":         new(big.Int).SetBytes(id).String(),
 		"send-result":      sendResult,
-	}).Info()
+	}).Info(err)
 	return
 }
 
@@ -228,7 +270,6 @@ func (n *P2P) ConnectTo(addr string) (id []byte, err error) {
 
 func (n *P2P) connectTo(addr string) (peer *PeerConn, err error) {
 	var conn net.Conn
-	var id []byte
 	//TODO CALL lenOfPeers() and rm some peerConn
 
 	//TODO Check if addr is a valid addr
@@ -240,7 +281,6 @@ func (n *P2P) connectTo(addr string) (peer *PeerConn, err error) {
 			if client.identity.Address == addr {
 
 				existing = true
-				id = make([]byte, len(client.identity.Id))
 				peer = client
 			}
 			return true
