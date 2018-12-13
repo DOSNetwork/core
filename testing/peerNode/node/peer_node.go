@@ -70,7 +70,7 @@ func (d *PeerNode) requestAllIDs() {
 			}
 		}
 	}
-	d.log.WithField("event", "requestAllIds done").Info()
+	//d.log.WithField("event", "requestAllIds done").Info()
 }
 
 func (d *PeerNode) requestAllIPs() {
@@ -163,41 +163,11 @@ func (d *PeerNode) Init(bootStrapIp string, port, peerSize int, numMessages int,
 		}
 	}
 	fmt.Println("nodeID = ", d.nodeID[:])
-
-	d.log.Data["testType"] = tStrategy
-	d.log.Data["role"] = "peernode"
-	d.log.Data["nodeId"] = new(big.Int).SetBytes(d.nodeID).String()
-
-	d.requestAllIDs() //get all ids
-	d.requestAllIPs() //get all ips
-
-	//teststart todo
-	//send test result todo
-
 	//2)Build a p2p network
 	d.p, d.peerEvent, _ = p2p.CreateP2PNetwork(d.nodeID[:], port, d.log)
-
 	d.p.Listen()
-	d.p.Join(bootStrapIp + ":44460")
-	fmt.Println("nodeIP = ", d.p.GetIP())
-}
-
-func (d *PeerNode) EventLoop() {
-	ticker := time.NewTicker(5 * time.Second)
-L:
-	for {
-		select {
-		case <-ticker.C:
-			if d.requestIsReady() {
-				d.tStrategy.StartTest(d)
-				ticker.Stop()
-			}
-		case <-d.done:
-			fmt.Println("EventLoop done")
-			d.log.WithField("event", "EventLoop done").Info()
-			break L
-		//event from peer
-		case msg := <-d.peerEvent:
+	go func() {
+		for msg := range d.peerEvent {
 			switch content := msg.Msg.Message.(type) {
 			case *internalMsg.Cmd:
 				if content.Ctype == internalMsg.Cmd_ALLIP {
@@ -221,18 +191,50 @@ L:
 						allID = append(allID, chunk)
 					}
 					d.nodeIDs = allID
-				} else if content.Ctype == internalMsg.Cmd_STARTTEST {
-					d.tStrategy.StartTest(d)
-				} else if content.Ctype == internalMsg.Cmd_TESTDONE {
-					go func() {
-						d.done <- true
-					}()
-				} else {
+				} else if content.Ctype == internalMsg.Cmd_SIGNIN {
 					sender := string(msg.Sender)
 					d.tStrategy.CheckResult(sender, content, d)
 				}
 			default:
 			}
+		}
+	}()
+
+	//d.p.Join(bootStrapIp + ":44460")
+	fmt.Println("nodeIP = ", d.p.GetIP())
+
+	d.log.Data["testType"] = tStrategy
+	d.log.Data["role"] = "peernode"
+	d.log.Data["nodeId"] = new(big.Int).SetBytes(d.nodeID).String()
+
+	d.requestAllIDs() //get all ids
+	d.requestAllIPs() //get all ips
+
+	if tStrategy == "FINDNODE" {
+		for i := 0; i < 4; i++ {
+			if d.p.GetIP() != d.nodeIPs[i] {
+				d.p.Join(d.nodeIPs[i])
+			}
+		}
+	}
+	//teststart todo
+	//send test result todo
+}
+
+func (d *PeerNode) EventLoop() {
+	ticker := time.NewTicker(5 * time.Second)
+L:
+	for {
+		select {
+		case <-ticker.C:
+			if d.requestIsReady() {
+				ticker.Stop()
+				d.tStrategy.StartTest(d)
+			}
+		case <-d.done:
+			fmt.Println("EventLoop done")
+			d.log.WithField("event", "EventLoop done").Info()
+			break L
 		default:
 		}
 	}

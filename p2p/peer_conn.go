@@ -47,7 +47,7 @@ type PeerConn struct {
 	mux             sync.Mutex
 	readWriteCount  uint64
 	idelPeriodCount uint8
-	lastusedtime time.Time
+	lastusedtime    time.Time
 }
 
 // RequestState represents a state of a request.
@@ -58,19 +58,19 @@ type RequestState struct {
 
 func NewPeerConn(p2pnet *P2P, conn *net.Conn, rxMessage chan P2PMessage) (peer *PeerConn, err error) {
 	peer = &PeerConn{
-		p2pnet:    p2pnet,
-		conn:      conn,
-		rxMessage: rxMessage,
-		waitForHi: make(chan bool, 2),
-		done:      make(chan bool, 1),
-		rw:        bufio.NewReadWriter(bufio.NewReader(*conn), bufio.NewWriter(*conn)),
+		p2pnet:       p2pnet,
+		conn:         conn,
+		rxMessage:    rxMessage,
+		waitForHi:    make(chan bool, 2),
+		done:         make(chan bool, 1),
+		rw:           bufio.NewReadWriter(bufio.NewReader(*conn), bufio.NewWriter(*conn)),
 		lastusedtime: time.Now(),
 	}
 	if err = peer.Start(); err != nil {
 		return
 	}
 
-	go peer.heartBeat()
+	//go peer.heartBeat()
 	return
 }
 
@@ -85,6 +85,7 @@ func (p *PeerConn) Start() (err error) {
 }
 
 func (p *PeerConn) SendMessage(msg proto.Message) (err error) {
+	p.lastusedtime = time.Now()
 	var prepared *internal.Package
 	prepared, err = p.prepareMessage(msg)
 	if err != nil {
@@ -154,34 +155,41 @@ func (p *PeerConn) receiveLoop() {
 			}
 
 			if err := p.Reply(pa.GetRequestNonce(), response); err != nil {
-				log.Fatal(err)
+				fmt.Println("PeerConn LookupNodeRequest Reply err ", err)
 			}
 		case *internal.Ping:
 			response := &internal.Pong{}
 			if err := p.Reply(pa.GetRequestNonce(), response); err != nil {
-				log.Fatal(err)
+				fmt.Println("PeerConn Ping Reply err ", err)
 			}
 		default:
+			p.lastusedtime = time.Now()
+			response := &internal.Pong{}
+			if err := p.Reply(pa.GetRequestNonce(), response); err != nil {
+				fmt.Println("PeerConn Ping Reply err ", err)
+			}
 			//TODO
 			msg := P2PMessage{Msg: *ptr, Sender: p.identity.Id}
 			p.rxMessage <- msg
 		}
 	}
 
-	if _, loaded := p.p2pnet.peers.GetPeerByID(string(p.identity.Id)); loaded {
-		p.p2pnet.peers.DeletePeer(string(p.identity.Id))
-	}
+	//if _, loaded := p.p2pnet.peers.GetPeerByID(string(p.identity.Id)); loaded {
+	p.p2pnet.peers.DeletePeer(string(p.identity.Id))
+	//}
 
 	if err := (*p.conn).Close(); err != nil {
 		fmt.Println(err)
+
 	}
+	fmt.Println("ReceiveLoop done ", p.identity.Id, " ", p.identity.Address)
 }
 
 func (p *PeerConn) End() {
 	if err := (*p.conn).Close(); err != nil {
-		fmt.Println("!!!!! End", err)
+		fmt.Println("!!!!! End err ", err, " ", p.identity.Id, " ", p.identity.Address)
+		p.p2pnet.peers.DeletePeer(string(p.identity.Id))
 	}
-	fmt.Println("End")
 }
 
 func (p *PeerConn) receivePackage() ([]byte, error) {
@@ -292,11 +300,11 @@ func (p *PeerConn) SendPackage(msg proto.Message) error {
 	defer p.mux.Unlock()
 
 	if _, err := p.rw.Write(bytes); err != nil {
-		fmt.Println("SendPackage Write err ", err)
+		//fmt.Println("SendPackage Write err ", err)
 		return err
 	}
 	if err := p.rw.Flush(); err != nil {
-		fmt.Println("!!!!SendPackage Flush err ", err)
+		//fmt.Println("!!!!SendPackage Flush err ", err)
 		return err
 	}
 
@@ -341,7 +349,6 @@ func (p *PeerConn) Request(req *Request) (proto.Message, error) {
 
 	prepared.RequestNonce = atomic.AddUint64(&p.RequestNonce, 1)
 	if err := p.SendPackage(prepared); err != nil {
-		fmt.Println("PeerConn Request err ", err)
 		return nil, err
 	}
 
@@ -368,6 +375,7 @@ func (p *PeerConn) Request(req *Request) (proto.Message, error) {
 	case res := <-channel:
 		return res, nil
 	case <-time.After(req.Timeout):
+		//TODO:Check to see if conn has been closed.
 		return nil, errors.New("request timed out")
 	}
 }
@@ -398,12 +406,12 @@ func (p *PeerConn) Reply(nonce uint64, message proto.Message) error {
 }
 
 func (p *PeerConn) heartBeat() {
-	fmt.Println("heartbeat started")
+	//fmt.Println("heartbeat started")
 	ticker := time.NewTicker(HEARTBEATINTERVAL * time.Second)
 	for {
 		select {
 		case <-ticker.C:
-			fmt.Println(p.idelPeriodCount, p.readWriteCount, CONNIDLETIMEOUT)
+			//fmt.Println(p.idelPeriodCount, p.readWriteCount, CONNIDLETIMEOUT)
 			if p.readWriteCount == 0 {
 				p.idelPeriodCount++
 			} else {
@@ -422,11 +430,11 @@ func (p *PeerConn) heartBeat() {
 				request := new(Request)
 				request.SetMessage(&internal.Ping{})
 				request.SetTimeout(HEARTBEATMAXWAIT * time.Second)
-				fmt.Println("send ping")
+				//fmt.Println("send ping")
 				if _, err := p.Request(request); err != nil {
 					timeout = true
 				} else {
-					fmt.Println("received pong")
+					//fmt.Println("received pong")
 					timeout = false
 					break
 				}

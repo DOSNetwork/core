@@ -1,19 +1,20 @@
 package p2p
 
 import (
-	"sync"
 	"container/heap"
 	"fmt"
+	"sync"
 )
-const MAXPEERCOUNT = 21
+
+const MAXPEERCOUNT = 10000
 
 type PeerManager struct {
-	mu sync.Mutex
-	peers sync.Map
+	mu     sync.Mutex
+	peers  sync.Map
 	parray PeerArray
 }
 
-func (pm *PeerManager) LoadOrStore(id string, peer *PeerConn) (actual *PeerConn, loaded bool){
+func (pm *PeerManager) LoadOrStore(id string, peer *PeerConn) (actual *PeerConn, loaded bool) {
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
 	ac, l := pm.peers.LoadOrStore(id, peer)
@@ -22,14 +23,15 @@ func (pm *PeerManager) LoadOrStore(id string, peer *PeerConn) (actual *PeerConn,
 		heap.Push(&pm.parray, peer)
 		if len(pm.parray) > MAXPEERCOUNT {
 			p := heap.Pop(&pm.parray).(*PeerConn)
+			fmt.Println("Force delete ", p.identity.Id)
 			//p.End() //todo disconnet peer_conn
 			pm.peers.Delete(string(p.identity.Id))
 
 		}
 		actual = peer
-	}else {
+	} else {
 		actual = ac.(*PeerConn)
-		fmt.Println("Load Peerconn:"+actual.identity.Address)
+		fmt.Println("Load Peerconn:" + actual.identity.Address)
 	}
 	return
 }
@@ -43,7 +45,7 @@ func (pm *PeerManager) GetPeerByID(id string) (value *PeerConn, ok bool) {
 	ok = exist
 	if ok {
 		value = v.(*PeerConn)
-	}else {
+	} else {
 		value = nil
 	}
 	return
@@ -56,7 +58,7 @@ func (pm *PeerManager) DeletePeer(id string) {
 	if exist {
 		pm.peers.Delete(id)
 		index := -1
-		for i := 0; i<pm.parray.Len(); i++ {
+		for i := 0; i < pm.parray.Len(); i++ {
 			if pm.parray[i].identity.Address == id {
 				index = i
 				break
