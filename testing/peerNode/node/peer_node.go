@@ -203,7 +203,7 @@ func (d *PeerNode) Init(bootStrapIp string, port, peerSize int, numMessages int,
 	d.log.Hooks.Add(hook)
 
 	d.p.Listen()
-	d.p.Join(bootStrapIp + ":44460")
+	//d.p.Join(bootStrapIp + ":44460")
 	fmt.Println("nodeIP = ", d.p.GetIP())
 }
 

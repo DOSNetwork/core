@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"math/big"
+	//"math/big"
 	"net"
 	"sort"
 	"strconv"
@@ -165,6 +165,7 @@ func (n *P2P) findPeer(id []byte, localOnly bool) (peer *PeerConn, found bool) {
 
 	// Find Peer from existing peerConn
 	if value, found = n.peers.GetPeerByID(string(id)); found {
+		//fmt.Println("!!!! Find Peer from existing peerConn ", id)
 		peer = value.(*PeerConn)
 		return
 	}
@@ -173,6 +174,7 @@ func (n *P2P) findPeer(id []byte, localOnly bool) (peer *PeerConn, found bool) {
 	peers := n.routingTable.GetPeers()
 	if ip, ok := peers[string(id)]; ok {
 		if peer, err = n.connectTo(ip); err == nil {
+			fmt.Println("!!!! Find Peer from routing map ", id)
 			found = true
 			return
 		}
@@ -187,6 +189,7 @@ func (n *P2P) findPeer(id []byte, localOnly bool) (peer *PeerConn, found bool) {
 
 		// Find Peer from existing peerConn
 		if value, found = n.peers.GetPeerByID(string(id)); found {
+			fmt.Println("!!!! Find Peer from routing map ", id)
 			peer = value.(*PeerConn)
 			found = true
 			return
@@ -196,22 +199,23 @@ func (n *P2P) findPeer(id []byte, localOnly bool) (peer *PeerConn, found bool) {
 }
 
 func (n *P2P) SendMessage(id []byte, m proto.Message) (err error) {
-	var sendResult bool
 	var peer *PeerConn
 	var found bool
-	start := time.Now()
 	localOnly := false
 
 	if peer, found = n.findPeer(id, localOnly); found {
-		err = peer.SendMessage(m)
+		request := new(Request)
+		request.SetMessage(m)
+		request.SetTimeout(5 * time.Second)
+
+		_, err = peer.Request(request)
+		if err != nil {
+			fmt.Println("!!!!!!!!! SendMessage err.Error() ", err.Error())
+			//TODO :Need to check to see if this conn is a closed connection
+			return
+		}
 	}
 
-	n.log.WithFields(logrus.Fields{
-		"time-sendMessage": time.Since(start).Seconds(),
-		"nodeID":           new(big.Int).SetBytes(n.GetID()).String(),
-		"targetID":         new(big.Int).SetBytes(id).String(),
-		"send-result":      sendResult,
-	}).Info()
 	return
 }
 
@@ -369,16 +373,15 @@ func (lookup *lookupBucket) performLookup(n *P2P, targetID internal.ID, alpha in
 func (n *P2P) queryPeerByID(peerID internal.ID, targetID internal.ID, responses chan []*internal.ID) {
 	var client *PeerConn
 
-	targetPeer, loaded := n.peers.GetPeerByID(string(peerID.Id))
+	client, loaded := n.peers.GetPeerByID(string(peerID.Id))
 	if !loaded {
 		var err error
-		targetPeer, err = n.connectTo(peerID.Address)
+		client, err = n.connectTo(peerID.Address)
 		if err != nil {
 			responses <- []*internal.ID{}
 			return
 		}
 	}
-	client = targetPeer.(*PeerConn)
 
 	targetProtoID := internal.ID(targetID)
 
