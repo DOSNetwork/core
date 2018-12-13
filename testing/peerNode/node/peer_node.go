@@ -4,16 +4,12 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
-	"net"
+	"math/big"
 	"net/http"
 	"os"
 	"strings"
 	"time"
 
-	"github.com/bshuster-repo/logrus-logstash-hook"
-	//	"github.com/ethereum/go-ethereum/common"
-
-	//"github.com/DOSNetwork/core/p2p/dht"
 	"github.com/DOSNetwork/core/testing/peerNode/internalMsg"
 
 	"github.com/DOSNetwork/core/p2p"
@@ -74,6 +70,7 @@ func (d *PeerNode) requestAllIDs() {
 			}
 		}
 	}
+	d.log.WithField("event", "requestAllIds done").Info()
 }
 
 func (d *PeerNode) requestAllIPs() {
@@ -99,6 +96,7 @@ func (d *PeerNode) requestAllIPs() {
 			}
 		}
 	}
+	d.log.WithField("event", "requestAllIPs done").Info()
 }
 
 func (d *PeerNode) requestIsReady() bool {
@@ -127,7 +125,7 @@ func (d *PeerNode) requestIsReady() bool {
 	return false
 }
 
-func (d *PeerNode) Init(bootStrapIp string, port, peerSize int, numMessages int, tStrategy string, logger *logrus.Logger) {
+func (d *PeerNode) Init(bootStrapIp string, port, peerSize int, numMessages int, tStrategy string, logger *logrus.Entry) {
 	d.peerSize = peerSize
 	d.checkCount = 1
 	d.bootStrapIp = bootStrapIp
@@ -135,6 +133,7 @@ func (d *PeerNode) Init(bootStrapIp string, port, peerSize int, numMessages int,
 	d.done = make(chan bool)
 	d.numMessages = numMessages
 	d.log = logger
+
 	if tStrategy == "SENDMESSAGE" {
 		d.tStrategy = &test1{}
 	} else {
@@ -165,6 +164,10 @@ func (d *PeerNode) Init(bootStrapIp string, port, peerSize int, numMessages int,
 	}
 	fmt.Println("nodeID = ", d.nodeID[:])
 
+	d.log.Data["testType"] = tStrategy
+	d.log.Data["role"] = "peernode"
+	d.log.Data["nodeId"] = new(big.Int).SetBytes(d.nodeID).String()
+
 	d.requestAllIDs() //get all ids
 	d.requestAllIPs() //get all ips
 
@@ -173,34 +176,6 @@ func (d *PeerNode) Init(bootStrapIp string, port, peerSize int, numMessages int,
 
 	//2)Build a p2p network
 	d.p, d.peerEvent, _ = p2p.CreateP2PNetwork(d.nodeID[:], port, d.log)
-
-	tcpAddr, err := net.ResolveTCPAddr("tcp", "163.172.36.173:9500")
-	if err != nil {
-		d.log.Error(err)
-	}
-
-	conn, err := net.DialTCP("tcp", nil, tcpAddr)
-	if err != nil {
-		d.log.Error(err)
-	}
-
-	if err = conn.SetKeepAlivePeriod(time.Minute); err != nil {
-		d.log.Warn(err)
-	}
-
-	if err = conn.SetKeepAlive(true); err != nil {
-		d.log.Warn(err)
-	}
-
-	hook, err := logrustash.NewHookWithFieldsAndConn(conn, "peer_node", logrus.Fields{
-		"queryType":         "peer_node",
-		"startingTimestamp": time.Now(),
-	})
-	if err != nil {
-		d.log.Error(err)
-	}
-
-	d.log.Hooks.Add(hook)
 
 	d.p.Listen()
 	d.p.Join(bootStrapIp + ":44460")
@@ -219,6 +194,7 @@ L:
 			}
 		case <-d.done:
 			fmt.Println("EventLoop done")
+			d.log.WithField("event", "EventLoop done").Info()
 			break L
 		//event from peer
 		case msg := <-d.peerEvent:

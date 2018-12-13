@@ -18,5 +18,5 @@ type node struct {
 	allIP     []string
 	peerSize  int
 	done      chan bool
-	log       *logrus.Logger
+	log       *logrus.Entry
 }
