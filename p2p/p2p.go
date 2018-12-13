@@ -25,7 +25,7 @@ import (
 type P2P struct {
 	identity internal.ID
 	//Map of ID (string) <-> *p2p.PeerConn
-	peers *sync.Map
+	peers *PeerManager //*sync.Map
 	// Todo:Add a subscrive fucntion to send message to application
 	messages     chan P2PMessage
 	suite        suites.Suite
@@ -167,7 +167,7 @@ func (n *P2P) findPeer(id []byte, localOnly bool) (peer *PeerConn, found bool) {
 	var err error
 
 	// Find Peer from existing peerConn
-	if value, found = n.peers.Load(string(id)); found {
+	if value, found = n.peers.GetPeerByID(string(id)); found {
 		peer = value.(*PeerConn)
 
 		n.fromLocal++
@@ -200,6 +200,7 @@ func (n *P2P) findPeer(id []byte, localOnly bool) (peer *PeerConn, found bool) {
 			return
 		}
 	}
+	fmt.Println("!!! Can't find node ", id)
 	if !localOnly {
 		// Updating Routing table to find peer
 		results := n.findNode(internal.ID{Id: id}, dht.BucketSize, 20)
@@ -208,7 +209,7 @@ func (n *P2P) findPeer(id []byte, localOnly bool) (peer *PeerConn, found bool) {
 		}
 
 		// Find Peer from existing peerConn
-		if value, found = n.peers.Load(string(id)); found {
+		if value, found = n.peers.GetPeerByID(string(id)); found {
 			peer = value.(*PeerConn)
 			found = true
 
@@ -274,23 +275,6 @@ func (n *P2P) connectTo(addr string) (peer *PeerConn, err error) {
 
 	//TODO Check if addr is a valid addr
 	for retry := 0; retry < 10; retry++ {
-		//1)Check if this address has been in peers map
-		existing := false
-		n.peers.Range(func(key, value interface{}) bool {
-			client := value.(*PeerConn)
-			if client.identity.Address == addr {
-
-				existing = true
-				peer = client
-			}
-			return true
-		})
-		if existing {
-			fmt.Println("Existing peer")
-			return
-		}
-
-		//2)Dial to peer to get a connection
 		conn, err = net.Dial("tcp", addr)
 		if err != nil {
 			fmt.Println("NewPeer Dial err ", err, " addr ", addr)
@@ -425,13 +409,17 @@ func (lookup *lookupBucket) performLookup(n *P2P, targetID internal.ID, alpha in
 
 func (n *P2P) queryPeerByID(peerID internal.ID, targetID internal.ID, responses chan []*internal.ID) {
 	var client *PeerConn
-	var found bool
-	localOnly := true
 
-	if client, found = n.findPeer(peerID.Id, localOnly); !found {
-		responses <- []*internal.ID{}
-		return
+	targetPeer, loaded := n.peers.GetPeerByID(string(peerID.Id))
+	if !loaded {
+		var err error
+		targetPeer, err = n.connectTo(peerID.Address)
+		if err != nil {
+			responses <- []*internal.ID{}
+			return
+		}
 	}
+	client = targetPeer.(*PeerConn)
 
 	targetProtoID := internal.ID(targetID)
 

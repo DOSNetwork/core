@@ -30,7 +30,18 @@ func (r test1) StartTest(d *PeerNode) {
 
 	for i := 0; i < d.numMessages; i++ {
 		for id, _ := range d.checkroll {
-			d.p.SendMessage([]byte(id), pb)
+
+			if err := d.p.SendMessage([]byte(id), pb); err != nil {
+				fmt.Println("SendMessage err ", err)
+			}
+			/*
+				tmp := make([]byte, len(id))
+				copy(tmp, id)
+				go func() {
+					if err := d.p.SendMessage(tmp, pb); err != nil {
+						fmt.Println("SendMessage err ", err)
+					}
+				}()*/
 		}
 	}
 }
