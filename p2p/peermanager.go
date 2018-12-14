@@ -1,31 +1,47 @@
 package p2p
 
 import (
-	"container/heap"
 	"fmt"
 	"sync"
+	"math"
 )
 
-const MAXPEERCOUNT = 10000
+const MAXPEERCOUNT = 21
 
-type PeerManager struct {
+type PeerConnManager struct {
 	mu     sync.Mutex
 	peers  sync.Map
-	parray PeerArray
+	count uint32
 }
 
-func (pm *PeerManager) LoadOrStore(id string, peer *PeerConn) (actual *PeerConn, loaded bool) {
+func (pm *PeerConnManager) FindLessUsedPeerConn() (pconn*PeerConn) {
+	var lastusedtime int64
+	lastusedtime = math.MaxInt64
+	pconn = nil
+	pm.peers.Range(func(key, value interface{}) bool {
+		pc := value.(*PeerConn)
+		if pc.lastusedtime.Unix() < lastusedtime {
+			lastusedtime = pc.lastusedtime.Unix()
+			pconn = pc
+		}
+		return true
+	})
+	return
+}
+
+func (pm *PeerConnManager) LoadOrStore(id string, peer *PeerConn) (actual *PeerConn, loaded bool) {
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
 	ac, l := pm.peers.LoadOrStore(id, peer)
 	loaded = l
 	if !l {
-		heap.Push(&pm.parray, peer)
-		if len(pm.parray) > MAXPEERCOUNT {
-			p := heap.Pop(&pm.parray).(*PeerConn)
+		pm.count++
+		if pm.count > MAXPEERCOUNT {
+			p := pm.FindLessUsedPeerConn()
 			fmt.Println("Force delete ", p.identity.Id)
-			//p.End() //todo disconnet peer_conn
+			p.End()
 			pm.peers.Delete(string(p.identity.Id))
+			pm.count--
 
 		}
 		actual = peer
@@ -36,11 +52,11 @@ func (pm *PeerManager) LoadOrStore(id string, peer *PeerConn) (actual *PeerConn,
 	return
 }
 
-func (pm *PeerManager) Range(f func(key, value interface{}) bool) {
+func (pm *PeerConnManager) Range(f func(key, value interface{}) bool) {
 	pm.peers.Range(f)
 }
 
-func (pm *PeerManager) GetPeerByID(id string) (value *PeerConn, ok bool) {
+func (pm *PeerConnManager) GetPeerByID(id string) (value *PeerConn, ok bool) {
 	v, exist := pm.peers.Load(id)
 	ok = exist
 	if ok {
@@ -51,26 +67,17 @@ func (pm *PeerManager) GetPeerByID(id string) (value *PeerConn, ok bool) {
 	return
 }
 
-func (pm *PeerManager) DeletePeer(id string) {
+func (pm *PeerConnManager) DeletePeer(id string) {
 	pm.mu.Lock()
 	defer pm.mu.Unlock()
 	_, exist := pm.GetPeerByID(id)
 	if exist {
 		pm.peers.Delete(id)
-		index := -1
-		for i := 0; i < pm.parray.Len(); i++ {
-			if pm.parray[i].identity.Address == id {
-				index = i
-				break
-			}
-		}
-		if index != -1 {
-			heap.Remove(&pm.parray, index)
-		}
+		pm.count--
 	}
 
 }
 
-func (pm *PeerManager) PeerNum() int {
-	return len(pm.parray)
+func (pm *PeerConnManager) PeerConnNum() uint32 {
+	return pm.count
 }

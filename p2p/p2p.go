@@ -26,7 +26,7 @@ import (
 type P2P struct {
 	identity internal.ID
 	//Map of ID (string) <-> *p2p.PeerConn
-	peers *PeerManager //*sync.Map
+	peers *PeerConnManager //*sync.Map
 	// Todo:Add a subscrive fucntion to send message to application
 	messages     chan P2PMessage
 	suite        suites.Suite

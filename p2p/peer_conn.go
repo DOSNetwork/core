@@ -187,6 +187,9 @@ func (p *PeerConn) receiveLoop() {
 }
 
 func (p *PeerConn) End() {
+	if p.conn == nil {
+		return
+	}
 	if err := (*p.conn).Close(); err != nil {
 		fmt.Println("!!!!! End err ", err, " ", p.identity.Id, " ", p.identity.Address)
 		p.p2pnet.peers.DeletePeer(string(p.identity.Id))
