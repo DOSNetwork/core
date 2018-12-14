@@ -6,13 +6,14 @@ services:
      replicas: 1
    environment:
      - ROLE=bootstrap
-     - PEERNUM=500
+     - PEERNUM=3
+     - GROUPSIZE=3
  peernode:
    image: peertalk
    depends_on:
      - bootstrap
    deploy:
-     replicas: 500
+     replicas: 3
    environment:
      - ROLE=testNode
      - BOOTSTRAPIP=bootstrap:44460
