@@ -139,6 +139,9 @@ func (r test2) StartTest(d *PeerNode) {
 				}
 			}
 		}
+		d.log.WithFields(logrus.Fields{
+			"eventCheckDone": true,
+		}).Info()
 	}
 }
 

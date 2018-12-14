@@ -135,9 +135,6 @@ func (b *BootNode) getAllIPs(w http.ResponseWriter, r *http.Request) {
 
 func (b *BootNode) isAllnodeready() bool {
 	fmt.Println("isAllnodeready ", len(b.readynode) >= b.peerSize, "", len(b.readynode))
-	b.log.WithFields(logrus.Fields{
-		"eventIsAllnodeready": len(b.readynode),
-	}).Info()
 	return len(b.readynode) >= b.peerSize
 }
 
@@ -151,6 +148,9 @@ func (b *BootNode) isTestReady(w http.ResponseWriter, r *http.Request) {
 	b.lock.Unlock()
 
 	if b.isAllnodeready() {
+		b.log.WithFields(logrus.Fields{
+			"eventIsAllnodeready": len(b.readynode),
+		}).Info()
 		w.Write([]byte{ALLNODEREADY})
 	} else {
 		w.Write([]byte{ALLNODENOTREADY})
