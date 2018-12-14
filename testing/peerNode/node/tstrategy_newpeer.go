@@ -110,6 +110,9 @@ func (r test2) StartTest(d *PeerNode) {
 				d.log.WithField("event", "SendMessage err").Warn(new(big.Int).SetBytes([]byte(id)).String())
 			}
 		}
+		d.log.WithFields(logrus.Fields{
+			"eventCheckDone": true,
+		}).Info()
 	}
 }
 
