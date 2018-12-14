@@ -1,0 +1,14 @@
+syntax = "proto3";
+package peerTalk;
+
+message Address {
+    string address = 1;
+}
+
+message Addresses {
+    repeated string address = 1;
+}
+
+message Done {
+    string address = 1;
+}
