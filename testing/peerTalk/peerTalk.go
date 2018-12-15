@@ -101,9 +101,9 @@ func main() {
 					"currentSize": len(idMap),
 					"targetSize":  peerNum,
 				}).Info()
-				if len(ids) == 0 {
+				if len(idMap) == 0 {
 					logger.WithField("event", "allDone").Info()
-					os.Exit(0)
+					//os.Exit(-100)
 				}
 			}
 		}
@@ -169,7 +169,7 @@ func main() {
 						} else {
 							logger.WithField("event", "allDone").Info()
 						}
-						os.Exit(0)
+						//os.Exit(-100)
 					}
 				}()
 
@@ -181,10 +181,15 @@ func main() {
 				for idx, id := range ids {
 					if bytes.Compare(p.GetID(), id) == 0 {
 						start := uint32(idx) / groupSize * groupSize
-						group = ids[start : start+groupSize-1]
+						fmt.Println("????????????", start, start+groupSize)
+						group = ids[start : start+groupSize]
 						break
 					}
 				}
+				for _, id := range group {
+					fmt.Println("!!!!!!!!!!!", new(big.Int).SetBytes(id).String())
+				}
+
 				p2pDkg.SetNbParticipants(int(groupSize))
 				p2pDkg.SetGroupMembers(group)
 				p2pDkg.RunDKG()
