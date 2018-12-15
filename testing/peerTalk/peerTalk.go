@@ -3,6 +3,10 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"math/big"
+	"os"
+	"strconv"
+
 	"github.com/DOSNetwork/core/p2p"
 	"github.com/DOSNetwork/core/share/dkg/pedersen"
 	"github.com/DOSNetwork/core/share/vss/pedersen"
@@ -10,9 +14,6 @@ import (
 	"github.com/DOSNetwork/core/testing/peerTalk/msg"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
-	"math/big"
-	"os"
-	"strconv"
 )
 
 func main() {

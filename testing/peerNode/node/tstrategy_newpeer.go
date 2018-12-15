@@ -3,8 +3,12 @@ package node
 import (
 	"bytes"
 	"fmt"
-	//	"math/big"
+	"os"
+	"strconv"
 
+	//	"math/big"
+	"github.com/DOSNetwork/core/share/dkg/pedersen"
+	"github.com/DOSNetwork/core/suites"
 	"github.com/DOSNetwork/core/testing/peerNode/internalMsg"
 
 	"github.com/golang/protobuf/proto"
@@ -154,3 +158,50 @@ func (r test2) CheckResult(sender string, content *internalMsg.Cmd, d *PeerNode)
 		}
 	}
 }
+
+type test3 struct{}
+
+func (r test3) StartTest(d *PeerNode) {
+	d.log.WithFields(logrus.Fields{
+		"eventStartTest": true,
+	}).Info()
+
+	groupSizeStr := os.Getenv("GROUPSIZE")
+	groupSize, err := strconv.Atoi(groupSizeStr)
+	if err != nil {
+		d.log.Fatal(err)
+	}
+
+	suite := suites.MustFind("bn256")
+	p2pDkg, err := dkg.CreateP2PDkg(d.p, suite, d.dkgChan, groupSize, d.log)
+	if err != nil {
+		d.log.Fatal(err)
+	}
+	go p2pDkg.EventLoop()
+	dkgEvent := make(chan string, 1)
+	p2pDkg.SubscribeEvent(dkgEvent)
+	defer close(dkgEvent)
+
+	var group [][]byte
+	for idx, id := range d.nodeIDs {
+		if bytes.Compare(d.p.GetID(), id) == 0 {
+			start := idx / groupSize * groupSize
+			group = d.nodeIDs[start : start+groupSize]
+			break
+		}
+	}
+
+	p2pDkg.SetGroupMembers(group)
+	p2pDkg.RunDKG()
+
+	result := <-dkgEvent
+	if result == "certified" {
+		d.log.WithFields(logrus.Fields{
+			"eventCheckDone": true,
+		}).Info()
+		go func() { d.done <- true }()
+	}
+
+}
+
+func (r test3) CheckResult(sender string, content *internalMsg.Cmd, d *PeerNode) {}
