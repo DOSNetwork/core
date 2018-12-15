@@ -9,9 +9,10 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func TestPeerConnEnd(t *testing.T) {
+func TestDKG(t *testing.T) {
 	numOfNodes := 10
 	log := logrus.New()
+	logger := log.WithField("subject", "TestDKG")
 	var ok bool
 	peerPort := 55550
 	peers := make([]*p2p.P2P, numOfNodes)
@@ -19,7 +20,7 @@ func TestPeerConnEnd(t *testing.T) {
 	dkgs := make([]P2PDkgInterface, numOfNodes)
 
 	peerIDs[0] = []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20}
-	peer, peerEvent, err := p2p.CreateP2PNetwork(peerIDs[0][:], peerPort, log)
+	peer, peerEvent, err := p2p.CreateP2PNetwork(peerIDs[0][:], peerPort, logger)
 	if err := peer.Listen(); err != nil {
 		t.Error("Test Failed: Listen failed ", err)
 	}
@@ -35,7 +36,7 @@ func TestPeerConnEnd(t *testing.T) {
 	for i := 1; i < numOfNodes; i++ {
 		peerIDs[i] = []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 + byte(i), 13, 14, 15, 16, 17, 18, 19, 21 + byte(i)}
 		peerPort := 55550 + i
-		peer, peerEvent, err := p2p.CreateP2PNetwork(peerIDs[i][:], peerPort, log)
+		peer, peerEvent, err := p2p.CreateP2PNetwork(peerIDs[i][:], peerPort, logger)
 		if err := peer.Listen(); err != nil {
 			t.Error("Test Failed: Listen failed ", err)
 		}
