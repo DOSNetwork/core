@@ -111,7 +111,7 @@ func main() {
 	suite := suites.MustFind("bn256")
 	peerEventForDKG := make(chan p2p.P2PMessage, 1)
 	defer close(peerEventForDKG)
-	p2pDkg, _ := dkg.CreateP2PDkg(p, suite, peerEventForDKG, nbParticipants, log)
+	p2pDkg, _ := dkg.CreateP2PDkg(p, suite, peerEventForDKG, nbParticipants, log.WithFields(logrus.Fields{}))
 	go p2pDkg.EventLoop()
 	dkgEvent := make(chan string, 1)
 	p2pDkg.SubscribeEvent(dkgEvent)
