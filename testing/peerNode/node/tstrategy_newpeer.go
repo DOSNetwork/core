@@ -9,6 +9,7 @@ import (
 	//	"math/big"
 	"github.com/DOSNetwork/core/share/dkg/pedersen"
 	"github.com/DOSNetwork/core/suites"
+
 	"github.com/DOSNetwork/core/testing/peerNode/internalMsg"
 
 	"github.com/golang/protobuf/proto"
@@ -69,6 +70,7 @@ func (r test1) StartTest(d *PeerNode) {
 			}
 		}
 	}
+	//d.done <- true
 }
 
 func (r test1) CheckResult(sender string, content *internalMsg.Cmd, d *PeerNode) {
@@ -85,7 +87,7 @@ func (r test1) CheckResult(sender string, content *internalMsg.Cmd, d *PeerNode)
 				d.log.WithFields(logrus.Fields{
 					"eventCheckDone": true,
 				}).Info()
-				d.MakeRequest(d.bootStrapIp, "post", d.nodeID)
+				//d.done <- true
 			} else {
 				fmt.Println("wait for  = ", len(d.checkroll))
 				for id, _ := range d.checkroll {
@@ -113,17 +115,21 @@ func (r test1) CheckResult(sender string, content *internalMsg.Cmd, d *PeerNode)
 		d.log.WithFields(logrus.Fields{
 			"eventCheckDone": true,
 		}).Info()
-		d.MakeRequest(d.bootStrapIp, "post", d.nodeID)
+		//d.done <- true
 	}
 }
 
 type test2 struct{}
 
 func (r test2) StartTest(d *PeerNode) {
+	fmt.Println("StartTest")
 	d.log.WithFields(logrus.Fields{
 		"eventStartTest": true,
 	}).Info()
-	if d.p.GetIP() == d.nodeIPs[5] {
+	id := len(d.nodeIPs) - 1
+	//d.done <- true
+
+	if d.p.GetIP() == d.nodeIPs[id] {
 		cmd := &internalMsg.Cmd{
 			Ctype: internalMsg.Cmd_SIGNIN,
 			Args:  []byte{},
@@ -146,11 +152,13 @@ func (r test2) StartTest(d *PeerNode) {
 		d.log.WithFields(logrus.Fields{
 			"eventCheckDone": true,
 		}).Info()
+		//d.done <- true
 	}
 }
 
 func (r test2) CheckResult(sender string, content *internalMsg.Cmd, d *PeerNode) {
-	if d.p.GetIP() != d.nodeIPs[5] {
+	id := len(d.nodeIPs) - 1
+	if d.p.GetIP() != d.nodeIPs[id] {
 		if content.Ctype == internalMsg.Cmd_SIGNIN {
 			d.log.WithFields(logrus.Fields{
 				"eventCheckDone": true,

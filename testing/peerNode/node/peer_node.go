@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math"
+
 	"math/big"
 	"net/http"
 	"os"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/DOSNetwork/core/share/dkg/pedersen"
 	"github.com/DOSNetwork/core/share/vss/pedersen"
+
 	"github.com/DOSNetwork/core/testing/peerNode/internalMsg"
 
 	"github.com/DOSNetwork/core/p2p"
@@ -201,7 +203,7 @@ func (d *PeerNode) Init(bootStrapIp string, port, peerSize int, numMessages int,
 					d.nodeIDs = allID
 				} else if content.Ctype == internalMsg.Cmd_SIGNIN {
 					sender := string(msg.Sender)
-					d.tStrategy.CheckResult(sender, content, d)
+					go d.tStrategy.CheckResult(sender, content, d)
 				}
 			case *vss.PublicKey:
 				d.dkgChan <- msg
@@ -240,18 +242,23 @@ func (d *PeerNode) Init(bootStrapIp string, port, peerSize int, numMessages int,
 
 func (d *PeerNode) EventLoop() {
 	ticker := time.NewTicker(5 * time.Second)
+	count := 0
 L:
 	for {
 		select {
 		case <-ticker.C:
 			if d.requestIsReady() {
 				ticker.Stop()
-				d.tStrategy.StartTest(d)
+				go d.tStrategy.StartTest(d)
 			}
 		case <-d.done:
-			fmt.Println("EventLoop done")
-			d.log.WithField("event", "EventLoop done").Info()
-			break L
+			count++
+			fmt.Println("done  count ", count)
+			if count >= 2 {
+				fmt.Println("EventLoop done")
+				d.log.WithField("event", "EventLoop done").Info()
+				break L
+			}
 		default:
 		}
 	}
