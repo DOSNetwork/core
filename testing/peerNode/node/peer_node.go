@@ -4,11 +4,16 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
+	"math"
+
 	"math/big"
 	"net/http"
 	"os"
 	"strings"
 	"time"
+
+	"github.com/DOSNetwork/core/share/dkg/pedersen"
+	"github.com/DOSNetwork/core/share/vss/pedersen"
 
 	"github.com/DOSNetwork/core/testing/peerNode/internalMsg"
 
@@ -27,6 +32,7 @@ type PeerNode struct {
 	checkroll   map[string]int
 	numMessages int
 	tStrategy   TestStrategy
+	dkgChan     chan p2p.P2PMessage
 }
 
 func (d *PeerNode) MakeRequest(bootStrapIp, f string, args []byte) ([]byte, error) {
@@ -131,13 +137,17 @@ func (d *PeerNode) Init(bootStrapIp string, port, peerSize int, numMessages int,
 	d.bootStrapIp = bootStrapIp
 	d.checkroll = make(map[string]int)
 	d.done = make(chan bool)
+	d.dkgChan = make(chan p2p.P2PMessage)
 	d.numMessages = numMessages
 	d.log = logger
 
-	if tStrategy == "SENDMESSAGE" {
+	switch tStrategy {
+	case "SENDMESSAGE":
 		d.tStrategy = &test1{}
-	} else {
+	case "FINDNODE":
 		d.tStrategy = &test2{}
+	case "DKG":
+		d.tStrategy = &test3{}
 	}
 
 	//1)Wait until bootstrap node assign an ID
@@ -195,6 +205,15 @@ func (d *PeerNode) Init(bootStrapIp string, port, peerSize int, numMessages int,
 					sender := string(msg.Sender)
 					go d.tStrategy.CheckResult(sender, content, d)
 				}
+			case *vss.PublicKey:
+				d.dkgChan <- msg
+				fmt.Println("PublicKey")
+			case *dkg.Deal:
+				d.dkgChan <- msg
+				fmt.Println("Deal")
+			case *dkg.Response:
+				d.dkgChan <- msg
+				fmt.Println("Response")
 			default:
 			}
 		}
@@ -210,8 +229,8 @@ func (d *PeerNode) Init(bootStrapIp string, port, peerSize int, numMessages int,
 	d.requestAllIDs() //get all ids
 	d.requestAllIPs() //get all ips
 
-	if tStrategy == "FINDNODE" {
-		for i := 0; i < 4; i++ {
+	if tStrategy != "SENDMESSAGE" {
+		for i := 0; i < int(math.Min(4, float64(len(d.nodeIPs)))); i++ {
 			if d.p.GetIP() != d.nodeIPs[i] {
 				d.p.Join(d.nodeIPs[i])
 			}

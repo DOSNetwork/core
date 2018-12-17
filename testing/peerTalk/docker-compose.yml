@@ -1,0 +1,19 @@
+version: '3'
+services:
+ bootstrap:
+   image: peertalk
+   deploy:
+     replicas: 1
+   environment:
+     - ROLE=bootstrap
+     - PEERNUM=12
+     - GROUPSIZE=12
+ peernode:
+   image: peertalk
+   depends_on:
+     - bootstrap
+   deploy:
+     replicas: 12
+   environment:
+     - ROLE=testNode
+     - BOOTSTRAPIP=bootstrap:44460

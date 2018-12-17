@@ -19,7 +19,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var log *logrus.Logger
+var log *logrus.Entry
 
 type P2PDkgInterface interface {
 	SetGroupId([]byte)
@@ -37,7 +37,7 @@ type P2PDkgInterface interface {
 	SubscribeEvent(chan string)
 }
 
-func CreateP2PDkg(p p2p.P2PInterface, suite suites.Suite, peerEvent chan p2p.P2PMessage, nbParticipants int, logger *logrus.Logger) (P2PDkgInterface, error) {
+func CreateP2PDkg(p p2p.P2PInterface, suite suites.Suite, peerEvent chan p2p.P2PMessage, nbParticipants int, logger *logrus.Entry) (P2PDkgInterface, error) {
 	log = logger
 	sec := suite.Scalar().Pick(suite.RandomStream())
 	d := &P2PDkg{

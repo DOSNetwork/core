@@ -42,33 +42,33 @@ func TestNewPeerAndSendMessage(test *testing.T) {
 	cmd.Stderr = os.Stderr
 	cmd.Dir = peerNodeDir()
 
-	err := cmd.Run()
+	if err := cmd.Run(); err != nil {
+		os.Stderr.WriteString(err.Error())
+		test.FailNow()
+	}
 
 	if ctx.Err() == context.DeadlineExceeded {
 		fmt.Println("Command timed out")
-		return
+		test.FailNow()
 	}
 
-	if err != nil {
-		os.Stderr.WriteString(err.Error())
-		test.Fail()
-	}
 	f, err := os.Create(cmd.Dir + "/NewPeerAndSendMessage.log")
 	if err != nil {
-		test.Fail()
+		fmt.Println("unable to create log file", err)
 	}
 	defer f.Close()
+
 	w := bufio.NewWriter(f)
 	_, err = w.WriteString(string(cmdOutput.Bytes()))
 	if err != nil {
-		fmt.Println(err.Error())
-		test.Fail()
+		fmt.Println("unable to write to log file", err)
 	}
 	w.Flush()
 
+	fmt.Println("finishing NewPeerAndSendMessage")
 	output, err := exec.Command("docker-compose", "-f", "peer-docker-compose.yml", "down").CombinedOutput()
 	if err != nil {
-		os.Stderr.WriteString(err.Error())
+		os.Stderr.WriteString(err)
 	}
 	fmt.Println(string(output))
 
@@ -88,36 +88,87 @@ func TestFindNode(test *testing.T) {
 	cmd := exec.CommandContext(ctx, "docker-compose", "-f", "findnode-docker-compose.yml", "up", "--scale", "peernode=5")
 	cmd.Stdout = cmdOutput
 	cmd.Stderr = os.Stderr
-	cmd.Dir = filepath.Join(os.Getenv("GOPATH"), "src", "github.com", "DOSNetwork", "core", "testing", "peerNode")
+	cmd.Dir = peerNodeDir()
 
-	err := cmd.Run()
-	if err != nil {
+	if err := cmd.Run(); err != nil {
 		os.Stderr.WriteString(err.Error())
-		test.Fail()
+		test.FailNow()
 	}
+
 	if ctx.Err() == context.DeadlineExceeded {
 		fmt.Println("Command timed out")
-		return
+		test.FailNow()
 	}
+
 	f, err := os.Create(cmd.Dir + "/FindNode.log")
 	if err != nil {
-		test.Fail()
+		fmt.Println("unable to create log file", err)
 	}
 	defer f.Close()
+
 	w := bufio.NewWriter(f)
 	_, err = w.WriteString(string(cmdOutput.Bytes()))
 	if err != nil {
-		test.Fail()
+		fmt.Println("unable to write to log file", err)
 	}
 	w.Flush()
-	fmt.Println("finishin test")
+
+	fmt.Println("finishing FindNode")
 	output, err := exec.Command("docker-compose", "-f", "findnode-docker-compose.yml", "down").CombinedOutput()
 	if err != nil {
-		os.Stderr.WriteString(err.Error())
+		os.Stderr.WriteString(err)
 	}
 	fmt.Println(string(output))
 
 	err, isfail := isTestFail("FindNode")
+	if err != nil {
+		fmt.Println(err.Error())
+	}
+	if isfail {
+		test.Fail()
+	}
+}
+
+func TestDKG(test *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+	defer cancel() // The cancel should be deferred so resources are cleaned up
+	cmdOutput := &bytes.Buffer{}
+	cmd := exec.CommandContext(ctx, "docker-compose", "-f", "dkg-docker-compose.yml", "up", "--scale", "peernode=5")
+	cmd.Stdout = cmdOutput
+	cmd.Stderr = os.Stderr
+	cmd.Dir = peerNodeDir()
+
+	if err := cmd.Run(); err != nil {
+		os.Stderr.WriteString(err.Error())
+		test.FailNow()
+	}
+
+	if ctx.Err() == context.DeadlineExceeded {
+		fmt.Println("Command timed out")
+		test.FailNow()
+	}
+
+	f, err := os.Create(cmd.Dir + "/dkg.log")
+	if err != nil {
+		fmt.Println("unable to create log file", err)
+	}
+	defer f.Close()
+
+	w := bufio.NewWriter(f)
+	_, err = w.WriteString(string(cmdOutput.Bytes()))
+	if err != nil {
+		fmt.Println("unable to write to log file", err)
+	}
+	w.Flush()
+
+	fmt.Println("finishing dkg")
+	output, err := exec.Command("docker-compose", "-f", "dkg-docker-compose.yml", "down").CombinedOutput()
+	if err != nil {
+		os.Stderr.WriteString(err)
+	}
+	fmt.Println(string(output))
+
+	err, isfail := isTestFail("dkg")
 	if err != nil {
 		fmt.Println(err.Error())
 	}
