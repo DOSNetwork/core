@@ -70,7 +70,7 @@ func NewPeerConn(p2pnet *P2P, conn *net.Conn, rxMessage chan P2PMessage) (peer *
 		return
 	}
 
-	go peer.heartBeat()
+	//go peer.heartBeat()
 	return
 }
 
@@ -174,18 +174,21 @@ func (p *PeerConn) receiveLoop() {
 		}
 	}
 
-	if _, loaded := p.p2pnet.peers.GetPeerByID(string(p.identity.Id)); loaded {
-		p.p2pnet.peers.DeletePeer(string(p.identity.Id))
-	}
+	//if _, loaded := p.p2pnet.peers.GetPeerByID(string(p.identity.Id)); loaded {
+	p.p2pnet.peers.DeletePeer(string(p.identity.Id))
+	//}
 
 	if err := (*p.conn).Close(); err != nil {
 		fmt.Println(err)
+
 	}
+	fmt.Println("ReceiveLoop done ", p.identity.Id, " ", p.identity.Address)
 }
 
 func (p *PeerConn) End() {
 	if err := (*p.conn).Close(); err != nil {
-		fmt.Println("!!!!! End", err)
+		fmt.Println("!!!!! End err ", err, " ", p.identity.Id, " ", p.identity.Address)
+		p.p2pnet.peers.DeletePeer(string(p.identity.Id))
 	}
 }
 

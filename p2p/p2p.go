@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+
 	//"math/big"
 	"net"
 	"sort"
@@ -34,9 +35,6 @@ type P2P struct {
 	pubKey       kyber.Point
 	routingTable *dht.RoutingTable
 	log          *logrus.Entry
-	fromLocal    int
-	fromDht      int
-	fromRemote   int
 }
 
 func (n *P2P) SetID(id []byte) {
@@ -162,23 +160,17 @@ func (n *P2P) lenOfPeers() (count int) {
 	return
 }
 
-func (n *P2P) findPeer(id []byte, localOnly bool) (peer *PeerConn, found bool) {
+func (n *P2P) findPeer(id []byte) (peer *PeerConn, found bool) {
 	var value interface{}
 	var err error
 
 	// Find Peer from existing peerConn
 	if value, found = n.peers.GetPeerByID(string(id)); found {
-		//fmt.Println("!!!! Find Peer from existing peerConn ", id)
 		peer = value.(*PeerConn)
 
-		n.fromLocal++
 		n.log.WithFields(logrus.Fields{
-			"event":      "findPeer",
-			"id":         new(big.Int).SetBytes(id).String(),
-			"fromLocal":  n.fromLocal,
-			"fromDht":    n.fromDht,
-			"fromRemote": n.fromRemote,
-		}).Info("fromLocal")
+			"eventFromLocal": true,
+		}).Info()
 
 		return
 	}
@@ -190,52 +182,36 @@ func (n *P2P) findPeer(id []byte, localOnly bool) (peer *PeerConn, found bool) {
 			fmt.Println("!!!! Find Peer from routing map ", id)
 			found = true
 
-			n.fromDht++
 			n.log.WithFields(logrus.Fields{
-				"event":      "findPeer",
-				"id":         new(big.Int).SetBytes(id).String(),
-				"fromLocal":  n.fromLocal,
-				"fromDht":    n.fromDht,
-				"fromRemote": n.fromRemote,
-			}).Info("fromDht")
+				"eventFromDht": true,
+			}).Info()
 
 			return
 		}
 	}
-	fmt.Println("!!! Can't find node ", id)
-	if !localOnly {
-		// Updating Routing table to find peer
-		results := n.findNode(internal.ID{Id: id}, dht.BucketSize, 20)
-		for _, result := range results {
-			n.routingTable.Update(result)
-		}
 
-		// Find Peer from existing peerConn
-		if value, found = n.peers.GetPeerByID(string(id)); found {
-			fmt.Println("!!!! Find Peer from routing map ", id)
-			peer = value.(*PeerConn)
-			found = true
+	// Updating Routing table to find peer
+	results := n.findNode(internal.ID{Id: id}, dht.BucketSize, 20)
+	for _, result := range results {
+		n.routingTable.Update(result)
+	}
 
-			n.fromRemote++
-			n.log.WithFields(logrus.Fields{
-				"event":      "findPeer",
-				"id":         new(big.Int).SetBytes(id).String(),
-				"fromLocal":  n.fromLocal,
-				"fromDht":    n.fromDht,
-				"fromRemote": n.fromRemote,
-			}).Info("fromRemote")
+	// Find Peer from existing peerConn
+	if value, found = n.peers.GetPeerByID(string(id)); found {
+		fmt.Println("!!!! Find Peer from routing map ", id)
+		peer = value.(*PeerConn)
+		found = true
 
-			return
-		}
+		n.log.WithFields(logrus.Fields{
+			"eventFromRemote": true,
+		}).Info()
+
+		return
 	}
 
 	n.log.WithFields(logrus.Fields{
-		"event":      "findPeer",
-		"id":         new(big.Int).SetBytes(id).String(),
-		"fromLocal":  n.fromLocal,
-		"fromDht":    n.fromDht,
-		"fromRemote": n.fromRemote,
-	}).Info("miss")
+		"eventNoFounding": true,
+	}).Info()
 
 	return
 }
@@ -243,20 +219,25 @@ func (n *P2P) findPeer(id []byte, localOnly bool) (peer *PeerConn, found bool) {
 func (n *P2P) SendMessage(id []byte, m proto.Message) (err error) {
 	var peer *PeerConn
 	var found bool
-	localOnly := false
+	startTime := time.Now()
 
-	if peer, found = n.findPeer(id, localOnly); found {
+	if peer, found = n.findPeer(id); found {
 		request := new(Request)
 		request.SetMessage(m)
 		request.SetTimeout(5 * time.Second)
 
 		_, err = peer.Request(request)
 		if err != nil {
-			fmt.Println("!!!!!!!!! SendMessage err.Error() ", err.Error())
-			//TODO :Need to check to see if this conn is a closed connection
+			n.log.WithFields(logrus.Fields{
+				"eventSendMessageErr": err,
+			}).Info()
 			return
 		}
 	}
+
+	n.log.WithFields(logrus.Fields{
+		"timeSendMessage": time.Since(startTime).Seconds(),
+	}).Info()
 
 	return
 }
@@ -279,23 +260,6 @@ func (n *P2P) connectTo(addr string) (peer *PeerConn, err error) {
 
 	//TODO Check if addr is a valid addr
 	for retry := 0; retry < 10; retry++ {
-		//1)Check if this address has been in peers map
-		existing := false
-		n.peers.Range(func(key, value interface{}) bool {
-			client := value.(*PeerConn)
-			if client.identity.Address == addr {
-
-				existing = true
-				peer = client
-			}
-			return true
-		})
-		if existing {
-			fmt.Println("Existing peer")
-			return
-		}
-
-		//2)Dial to peer to get a connection
 		conn, err = net.Dial("tcp", addr)
 		if err != nil {
 			fmt.Println("NewPeer Dial err ", err, " addr ", addr)
@@ -330,6 +294,7 @@ type lookupBucket struct {
 //
 // Queries at most #ALPHA nodes at a time per lookup, and returns all peer IDs closest to a target peer ID.
 func (n *P2P) findNode(targetID internal.ID, alpha int, disjointPaths int) (results []internal.ID) {
+	startTime := time.Now()
 	visited := new(sync.Map)
 
 	var lookups []*lookupBucket
@@ -379,7 +344,9 @@ func (n *P2P) findNode(targetID internal.ID, alpha int, disjointPaths int) (resu
 	if len(results) > dht.BucketSize {
 		results = results[:dht.BucketSize]
 	}
-
+	n.log.WithFields(logrus.Fields{
+		"timeFindNode": time.Since(startTime).Seconds(),
+	}).Info()
 	return
 }
 

@@ -6,7 +6,7 @@ import (
 	"sync"
 )
 
-const MAXPEERCOUNT = 21
+const MAXPEERCOUNT = 10000
 
 type PeerManager struct {
 	mu     sync.Mutex
@@ -24,7 +24,7 @@ func (pm *PeerManager) LoadOrStore(id string, peer *PeerConn) (actual *PeerConn,
 		if len(pm.parray) > MAXPEERCOUNT {
 			p := heap.Pop(&pm.parray).(*PeerConn)
 			fmt.Println("Force delete ", p.identity.Id)
-			p.End() //todo disconnet peer_conn
+			//p.End() //todo disconnet peer_conn
 			pm.peers.Delete(string(p.identity.Id))
 
 		}

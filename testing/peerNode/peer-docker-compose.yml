@@ -7,7 +7,7 @@ services:
    environment:
      - NODEROLE=boot
      - PEERSIZE=5
-     - NUMOFMESSAGS=10
+     - NUMOFMESSAGS=1
  peernode:
    image: peernode
    depends_on:
@@ -17,5 +17,5 @@ services:
    environment:
      - BOOTSTRAPIP=bootstrap:44460
      - PEERSIZE=5
-     - NUMOFMESSAGS=10
+     - NUMOFMESSAGS=1
      - TESTSTRATEGY=SENDMESSAGE

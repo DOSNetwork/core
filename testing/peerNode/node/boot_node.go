@@ -4,7 +4,6 @@ import (
 	"crypto/rand"
 	"fmt"
 	"io/ioutil"
-	"math/big"
 	"net/http"
 	"os"
 	"sync"
@@ -26,11 +25,12 @@ const ALLNODENOTREADY = 0
 
 type BootNode struct {
 	node
-	count     int
-	ipIdMap   map[string][]byte
-	lock      sync.Mutex
-	checkroll map[string]bool
-	readynode map[string]bool
+	count          int
+	testReadyCount int
+	ipIdMap        map[string][]byte
+	lock           sync.Mutex
+	checkroll      map[string]bool
+	readynode      map[string]bool
 }
 
 func GenerateRandomBytes(n int) ([]byte, error) {
@@ -51,7 +51,8 @@ func (b *BootNode) Init(port, peerSize int, logger *logrus.Entry) {
 	b.allIP = []string{}
 	bootID := []byte{1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1}
 	//bootID := []byte{152, 37, 111, 123, 113, 163, 23, 27, 114, 171, 254, 13, 147, 217, 232, 54, 148, 166, 46, 131}
-	b.members = append(b.members, bootID)
+	//	b.members = append(b.members, bootID)
+
 	b.checkroll = make(map[string]bool)
 	b.ipIdMap = make(map[string][]byte)
 	b.done = make(chan bool)
@@ -65,9 +66,7 @@ func (b *BootNode) Init(port, peerSize int, logger *logrus.Entry) {
 			id, _ = GenerateRandomBytes(len(bootID))
 		}
 		b.checkroll[string(id)] = true
-		b.lock.Lock()
 		b.members = append(b.members, id)
-		b.lock.Unlock()
 	}
 
 	//2)Declare a new router to handle REST API call
@@ -87,7 +86,7 @@ func (b *BootNode) Init(port, peerSize int, logger *logrus.Entry) {
 }
 
 func (b *BootNode) getMembers(w http.ResponseWriter, r *http.Request) {
-	for i := 1; i <= b.peerSize; i++ {
+	for i := 0; i < b.peerSize; i++ {
 		w.Write(b.members[i])
 	}
 }
@@ -96,23 +95,22 @@ func (b *BootNode) getID(w http.ResponseWriter, r *http.Request) {
 	body, _ := ioutil.ReadAll(r.Body)
 	ip := string(body)
 	if b.ipIdMap[ip] == nil {
-		b.allIP = append(b.allIP, ip)
-		b.count++
-		if b.count > b.peerSize {
+
+		if b.count >= b.peerSize {
 			fmt.Println("getID over size error!!!")
 			return
 		}
-		fmt.Println("getID count ", b.count, " peerSize", b.peerSize, " members", b.node.members[b.count])
+		b.allIP = append(b.allIP, ip)
+		fmt.Println("getID count ", b.count, " peerSize", b.peerSize, " len(b.allIP)", len(b.allIP))
 		b.ipIdMap[ip] = b.node.members[b.count]
+		b.count++
+		b.log.WithFields(logrus.Fields{
+			"eventGetID": b.count,
+		}).Info()
 	}
-	b.log.WithFields(logrus.Fields{
-		"bootGetID": true,
-	}).Info()
-	if len(b.node.members) > b.count {
-		w.Write(b.ipIdMap[ip])
-	} else {
-		fmt.Println(b.node.members)
-	}
+
+	w.Write(b.ipIdMap[ip])
+
 	//TODO:Send addresses and IDs after all peer node already build p2p connection to boot node
 	//if b.count == b.peerSize {
 	//	go b.sendPeerAddresses()
@@ -122,14 +120,15 @@ func (b *BootNode) getID(w http.ResponseWriter, r *http.Request) {
 
 func (b *BootNode) getAllIDs(w http.ResponseWriter, r *http.Request) {
 	//fmt.Println("getAllIDs ,", b.peerSize)
-	for i := 1; i <= b.peerSize; i++ {
+	//d.log.WithField("requestAllIds", len(b.allIP)).Info()
+	for i := 0; i < b.peerSize; i++ {
 		w.Write(b.members[i])
 	}
 }
 
 func (b *BootNode) getAllIPs(w http.ResponseWriter, r *http.Request) {
-	if b.count == b.peerSize {
-		for i := 0; i < len(b.allIP); i++ {
+	if len(b.allIP) >= b.peerSize {
+		for i := 0; i < b.peerSize; i++ {
 			w.Write([]byte(b.allIP[i] + ","))
 		}
 	}
@@ -148,14 +147,16 @@ func (b *BootNode) isTestReady(w http.ResponseWriter, r *http.Request) {
 		b.readynode[ip] = true
 	}
 	b.lock.Unlock()
+
 	if b.isAllnodeready() {
 		b.log.WithFields(logrus.Fields{
 			"eventIsAllnodeready": len(b.readynode),
 		}).Info()
 		w.Write([]byte{ALLNODEREADY})
-		b.log.WithFields(logrus.Fields{
-			"bootTestReady": true,
-		}).Info()
+		b.testReadyCount++
+		if b.testReadyCount >= b.peerSize {
+			b.done <- true
+		}
 	} else {
 		w.Write([]byte{ALLNODENOTREADY})
 	}
@@ -173,9 +174,7 @@ func (b *BootNode) postHandler(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("check done ", len(b.checkroll))
 
 	b.log.WithFields(logrus.Fields{
-		"event": "check done",
-		"len":   len(b.checkroll),
-		"id":    new(big.Int).SetBytes(body).String(),
+		"eventTestDone": len(b.checkroll),
 	}).Info()
 
 	if len(b.checkroll) == 0 {
@@ -183,29 +182,6 @@ func (b *BootNode) postHandler(w http.ResponseWriter, r *http.Request) {
 		b.done <- true
 	}
 }
-
-/*
-func (b *BootNode) startTest() {
-	cmd := &internalMsg.Cmd{
-		Ctype: internalMsg.Cmd_STARTTEST,
-		Args:  []byte{},
-	}
-	pb := proto.Message(cmd)
-	for i := 1; i <= b.peerSize; i++ {
-		b.p.SendMessage(b.members[i], pb)
-	}
-}
-
-func (b *BootNode) finishTest() {
-	cmd := &internalMsg.Cmd{
-		Ctype: internalMsg.Cmd_TESTDONE,
-		Args:  []byte{},
-	}
-	pb := proto.Message(cmd)
-	for i := 1; i <= b.peerSize; i++ {
-		b.p.SendMessage(b.members[i], pb)
-	}
-}*/
 
 func (b *BootNode) EventLoop() {
 L:
