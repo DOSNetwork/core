@@ -2,19 +2,19 @@ package p2p
 
 import (
 	"fmt"
-	"sync"
 	"math"
+	"sync"
 )
 
-const MAXPEERCOUNT = 21
+const MAXPEERCOUNT = 100000
 
 type PeerConnManager struct {
-	mu     sync.Mutex
-	peers  sync.Map
+	mu    sync.Mutex
+	peers sync.Map
 	count uint32
 }
 
-func (pm *PeerConnManager) FindLessUsedPeerConn() (pconn*PeerConn) {
+func (pm *PeerConnManager) FindLessUsedPeerConn() (pconn *PeerConn) {
 	var lastusedtime int64
 	lastusedtime = math.MaxInt64
 	pconn = nil
