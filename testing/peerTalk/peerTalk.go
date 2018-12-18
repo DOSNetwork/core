@@ -4,15 +4,21 @@ import (
 	"bytes"
 	"fmt"
 	"math/big"
+	"net"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/DOSNetwork/core/p2p"
 	"github.com/DOSNetwork/core/share/dkg/pedersen"
 	"github.com/DOSNetwork/core/share/vss/pedersen"
 	"github.com/DOSNetwork/core/suites"
 	"github.com/DOSNetwork/core/testing/peerTalk/msg"
+
+	"github.com/bshuster-repo/logrus-logstash-hook"
+
 	"github.com/google/uuid"
+
 	"github.com/sirupsen/logrus"
 )
 
@@ -20,7 +26,26 @@ func main() {
 	id := uuid.New()
 	fmt.Println(id[:])
 	log := logrus.New()
-	logger := log.WithField("id", new(big.Int).SetBytes(id[:]).String())
+	tcpAddr, err := net.ResolveTCPAddr("tcp", "163.172.36.173:9500")
+	if err != nil {
+		log.Error(err)
+	}
+
+	conn, err := net.DialTCP("tcp", nil, tcpAddr)
+	if err != nil {
+		log.Error(err)
+	}
+
+	hook, err := logrustash.NewHookWithFieldsAndConn(conn, "匹凸匹test", logrus.Fields{
+		"startingTimestamp": time.Now(),
+		"id":                new(big.Int).SetBytes(id[:]).String(),
+	})
+	if err != nil {
+		log.Error(err)
+	}
+
+	log.AddHook(hook)
+	logger := log.WithFields(logrus.Fields{})
 	p, peerEvent, err := p2p.CreateP2PNetwork(id[:], 44460, logger)
 	if err != nil {
 		logger.Fatal(err)
