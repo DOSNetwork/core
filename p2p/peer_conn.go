@@ -162,15 +162,16 @@ func (p *PeerConn) receiveLoop() {
 			if err := p.Reply(pa.GetRequestNonce(), response); err != nil {
 				fmt.Println("PeerConn Ping Reply err ", err)
 			}
+		case *internal.Pong:
 		default:
 			p.lastusedtime = time.Now()
+			//TODO
+			msg := P2PMessage{Msg: *ptr, Sender: p.identity.Id}
+			go func() { p.rxMessage <- msg }()
 			response := &internal.Pong{}
 			if err := p.Reply(pa.GetRequestNonce(), response); err != nil {
 				fmt.Println("PeerConn Ping Reply err ", err)
 			}
-			//TODO
-			msg := P2PMessage{Msg: *ptr, Sender: p.identity.Id}
-			p.rxMessage <- msg
 		}
 	}
 
@@ -348,9 +349,6 @@ func (p *PeerConn) Request(req *Request) (proto.Message, error) {
 	}
 
 	prepared.RequestNonce = atomic.AddUint64(&p.RequestNonce, 1)
-	if err := p.SendPackage(prepared); err != nil {
-		return nil, err
-	}
 
 	switch req.Message.(type) {
 	case *internal.Ping:
@@ -370,6 +368,10 @@ func (p *PeerConn) Request(req *Request) (proto.Message, error) {
 	// Stop tracking the request.
 	defer close(closeSignal)
 	defer p.Requests.Delete(prepared.GetRequestNonce())
+
+	if err := p.SendPackage(prepared); err != nil {
+		return nil, err
+	}
 
 	select {
 	case res := <-channel:
