@@ -1,0 +1,18 @@
+version: '3'
+services:
+ bootstrap:
+   image: dhtnode
+   deploy:
+     replicas: 1
+   environment:
+     - NODEROLE=boot
+     - DHTSIZE=21
+ dhtnode:
+   image: dhtnode
+   depends_on:
+     - bootstrap
+   deploy:
+     replicas: 3
+   environment:
+     - BOOTSTRAPIP=bootstrap:44460
+     - DHTSIZE=21

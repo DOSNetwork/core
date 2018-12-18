@@ -15,6 +15,7 @@ import (
 	"github.com/DOSNetwork/core/configuration"
 	"github.com/DOSNetwork/core/onchain"
 	"github.com/DOSNetwork/core/p2p"
+	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -67,12 +68,10 @@ func main() {
 	}
 
 	//2)Build a p2p network
-	peerEvent := make(chan p2p.P2PMessage, 100)
-	p, _ := p2p.CreateP2PNetwork(peerEvent, offChainConfig.Port)
-	defer close(peerEvent)
-	//2-1)Set node ID
 	id := []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20}
-	p.SetId(id[:])
+	p, peerEvent, _ := p2p.CreateP2PNetwork(id[:], offChainConfig.Port, logrus.New().WithFields(logrus.Fields{}))
+	defer close(peerEvent)
+
 	//2-2)Start to listen incoming connection
 	if err = p.Listen(); err != nil {
 		log.Fatal(err)

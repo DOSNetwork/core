@@ -1,0 +1,14 @@
+syntax = "proto3";
+package internalMsg;
+
+message Cmd{
+    enum Type {
+        ALLIP = 0;
+	    ALLID = 1;
+	    STARTTEST = 2;
+        SIGNIN = 3;
+	    TESTDONE =4;
+    }
+    Type Ctype = 1;
+    bytes Args = 2;
+}

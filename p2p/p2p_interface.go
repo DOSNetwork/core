@@ -3,15 +3,12 @@ package p2p
 import (
 	"errors"
 	"net"
-	"sync"
-
+	"os"
+	"github.com/DOSNetwork/core/suites"
+	"github.com/dedis/kyber"
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes"
-
-	"github.com/DOSNetwork/core/p2p/dht"
-	"github.com/DOSNetwork/core/suites"
-
-	"github.com/dedis/kyber"
+	"github.com/sirupsen/logrus"
 )
 
 var suite = suites.MustFind("bn256")
@@ -22,17 +19,35 @@ func genPair() (kyber.Scalar, kyber.Point) {
 	return secret, public
 }
 
-func CreateP2PNetwork(tunnel chan P2PMessage, port int) (P2PInterface, error) {
-	p := &P2P{
-		peers:       new(sync.Map),
-		messageChan: tunnel,
-		suite:       suite,
-		port:        port,
+func CreateP2PNetwork(id []byte, port int, logger *logrus.Entry) (P2PInterface, chan P2PMessage, error) {
+	testStrategy := os.Getenv("TESTSTRATEGY")
+	if testStrategy == "DELAY_BEFORE_RECEIVELOOP" {
+		p := &TestP2P{
+			P2P{
+				peers:    new(PeerConnManager),
+				suite:    suite,
+				messages: make(chan P2PMessage, 100),
+				port:     port,
+				log:      logger,
+			},
+			testStrategy,
+		}
+		return p, p.messages, nil
+	} else {
+		p := &P2P{
+			peers:    new(PeerConnManager),
+			suite:    suite,
+			messages: make(chan P2PMessage, 100),
+			port:     port,
+			log:      logger,
+		}
+		p.identity.Id = id
+		return p, p.messages, nil
 	}
-	return p, nil
+
 }
 
-func getLocalIp() (string, error) {
+func GetLocalIp() (string, error) {
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {
 		return "", err
@@ -54,14 +69,11 @@ type P2PMessage struct {
 }
 
 type P2PInterface interface {
-	SetId([]byte)
-	GetId() dht.ID
+	GetIP() string
+	GetID() []byte
 	Listen() error
-	Broadcast(proto.Message)
-	SendMessageById([]byte, proto.Message) error
-	CreatePeer(string, *net.Conn)
-	GetTunnel() chan P2PMessage
-	FindNodeById(id []byte) []dht.ID
-	FindNode(targetID dht.ID, alpha int, disjointPaths int) (results []dht.ID)
-	GetRoutingTable() *dht.RoutingTable
+	Join(bootstrapIp string) error
+	ConnectTo(IpAddr string) (id []byte, err error)
+	Leave()
+	SendMessage(id []byte, msg proto.Message) error
 }

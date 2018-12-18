@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/DOSNetwork/core/configuration"
-	"github.com/DOSNetwork/core/group/bn256"
 	"github.com/DOSNetwork/core/onchain/dosproxy"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -711,13 +710,6 @@ func DecodeSig(sig []byte) (x, y *big.Int) {
 	y = new(big.Int)
 	x.SetBytes(sig[0:32])
 	y.SetBytes(sig[32:])
-
-	if x.Cmp(big.NewInt(0)) == 0 && y.Cmp(big.NewInt(0)) == 0 {
-		return big.NewInt(0), big.NewInt(0)
-	}
-
-	y.Sub(bn256.P, y.Mod(y, bn256.P))
-
 	return
 }
 

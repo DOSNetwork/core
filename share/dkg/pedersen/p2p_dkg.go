@@ -19,7 +19,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var log *logrus.Logger
+var log *logrus.Entry
 
 type P2PDkgInterface interface {
 	SetGroupId([]byte)
@@ -37,7 +37,7 @@ type P2PDkgInterface interface {
 	SubscribeEvent(chan string)
 }
 
-func CreateP2PDkg(p p2p.P2PInterface, suite suites.Suite, peerEvent chan p2p.P2PMessage, nbParticipants int, logger *logrus.Logger) (P2PDkgInterface, error) {
+func CreateP2PDkg(p p2p.P2PInterface, suite suites.Suite, peerEvent chan p2p.P2PMessage, nbParticipants int, logger *logrus.Entry) (P2PDkgInterface, error) {
 	log = logger
 	sec := suite.Scalar().Pick(suite.RandomStream())
 	d := &P2PDkg{
@@ -213,7 +213,7 @@ func (d *P2PDkg) enterInit(e *fsm.Event) {
 
 func (d *P2PDkg) enterExchangePubKey(e *fsm.Event) {
 	d.groupingStart = time.Now()
-	id := (*d.network).GetId().Id
+	id := (*d.network).GetID()
 	d.pubkeyIdMap[d.partPub.String()] = string(id)
 	d.publicKeys = append(d.publicKeys, d.partPub)
 
@@ -277,7 +277,7 @@ func (d *P2PDkg) enterNewDistKeyGenerator(e *fsm.Event) {
 	}
 	for i, pub := range d.publicKeys {
 		if !pub.Equal(d.partPub) {
-			err = (*d.network).SendMessageById([]byte(d.pubkeyIdMap[pub.String()]), deals[i])
+			err = (*d.network).SendMessage([]byte(d.pubkeyIdMap[pub.String()]), deals[i])
 			if err != nil {
 				fmt.Println(err)
 			}
@@ -337,8 +337,10 @@ func (d *P2PDkg) Event(event string) {
 
 func (d *P2PDkg) broadcast(m proto.Message) {
 	for _, member := range d.groupIds {
-		if string(member) != string((*d.network).GetId().Id) {
-			go (*d.network).SendMessageById(member, m)
+		if string(member) != string((*d.network).GetID()) {
+			if err := (*d.network).SendMessage(member, m); err != nil {
+				fmt.Println("DKG SendMessage err ", err)
+			}
 		}
 	}
 }

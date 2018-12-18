@@ -1,0 +1,20 @@
+version: '3'
+services:
+ bootstrap:
+   image: peernode
+   deploy:
+     replicas: 1
+   environment:
+     - NODEROLE=boot
+     - PEERSIZE=12
+ peernode:
+   image: peernode
+   depends_on:
+     - bootstrap
+   deploy:
+     replicas: 12
+   environment:
+     - BOOTSTRAPIP=bootstrap:44460
+     - PEERSIZE=12
+     - GROUPSIZE=12
+     - TESTSTRATEGY=DKG
