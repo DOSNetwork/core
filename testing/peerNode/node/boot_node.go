@@ -22,6 +22,8 @@ import (
 
 const ALLNODEREADY = 1
 const ALLNODENOTREADY = 0
+const ALLNODEFINISH = 1
+const ALLNODENOTFINISH = 0
 
 type BootNode struct {
 	node
@@ -31,6 +33,7 @@ type BootNode struct {
 	lock           sync.Mutex
 	checkroll      map[string]bool
 	readynode      map[string]bool
+	finishnode     map[string]bool
 }
 
 func GenerateRandomBytes(n int) ([]byte, error) {
@@ -76,6 +79,7 @@ func (b *BootNode) Init(port, peerSize int, logger *logrus.Entry) {
 	r.HandleFunc("/getAllIDs", b.getAllIDs).Methods("POST")
 	r.HandleFunc("/getAllIPs", b.getAllIPs).Methods("POST")
 	r.HandleFunc("/isTestReady", b.isTestReady).Methods("POST")
+	r.HandleFunc("/isTestFinish", b.isTestFinish).Methods("POST")
 	r.HandleFunc("/post", b.postHandler)
 	go http.ListenAndServe(":8080", r)
 
@@ -139,6 +143,11 @@ func (b *BootNode) isAllnodeready() bool {
 	return len(b.readynode) >= b.peerSize
 }
 
+func (b *BootNode) isAllnodefinish() bool {
+	fmt.Println("isAllnodefinish ", len(b.finishnode) >= b.peerSize, "", len(b.finishnode))
+	return len(b.finishnode) >= b.peerSize
+}
+
 func (b *BootNode) isTestReady(w http.ResponseWriter, r *http.Request) {
 	body, _ := ioutil.ReadAll(r.Body)
 	ip := string(body)
@@ -159,6 +168,25 @@ func (b *BootNode) isTestReady(w http.ResponseWriter, r *http.Request) {
 		}
 	} else {
 		w.Write([]byte{ALLNODENOTREADY})
+	}
+}
+
+func (b *BootNode) isTestFinish(w http.ResponseWriter, r *http.Request) {
+	body, _ := ioutil.ReadAll(r.Body)
+	ip := string(body)
+	b.lock.Lock()
+	if b.finishnode[ip] == false {
+		b.finishnode[ip] = true
+	}
+	b.lock.Unlock()
+
+	if b.isAllnodefinish() {
+		b.log.WithFields(logrus.Fields{
+			"eventIsAllnodefinish": len(b.finishnode),
+		}).Info()
+		w.Write([]byte{ALLNODEFINISH})
+	} else {
+		w.Write([]byte{ALLNODENOTFINISH})
 	}
 }
 

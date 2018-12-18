@@ -131,6 +131,32 @@ func (d *PeerNode) requestIsReady() bool {
 	return false
 }
 
+func (d *PeerNode) requestIsFinish() bool {
+	ip, _ := p2p.GetLocalIp()
+
+	r, err := d.MakeRequest(d.bootStrapIp, "isTestFinish", []byte(ip))
+	for err != nil {
+		time.Sleep(10 * time.Second)
+		r, err = d.MakeRequest(d.bootStrapIp, "isTestFinish", []byte(ip))
+	}
+
+	if err != nil {
+		fmt.Println(err)
+	} else {
+		if len(r) != 0 {
+			if r[0] == byte(ALLNODEFINISH) {
+				return true
+			} else {
+				return false
+			}
+		} else {
+			return false
+		}
+	}
+
+	return false
+}
+
 func (d *PeerNode) Init(bootStrapIp string, port, peerSize int, numMessages int, tStrategy string, logger *logrus.Entry) {
 	d.peerSize = peerSize
 	d.checkCount = 1
@@ -240,6 +266,22 @@ func (d *PeerNode) Init(bootStrapIp string, port, peerSize int, numMessages int,
 	//send test result todo
 }
 
+func (d *PeerNode) FinishTest() {
+	ticker := time.NewTicker(5 * time.Second)
+L:
+	for {
+		select {
+		case <-ticker.C:
+			if d.requestIsFinish() {
+				ticker.Stop()
+				//todo stoptest
+				break L
+			}
+		default:
+		}
+	}
+}
+
 func (d *PeerNode) EventLoop() {
 	ticker := time.NewTicker(5 * time.Second)
 	count := 0
@@ -257,6 +299,7 @@ L:
 			if count >= 2 {
 				fmt.Println("EventLoop done")
 				d.log.WithField("event", "EventLoop done").Info()
+				d.FinishTest()
 				break L
 			}
 		default:
