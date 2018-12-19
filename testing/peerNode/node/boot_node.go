@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"os"
 	"sync"
 
 	//	"github.com/ethereum/go-ethereum/common"
@@ -212,7 +211,6 @@ func (b *BootNode) postHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (b *BootNode) EventLoop() {
-L:
 	for {
 		select {
 		//event from peer
@@ -220,9 +218,7 @@ L:
 		case <-b.done:
 			fmt.Println("EventLoop done")
 			b.log.WithField("event", "EventLoop done").Info()
-			break L
 		default:
 		}
 	}
-	os.Exit(0)
 }
