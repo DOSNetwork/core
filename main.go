@@ -178,7 +178,7 @@ func main() {
 				peerEventForDKG <- msg
 			case *dkg.Deal:
 				peerEventForDKG <- msg
-			case *dkg.Response:
+			case *dkg.Responses:
 				peerEventForDKG <- msg
 			case *vss.Signature:
 				cSignatureFromPeer <- *content
