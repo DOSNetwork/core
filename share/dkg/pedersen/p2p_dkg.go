@@ -43,7 +43,7 @@ func CreateP2PDkg(p p2p.P2PInterface, suite suites.Suite, peerEvent chan p2p.P2P
 	d := &P2PDkg{
 		suite:       suite,
 		publicKeys:  Pubkeys{},
-		chResponse:  make(chan Response, 1),
+		chResponse:  make(chan Responses, 1),
 		pubkeyIdMap: make(map[string]string),
 		partSec:     sec,
 		partPub:     suite.Point().Mul(sec, nil),
@@ -64,8 +64,7 @@ func CreateP2PDkg(p p2p.P2PInterface, suite suites.Suite, peerEvent chan p2p.P2P
 			{Name: "receiveDeal", Src: []string{"ExchangePubKey"}, Dst: "ExchangePubKey"},
 			{Name: "receiveDeal", Src: []string{"NewDistKeyGenerator"}, Dst: "NewDistKeyGenerator"},
 			{Name: "receiveAllDeal", Src: []string{"NewDistKeyGenerator"}, Dst: "ProcessDeal"},
-			{Name: "ReadyForResponse", Src: []string{"ProcessDeal"}, Dst: "ProcessResponse"},
-			{Name: "certified", Src: []string{"ProcessResponse"}, Dst: "Verified"},
+			{Name: "certified", Src: []string{"ProcessDeal"}, Dst: "Verified"},
 			{Name: "checkURL", Src: []string{"Verified"}, Dst: "Verified"},
 			{Name: "receiveSignature", Src: []string{"Verified"}, Dst: "Verified"},
 			{Name: "verify", Src: []string{"Verified"}, Dst: "Verified"},
@@ -90,8 +89,7 @@ type P2PDkg struct {
 	//Data Buffer
 	publicKeys Pubkeys
 	deals      []Deal
-	responses  []Response
-	chResponse chan Response
+	chResponse chan Responses
 	//Group member ID
 	groupIds [][]byte
 	//node key pair
@@ -147,6 +145,9 @@ func (d *P2PDkg) IsCertified() bool {
 func (d *P2PDkg) RunDKG() {
 	if d.FSM.Current() == "Init" {
 		d.chFsmEvent <- "grouping"
+		log.WithFields(logrus.Fields{
+			"eventRunDKG": true,
+		}).Info()
 	}
 }
 
@@ -171,6 +172,10 @@ func (d *P2PDkg) SubscribeEvent(dkgEvent chan string) {
 	d.subscribeEvent = dkgEvent
 }
 func (d *P2PDkg) EventLoop() {
+	pubKeyCount := 0
+	dealCount := 0
+	responseCount := 0
+	unknown := 0
 	for {
 		select {
 		//event from FSM
@@ -180,6 +185,10 @@ func (d *P2PDkg) EventLoop() {
 		case msg := <-d.chPeerEvent:
 			switch content := msg.Msg.Message.(type) {
 			case *vss.PublicKey:
+				pubKeyCount++
+				log.WithFields(logrus.Fields{
+					"pubKeyCount": pubKeyCount,
+				}).Info()
 				pubkey := *content
 				p, err := pubkey.GetPoint(d.suite)
 				if err != nil {
@@ -189,11 +198,23 @@ func (d *P2PDkg) EventLoop() {
 				d.publicKeys = append(d.publicKeys, p)
 				d.Event("receivePubkey")
 			case *Deal:
+				dealCount++
+				log.WithFields(logrus.Fields{
+					"dealCount": dealCount,
+				}).Info()
 				d.deals = append(d.deals, *content)
 				d.Event("receiveDeal")
-			case *Response:
+			case *Responses:
+				responseCount++
+				log.WithFields(logrus.Fields{
+					"responseCount": responseCount,
+				}).Info()
 				d.chResponse <- *content
 			default:
+				unknown++
+				log.WithFields(logrus.Fields{
+					"unknown": unknown,
+				}).Info()
 				fmt.Println("unknown", content)
 			}
 		}
@@ -204,7 +225,7 @@ func (d *P2PDkg) enterInit(e *fsm.Event) {
 	//Data Buffer
 	d.publicKeys = d.publicKeys[:0]
 	d.deals = d.deals[:0]
-	d.chResponse = make(chan Response, 1)
+	d.chResponse = make(chan Responses, 1)
 
 	d.pubkeyIdMap = make(map[string]string)
 	d.partSec = d.suite.Scalar().Pick(d.suite.RandomStream())
@@ -225,6 +246,10 @@ func (d *P2PDkg) enterExchangePubKey(e *fsm.Event) {
 	}
 	d.broadcast(&public)
 
+	log.WithFields(logrus.Fields{
+		"eventSendAllPubKey": true,
+	}).Info()
+
 	//TODO: Should check if publicKeys are all belong to the members
 	if len(d.publicKeys) == d.nbParticipants {
 		d.chFsmEvent <- "receiveAllPubkey"
@@ -240,24 +265,18 @@ func (d *P2PDkg) afterReceivePubkey(e *fsm.Event) {
 
 //Can't call NewDistKeyGenerator .need to wait unitl all deal has been received
 func (d *P2PDkg) enterNewDistKeyGenerator(e *fsm.Event) {
+	log.WithFields(logrus.Fields{
+		"eventReceiveAllPubKey": true,
+	}).Info()
 
 	go func() {
-		for r := range d.chResponse {
-			if d.FSM.Current() != "ProcessResponse" {
-				d.responses = append(d.responses, r)
-			} else {
-				for _, savedResponses := range d.responses {
-					_, err := (*d.partDkg).ProcessResponse(&savedResponses)
-					if err != nil {
-						fmt.Println(err)
-					}
-				}
-				d.responses = d.responses[:0]
-				_, err := (*d.partDkg).ProcessResponse(&r)
+		for rs := range d.chResponse {
+			for _, r := range rs.GetResponse() {
+				_, err := (*d.partDkg).ProcessResponse(r)
 				if err != nil {
 					fmt.Println(err)
 				}
-				if (*d.partDkg).Certified() && d.FSM.Current() == "ProcessResponse" {
+				if (*d.partDkg).Certified() && d.FSM.Current() == "ProcessDeal" {
 					fmt.Println("resp Certified ")
 					d.chFsmEvent <- "certified"
 				}
@@ -285,6 +304,11 @@ func (d *P2PDkg) enterNewDistKeyGenerator(e *fsm.Event) {
 			d.dkgIndex = i
 		}
 	}
+
+	log.WithFields(logrus.Fields{
+		"eventSendAllDeal": true,
+	}).Info()
+
 	condition := d.nbParticipants - 1
 	if len(d.deals) == condition {
 		d.chFsmEvent <- "receiveAllDeal"
@@ -299,18 +323,38 @@ func (d *P2PDkg) afterReceiveDeal(e *fsm.Event) {
 
 //This is only happened after all peers has all public keys
 func (d *P2PDkg) enterProcessDeal(e *fsm.Event) {
+	log.WithFields(logrus.Fields{
+		"eventReceiveAllDeal": true,
+	}).Info()
+
+	var resps []*Response
+
 	for _, deal := range d.deals {
 		resp, err := (*d.partDkg).ProcessDeal(&deal)
 		if err != nil {
 			fmt.Println(err)
 		} else {
-			d.broadcast(resp)
+			resps = append(resps, resp)
 		}
 	}
-	d.chFsmEvent <- "ReadyForResponse"
+
+	d.broadcast(&Responses{Response: resps})
+
+	if (*d.partDkg).Certified() {
+		fmt.Println("resp Certified ")
+		d.chFsmEvent <- "certified"
+	}
+
+	log.WithFields(logrus.Fields{
+		"eventProcessAllDeal": true,
+	}).Info()
 }
 
 func (d *P2PDkg) enterVerified(e *fsm.Event) {
+	log.WithFields(logrus.Fields{
+		"eventProcessAllResponse": true,
+	}).Info()
+
 	close(d.chResponse)
 	var err error
 	d.partDks, err = d.partDkg.DistKeyShare()
@@ -321,8 +365,9 @@ func (d *P2PDkg) enterVerified(e *fsm.Event) {
 	timeCost := time.Since(d.groupingStart).Seconds()
 	fmt.Println("DistKeyShare SUCCESS ", timeCost)
 	log.WithFields(logrus.Fields{
-		"timeCost": timeCost,
-	}).Info("DKG Succeed")
+		"eventDKGSucceed": true,
+		"DKGTimeCost":     timeCost,
+	}).Info()
 	if d.subscribeEvent != nil {
 		d.subscribeEvent <- "certified"
 	}
