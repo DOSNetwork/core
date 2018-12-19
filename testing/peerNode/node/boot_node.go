@@ -59,6 +59,7 @@ func (b *BootNode) Init(port, peerSize int, logger *logrus.Entry) {
 	b.ipIdMap = make(map[string][]byte)
 	b.done = make(chan bool)
 	b.readynode = make(map[string]bool)
+	b.finishnode = make(map[string]bool)
 	b.log = logger
 	b.log.Data["role"] = "bootstrap"
 

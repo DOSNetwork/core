@@ -274,6 +274,7 @@ L:
 		case <-ticker.C:
 			if d.requestIsFinish() {
 				ticker.Stop()
+				d.done <- true
 				//todo stoptest
 				break L
 			}
@@ -284,7 +285,6 @@ L:
 
 func (d *PeerNode) EventLoop() {
 	ticker := time.NewTicker(5 * time.Second)
-	count := 0
 L:
 	for {
 		select {
@@ -294,14 +294,10 @@ L:
 				go d.tStrategy.StartTest(d)
 			}
 		case <-d.done:
-			count++
-			fmt.Println("done  count ", count)
-			if count >= 2 {
-				fmt.Println("EventLoop done")
-				d.log.WithField("event", "EventLoop done").Info()
-				d.FinishTest()
-				break L
-			}
+			fmt.Println("done  count")
+		    fmt.Println("EventLoop done")
+		    d.log.WithField("event", "EventLoop done").Info()
+		    break L
 		default:
 		}
 	}

@@ -89,6 +89,7 @@ func (r test1) CheckResult(sender string, content *internalMsg.Cmd, d *PeerNode)
 				d.log.WithFields(logrus.Fields{
 					"eventCheckDone": true,
 				}).Info()
+				d.FinishTest()
 				//d.done <- true
 			} else {
 				fmt.Println("wait for  = ", len(d.checkroll))
@@ -117,6 +118,7 @@ func (r test1) CheckResult(sender string, content *internalMsg.Cmd, d *PeerNode)
 		d.log.WithFields(logrus.Fields{
 			"eventCheckDone": true,
 		}).Info()
+		d.FinishTest()
 		//d.done <- true
 	}
 }
@@ -154,6 +156,7 @@ func (r test2) StartTest(d *PeerNode) {
 		d.log.WithFields(logrus.Fields{
 			"eventCheckDone": true,
 		}).Info()
+		d.FinishTest()
 		//d.done <- true
 	}
 }
@@ -166,6 +169,7 @@ func (r test2) CheckResult(sender string, content *internalMsg.Cmd, d *PeerNode)
 				"eventCheckDone": true,
 			}).Info()
 		}
+		d.FinishTest()
 	}
 }
 
