@@ -50,19 +50,21 @@ func (r test1) StartTest(d *PeerNode) {
 		}
 		for i := 0; i < d.numMessages; i++ {
 			for id, _ := range d.checkroll {
-				if err := d.p.SendMessage([]byte(id), pb); err != nil {
+				var err error
+				if err = d.p.SendMessage([]byte(id), pb); err != nil {
 					retry := 1
 					for err != nil {
 						d.log.WithFields(logrus.Fields{
 							"SendMessageErr": err,
 						}).Info()
 						retry++
-						err = d.p.SendMessage([]byte(id), pb)
 						if retry > 20 {
 							break
 						}
+						err = d.p.SendMessage([]byte(id), pb)
 					}
-				} else {
+				}
+				if err == nil {
 					d.log.WithFields(logrus.Fields{
 						"SendMessageSuccess": true,
 					}).Info()
