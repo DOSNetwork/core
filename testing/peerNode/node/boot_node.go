@@ -17,6 +17,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
+	"time"
 )
 
 const ALLNODEREADY = 1
@@ -27,7 +28,7 @@ const ALLNODENOTFINISH = 0
 type BootNode struct {
 	node
 	count          int
-	testReadyCount int
+	testFinishCount int
 	ipIdMap        map[string][]byte
 	lock           sync.Mutex
 	checkroll      map[string]bool
@@ -48,6 +49,7 @@ func GenerateRandomBytes(n int) ([]byte, error) {
 
 func (b *BootNode) Init(port, peerSize int, logger *logrus.Entry) {
 	//1)Generate member ID
+	b.testFinishCount = 0
 	b.peerSize = peerSize
 	b.members = [][]byte{}
 	b.allIP = []string{}
@@ -162,10 +164,6 @@ func (b *BootNode) isTestReady(w http.ResponseWriter, r *http.Request) {
 			"eventIsAllnodeready": len(b.readynode),
 		}).Info()
 		w.Write([]byte{ALLNODEREADY})
-		b.testReadyCount++
-		if b.testReadyCount >= b.peerSize {
-			b.done <- true
-		}
 	} else {
 		w.Write([]byte{ALLNODENOTREADY})
 	}
@@ -185,6 +183,10 @@ func (b *BootNode) isTestFinish(w http.ResponseWriter, r *http.Request) {
 			"eventIsAllnodefinish": len(b.finishnode),
 		}).Info()
 		w.Write([]byte{ALLNODEFINISH})
+		b.testFinishCount++
+		if b.testFinishCount >= b.peerSize {
+			b.done <- true
+		}
 	} else {
 		w.Write([]byte{ALLNODENOTFINISH})
 	}
@@ -204,14 +206,10 @@ func (b *BootNode) postHandler(w http.ResponseWriter, r *http.Request) {
 	b.log.WithFields(logrus.Fields{
 		"eventTestDone": len(b.checkroll),
 	}).Info()
-
-	if len(b.checkroll) == 0 {
-		//		b.finishTest()
-		b.done <- true
-	}
 }
 
 func (b *BootNode) EventLoop() {
+L:
 	for {
 		select {
 		//event from peer
@@ -219,7 +217,9 @@ func (b *BootNode) EventLoop() {
 		case <-b.done:
 			fmt.Println("EventLoop done")
 			b.log.WithField("event", "EventLoop done").Info()
+		    break L
 		default:
 		}
 	}
+	time.Sleep(time.Second)
 }

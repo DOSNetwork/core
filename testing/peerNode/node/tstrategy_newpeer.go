@@ -213,7 +213,7 @@ func (r test3) StartTest(d *PeerNode) {
 		d.log.WithFields(logrus.Fields{
 			"eventCheckDone": true,
 		}).Info()
-		go func() { d.done <- true }()
+		d.FinishTest()
 	}
 
 }
