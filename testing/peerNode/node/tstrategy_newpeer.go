@@ -3,13 +3,17 @@ package node
 import (
 	"bytes"
 	"fmt"
+	"io/ioutil"
+	"net/http"
 	"os"
 	"strconv"
+	"time"
 
-	//	"math/big"
 	"github.com/DOSNetwork/core/share/dkg/pedersen"
+	"github.com/DOSNetwork/core/share/vss/pedersen"
+	"github.com/DOSNetwork/core/sign/bls"
+	"github.com/DOSNetwork/core/sign/tbls"
 	"github.com/DOSNetwork/core/suites"
-
 	"github.com/DOSNetwork/core/testing/peerNode/internalMsg"
 
 	"github.com/golang/protobuf/proto"
@@ -213,3 +217,116 @@ func (r test3) StartTest(d *PeerNode) {
 }
 
 func (r test3) CheckResult(sender string, content *internalMsg.Cmd, d *PeerNode) {}
+
+type test4 struct{}
+
+func (r test4) StartTest(d *PeerNode) {
+	d.log.WithFields(logrus.Fields{
+		"eventStartTest": true,
+	}).Info()
+
+	groupSizeStr := os.Getenv("GROUPSIZE")
+	groupSize, err := strconv.Atoi(groupSizeStr)
+	if err != nil {
+		d.log.Fatal(err)
+	}
+
+	suite := suites.MustFind("bn256")
+	p2pDkg, err := dkg.CreateP2PDkg(d.p, suite, d.dkgChan, groupSize, d.log)
+	if err != nil {
+		d.log.Fatal(err)
+	}
+	go p2pDkg.EventLoop()
+	dkgEvent := make(chan string, 1)
+	p2pDkg.SubscribeEvent(dkgEvent)
+	defer close(dkgEvent)
+
+	var group [][]byte
+	for idx, id := range d.nodeIDs {
+		if bytes.Compare(d.p.GetID(), id) == 0 {
+			start := idx / groupSize * groupSize
+			group = d.nodeIDs[start : start+groupSize]
+			break
+		}
+	}
+
+	p2pDkg.SetGroupMembers(group)
+	p2pDkg.RunDKG()
+
+	var signatures [][]byte
+	go func() {
+		for sig := range d.tblsChan {
+			signatures = append(signatures, sig.Signature)
+			if len(signatures) > groupSize/2 {
+				finalSig, err := tbls.Recover(suite, p2pDkg.GetGroupPublicPoly(), sig.Content, signatures, groupSize/2+1, groupSize)
+				if err != nil {
+					d.log.WithFields(logrus.Fields{
+						"eventTblsRecoverErr": true,
+					}).Info(err)
+					continue
+				}
+				if err = bls.Verify(suite, p2pDkg.GetGroupPublicPoly().Commit(), sig.Content, finalSig); err != nil {
+					d.log.WithFields(logrus.Fields{
+						"eventTblsVerifyErr": true,
+					}).Info(err)
+					continue
+				} else {
+					d.done <- true
+					break
+				}
+			}
+		}
+	}()
+
+	result := <-dkgEvent
+	if result == "certified" {
+		d.log.WithFields(logrus.Fields{
+			"eventCheckDone": true,
+		}).Info()
+	}
+
+	rawMsg, err := dataFetch(os.Getenv("URL"))
+	if err != nil {
+		d.log.WithFields(logrus.Fields{
+			"eventFetchURLFail": true,
+		}).Info(err)
+	} else {
+		d.log.WithFields(logrus.Fields{
+			"eventFetchURL": true,
+		}).Info(string(rawMsg))
+	}
+
+	sig, err := tbls.Sign(suite, p2pDkg.GetShareSecurity(), rawMsg)
+	sign := &vss.Signature{
+		Content:   rawMsg,
+		Signature: sig,
+	}
+	signatures = append(signatures, sig)
+	for _, id := range d.nodeIDs {
+		if bytes.Compare(d.p.GetID(), id) != 0 {
+			if err = d.p.SendMessage(id, sign); err != nil {
+				d.log.WithFields(logrus.Fields{
+					"eventSendSignatureErr": true,
+				}).Info(err)
+			}
+		}
+	}
+}
+
+func (r test4) CheckResult(sender string, content *internalMsg.Cmd, d *PeerNode) {}
+
+func dataFetch(url string) (body []byte, err error) {
+	client := &http.Client{Timeout: 60 * time.Second}
+	r, err := client.Get(url)
+	if err != nil {
+		return
+	}
+
+	body, err = ioutil.ReadAll(r.Body)
+	if err != nil {
+		return
+	}
+
+	err = r.Body.Close()
+	return
+}
