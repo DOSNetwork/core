@@ -119,9 +119,15 @@ func (n *P2P) Listen() error {
 				if err != nil {
 					log.Fatal(err)
 				}
-				n.peers.LoadOrStore(string(peer.identity.Id), peer)
-				n.routingTable.Update(peer.identity)
-
+				go func() {
+					err = peer.HeadHi()
+					if err == nil {
+						n.peers.LoadOrStore(string(peer.identity.Id), peer)
+						n.routingTable.Update(peer.identity)
+					} else {
+						fmt.Println(err)
+					}
+				}()
 			} else {
 				fmt.Println("Failed accepting a connection request:", err)
 				log.Fatal(err)
@@ -272,9 +278,14 @@ func (n *P2P) connectTo(addr string) (peer *PeerConn, err error) {
 			fmt.Println("NewPeerConn err ", err)
 			continue
 		}
-		n.peers.LoadOrStore(string(peer.identity.Id), peer)
-		n.routingTable.Update(peer.identity)
-
+		err = peer.SayHi()
+		if err == nil {
+			n.peers.LoadOrStore(string(peer.identity.Id), peer)
+			n.routingTable.Update(peer.identity)
+		} else {
+			fmt.Println("RequestHi err ", err)
+			continue
+		}
 		return
 	}
 	err = errors.New("Peer : retried over 10 times")
@@ -318,6 +329,7 @@ func (n *P2P) findNode(targetID internal.ID, alpha int, disjointPaths int) (resu
 	wait, mutex := &sync.WaitGroup{}, &sync.Mutex{}
 
 	for _, lookup := range lookups {
+		wait.Add(1)
 		go func(lookup *lookupBucket) {
 			mutex.Lock()
 			results = append(results, lookup.performLookup(n, targetID, alpha, visited)...)
@@ -326,7 +338,6 @@ func (n *P2P) findNode(targetID internal.ID, alpha int, disjointPaths int) (resu
 			wait.Done()
 		}(lookup)
 
-		wait.Add(1)
 	}
 
 	// Wait until all #D parallel lookups have been completed.
