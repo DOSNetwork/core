@@ -4,8 +4,6 @@ import (
 	//	"bytes"
 	"errors"
 	"fmt"
-	"log"
-
 	//"math/big"
 	"net"
 	"sort"
@@ -34,7 +32,6 @@ type P2P struct {
 	secKey       kyber.Scalar
 	pubKey       kyber.Point
 	routingTable *dht.RoutingTable
-	log          *logrus.Entry
 }
 
 func (n *P2P) SetID(id []byte) {
@@ -52,7 +49,7 @@ func (n *P2P) GetIP() string {
 func (n *P2P) Listen() error {
 	ip, err := GetLocalIp()
 	if err != nil {
-		log.Fatal(err)
+		log.WithField("function", "getLocalIp").Fatal(err)
 	}
 
 	p := fmt.Sprintf(":%d", n.port)
@@ -117,20 +114,20 @@ func (n *P2P) Listen() error {
 				var peer *PeerConn
 				peer, err = NewPeerConn(n, &conn, n.messages)
 				if err != nil {
-					log.Fatal(err)
+					log.WithField("function", "newPeerConn").Fatal(err)
 				}
 				go func() {
-					err = peer.HeadHi()
+					err = peer.HeardHi()
 					if err == nil {
 						n.peers.LoadOrStore(string(peer.identity.Id), peer)
 						n.routingTable.Update(peer.identity)
 					} else {
-						fmt.Println(err)
+						log.WithField("function", "heardHi").Fatal(err)
 					}
 				}()
 			} else {
 				fmt.Println("Failed accepting a connection request:", err)
-				log.Fatal(err)
+				log.WithField("function", "accept").Fatal(err)
 			}
 		}
 	}()
@@ -174,7 +171,8 @@ func (n *P2P) findPeer(id []byte) (peer *PeerConn, found bool) {
 	if value, found = n.peers.GetPeerByID(string(id)); found {
 		peer = value.(*PeerConn)
 
-		n.log.WithFields(logrus.Fields{
+		log.WithFields(logrus.Fields{
+			"function":       "findPeer",
 			"eventFromLocal": true,
 		}).Info()
 
@@ -188,7 +186,8 @@ func (n *P2P) findPeer(id []byte) (peer *PeerConn, found bool) {
 			fmt.Println("!!!! Find Peer from routing map ", id)
 			found = true
 
-			n.log.WithFields(logrus.Fields{
+			log.WithFields(logrus.Fields{
+				"function":     "findPeer",
 				"eventFromDht": true,
 			}).Info()
 
@@ -208,14 +207,16 @@ func (n *P2P) findPeer(id []byte) (peer *PeerConn, found bool) {
 		peer = value.(*PeerConn)
 		found = true
 
-		n.log.WithFields(logrus.Fields{
+		log.WithFields(logrus.Fields{
+			"function":        "findPeer",
 			"eventFromRemote": true,
 		}).Info()
 
 		return
 	}
 
-	n.log.WithFields(logrus.Fields{
+	log.WithFields(logrus.Fields{
+		"function":        "findPeer",
 		"eventNoFounding": true,
 	}).Info()
 
@@ -234,14 +235,16 @@ func (n *P2P) SendMessage(id []byte, m proto.Message) (err error) {
 
 		_, err = peer.Request(request)
 		if err != nil {
-			n.log.WithFields(logrus.Fields{
+			log.WithFields(logrus.Fields{
+				"function":            "sendMessage",
 				"eventSendMessageErr": err,
 			}).Info()
 			return
 		}
 	}
 
-	n.log.WithFields(logrus.Fields{
+	log.WithFields(logrus.Fields{
+		"function":        "sendMessage",
 		"timeSendMessage": time.Since(startTime).Seconds(),
 	}).Info()
 
@@ -268,22 +271,21 @@ func (n *P2P) connectTo(addr string) (peer *PeerConn, err error) {
 	for retry := 0; retry < 10; retry++ {
 		conn, err = net.Dial("tcp", addr)
 		if err != nil {
-			fmt.Println("NewPeer Dial err ", err, " addr ", addr)
+			log.WithField("function", "dial").Warn("NewPeer Dial err ", err, " addr ", addr)
 			time.Sleep(1 * time.Second)
 			continue
 		}
 
 		peer, err = NewPeerConn(n, &conn, n.messages)
 		if err != nil {
-			fmt.Println("NewPeerConn err ", err)
+			log.WithField("function", "newPeerConn").Warn("NewPeerConn err ", err)
 			continue
 		}
-		err = peer.SayHi()
-		if err == nil {
+		if err = peer.SayHi(); err == nil {
 			n.peers.LoadOrStore(string(peer.identity.Id), peer)
 			n.routingTable.Update(peer.identity)
 		} else {
-			fmt.Println("RequestHi err ", err)
+			log.WithField("function", "newPeerConn").Warn("RequestHi err ", err)
 			continue
 		}
 		return
@@ -355,7 +357,8 @@ func (n *P2P) findNode(targetID internal.ID, alpha int, disjointPaths int) (resu
 	if len(results) > dht.BucketSize {
 		results = results[:dht.BucketSize]
 	}
-	n.log.WithFields(logrus.Fields{
+	log.WithFields(logrus.Fields{
+		"function":     "findNode",
 		"timeFindNode": time.Since(startTime).Seconds(),
 	}).Info()
 	return

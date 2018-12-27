@@ -12,7 +12,10 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var suite = suites.MustFind("bn256")
+var (
+	suite = suites.MustFind("bn256")
+	log   *logrus.Entry
+)
 
 func genPair() (kyber.Scalar, kyber.Point) {
 	secret := suite.Scalar().Pick(suite.RandomStream())
@@ -22,6 +25,7 @@ func genPair() (kyber.Scalar, kyber.Point) {
 
 func CreateP2PNetwork(id []byte, port int, logger *logrus.Entry) (P2PInterface, chan P2PMessage, error) {
 	testStrategy := os.Getenv("TESTSTRATEGY")
+	log = logger
 	if testStrategy == "DELAY_BEFORE_RECEIVELOOP" {
 		p := &TestP2P{
 			P2P{
@@ -29,7 +33,6 @@ func CreateP2PNetwork(id []byte, port int, logger *logrus.Entry) (P2PInterface, 
 				suite:    suite,
 				messages: make(chan P2PMessage, 100),
 				port:     port,
-				log:      logger,
 			},
 			testStrategy,
 		}
@@ -40,7 +43,6 @@ func CreateP2PNetwork(id []byte, port int, logger *logrus.Entry) (P2PInterface, 
 			suite:    suite,
 			messages: make(chan P2PMessage, 100),
 			port:     port,
-			log:      logger,
 		}
 		p.identity.Id = id
 		return p, p.messages, nil
