@@ -2,14 +2,10 @@ package main
 
 import (
 	"bytes"
-	"fmt"
+	"github.com/bshuster-repo/logrus-logstash-hook"
 	"math/big"
-	"net"
 	_ "net/http/pprof"
 	"runtime/debug"
-	"time"
-
-	"github.com/bshuster-repo/logrus-logstash-hook"
 
 	"github.com/ethereum/go-ethereum/common"
 
@@ -28,9 +24,14 @@ var log *logrus.Logger
 
 // main
 func main() {
+	//0)initial log module
+	log = logrus.New()
+	mainLogger := log.WithField("module", "main")
+
+	//0.5)Read Config
 	offChainConfig := configuration.OffChainConfig{}
 	if err := offChainConfig.LoadConfig(); err != nil {
-		log.Fatal(err)
+		mainLogger.WithField("function", "loadConfig").Fatal(err)
 	}
 	role := offChainConfig.NodeRole
 	nbParticipants := offChainConfig.RandomGroupSize
@@ -39,53 +40,32 @@ func main() {
 
 	onChainConfig := configuration.OnChainConfig{}
 	if err := onChainConfig.LoadConfig(); err != nil {
-		log.Fatal(err)
+		mainLogger.WithField("function", "loadConfig").Fatal(err)
 	}
 	chainConfig := onChainConfig.GetChainConfig()
 
-	//0)initial log module
-	log = logrus.New()
-
 	//1)Connect to Eth
-	chainConn, err := onchain.AdaptTo(chainConfig.ChainType, &chainConfig, log)
+	chainConn, err := onchain.AdaptTo(chainConfig.ChainType, &chainConfig, log.WithField("module", "chainConn"))
 	if err != nil {
-		log.Fatal(err)
+		mainLogger.WithField("function", "adaptTo").Fatal(err)
 	}
 
 	//2)Build a p2p network
-	p, peerEvent, err := p2p.CreateP2PNetwork(chainConn.GetId(), port, log.WithFields(logrus.Fields{}))
+	p, peerEvent, err := p2p.CreateP2PNetwork(chainConn.GetId(), port, log.WithField("module", "p2pConn"))
 	if err != nil {
-		log.Fatal(err)
+		mainLogger.WithField("function", "createP2PNetwork").Fatal(err)
 	}
 	if err := p.Listen(); err != nil {
-		log.Error(err)
+		mainLogger.WithField("function", "listen").Error(err)
 	}
 
 	//2.5)Add hook to log module
-	tcpAddr, err := net.ResolveTCPAddr("tcp", "163.172.36.173:9500")
-	if err != nil {
-		log.Error(err)
-	}
-
-	conn, err := net.DialTCP("tcp", nil, tcpAddr)
-	if err != nil {
-		log.Error(err)
-	}
-
-	if err = conn.SetKeepAlivePeriod(time.Minute); err != nil {
-		log.Warn(err)
-	}
-
-	if err = conn.SetKeepAlive(true); err != nil {
-		log.Warn(err)
-	}
-
-	hook, err := logrustash.NewHookWithFieldsAndConn(conn, "DOS_node", logrus.Fields{
+	hook, err := logrustash.NewHookWithFields("tcp", "163.172.36.173:9500", "DOS_node", logrus.Fields{
 		"DOS_node_ip": p.GetIP(),
 		"Serial":      string(common.BytesToAddress(p.GetID()).String()),
 	})
 	if err != nil {
-		log.Error(err)
+		mainLogger.WithField("function", "newHookWithFields").Error(err)
 	}
 
 	log.Hooks.Add(hook)
@@ -94,24 +74,29 @@ func main() {
 	if role == "BootstrapNode" {
 		address, err := chainConn.GetWhitelist()
 		if err != nil {
-			log.Fatal(err)
+			mainLogger.WithField("function", "getWhitelist").Fatal(err)
 		}
 
 		if bytes.Compare(address.Bytes(), chainConn.GetId()) != 0 {
-			err = chainConn.InitialWhiteList()
-			if err != nil {
-				log.Fatal(err)
+			if err = chainConn.InitialWhiteList(); err != nil {
+				mainLogger.WithField("function", "initialWhiteList").Fatal(err)
 			}
 		}
 	} else {
-		err = p.Join(bootstrapIp)
+		if err = p.Join(bootstrapIp); err != nil {
+			mainLogger.WithField("function", "join").Fatal(err)
+		}
 	}
 
 	//4)Build a p2pDKG
 	suite := suites.MustFind("bn256")
 	peerEventForDKG := make(chan p2p.P2PMessage, 1)
 	defer close(peerEventForDKG)
-	p2pDkg, _ := dkg.CreateP2PDkg(p, suite, peerEventForDKG, nbParticipants, log.WithFields(logrus.Fields{}))
+	p2pDkg, err := dkg.CreateP2PDkg(p, suite, peerEventForDKG, nbParticipants, log.WithField("module", "p2pDKG"))
+	if err != nil {
+		mainLogger.WithField("function", "createP2PDkg").Fatal(err)
+	}
+
 	go p2pDkg.EventLoop()
 	dkgEvent := make(chan string, 1)
 	p2pDkg.SubscribeEvent(dkgEvent)
@@ -131,27 +116,27 @@ func main() {
 	eventValidation := make(chan interface{}, 20)
 	defer close(eventValidation)
 	if err = chainConn.SubscribeEvent(eventGrouping, onchain.SubscribeDOSProxyLogGrouping); err != nil {
-		log.Fatal(err)
+		mainLogger.WithField("function", "subscribeEvent").Fatal(err)
 	}
 
 	if err = chainConn.SubscribeEvent(chUrl, onchain.SubscribeDOSProxyLogUrl); err != nil {
-		log.Fatal(err)
+		mainLogger.WithField("function", "subscribeEvent").Fatal(err)
 	}
 
 	if err = chainConn.SubscribeEvent(chRandom, onchain.SubscribeDOSProxyLogUpdateRandom); err != nil {
-		log.Fatal(err)
+		mainLogger.WithField("function", "subscribeEvent").Fatal(err)
 	}
 
 	if err = chainConn.SubscribeEvent(chUsrRandom, onchain.SubscribeDOSProxyLogRequestUserRandom); err != nil {
-		log.Fatal(err)
+		mainLogger.WithField("function", "subscribeEvent").Fatal(err)
 	}
 
 	if err = chainConn.SubscribeEvent(eventValidation, onchain.SubscribeDOSProxyLogValidationResult); err != nil {
-		log.Fatal(err)
+		mainLogger.WithField("function", "subscribeEvent").Fatal(err)
 	}
 
 	//6)Set up a dosnode pipeline
-	d := dos.CreateDosNode(suite, nbParticipants, p, chainConn, p2pDkg, log)
+	d := dos.CreateDosNode(suite, nbParticipants, p, chainConn, p2pDkg, log.WithField("module", "dosNode"))
 	d.PipeGrouping(eventGrouping)
 	queriesReports := d.PipeQueries(chUrl, chUsrRandom, chRandom)
 	outForRecover, outForValidate := d.PipeSignAndBroadcast(queriesReports)
@@ -159,9 +144,8 @@ func main() {
 	submitForValidate := d.PipeSendToOnchain(reportsToSubmit)
 	chRetrigerUrl := d.PipeCleanFinishMap(eventValidation, outForValidate, submitForValidate)
 
-	err = chainConn.UploadID()
-	if err != nil {
-		log.Fatal(err)
+	if err = chainConn.UploadID(); err != nil {
+		mainLogger.WithField("function", "uploadID").Fatal(err)
 	}
 	//TODO:/crypto/scrypt: memory not released after hash is calculated
 	//https://github.com/golang/go/issues/20000
@@ -183,14 +167,14 @@ func main() {
 			case *vss.Signature:
 				cSignatureFromPeer <- *content
 			default:
-				fmt.Println("unknown", content)
+				mainLogger.WithField("function", "dispatchEvent").Warn("unknown", content)
 			}
 		case msg := <-dkgEvent:
 			if msg == "certified" {
 				gId := new(big.Int)
 				gId.SetBytes(p2pDkg.GetGroupId())
 				if err := chainConn.UploadPubKey(p2pDkg.GetGroupPublicPoly().Commit()); err != nil {
-					fmt.Println(err)
+					mainLogger.WithField("function", "uploadPubKey").Warn(err)
 				}
 			}
 		//For re-trigger query
