@@ -50,7 +50,7 @@ docker-all: gen docker-bootnode docker-dosnode docker-usernode docker-peernode
 
 update-dosenv:
 	-docker rmi dosenv
-	-docker rmi xiaorui89/dosenv
+	-docker rmi dosnetwork/dosenv
 	cd .. && docker build -t dosenv -f Dockerfile.env .
-	docker tag dosenv xiaorui89/dosenv:latest
-	docker push xiaorui89/dosenv:latest
+	docker tag dosenv dosnetwork/dosenv:latest
+	docker push dosnetwork/dosenv:latest

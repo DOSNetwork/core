@@ -1,4 +1,4 @@
-FROM golang:1.9 as dosbase
+FROM golang:1.10 as dosbase
 WORKDIR /go/src/github.com/DOSNetwork/core
 COPY . .
 ADD https://github.com/golang/dep/releases/download/v0.4.1/dep-linux-amd64 /usr/local/bin/dep
