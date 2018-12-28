@@ -2,9 +2,12 @@ package node
 
 import (
 	"crypto/rand"
+	"encoding/binary"
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
+	"strconv"
 	"sync"
 
 	//	"github.com/ethereum/go-ethereum/common"
@@ -20,20 +23,26 @@ import (
 	"time"
 )
 
-const ALLNODEREADY = 1
-const ALLNODENOTREADY = 0
-const ALLNODEFINISH = 1
-const ALLNODENOTFINISH = 0
+const (
+	ALLNODEREADY     = 1
+	ALLNODENOTREADY  = 0
+	DKGROUNDFINISH   = 2
+	ALLNODEFINISH    = 1
+	ALLNODENOTFINISH = 0
+)
+
+var dkgRound = 0
 
 type BootNode struct {
 	node
-	count          int
+	count           int
 	testFinishCount int
-	ipIdMap        map[string][]byte
-	lock           sync.Mutex
-	checkroll      map[string]bool
-	readynode      map[string]bool
-	finishnode     map[string]bool
+	ipIdMap         map[string][]byte
+	lock            sync.Mutex
+	checkroll       map[string]bool
+	readynode       map[string]bool
+	finishnode      map[string]bool
+	dkgProgress     map[string]uint16
 }
 
 func GenerateRandomBytes(n int) ([]byte, error) {
@@ -48,6 +57,15 @@ func GenerateRandomBytes(n int) ([]byte, error) {
 }
 
 func (b *BootNode) Init(port, peerSize int, logger *logrus.Entry) {
+	//0)prepare round count for dkg test
+	dkgRoundStr := os.Getenv("DKGROUND")
+	if len(dkgRoundStr) > 0 {
+		var err error
+		dkgRound, err = strconv.Atoi(dkgRoundStr)
+		if err != nil {
+			b.log.Fatal(err)
+		}
+	}
 	//1)Generate member ID
 	b.testFinishCount = 0
 	b.peerSize = peerSize
@@ -62,6 +80,7 @@ func (b *BootNode) Init(port, peerSize int, logger *logrus.Entry) {
 	b.done = make(chan bool)
 	b.readynode = make(map[string]bool)
 	b.finishnode = make(map[string]bool)
+	b.dkgProgress = make(map[string]uint16)
 	b.log = logger
 	b.log.Data["role"] = "bootstrap"
 
@@ -81,6 +100,7 @@ func (b *BootNode) Init(port, peerSize int, logger *logrus.Entry) {
 	r.HandleFunc("/getAllIDs", b.getAllIDs).Methods("POST")
 	r.HandleFunc("/getAllIPs", b.getAllIPs).Methods("POST")
 	r.HandleFunc("/isTestReady", b.isTestReady).Methods("POST")
+	r.HandleFunc("/isNextRoundReady", b.isNextRoundReady).Methods("POST")
 	r.HandleFunc("/isTestFinish", b.isTestFinish).Methods("POST")
 	r.HandleFunc("/post", b.postHandler)
 	go http.ListenAndServe(":8080", r)
@@ -101,7 +121,6 @@ func (b *BootNode) getID(w http.ResponseWriter, r *http.Request) {
 	body, _ := ioutil.ReadAll(r.Body)
 	ip := string(body)
 	if b.ipIdMap[ip] == nil {
-
 		if b.count >= b.peerSize {
 			fmt.Println("getID over size error!!!")
 			return
@@ -109,6 +128,7 @@ func (b *BootNode) getID(w http.ResponseWriter, r *http.Request) {
 		b.allIP = append(b.allIP, ip)
 		fmt.Println("getID count ", b.count, " peerSize", b.peerSize, " len(b.allIP)", len(b.allIP))
 		b.ipIdMap[ip] = b.node.members[b.count]
+		b.dkgProgress[ip] = 0
 		b.count++
 		b.log.WithFields(logrus.Fields{
 			"eventGetID": b.count,
@@ -150,6 +170,18 @@ func (b *BootNode) isAllnodefinish() bool {
 	return len(b.finishnode) >= b.peerSize
 }
 
+func (b *BootNode) isAllNextRoundReady(roundCount uint16) bool {
+	b.lock.Lock()
+	defer b.lock.Unlock()
+
+	for _, value := range b.dkgProgress {
+		if value != roundCount {
+			return false
+		}
+	}
+	return true
+}
+
 func (b *BootNode) isTestReady(w http.ResponseWriter, r *http.Request) {
 	body, _ := ioutil.ReadAll(r.Body)
 	ip := string(body)
@@ -162,6 +194,31 @@ func (b *BootNode) isTestReady(w http.ResponseWriter, r *http.Request) {
 	if b.isAllnodeready() {
 		b.log.WithFields(logrus.Fields{
 			"eventIsAllnodeready": len(b.readynode),
+		}).Info()
+		w.Write([]byte{ALLNODEREADY})
+	} else {
+		w.Write([]byte{ALLNODENOTREADY})
+	}
+}
+
+func (b *BootNode) isNextRoundReady(w http.ResponseWriter, r *http.Request) {
+	body, _ := ioutil.ReadAll(r.Body)
+	ipBytes := body[:len(body)-2]
+	roundCountBytes := body[len(body)-2:]
+	ip := string(ipBytes)
+	roundCount := binary.LittleEndian.Uint16(roundCountBytes)
+	b.lock.Lock()
+	b.dkgProgress[ip] = roundCount
+	b.lock.Unlock()
+
+	if roundCount == uint16(dkgRound) {
+		b.log.WithFields(logrus.Fields{
+			"eventIsRoundFinished": ip,
+		}).Info()
+		w.Write([]byte{DKGROUNDFINISH})
+	} else if b.isAllNextRoundReady(roundCount) {
+		b.log.WithFields(logrus.Fields{
+			"eventIsNextRoundReady": ip,
 		}).Info()
 		w.Write([]byte{ALLNODEREADY})
 	} else {
@@ -217,7 +274,7 @@ L:
 		case <-b.done:
 			fmt.Println("EventLoop done")
 			b.log.WithField("event", "EventLoop done").Info()
-		    break L
+			break L
 		default:
 		}
 	}
