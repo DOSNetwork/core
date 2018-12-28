@@ -2,6 +2,7 @@ package node
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
 	"io/ioutil"
 	"math"
@@ -108,6 +109,7 @@ func (d *PeerNode) requestAllIPs() {
 
 func (d *PeerNode) requestIsReady() bool {
 	ip, _ := p2p.GetLocalIp()
+	ip += ":44460"
 
 	r, err := d.MakeRequest(d.bootStrapIp, "isTestReady", []byte(ip))
 	for err != nil {
@@ -117,23 +119,35 @@ func (d *PeerNode) requestIsReady() bool {
 
 	if err != nil {
 		fmt.Println(err)
+		return false
+	} else if len(r) == 0 {
+		return false
+	} else if r[0] == byte(ALLNODEREADY) {
+		return true
 	} else {
-		if len(r) != 0 {
-			if r[0] == byte(ALLNODEREADY) {
-				return true
-			} else {
-				return false
-			}
-		} else {
-			return false
-		}
+		return false
+	}
+}
+
+func (d *PeerNode) requestIsNextRoundReady(roundCount uint16) byte {
+	ip, _ := p2p.GetLocalIp()
+	ip += ":44460"
+	roundCountBytes := make([]byte, 2)
+	binary.LittleEndian.PutUint16(roundCountBytes, roundCount)
+	request := append([]byte(ip), roundCountBytes...)
+
+	r, err := d.MakeRequest(d.bootStrapIp, "isNextRoundReady", request)
+	for r[0] == byte(ALLNODENOTREADY) || err != nil {
+		time.Sleep(1 * time.Second)
+		r, err = d.MakeRequest(d.bootStrapIp, "isNextRoundReady", request)
 	}
 
-	return false
+	return r[0]
 }
 
 func (d *PeerNode) requestIsFinish() bool {
 	ip, _ := p2p.GetLocalIp()
+	ip += ":44460"
 
 	r, err := d.MakeRequest(d.bootStrapIp, "isTestFinish", []byte(ip))
 	for err != nil {
@@ -143,19 +157,15 @@ func (d *PeerNode) requestIsFinish() bool {
 
 	if err != nil {
 		fmt.Println(err)
+		return false
+	} else if len(r) == 0 {
+		return false
+	} else if r[0] == byte(ALLNODEFINISH) {
+		return true
 	} else {
-		if len(r) != 0 {
-			if r[0] == byte(ALLNODEFINISH) {
-				return true
-			} else {
-				return false
-			}
-		} else {
-			return false
-		}
+		return false
 	}
 
-	return false
 }
 
 func (d *PeerNode) Init(bootStrapIp string, port, peerSize int, numMessages int, tStrategy string, logger *logrus.Entry) {
@@ -178,6 +188,8 @@ func (d *PeerNode) Init(bootStrapIp string, port, peerSize int, numMessages int,
 		d.tStrategy = &test3{}
 	case "TBLS":
 		d.tStrategy = &test4{}
+	case "DKGMULTIGROUPING":
+		d.tStrategy = &test5{}
 	}
 
 	//1)Wait until bootstrap node assign an ID
@@ -210,28 +222,7 @@ func (d *PeerNode) Init(bootStrapIp string, port, peerSize int, numMessages int,
 		for msg := range d.peerEvent {
 			switch content := msg.Msg.Message.(type) {
 			case *internalMsg.Cmd:
-				if content.Ctype == internalMsg.Cmd_ALLIP {
-					nodes := strings.Split(string(content.Args), ",")
-					allIP := []string{}
-					ip, _ := p2p.GetLocalIp()
-					ip = ip + ":44460"
-					for _, node := range nodes {
-						if ip != node {
-							allIP = append(allIP, node)
-						}
-					}
-					d.nodeIPs = allIP
-				} else if content.Ctype == internalMsg.Cmd_ALLID {
-					buf := []byte(content.Args)
-					allID := [][]byte{}
-					var chunk []byte
-					lim := 20
-					for len(buf) >= lim {
-						chunk, buf = buf[:lim], buf[lim:]
-						allID = append(allID, chunk)
-					}
-					d.nodeIDs = allID
-				} else if content.Ctype == internalMsg.Cmd_SIGNIN {
+				if content.Ctype == internalMsg.Cmd_SIGNIN {
 					sender := string(msg.Sender)
 					go d.tStrategy.CheckResult(sender, content, d)
 				}
@@ -302,9 +293,9 @@ L:
 			}
 		case <-d.done:
 			fmt.Println("done  count")
-		    fmt.Println("EventLoop done")
-		    d.log.WithField("event", "EventLoop done").Info()
-		    break L
+			fmt.Println("EventLoop done")
+			d.log.WithField("event", "EventLoop done").Info()
+			break L
 		default:
 		}
 	}
