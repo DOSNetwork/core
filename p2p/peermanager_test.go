@@ -24,13 +24,13 @@ func TestPeerManagerAddPeer(test *testing.T) {
 		pconn.identity.Id = []byte{byte(i)}
 		pm.LoadOrStore(string(pconn.identity.Id), pconn)
 		toppconn := pm.FindLessUsedPeerConn()
-		if uint32(i) < MAXPEERCONNCOUNT {
+		if i < MAXPEERCOUNT {
 			if toppconn.identity.Address != strconv.Itoa(0) {
 				test.Fail()
 				fmt.Println("top peer id not equel to expected id")
 			}
 		}else {
-			if pm.PeerConnNum() > MAXPEERCONNCOUNT {
+			if pm.PeerConnNum() > MAXPEERCOUNT {
 				test.Fail()
 				fmt.Println(pm.PeerConnNum())
 				fmt.Println("peer size bigger then maxpeercount")
