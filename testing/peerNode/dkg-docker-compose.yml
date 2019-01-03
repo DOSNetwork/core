@@ -6,15 +6,15 @@ services:
      replicas: 1
    environment:
      - NODEROLE=boot
-     - PEERSIZE=12
+     - PEERSIZE=10
  peernode:
    image: peernode
    depends_on:
      - bootstrap
    deploy:
-     replicas: 12
+     replicas: 10
    environment:
      - BOOTSTRAPIP=bootstrap:44460
-     - PEERSIZE=12
-     - GROUPSIZE=12
+     - PEERSIZE=10
+     - GROUPSIZE=10
      - TESTSTRATEGY=DKG

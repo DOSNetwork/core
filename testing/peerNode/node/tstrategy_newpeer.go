@@ -261,29 +261,6 @@ func (r test4) StartTest(d *PeerNode) {
 	p2pDkg.RunDKG()
 
 	var signatures [][]byte
-	go func() {
-		for sig := range d.tblsChan {
-			signatures = append(signatures, sig.Signature)
-			if len(signatures) > groupSize/2 {
-				finalSig, err := tbls.Recover(suite, p2pDkg.GetGroupPublicPoly(), sig.Content, signatures, groupSize/2+1, groupSize)
-				if err != nil {
-					d.log.WithFields(logrus.Fields{
-						"eventTblsRecoverErr": true,
-					}).Info(err)
-					continue
-				}
-				if err = bls.Verify(suite, p2pDkg.GetGroupPublicPoly().Commit(), sig.Content, finalSig); err != nil {
-					d.log.WithFields(logrus.Fields{
-						"eventTblsVerifyErr": true,
-					}).Info(err)
-					continue
-				} else {
-					d.FinishTest()
-					break
-				}
-			}
-		}
-	}()
 
 	result := <-dkgEvent
 	if result == "certified" {
@@ -315,6 +292,30 @@ func (r test4) StartTest(d *PeerNode) {
 				d.log.WithFields(logrus.Fields{
 					"eventSendSignatureErr": true,
 				}).Info(err)
+			}
+		}
+	}
+	for sig := range d.tblsChan {
+		signatures = append(signatures, sig.Signature)
+		fmt.Printf(" len(signatures) ", len(signatures))
+		if len(signatures) > groupSize/2 {
+			finalSig, err := tbls.Recover(suite, p2pDkg.GetGroupPublicPoly(), sig.Content, signatures, groupSize/2+1, groupSize)
+			if err != nil {
+				d.log.WithFields(logrus.Fields{
+					"eventTblsRecoverErr": true,
+				}).Info(err)
+				continue
+			}
+			if err = bls.Verify(suite, p2pDkg.GetGroupPublicPoly().Commit(), sig.Content, finalSig); err != nil {
+				d.log.WithFields(logrus.Fields{
+					"eventTblsVerifyErr": true,
+				}).Info(err)
+				continue
+			} else {
+				fmt.Printf(" !!!!FinishTest ", len(signatures))
+
+				d.FinishTest()
+				break
 			}
 		}
 	}

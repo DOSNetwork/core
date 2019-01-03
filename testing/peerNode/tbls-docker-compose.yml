@@ -6,16 +6,16 @@ services:
       replicas: 1
     environment:
       - NODEROLE=boot
-      - PEERSIZE=3
+      - PEERSIZE=10
   peernode:
     image: peernode
     depends_on:
       - bootstrap
     deploy:
-      replicas: 3
+      replicas: 5
     environment:
       - BOOTSTRAPIP=bootstrap:44460
-      - PEERSIZE=3
-      - GROUPSIZE=3
+      - PEERSIZE=10
+      - GROUPSIZE=10
       - TESTSTRATEGY=TBLS
       - URL=https://api.coinbase.com/v2/prices/ETH-USD/spot
