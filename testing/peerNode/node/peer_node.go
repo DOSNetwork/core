@@ -211,7 +211,7 @@ func (d *PeerNode) Init(bootStrapIp string, port, peerSize int, numMessages int,
 			case *dkg.Deal:
 				d.dkgChan <- msg
 				fmt.Println("Deal")
-			case *dkg.Responses:
+			case *dkg.Response:
 				d.dkgChan <- msg
 				fmt.Println("Response")
 			default:
