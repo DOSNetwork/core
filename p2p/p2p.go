@@ -46,6 +46,12 @@ func (n *P2P) GetIP() string {
 	return n.identity.Address
 }
 
+func (n *P2P) GetShareKeyAndNonce(point kyber.Point) (id []byte, nouce []byte, err error) {
+	p := suite.Point().Mul(n.secKey, point)
+	id, err = p.MarshalBinary()
+	return id[0:32], id[32:44], err
+}
+
 func (n *P2P) Listen() error {
 	ip, err := GetLocalIp()
 	if err != nil {
@@ -172,7 +178,7 @@ func (n *P2P) findPeer(id []byte) (peer *PeerConn, found bool) {
 			"function":       "findPeer",
 			"eventFromLocal": true,
 		}).Info()
-        found = true
+		found = true
 		return
 	}
 
