@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"github.com/bshuster-repo/logrus-logstash-hook"
+	"net"
 	"os"
 	"runtime"
 	"runtime/debug"
@@ -62,8 +63,17 @@ func main() {
 
 	//0)initial log module
 	log = logrus.New()
+	tcpAddr, err := net.ResolveTCPAddr("tcp", "163.172.36.173:9500")
+	if err != nil {
+		log.Error(err)
+	}
 
-	hook, err := logrustash.NewHookWithFields("tcp", "163.172.36.173:9500", "匹凸匹test", logrus.Fields{
+	conn, err := net.DialTCP("tcp", nil, tcpAddr)
+	if err != nil {
+		log.Error(err)
+	}
+
+	hook, err := logrustash.NewHookWithFieldsAndConn(conn, "匹凸匹test", logrus.Fields{
 		"startingTimestamp": time.Now(),
 		"testCode":          os.Getenv("TESTCODE"),
 	})

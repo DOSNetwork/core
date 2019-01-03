@@ -53,7 +53,7 @@ func (r test1) StartTest(d *PeerNode) {
 			}
 		}
 		for i := 0; i < d.numMessages; i++ {
-			for id := range d.checkroll {
+			for id, _ := range d.checkroll {
 				var err error
 				if err = d.p.SendMessage([]byte(id), pb); err != nil {
 					retry := 1
@@ -97,7 +97,7 @@ func (r test1) CheckResult(sender string, content *internalMsg.Cmd, d *PeerNode)
 				//d.done <- true
 			} else {
 				fmt.Println("wait for  = ", len(d.checkroll))
-				for id := range d.checkroll {
+				for id, _ := range d.checkroll {
 					fmt.Println("wait for ", []byte(id))
 				}
 				fmt.Println("==================== ")
@@ -277,7 +277,7 @@ func (r test4) StartTest(d *PeerNode) {
 					}).Info(err)
 					continue
 				} else {
-					d.FinishTest()
+					d.done <- true
 					break
 				}
 			}
@@ -336,62 +336,3 @@ func dataFetch(url string) (body []byte, err error) {
 	err = r.Body.Close()
 	return
 }
-
-type test5 struct{}
-
-func (r test5) StartTest(d *PeerNode) {
-	d.log.WithFields(logrus.Fields{
-		"eventStartTest": true,
-	}).Info()
-
-	groupSizeStr := os.Getenv("GROUPSIZE")
-	groupSize, err := strconv.Atoi(groupSizeStr)
-	if err != nil {
-		d.log.Fatal(err)
-	}
-
-	suite := suites.MustFind("bn256")
-	p2pDkg, err := dkg.CreateP2PDkg(d.p, suite, d.dkgChan, groupSize, d.log)
-	if err != nil {
-		d.log.Fatal(err)
-	}
-	go p2pDkg.EventLoop()
-	dkgEvent := make(chan string, 1)
-	p2pDkg.SubscribeEvent(dkgEvent)
-	defer close(dkgEvent)
-
-	roundCount := uint16(1)
-	for {
-		var group [][]byte
-		for idx, id := range d.nodeIDs {
-			if bytes.Compare(d.p.GetID(), id) == 0 {
-				start := idx / groupSize * groupSize
-				group = d.nodeIDs[start : start+groupSize]
-				break
-			}
-		}
-
-		p2pDkg.SetGroupMembers(group)
-		p2pDkg.RunDKG()
-
-		result := <-dkgEvent
-		if result == "certified" {
-			d.log.WithFields(logrus.Fields{
-				"eventCheckRoundDone": roundCount,
-			}).Info()
-			p2pDkg.Reset()
-			next := d.requestIsNextRoundReady(roundCount)
-			if next == byte(DKGROUNDFINISH) {
-				break
-			} else {
-				roundCount++
-				//rand.Shuffle(len(d.nodeIDs), func(i, j int) {
-				//	d.nodeIDs[i], d.nodeIDs[j] = d.nodeIDs[j], d.nodeIDs[i]
-				//})
-			}
-		}
-	}
-	//d.FinishTest()
-}
-
-func (r test5) CheckResult(sender string, content *internalMsg.Cmd, d *PeerNode) {}
