@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io/ioutil"
-	"math/rand"
 	"net/http"
 	"os"
 	"strconv"
@@ -377,24 +376,22 @@ func (r test5) StartTest(d *PeerNode) {
 
 		result := <-dkgEvent
 		if result == "certified" {
-			fmt.Println("\n certified!!!!!!")
 			d.log.WithFields(logrus.Fields{
 				"eventCheckRoundDone": roundCount,
 			}).Info()
 			p2pDkg.Reset()
 			next := d.requestIsNextRoundReady(roundCount)
 			if next == byte(DKGROUNDFINISH) {
-				fmt.Println("\n test over!!!!!!")
 				break
 			} else {
 				roundCount++
-				rand.Shuffle(len(d.nodeIDs), func(i, j int) {
-					d.nodeIDs[i], d.nodeIDs[j] = d.nodeIDs[j], d.nodeIDs[i]
-				})
+				//rand.Shuffle(len(d.nodeIDs), func(i, j int) {
+				//	d.nodeIDs[i], d.nodeIDs[j] = d.nodeIDs[j], d.nodeIDs[i]
+				//})
 			}
 		}
 	}
-	d.FinishTest()
+	//d.FinishTest()
 }
 
 func (r test5) CheckResult(sender string, content *internalMsg.Cmd, d *PeerNode) {}
