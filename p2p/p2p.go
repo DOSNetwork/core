@@ -164,15 +164,18 @@ func (n *P2P) lenOfPeers() (count int) {
 }
 
 func (n *P2P) findPeer(id []byte) (peer *PeerConn, found bool) {
+	var value interface{}
 	var err error
 
 	// Find Peer from existing peerConn
-	if peer = n.peers.GetPeerByID(string(id)); peer != nil {
+	if value, found = n.peers.GetPeerByID(string(id)); found {
+		peer = value.(*PeerConn)
+
 		log.WithFields(logrus.Fields{
 			"function":       "findPeer",
 			"eventFromLocal": true,
 		}).Info()
-        found = true
+
 		return
 	}
 
@@ -199,13 +202,16 @@ func (n *P2P) findPeer(id []byte) (peer *PeerConn, found bool) {
 	}
 
 	// Find Peer from existing peerConn
-	if peer = n.peers.GetPeerByID(string(id)); peer != nil {
+	if value, found = n.peers.GetPeerByID(string(id)); found {
 		fmt.Println("!!!! Find Peer from routing map ", id)
+		peer = value.(*PeerConn)
 		found = true
+
 		log.WithFields(logrus.Fields{
 			"function":        "findPeer",
 			"eventFromRemote": true,
 		}).Info()
+
 		return
 	}
 
@@ -404,8 +410,10 @@ func (lookup *lookupBucket) performLookup(n *P2P, targetID internal.ID, alpha in
 }
 
 func (n *P2P) queryPeerByID(peerID internal.ID, targetID internal.ID, responses chan []*internal.ID) {
-	client := n.peers.GetPeerByID(string(peerID.Id))
-	if client == nil {
+	var client *PeerConn
+
+	client, loaded := n.peers.GetPeerByID(string(peerID.Id))
+	if !loaded {
 		var err error
 		client, err = n.connectTo(peerID.Address)
 		if err != nil {
