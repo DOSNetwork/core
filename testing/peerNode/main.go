@@ -75,7 +75,6 @@ func main() {
 
 	hook, err := logrustash.NewHookWithFieldsAndConn(conn, "匹凸匹test", logrus.Fields{
 		"startingTimestamp": time.Now(),
-		"testCode":          os.Getenv("TESTCODE"),
 	})
 	if err != nil {
 		log.Error(err)

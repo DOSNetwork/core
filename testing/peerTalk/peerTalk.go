@@ -172,7 +172,7 @@ func main() {
 				peerEventForDKG <- event
 			case *dkg.Deal:
 				peerEventForDKG <- event
-			case *dkg.Responses:
+			case *dkg.Response:
 				peerEventForDKG <- event
 			case *peerTalk.Bootstrap:
 				if err = p.Join(content.GetAddress()); err != nil {

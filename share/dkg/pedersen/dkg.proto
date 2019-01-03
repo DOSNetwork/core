@@ -10,7 +10,3 @@ message Response {
     uint32 index = 1;
     vss.Response response = 2;
 }
-
-message Responses{
-    repeated Response response = 1;
-}
