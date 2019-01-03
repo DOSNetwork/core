@@ -34,17 +34,18 @@ func (pm *PeerConnManager) FindLessUsedPeerConn() (pconn *PeerConn) {
 
 func (pm *PeerConnManager) LoadOrStore(id string, peer *PeerConn) (actual *PeerConn, loaded bool) {
 	pm.mu.Lock()
+	defer pm.mu.Unlock()
 	ac, l := pm.peers.LoadOrStore(id, peer)
 	loaded = l
 	if !l {
 		pm.count++
-	}
-	pm.mu.Unlock()
-	if !l {
 		if pm.count > MAXPEERCOUNT {
 			p := pm.FindLessUsedPeerConn()
 			fmt.Println("Force delete ", p.identity.Id)
 			p.End()
+			pm.peers.Delete(string(p.identity.Id))
+			pm.count--
+
 		}
 		pm.log.WithFields(logrus.Fields{
 			"countConn": pm.count,
