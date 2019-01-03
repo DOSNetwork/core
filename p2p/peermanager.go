@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"math"
 	"sync"
-
-	"github.com/sirupsen/logrus"
 )
 
 const MAXPEERCOUNT = 100000
@@ -14,7 +12,6 @@ type PeerConnManager struct {
 	mu    sync.Mutex
 	peers sync.Map
 	count uint32
-	log   *logrus.Entry
 }
 
 func (pm *PeerConnManager) FindLessUsedPeerConn() (pconn *PeerConn) {
@@ -47,9 +44,6 @@ func (pm *PeerConnManager) LoadOrStore(id string, peer *PeerConn) (actual *PeerC
 			pm.count--
 
 		}
-		pm.log.WithFields(logrus.Fields{
-			"countConn": pm.count,
-		}).Info()
 		actual = peer
 	} else {
 		actual = ac.(*PeerConn)
@@ -80,9 +74,6 @@ func (pm *PeerConnManager) DeletePeer(id string) {
 	if exist {
 		pm.peers.Delete(id)
 		pm.count--
-		pm.log.WithFields(logrus.Fields{
-			"countConn": pm.count,
-		}).Info()
 	}
 
 }
