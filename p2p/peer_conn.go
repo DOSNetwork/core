@@ -76,6 +76,11 @@ func NewPeerConn(p2pnet *P2P, conn *net.Conn, rxMessage chan P2PMessage) (peer *
 
 func (p *PeerConn) Start() (err error) {
 	go p.receiveLoop()
+	if err = p.SayHi(); err != nil {
+		return
+	}
+
+	err = p.heardHi()
 	return
 }
 
@@ -135,18 +140,9 @@ func (p *PeerConn) receiveLoop() {
 				}
 				p.pubKey = pub
 				p.waitForHi <- true
-				response := &internal.Hi{
-					PublicKey: p.p2pnet.identity.PublicKey,
-					Address:   p.p2pnet.identity.Address,
-					Id:        p.p2pnet.identity.Id,
-				}
-				if err := p.Reply(pa.GetRequestNonce(), response); err != nil {
-					fmt.Println("Reply Hi message err ", err)
-				}
 			} else {
 				fmt.Println("Ignore Hi")
 			}
-
 			//TODO:move this to routing
 		case *internal.LookupNodeRequest:
 			// Prepare response.
@@ -187,7 +183,6 @@ func (p *PeerConn) receiveLoop() {
 		fmt.Println(err)
 
 	}
-	close(p.waitForHi)
 	fmt.Println("ReceiveLoop done ", p.identity.Id, " ", p.identity.Address)
 }
 
@@ -266,39 +261,18 @@ func (p *PeerConn) decodePackage(bytes []byte) (*internal.Package, *ptypes.Dynam
 }
 
 func (p *PeerConn) SayHi() (err error) {
-	request := new(Request)
-	request.SetMessage(&internal.Hi{
+	pa := &internal.Hi{
 		PublicKey: p.p2pnet.identity.PublicKey,
 		Address:   p.p2pnet.identity.Address,
 		Id:        p.p2pnet.identity.Id,
-	})
-	request.SetTimeout(HITIMEOUT * time.Second)
-
-	response, err := p.Request(request)
-	if err != nil {
-		fmt.Println("Request Hi err", err)
-		return err
 	}
 
-	content, ok := response.(*internal.Hi)
-	if !ok {
-		return errors.New("Not a Hi message")
-	}
-	if len(p.identity.Id) == 0 {
-		p.identity.Id = content.GetId()
-		p.identity.Address = content.GetAddress()
-		p.identity.PublicKey = content.GetPublicKey()
-		pub := suite.G2().Point()
-		if err = pub.UnmarshalBinary(content.GetPublicKey()); err != nil {
-			fmt.Println("PeerConn UnmarshalBinary err ", err)
-		}
-		p.pubKey = pub
-	}
-	return nil
+	err = p.SendMessage(pa)
+	return
 }
 
 //Add a timer to avoid wait for Hi forever
-func (p *PeerConn) HeadHi() (err error) {
+func (p *PeerConn) heardHi() (err error) {
 	timer := time.NewTimer(HITIMEOUT * time.Second)
 
 	select {
@@ -309,6 +283,7 @@ func (p *PeerConn) HeadHi() (err error) {
 		timer.Stop()
 	}
 
+	close(p.waitForHi)
 	return
 }
 
