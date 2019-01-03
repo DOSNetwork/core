@@ -33,7 +33,6 @@ type PeerNode struct {
 	numMessages int
 	tStrategy   TestStrategy
 	dkgChan     chan p2p.P2PMessage
-	tblsChan    chan vss.Signature
 }
 
 func (d *PeerNode) MakeRequest(bootStrapIp, f string, args []byte) ([]byte, error) {
@@ -139,7 +138,6 @@ func (d *PeerNode) Init(bootStrapIp string, port, peerSize int, numMessages int,
 	d.checkroll = make(map[string]int)
 	d.done = make(chan bool)
 	d.dkgChan = make(chan p2p.P2PMessage)
-	d.tblsChan = make(chan vss.Signature)
 	d.numMessages = numMessages
 	d.log = logger
 
@@ -150,8 +148,6 @@ func (d *PeerNode) Init(bootStrapIp string, port, peerSize int, numMessages int,
 		d.tStrategy = &test2{}
 	case "DKG":
 		d.tStrategy = &test3{}
-	case "TBLS":
-		d.tStrategy = &test4{}
 	}
 
 	//1)Wait until bootstrap node assign an ID
@@ -218,9 +214,6 @@ func (d *PeerNode) Init(bootStrapIp string, port, peerSize int, numMessages int,
 			case *dkg.Responses:
 				d.dkgChan <- msg
 				fmt.Println("Response")
-			case *vss.Signature:
-				d.tblsChan <- *content
-				fmt.Println("Signature")
 			default:
 			}
 		}
