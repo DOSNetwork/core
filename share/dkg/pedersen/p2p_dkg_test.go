@@ -31,7 +31,7 @@ func TestDKG(t *testing.T) {
 	if !ok {
 		t.Error("Test Failed: ")
 	}
-	dkgs[0], _ = CreateP2PDkg(peers[0], suite, peerEvent, numOfNodes, logger)
+	dkgs[0], _ = CreateP2PDkg(peers[0], suite, peerEvent, numOfNodes, log)
 	go dkgs[0].EventLoop()
 	for i := 1; i < numOfNodes; i++ {
 		peerIDs[i] = []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 + byte(i), 13, 14, 15, 16, 17, 18, 19, 21 + byte(i)}
@@ -47,7 +47,7 @@ func TestDKG(t *testing.T) {
 		if !ok {
 			t.Error("Test Failed: ")
 		}
-		dkgs[i], _ = CreateP2PDkg(peers[i], suite, peerEvent, numOfNodes, logger)
+		dkgs[i], _ = CreateP2PDkg(peers[i], suite, peerEvent, numOfNodes, log)
 		go dkgs[i].EventLoop()
 		peer.Join(peers[0].GetIP())
 
