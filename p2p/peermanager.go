@@ -78,8 +78,6 @@ func (pm *PeerConnManager) Range(f func(key, value interface{}) bool) {
 }
 
 func (pm *PeerConnManager) GetPeerByID(id string) *PeerConn {
-	pm.mu.RLock()
-	defer pm.mu.RUnlock()
 	value, ok := pm.peers[id]
 	if ok {
 		return value
