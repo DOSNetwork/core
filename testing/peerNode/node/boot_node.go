@@ -17,23 +17,19 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
-	"time"
 )
 
 const ALLNODEREADY = 1
 const ALLNODENOTREADY = 0
-const ALLNODEFINISH = 1
-const ALLNODENOTFINISH = 0
 
 type BootNode struct {
 	node
 	count          int
-	testFinishCount int
+	testReadyCount int
 	ipIdMap        map[string][]byte
 	lock           sync.Mutex
 	checkroll      map[string]bool
 	readynode      map[string]bool
-	finishnode     map[string]bool
 }
 
 func GenerateRandomBytes(n int) ([]byte, error) {
@@ -49,7 +45,6 @@ func GenerateRandomBytes(n int) ([]byte, error) {
 
 func (b *BootNode) Init(port, peerSize int, logger *logrus.Entry) {
 	//1)Generate member ID
-	b.testFinishCount = 0
 	b.peerSize = peerSize
 	b.members = [][]byte{}
 	b.allIP = []string{}
@@ -61,7 +56,6 @@ func (b *BootNode) Init(port, peerSize int, logger *logrus.Entry) {
 	b.ipIdMap = make(map[string][]byte)
 	b.done = make(chan bool)
 	b.readynode = make(map[string]bool)
-	b.finishnode = make(map[string]bool)
 	b.log = logger
 	b.log.Data["role"] = "bootstrap"
 
@@ -81,7 +75,6 @@ func (b *BootNode) Init(port, peerSize int, logger *logrus.Entry) {
 	r.HandleFunc("/getAllIDs", b.getAllIDs).Methods("POST")
 	r.HandleFunc("/getAllIPs", b.getAllIPs).Methods("POST")
 	r.HandleFunc("/isTestReady", b.isTestReady).Methods("POST")
-	r.HandleFunc("/isTestFinish", b.isTestFinish).Methods("POST")
 	r.HandleFunc("/post", b.postHandler)
 	go http.ListenAndServe(":8080", r)
 
@@ -145,11 +138,6 @@ func (b *BootNode) isAllnodeready() bool {
 	return len(b.readynode) >= b.peerSize
 }
 
-func (b *BootNode) isAllnodefinish() bool {
-	fmt.Println("isAllnodefinish ", len(b.finishnode) >= b.peerSize, "", len(b.finishnode))
-	return len(b.finishnode) >= b.peerSize
-}
-
 func (b *BootNode) isTestReady(w http.ResponseWriter, r *http.Request) {
 	body, _ := ioutil.ReadAll(r.Body)
 	ip := string(body)
@@ -164,31 +152,12 @@ func (b *BootNode) isTestReady(w http.ResponseWriter, r *http.Request) {
 			"eventIsAllnodeready": len(b.readynode),
 		}).Info()
 		w.Write([]byte{ALLNODEREADY})
-	} else {
-		w.Write([]byte{ALLNODENOTREADY})
-	}
-}
-
-func (b *BootNode) isTestFinish(w http.ResponseWriter, r *http.Request) {
-	body, _ := ioutil.ReadAll(r.Body)
-	ip := string(body)
-	b.lock.Lock()
-	if b.finishnode[ip] == false {
-		b.finishnode[ip] = true
-	}
-	b.lock.Unlock()
-
-	if b.isAllnodefinish() {
-		b.log.WithFields(logrus.Fields{
-			"eventIsAllnodefinish": len(b.finishnode),
-		}).Info()
-		w.Write([]byte{ALLNODEFINISH})
-		b.testFinishCount++
-		if b.testFinishCount >= b.peerSize {
+		b.testReadyCount++
+		if b.testReadyCount >= b.peerSize {
 			b.done <- true
 		}
 	} else {
-		w.Write([]byte{ALLNODENOTFINISH})
+		w.Write([]byte{ALLNODENOTREADY})
 	}
 }
 
@@ -206,10 +175,14 @@ func (b *BootNode) postHandler(w http.ResponseWriter, r *http.Request) {
 	b.log.WithFields(logrus.Fields{
 		"eventTestDone": len(b.checkroll),
 	}).Info()
+
+	if len(b.checkroll) == 0 {
+		//		b.finishTest()
+		b.done <- true
+	}
 }
 
 func (b *BootNode) EventLoop() {
-L:
 	for {
 		select {
 		//event from peer
@@ -217,9 +190,7 @@ L:
 		case <-b.done:
 			fmt.Println("EventLoop done")
 			b.log.WithField("event", "EventLoop done").Info()
-		    break L
 		default:
 		}
 	}
-	time.Sleep(time.Second)
 }

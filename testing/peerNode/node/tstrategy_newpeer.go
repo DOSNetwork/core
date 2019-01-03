@@ -54,21 +54,19 @@ func (r test1) StartTest(d *PeerNode) {
 		}
 		for i := 0; i < d.numMessages; i++ {
 			for id, _ := range d.checkroll {
-				var err error
-				if err = d.p.SendMessage([]byte(id), pb); err != nil {
+				if err := d.p.SendMessage([]byte(id), pb); err != nil {
 					retry := 1
 					for err != nil {
 						d.log.WithFields(logrus.Fields{
 							"SendMessageErr": err,
 						}).Info()
 						retry++
+						err = d.p.SendMessage([]byte(id), pb)
 						if retry > 20 {
 							break
 						}
-						err = d.p.SendMessage([]byte(id), pb)
 					}
-				}
-				if err == nil {
+				} else {
 					d.log.WithFields(logrus.Fields{
 						"SendMessageSuccess": true,
 					}).Info()
@@ -93,7 +91,6 @@ func (r test1) CheckResult(sender string, content *internalMsg.Cmd, d *PeerNode)
 				d.log.WithFields(logrus.Fields{
 					"eventCheckDone": true,
 				}).Info()
-				d.FinishTest()
 				//d.done <- true
 			} else {
 				fmt.Println("wait for  = ", len(d.checkroll))
@@ -122,7 +119,6 @@ func (r test1) CheckResult(sender string, content *internalMsg.Cmd, d *PeerNode)
 		d.log.WithFields(logrus.Fields{
 			"eventCheckDone": true,
 		}).Info()
-		d.FinishTest()
 		//d.done <- true
 	}
 }
@@ -160,7 +156,6 @@ func (r test2) StartTest(d *PeerNode) {
 		d.log.WithFields(logrus.Fields{
 			"eventCheckDone": true,
 		}).Info()
-		d.FinishTest()
 		//d.done <- true
 	}
 }
@@ -173,7 +168,6 @@ func (r test2) CheckResult(sender string, content *internalMsg.Cmd, d *PeerNode)
 				"eventCheckDone": true,
 			}).Info()
 		}
-		d.FinishTest()
 	}
 }
 
@@ -217,7 +211,7 @@ func (r test3) StartTest(d *PeerNode) {
 		d.log.WithFields(logrus.Fields{
 			"eventCheckDone": true,
 		}).Info()
-		d.FinishTest()
+		go func() { d.done <- true }()
 	}
 
 }
