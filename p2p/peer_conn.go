@@ -13,10 +13,11 @@ import (
 	"github.com/DOSNetwork/core/p2p/dht"
 	"github.com/DOSNetwork/core/p2p/internal"
 	"github.com/DOSNetwork/core/sign/bls"
-
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes"
 
+	"crypto/aes"
+	"crypto/cipher"
 	"github.com/dedis/kyber"
 )
 
@@ -47,6 +48,8 @@ type PeerConn struct {
 	readWriteCount  uint64
 	idelPeriodCount uint8
 	lastusedtime    time.Time
+	sharekey        []byte
+	nonce           []byte
 }
 
 // RequestState represents a state of a request.
@@ -142,6 +145,10 @@ func (p *PeerConn) receiveLoop() {
 				if err := p.Reply(pa.GetRequestNonce(), response); err != nil {
 					log.WithField("function", "reply").Warn("Reply Hi message err ", err)
 				}
+				p.sharekey, p.nonce, err = p.p2pnet.GetShareKeyAndNonce(pub)
+				if err != nil {
+					fmt.Println("PeerConn GetShareKeyAndNonce err ", err)
+				}
 			} else {
 				fmt.Println("Ignore Hi")
 			}
@@ -236,17 +243,20 @@ func (p *PeerConn) receivePackage() ([]byte, error) {
 }
 
 func (p *PeerConn) decodePackage(bytes []byte) (*internal.Package, *ptypes.DynamicAny, error) {
+	bytes = p.Decrypt(bytes)
 	pa := new(internal.Package)
 	if err := proto.Unmarshal(bytes, pa); err != nil {
 		return nil, nil, err
 	}
 
 	//Todo verify pa.Signature by public key
-	pub := suite.G2().Point()
-	_ = pub.UnmarshalBinary(pa.GetPubkey())
+	if len(p.sharekey) == 0 {
+		pub := suite.G2().Point()
+		_ = pub.UnmarshalBinary(pa.GetPubkey())
 
-	if err := bls.Verify(p.p2pnet.suite, pub, pa.GetAnything().Value, pa.GetSignature()); err != nil {
-		return nil, nil, err
+		if err := bls.Verify(p.p2pnet.suite, pub, pa.GetAnything().Value, pa.GetSignature()); err != nil {
+			return nil, nil, err
+		}
 	}
 
 	var ptr ptypes.DynamicAny
@@ -292,8 +302,51 @@ func (p *PeerConn) SayHi() (err error) {
 			log.WithField("function", "unmarshalBinary").Warn("PeerConn UnmarshalBinary err ", err)
 		}
 		p.pubKey = pub
+		p.sharekey, p.nonce, err = p.p2pnet.GetShareKeyAndNonce(pub)
+		if err != nil {
+			fmt.Println("PeerConn GetShareKeyAndNonce err ", err)
+		}
 	}
 	return nil
+}
+
+func (p *PeerConn) Encrypt(plaintext []byte) []byte {
+	if len(p.sharekey) == 0 {
+		return plaintext
+	}
+	block, err := aes.NewCipher(p.sharekey)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	aesgcm, err := cipher.NewGCM(block)
+	if err != nil {
+		panic(err.Error())
+	}
+	return aesgcm.Seal(nil, p.nonce, plaintext, nil)
+}
+
+func (p *PeerConn) Decrypt(ciphertext []byte) []byte {
+	if len(p.sharekey) == 0 {
+		return ciphertext
+	}
+	block, err := aes.NewCipher(p.sharekey)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	aesgcm, err := cipher.NewGCM(block)
+	if err != nil {
+		panic(err.Error())
+	}
+	plaintext, err := aesgcm.Open(nil, p.nonce, ciphertext, nil)
+	if err != nil {
+		fmt.Println("PeerConn Decrypt Err", err.Error())
+		return []byte{}
+	} else {
+		return plaintext
+	}
+
 }
 
 //Add a timer to avoid wait for Hi forever
@@ -321,6 +374,7 @@ func (p *PeerConn) SendPackage(msg proto.Message) error {
 		log.WithField("function", "marshal").Warn("SendPackage Marshal err ", err)
 	}
 	// Serialize size.
+	bytes = p.Encrypt(bytes)
 	prefix := make([]byte, 4)
 	binary.BigEndian.PutUint32(prefix, uint32(len(bytes)))
 	bytes = append(prefix, bytes...)
@@ -352,17 +406,26 @@ func (p *PeerConn) prepareMessage(msg proto.Message) (*internal.Package, error) 
 		return nil, err
 	}
 	//TODO:change to AES256-GCM
-	sig, err := bls.Sign(p.p2pnet.suite, p.p2pnet.secKey, anything.Value)
-	if err != nil {
-		log.WithField("function", "blsSign").Warn("prepareMessage ", err)
-	}
-	pub, _ := p.p2pnet.pubKey.MarshalBinary()
 
+	if len(p.sharekey) == 0 {
+		sig, err := bls.Sign(p.p2pnet.suite, p.p2pnet.secKey, anything.Value)
+		if err != nil {
+			log.WithField("function", "blsSign").Warn("prepareMessage ", err)
+		}
+		pub, _ := p.p2pnet.pubKey.MarshalBinary()
+		pa := &internal.Package{
+			Sender:    &id,
+			Anything:  anything,
+			Pubkey:    pub,
+			Signature: sig,
+		}
+		return pa, nil
+	}
 	pa := &internal.Package{
 		Sender:    &id,
 		Anything:  anything,
-		Pubkey:    pub,
-		Signature: sig,
+		Pubkey:    []byte{},
+		Signature: []byte{},
 	}
 
 	return pa, nil

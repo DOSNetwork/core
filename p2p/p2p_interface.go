@@ -79,4 +79,5 @@ type P2PInterface interface {
 	ConnectTo(IpAddr string) (id []byte, err error)
 	Leave()
 	SendMessage(id []byte, msg proto.Message) error
+	GetShareKeyAndNonce(point kyber.Point) (id []byte, nouce []byte, err error)
 }
