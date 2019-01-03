@@ -6,16 +6,16 @@ services:
       replicas: 1
     environment:
       - NODEROLE=boot
-      - PEERSIZE=5
-      - DKGROUND=5
+      - PEERSIZE=10
+      - DKGROUND=3
   peernode:
     image: peernode
     depends_on:
       - bootstrap
     deploy:
-      replicas: 5
+      replicas: 10
     environment:
       - BOOTSTRAPIP=bootstrap:44460
-      - PEERSIZE=5
+      - PEERSIZE=10
       - GROUPSIZE=5
       - TESTSTRATEGY=DKGMULTIGROUPING

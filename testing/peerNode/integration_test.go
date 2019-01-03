@@ -37,7 +37,7 @@ func TestNewPeerAndSendMessage(test *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel() // The cancel should be deferred so resources are cleaned up
 	cmdOutput := &bytes.Buffer{}
-	cmd := exec.CommandContext(ctx, "docker-compose", "-f", "peer-docker-compose.yml", "up", "--scale", "peernode=5")
+	cmd := exec.CommandContext(ctx, "docker-compose", "-f", "peer-docker-compose.yml", "up", "--scale", "peernode=10")
 	cmd.Stdout = cmdOutput
 	cmd.Stderr = os.Stderr
 	cmd.Dir = peerNodeDir()
@@ -68,7 +68,7 @@ func TestNewPeerAndSendMessage(test *testing.T) {
 	fmt.Println("finishing NewPeerAndSendMessage")
 	output, err := exec.Command("docker-compose", "-f", "peer-docker-compose.yml", "down").CombinedOutput()
 	if err != nil {
-		os.Stderr.WriteString(err)
+		os.Stderr.WriteString(err.Error())
 	}
 	fmt.Println(string(output))
 
@@ -85,7 +85,7 @@ func TestFindNode(test *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel() // The cancel should be deferred so resources are cleaned up
 	cmdOutput := &bytes.Buffer{}
-	cmd := exec.CommandContext(ctx, "docker-compose", "-f", "findnode-docker-compose.yml", "up", "--scale", "peernode=5")
+	cmd := exec.CommandContext(ctx, "docker-compose", "-f", "findnode-docker-compose.yml", "up", "--scale", "peernode=10")
 	cmd.Stdout = cmdOutput
 	cmd.Stderr = os.Stderr
 	cmd.Dir = peerNodeDir()
@@ -116,7 +116,7 @@ func TestFindNode(test *testing.T) {
 	fmt.Println("finishing FindNode")
 	output, err := exec.Command("docker-compose", "-f", "findnode-docker-compose.yml", "down").CombinedOutput()
 	if err != nil {
-		os.Stderr.WriteString(err)
+		os.Stderr.WriteString(err.Error())
 	}
 	fmt.Println(string(output))
 
@@ -133,7 +133,7 @@ func TestDKG(test *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel() // The cancel should be deferred so resources are cleaned up
 	cmdOutput := &bytes.Buffer{}
-	cmd := exec.CommandContext(ctx, "docker-compose", "-f", "dkg-docker-compose.yml", "up", "--scale", "peernode=5")
+	cmd := exec.CommandContext(ctx, "docker-compose", "-f", "dkg-docker-compose.yml", "up", "--scale", "peernode=10")
 	cmd.Stdout = cmdOutput
 	cmd.Stderr = os.Stderr
 	cmd.Dir = peerNodeDir()
@@ -164,7 +164,7 @@ func TestDKG(test *testing.T) {
 	fmt.Println("finishing dkg")
 	output, err := exec.Command("docker-compose", "-f", "dkg-docker-compose.yml", "down").CombinedOutput()
 	if err != nil {
-		os.Stderr.WriteString(err)
+		os.Stderr.WriteString(err.Error())
 	}
 	fmt.Println(string(output))
 
@@ -181,7 +181,7 @@ func TestTBLS(test *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel() // The cancel should be deferred so resources are cleaned up
 	cmdOutput := &bytes.Buffer{}
-	cmd := exec.CommandContext(ctx, "docker-compose", "-f", "tbls-docker-compose.yml", "up", "--scale", "peernode=5")
+	cmd := exec.CommandContext(ctx, "docker-compose", "-f", "tbls-docker-compose.yml", "up", "--scale", "peernode=10")
 	cmd.Stdout = cmdOutput
 	cmd.Stderr = os.Stderr
 	cmd.Dir = peerNodeDir()
@@ -212,7 +212,7 @@ func TestTBLS(test *testing.T) {
 	fmt.Println("finishing tbls")
 	output, err := exec.Command("docker-compose", "-f", "tbls-docker-compose.yml", "down").CombinedOutput()
 	if err != nil {
-		os.Stderr.WriteString(err)
+		os.Stderr.WriteString(err.Error())
 	}
 	fmt.Println(string(output))
 
@@ -229,7 +229,7 @@ func TestDKGMultiGrouping(test *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel() // The cancel should be deferred so resources are cleaned up
 	cmdOutput := &bytes.Buffer{}
-	cmd := exec.CommandContext(ctx, "docker-compose", "-f", "dkgMultiGrouping-docker-compose.yml", "up", "--scale", "peernode=5")
+	cmd := exec.CommandContext(ctx, "docker-compose", "-f", "dkgMultiGrouping-docker-compose.yml", "up", "--scale", "peernode=10")
 	cmd.Stdout = cmdOutput
 	cmd.Stderr = os.Stderr
 	cmd.Dir = peerNodeDir()
@@ -260,7 +260,7 @@ func TestDKGMultiGrouping(test *testing.T) {
 	fmt.Println("finishing dkgMultiGrouping")
 	output, err := exec.Command("docker-compose", "-f", "dkgMultiGrouping-docker-compose.yml", "down").CombinedOutput()
 	if err != nil {
-		os.Stderr.WriteString(err)
+		os.Stderr.WriteString(err.Error())
 	}
 	fmt.Println(string(output))
 
