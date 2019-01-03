@@ -17,7 +17,7 @@ const (
 	ETH = "ETH"
 )
 
-var log *logrus.Entry
+var log *logrus.Logger
 
 type ChainInterface interface {
 	Init(chainConfig *configuration.ChainConfig) (err error)
@@ -38,7 +38,7 @@ type ChainInterface interface {
 	WhitelistInitialized() (initialized bool, err error)
 }
 
-func AdaptTo(chainName string, chainConfig *configuration.ChainConfig, logger *logrus.Entry) (conn ChainInterface, err error) {
+func AdaptTo(chainName string, chainConfig *configuration.ChainConfig, logger *logrus.Logger) (conn ChainInterface, err error) {
 	log = logger
 	switch chainConfig.ChainType {
 	case ETH:

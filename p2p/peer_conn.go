@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"log"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -83,13 +84,13 @@ func (p *PeerConn) SendMessage(msg proto.Message) (err error) {
 	var prepared *internal.Package
 	prepared, err = p.prepareMessage(msg)
 	if err != nil {
-		log.WithField("function", "prepareMessage").Warn("PeerConn sendLoop ", err)
+		fmt.Println("PeerConn sendLoop err ", err)
 		return
 	}
 
 	prepared.RequestNonce = atomic.AddUint64(&p.RequestNonce, 1)
 	if err = p.SendPackage(prepared); err != nil {
-		log.WithField("function", "sendMessage").Warn("PeerConn sendLoop ", err)
+		fmt.Println("PeerConn sendLoop SendPackage ", err)
 	}
 
 	atomic.AddUint64(&p.readWriteCount, 1)
@@ -100,13 +101,13 @@ func (p *PeerConn) receiveLoop() {
 	for {
 		buf, err := p.receivePackage()
 		if err != nil {
-			log.WithField("function", "receivePackage").Warn("PeerConn ", p.identity.Id, " err ", err)
+			fmt.Println("PeerConn ", p.identity.Id, " err ", err)
 			break
 		}
 
 		pa, ptr, err := p.decodePackage(buf)
 		if err != nil {
-			log.WithField("function", "decodePackage").Warn("PeerConn decodePackage err ", err)
+			fmt.Println("PeerConn decodePackage err ", err)
 			continue
 		}
 
@@ -130,7 +131,7 @@ func (p *PeerConn) receiveLoop() {
 				p.identity.PublicKey = content.GetPublicKey()
 				pub := suite.G2().Point()
 				if err = pub.UnmarshalBinary(content.GetPublicKey()); err != nil {
-					log.WithField("function", "unmarshalBinary").Warn("PeerConn UnmarshalBinary err ", err)
+					fmt.Println("PeerConn UnmarshalBinary err ", err)
 				}
 				p.pubKey = pub
 				p.waitForHi <- true
@@ -140,7 +141,7 @@ func (p *PeerConn) receiveLoop() {
 					Id:        p.p2pnet.identity.Id,
 				}
 				if err := p.Reply(pa.GetRequestNonce(), response); err != nil {
-					log.WithField("function", "reply").Warn("Reply Hi message err ", err)
+					fmt.Println("Reply Hi message err ", err)
 				}
 			} else {
 				fmt.Println("Ignore Hi")
@@ -158,12 +159,12 @@ func (p *PeerConn) receiveLoop() {
 			}
 
 			if err := p.Reply(pa.GetRequestNonce(), response); err != nil {
-				log.WithField("function", "reply").Warn("PeerConn LookupNodeRequest Reply err ", err)
+				fmt.Println("PeerConn LookupNodeRequest Reply err ", err)
 			}
 		case *internal.Ping:
 			response := &internal.Pong{}
 			if err := p.Reply(pa.GetRequestNonce(), response); err != nil {
-				log.WithField("function", "reply").Warn("PeerConn Ping Reply err ", err)
+				fmt.Println("PeerConn Ping Reply err ", err)
 			}
 		case *internal.Pong:
 		default:
@@ -173,7 +174,7 @@ func (p *PeerConn) receiveLoop() {
 			go func() { p.rxMessage <- msg }()
 			response := &internal.Pong{}
 			if err := p.Reply(pa.GetRequestNonce(), response); err != nil {
-				log.WithField("function", "reply").Warn("PeerConn Ping Reply err ", err)
+				fmt.Println("PeerConn Ping Reply err ", err)
 			}
 		}
 	}
@@ -183,7 +184,7 @@ func (p *PeerConn) receiveLoop() {
 	//}
 
 	if err := (*p.conn).Close(); err != nil {
-		log.WithField("function", "receiveLoopClose").Warn(err)
+		fmt.Println(err)
 
 	}
 	close(p.waitForHi)
@@ -195,7 +196,7 @@ func (p *PeerConn) End() {
 		return
 	}
 	if err := (*p.conn).Close(); err != nil {
-		log.WithField("function", "end").Warn("!!!!! End err ", err, " ", p.identity.Id, " ", p.identity.Address)
+		fmt.Println("!!!!! End err ", err, " ", p.identity.Id, " ", p.identity.Address)
 		p.p2pnet.peers.DeletePeer(string(p.identity.Id))
 	}
 }
@@ -275,7 +276,7 @@ func (p *PeerConn) SayHi() (err error) {
 
 	response, err := p.Request(request)
 	if err != nil {
-		log.WithField("function", "request").Warn("Request Hi err", err)
+		fmt.Println("Request Hi err", err)
 		return err
 	}
 
@@ -289,7 +290,7 @@ func (p *PeerConn) SayHi() (err error) {
 		p.identity.PublicKey = content.GetPublicKey()
 		pub := suite.G2().Point()
 		if err = pub.UnmarshalBinary(content.GetPublicKey()); err != nil {
-			log.WithField("function", "unmarshalBinary").Warn("PeerConn UnmarshalBinary err ", err)
+			fmt.Println("PeerConn UnmarshalBinary err ", err)
 		}
 		p.pubKey = pub
 	}
@@ -297,7 +298,7 @@ func (p *PeerConn) SayHi() (err error) {
 }
 
 //Add a timer to avoid wait for Hi forever
-func (p *PeerConn) HeardHi() (err error) {
+func (p *PeerConn) HeadHi() (err error) {
 	timer := time.NewTimer(HITIMEOUT * time.Second)
 
 	select {
@@ -318,7 +319,7 @@ func (p *PeerConn) SendPackage(msg proto.Message) error {
 	//Encode the package
 	bytes, err := proto.Marshal(msg)
 	if err != nil {
-		log.WithField("function", "marshal").Warn("SendPackage Marshal err ", err)
+		fmt.Println("SendPackage Marshal err ", err)
 	}
 	// Serialize size.
 	prefix := make([]byte, 4)
@@ -348,13 +349,13 @@ func (p *PeerConn) prepareMessage(msg proto.Message) (*internal.Package, error) 
 	id := internal.ID(p.p2pnet.identity)
 	anything, err := ptypes.MarshalAny(msg)
 	if err != nil {
-		log.WithField("function", "marshalAny").Warn("ptypes.MarshalAny ", err)
+		fmt.Println("ptypes.MarshalAny ", err)
 		return nil, err
 	}
 	//TODO:change to AES256-GCM
 	sig, err := bls.Sign(p.p2pnet.suite, p.p2pnet.secKey, anything.Value)
 	if err != nil {
-		log.WithField("function", "blsSign").Warn("prepareMessage ", err)
+		fmt.Println("prepareMessage ", err)
 	}
 	pub, _ := p.p2pnet.pubKey.MarshalBinary()
 
@@ -421,7 +422,7 @@ func (p *PeerConn) Reply(nonce uint64, message proto.Message) error {
 	prepared.ReplyFlag = true
 
 	if err := p.SendPackage(prepared); err != nil {
-		log.WithField("function", "sendPackage").Warn("PeerConn Reply err ", err)
+		fmt.Println("PeerConn Reply err ", err)
 		return err
 	}
 
@@ -470,7 +471,7 @@ func (p *PeerConn) heartBeat() {
 			}
 			if timeout {
 				if err := (*p.conn).Close(); err != nil {
-					log.WithField("function", "heartBeatClose").Warn(err)
+					log.Println(err)
 				}
 				return
 			} else {

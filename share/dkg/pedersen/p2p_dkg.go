@@ -146,7 +146,6 @@ func (d *P2PDkg) RunDKG() {
 	if d.FSM.Current() == "Init" {
 		d.chFsmEvent <- "grouping"
 		log.WithFields(logrus.Fields{
-			"function":    "runDKG",
 			"eventRunDKG": true,
 		}).Info()
 	}
@@ -188,13 +187,12 @@ func (d *P2PDkg) EventLoop() {
 			case *vss.PublicKey:
 				pubKeyCount++
 				log.WithFields(logrus.Fields{
-					"function":    "eventLoop",
 					"pubKeyCount": pubKeyCount,
 				}).Info()
 				pubkey := *content
 				p, err := pubkey.GetPoint(d.suite)
 				if err != nil {
-					log.WithField("function", "getPoint").Warn(err)
+					fmt.Println(err)
 				}
 				d.pubkeyIdMap[p.String()] = string(pubkey.SenderId)
 				d.publicKeys = append(d.publicKeys, p)
@@ -202,7 +200,6 @@ func (d *P2PDkg) EventLoop() {
 			case *Deal:
 				dealCount++
 				log.WithFields(logrus.Fields{
-					"function":  "eventLoop",
 					"dealCount": dealCount,
 				}).Info()
 				d.deals = append(d.deals, *content)
@@ -210,15 +207,13 @@ func (d *P2PDkg) EventLoop() {
 			case *Responses:
 				responseCount++
 				log.WithFields(logrus.Fields{
-					"function":      "eventLoop",
 					"responseCount": responseCount,
 				}).Info()
 				d.chResponse <- *content
 			default:
 				unknown++
 				log.WithFields(logrus.Fields{
-					"function": "eventLoop",
-					"unknown":  unknown,
+					"unknown": unknown,
 				}).Info()
 				fmt.Println("unknown", content)
 			}
@@ -247,12 +242,11 @@ func (d *P2PDkg) enterExchangePubKey(e *fsm.Event) {
 	public := vss.PublicKey{SenderId: id}
 	err := public.SetPoint(d.suite, d.partPub)
 	if err != nil {
-		log.WithField("function", "setPoint").Warn(err)
+		fmt.Println(err)
 	}
 	d.broadcast(&public)
 
 	log.WithFields(logrus.Fields{
-		"function":           "enterExchangePubKey",
 		"eventSendAllPubKey": true,
 	}).Info()
 
@@ -272,7 +266,6 @@ func (d *P2PDkg) afterReceivePubkey(e *fsm.Event) {
 //Can't call NewDistKeyGenerator .need to wait unitl all deal has been received
 func (d *P2PDkg) enterNewDistKeyGenerator(e *fsm.Event) {
 	log.WithFields(logrus.Fields{
-		"function":              "enterNewDistKeyGenerator",
 		"eventReceiveAllPubKey": true,
 	}).Info()
 
@@ -281,7 +274,7 @@ func (d *P2PDkg) enterNewDistKeyGenerator(e *fsm.Event) {
 			for _, r := range rs.GetResponse() {
 				_, err := (*d.partDkg).ProcessResponse(r)
 				if err != nil {
-					log.WithField("function", "ProcessResponse").Warn(err)
+					fmt.Println(err)
 				}
 				if (*d.partDkg).Certified() && d.FSM.Current() == "ProcessDeal" {
 					fmt.Println("resp Certified ")
@@ -295,17 +288,17 @@ func (d *P2PDkg) enterNewDistKeyGenerator(e *fsm.Event) {
 	sort.Sort(d.publicKeys)
 	d.partDkg, err = NewDistKeyGenerator(d.suite, d.partSec, d.publicKeys, d.nbParticipants/2+1)
 	if err != nil {
-		log.WithField("function", "newDistKeyGenerator").Warn(err)
+		fmt.Println(err)
 	}
 	deals, err := d.partDkg.Deals()
 	if err != nil {
-		log.WithField("function", "deals").Warn(err)
+		fmt.Println(err)
 	}
 	for i, pub := range d.publicKeys {
 		if !pub.Equal(d.partPub) {
 			err = (*d.network).SendMessage([]byte(d.pubkeyIdMap[pub.String()]), deals[i])
 			if err != nil {
-				log.WithField("function", "sendMessage").Warn(err)
+				fmt.Println(err)
 			}
 		} else {
 			d.dkgIndex = i
@@ -313,7 +306,6 @@ func (d *P2PDkg) enterNewDistKeyGenerator(e *fsm.Event) {
 	}
 
 	log.WithFields(logrus.Fields{
-		"function":         "enterNewDistKeyGenerator",
 		"eventSendAllDeal": true,
 	}).Info()
 
@@ -332,7 +324,6 @@ func (d *P2PDkg) afterReceiveDeal(e *fsm.Event) {
 //This is only happened after all peers has all public keys
 func (d *P2PDkg) enterProcessDeal(e *fsm.Event) {
 	log.WithFields(logrus.Fields{
-		"function":            "enterProcessDeal",
 		"eventReceiveAllDeal": true,
 	}).Info()
 
@@ -341,7 +332,7 @@ func (d *P2PDkg) enterProcessDeal(e *fsm.Event) {
 	for _, deal := range d.deals {
 		resp, err := (*d.partDkg).ProcessDeal(&deal)
 		if err != nil {
-			log.WithField("function", "processDeal").Warn(err)
+			fmt.Println(err)
 		} else {
 			resps = append(resps, resp)
 		}
@@ -355,14 +346,12 @@ func (d *P2PDkg) enterProcessDeal(e *fsm.Event) {
 	}
 
 	log.WithFields(logrus.Fields{
-		"function":            "enterProcessDeal",
 		"eventProcessAllDeal": true,
 	}).Info()
 }
 
 func (d *P2PDkg) enterVerified(e *fsm.Event) {
 	log.WithFields(logrus.Fields{
-		"function":                "enterVerified",
 		"eventProcessAllResponse": true,
 	}).Info()
 
@@ -370,13 +359,12 @@ func (d *P2PDkg) enterVerified(e *fsm.Event) {
 	var err error
 	d.partDks, err = d.partDkg.DistKeyShare()
 	if err != nil {
-		log.WithField("function", "distKeyShare").Warn(err)
+		fmt.Println(err)
 	}
 	d.groupPubPoly = share.NewPubPoly(d.suite, d.suite.Point().Base(), d.partDks.Commitments())
 	timeCost := time.Since(d.groupingStart).Seconds()
 	fmt.Println("DistKeyShare SUCCESS ", timeCost)
 	log.WithFields(logrus.Fields{
-		"function":        "enterVerified",
 		"eventDKGSucceed": true,
 		"DKGTimeCost":     timeCost,
 	}).Info()
@@ -388,7 +376,7 @@ func (d *P2PDkg) enterVerified(e *fsm.Event) {
 func (d *P2PDkg) Event(event string) {
 	err := d.FSM.Event(event)
 	if err != nil {
-		log.WithField("function", "event").Warn(err)
+		fmt.Println(err)
 	}
 }
 
@@ -396,7 +384,7 @@ func (d *P2PDkg) broadcast(m proto.Message) {
 	for _, member := range d.groupIds {
 		if string(member) != string((*d.network).GetID()) {
 			if err := (*d.network).SendMessage(member, m); err != nil {
-				log.WithField("function", "sendMessage").Warn("DKG SendMessage err ", err)
+				fmt.Println("DKG SendMessage err ", err)
 			}
 		}
 	}

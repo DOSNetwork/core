@@ -39,7 +39,7 @@ func (e *EthCommon) DialToEth() (err error) {
 	fmt.Println("dialing...")
 	e.Client, err = ethclient.Dial(e.config.RemoteNodeAddress)
 	for err != nil {
-		log.WithField("function", "dialToEth").Warn(err)
+		fmt.Println(err)
 		fmt.Println("Cannot connect to the network, retrying...", e.config.RemoteNodeAddress)
 		e.Client, err = ethclient.Dial(e.config.RemoteNodeAddress)
 	}
@@ -52,12 +52,8 @@ func (e *EthCommon) Init(credentialPath string, config *configuration.ChainConfi
 
 	fmt.Println("start initial onChainConn...", config.DOSProxyAddress)
 
-	if err = e.DialToEth(); err != nil {
-		log.WithField("function", "dialToEth").Warn(err)
-	}
-	if err = e.setAccount(credentialPath); err != nil {
-		log.WithField("function", "setAccount").Warn(err)
-	}
+	e.DialToEth()
+	err = e.setAccount(credentialPath)
 	return
 }
 
