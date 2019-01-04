@@ -263,10 +263,8 @@ func (r test4) StartTest(d *PeerNode) {
 	var signatures [][]byte
 
 	result := <-dkgEvent
-	if result == "certified" {
-		d.log.WithFields(logrus.Fields{
-			"eventCheckDone": true,
-		}).Info()
+	if result != "certified" {
+		d.FinishTest()
 	}
 
 	rawMsg, err := dataFetch(os.Getenv("URL"))
@@ -297,7 +295,6 @@ func (r test4) StartTest(d *PeerNode) {
 	}
 	for sig := range d.tblsChan {
 		signatures = append(signatures, sig.Signature)
-		fmt.Printf(" len(signatures) ", len(signatures))
 		if len(signatures) > groupSize/2 {
 			finalSig, err := tbls.Recover(suite, p2pDkg.GetGroupPublicPoly(), sig.Content, signatures, groupSize/2+1, groupSize)
 			if err != nil {
@@ -312,8 +309,9 @@ func (r test4) StartTest(d *PeerNode) {
 				}).Info(err)
 				continue
 			} else {
-				fmt.Printf(" !!!!FinishTest ", len(signatures))
-
+				d.log.WithFields(logrus.Fields{
+					"eventCheckDone": true,
+				}).Info()
 				d.FinishTest()
 				break
 			}
@@ -385,7 +383,9 @@ func (r test5) StartTest(d *PeerNode) {
 			p2pDkg.Reset()
 			next := d.requestIsNextRoundReady(roundCount)
 			if next == byte(DKGROUNDFINISH) {
-				fmt.Println("\n test over!!!!!!")
+				d.log.WithFields(logrus.Fields{
+					"eventCheckDone": true,
+				}).Info()
 				break
 			} else {
 				roundCount++

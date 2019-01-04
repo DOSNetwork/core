@@ -8,6 +8,7 @@ services:
      - NODEROLE=boot
      - PEERSIZE=10
      - NUMOFMESSAGS=1
+     - TESTSTRATEGY=SENDMESSAGE
  peernode:
    image: peernode
    depends_on:

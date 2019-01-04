@@ -2,13 +2,14 @@ package main
 
 import (
 	"fmt"
-	"github.com/bshuster-repo/logrus-logstash-hook"
 	"os"
 	"runtime"
 	"runtime/debug"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/bshuster-repo/logrus-logstash-hook"
 
 	"github.com/DOSNetwork/core/configuration"
 	"github.com/DOSNetwork/core/testing/peerNode/node"
@@ -76,13 +77,13 @@ func main() {
 	//boot node
 	if noderole == "boot" {
 		b := new(node.BootNode)
-		b.Init(port, peerSize, log.WithField("role", "boot"))
+		b.Init(port, peerSize, log.WithField("testType", tStrategy))
 		b.EventLoop()
 	} else {
 		s := strings.Split(bootStrapIP, ":")
 		ip, _ = s[0], s[1]
 		d := new(node.PeerNode)
-		d.Init(ip, port, peerSize, numMessages, tStrategy, log.WithField("role", "node"))
+		d.Init(ip, port, peerSize, numMessages, tStrategy, log.WithField("testType", tStrategy))
 		d.EventLoop()
 	}
 }

@@ -246,8 +246,6 @@ func (d *PeerNode) Init(bootStrapIp string, port, peerSize int, numMessages int,
 	//d.p.Join(bootStrapIp + ":44460")
 	fmt.Println("nodeIP = ", d.p.GetIP())
 
-	d.log.Data["testType"] = tStrategy
-	d.log.Data["role"] = "peernode"
 	d.log.Data["nodeId"] = new(big.Int).SetBytes(d.nodeID).String()
 
 	d.requestAllIDs() //get all ids

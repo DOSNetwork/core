@@ -18,9 +18,10 @@ import (
 	//	"github.com/DOSNetwork/core/p2p/dht"
 	//	"github.com/golang/protobuf/proto"
 
+	"time"
+
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
-	"time"
 )
 
 const (
@@ -82,7 +83,6 @@ func (b *BootNode) Init(port, peerSize int, logger *logrus.Entry) {
 	b.finishnode = make(map[string]bool)
 	b.dkgProgress = make(map[string]uint16)
 	b.log = logger
-	b.log.Data["role"] = "bootstrap"
 
 	for i := 1; i <= b.peerSize; i++ {
 		id, _ := GenerateRandomBytes(len(bootID))

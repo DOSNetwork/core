@@ -8,6 +8,7 @@ services:
      - NODEROLE=boot
      - PEERSIZE=10
      - NUMOFMESSAGS=1
+     - TESTSTRATEGY=FINDNODE
  peernode:
    image: peernode
    depends_on:
