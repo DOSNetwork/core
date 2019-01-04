@@ -68,7 +68,7 @@ func TestDosNodeStart(test *testing.T) {
 	}
 	w.Flush()
 
-	output, err := exec.Command("docker-compose", "-f", "peer-docker-compose.yml", "down").CombinedOutput()
+	output, err := exec.Command("docker-compose", "-f", "dos-docker-compose.yml", "down").CombinedOutput()
 	if err != nil {
 		os.Stderr.WriteString(err.Error())
 	}
