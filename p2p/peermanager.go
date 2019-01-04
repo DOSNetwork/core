@@ -6,87 +6,99 @@ import (
 	"sync"
 
 	"github.com/sirupsen/logrus"
+	"os"
+	"strconv"
 )
 
-const MAXPEERCOUNT = 100000
+var MAXPEERCONNCOUNT uint32 = 100000
+
+func init() {
+	temp, err := strconv.ParseUint(os.Getenv("MAXPEERCONNCOUNT"), 10, 32)
+	if err == nil {
+		MAXPEERCONNCOUNT = uint32(temp)
+		fmt.Println("MAXPEERCONNCOUNT", MAXPEERCONNCOUNT)
+	}
+}
 
 type PeerConnManager struct {
-	mu    sync.Mutex
-	peers sync.Map
-	count uint32
+	mu    sync.RWMutex
+	peers map[string]*PeerConn
 	log   *logrus.Entry
+}
+
+func CreatePeerConnManager(log *logrus.Entry) (pconn *PeerConnManager) {
+	pconn = &PeerConnManager{
+		peers: make(map[string]*PeerConn),
+		log:   log,
+	}
+	return pconn
 }
 
 func (pm *PeerConnManager) FindLessUsedPeerConn() (pconn *PeerConn) {
 	var lastusedtime int64
 	lastusedtime = math.MaxInt64
 	pconn = nil
-	pm.peers.Range(func(key, value interface{}) bool {
-		pc := value.(*PeerConn)
-		if pc.lastusedtime.Unix() < lastusedtime {
-			lastusedtime = pc.lastusedtime.Unix()
-			pconn = pc
+	pm.mu.RLock()
+	defer pm.mu.RUnlock()
+	for _, value := range pm.peers {
+		if value.lastusedtime.Unix() < lastusedtime {
+			lastusedtime = value.lastusedtime.Unix()
+			pconn = value
 		}
-		return true
-	})
+	}
 	return
 }
 
 func (pm *PeerConnManager) LoadOrStore(id string, peer *PeerConn) (actual *PeerConn, loaded bool) {
-	pm.mu.Lock()
-	defer pm.mu.Unlock()
-	ac, l := pm.peers.LoadOrStore(id, peer)
-	loaded = l
-	if !l {
-		pm.count++
-		if pm.count > MAXPEERCOUNT {
-			p := pm.FindLessUsedPeerConn()
-			fmt.Println("Force delete ", p.identity.Id)
-			p.End()
-			pm.peers.Delete(string(p.identity.Id))
-			pm.count--
-
-		}
-		pm.log.WithFields(logrus.Fields{
-			"countConn": pm.count,
-		}).Info()
-		actual = peer
-	} else {
-		actual = ac.(*PeerConn)
-		fmt.Println("Load Peerconn:" + actual.identity.Address)
+	if actual, loaded = pm.peers[id]; loaded {
+		return
 	}
+	actual = peer
+	loaded = false
+	pm.mu.Lock()
+	pm.peers[id] = peer
+	pm.mu.Unlock()
+	if pm.PeerConnNum() > MAXPEERCONNCOUNT {
+		p := pm.FindLessUsedPeerConn()
+		fmt.Println("Force delete ", p.identity.Id)
+		p.End()
+	}
+	pm.log.WithFields(logrus.Fields{
+		"countConn": pm.PeerConnNum(),
+	}).Info()
 	return
 }
 
 func (pm *PeerConnManager) Range(f func(key, value interface{}) bool) {
-	pm.peers.Range(f)
+	for key, value := range pm.peers {
+		if !f(key, value) {
+			break
+		}
+	}
 }
 
-func (pm *PeerConnManager) GetPeerByID(id string) (value *PeerConn, ok bool) {
-	v, exist := pm.peers.Load(id)
-	ok = exist
+func (pm *PeerConnManager) GetPeerByID(id string) *PeerConn {
+	pm.mu.RLock()
+	defer pm.mu.RUnlock()
+	value, ok := pm.peers[id]
 	if ok {
-		value = v.(*PeerConn)
+		return value
 	} else {
-		value = nil
+		return nil
 	}
-	return
 }
 
 func (pm *PeerConnManager) DeletePeer(id string) {
-	pm.mu.Lock()
-	defer pm.mu.Unlock()
-	_, exist := pm.GetPeerByID(id)
-	if exist {
-		pm.peers.Delete(id)
-		pm.count--
+	if pm.GetPeerByID(id) != nil {
+		pm.mu.Lock()
+		defer pm.mu.Unlock()
+		delete(pm.peers, id)
 		pm.log.WithFields(logrus.Fields{
-			"countConn": pm.count,
+			"countConn": pm.PeerConnNum,
 		}).Info()
 	}
-
 }
 
 func (pm *PeerConnManager) PeerConnNum() uint32 {
-	return pm.count
+	return uint32(len(pm.peers))
 }
