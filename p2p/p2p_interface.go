@@ -29,7 +29,7 @@ func CreateP2PNetwork(id []byte, port int, logger *logrus.Entry) (P2PInterface, 
 	if testStrategy == "DELAY_BEFORE_RECEIVELOOP" {
 		p := &TestP2P{
 			P2P{
-				peers:    &PeerConnManager{log: logger},
+				peers:    CreatePeerConnManager(log),
 				suite:    suite,
 				messages: make(chan P2PMessage, 100),
 				port:     port,
@@ -39,7 +39,7 @@ func CreateP2PNetwork(id []byte, port int, logger *logrus.Entry) (P2PInterface, 
 		return p, p.messages, nil
 	} else {
 		p := &P2P{
-			peers:    &PeerConnManager{log: logger},
+			peers:    CreatePeerConnManager(log),
 			suite:    suite,
 			messages: make(chan P2PMessage, 100),
 			port:     port,
