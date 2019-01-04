@@ -7,6 +7,7 @@ services:
    environment:
      - NODEROLE=boot
      - PEERSIZE=10
+     - TESTSTRATEGY=DKG
  peernode:
    image: peernode
    depends_on:

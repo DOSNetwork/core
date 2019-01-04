@@ -8,6 +8,7 @@ services:
       - NODEROLE=boot
       - PEERSIZE=10
       - DKGROUND=3
+      - TESTSTRATEGY=DKGMULTIGROUPING
   peernode:
     image: peernode
     depends_on:
