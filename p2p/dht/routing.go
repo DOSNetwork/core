@@ -176,37 +176,49 @@ func (t *RoutingTable) FindClosestPeers(target internal.ID, count int) (peers []
 		return []internal.ID{}
 	}
 
+
 	bucketID := PrefixLen(XorID(target, t.self))
-	bucket := t.Bucket(bucketID)
 
-	bucket.mutex.RLock()
 
-	for e := bucket.Front(); e != nil; e = e.Next() {
-		peers = append(peers, e.Value.(internal.ID))
-	}
-
-	bucket.mutex.RUnlock()
-
-	for i := 1; len(peers) < count && (bucketID-i >= 0 || bucketID+i < len(t.self.Id)*8); i++ {
-		if bucketID-i >= 0 {
-			other := t.Bucket(bucketID - i)
+	l := list.New()
+	tempID := XorID(target, t.self)
+	for i := bucketID; len(peers) < count && i < len(t.self.Id)*8; i++ {
+		indexofid := i / 8
+		posofbyte := i % 8
+		if (tempID.Id[indexofid] & (1<<uint(7 - posofbyte))) != 0 {
+			other := t.Bucket(i)
 			other.mutex.RLock()
 			for e := other.Front(); e != nil; e = e.Next() {
 				peers = append(peers, e.Value.(internal.ID))
 			}
 			other.mutex.RUnlock()
-		}
-
-		if bucketID+i < len(t.self.Id)*8 {
-			other := t.Bucket(bucketID + i)
-			other.mutex.RLock()
-			for e := other.Front(); e != nil; e = e.Next() {
-				peers = append(peers, e.Value.(internal.ID))
-			}
-			other.mutex.RUnlock()
+		}else {
+			l.PushFront(i)
 		}
 	}
 
+
+	for el := l.Front(); len(peers) < count && el != nil; el = el.Next() {
+		bi := el.Value.(int)
+		other := t.Bucket(bi)
+		other.mutex.RLock()
+		for e := other.Front(); e != nil; e = e.Next() {
+			peers = append(peers, e.Value.(internal.ID))
+		}
+		other.mutex.RUnlock()
+	}
+
+
+	for i := bucketID - 1; len(peers) < count && i >= 0; i-- {
+		other := t.Bucket(i)
+		other.mutex.RLock()
+		for e := other.Front(); e != nil; e = e.Next() {
+			peers = append(peers, e.Value.(internal.ID))
+		}
+		other.mutex.RUnlock()
+	}
+
+	peers = append(peers, t.self)
 	// Sort peers by XorID distance.
 	sort.Slice(peers, func(i, j int) bool {
 		left := XorID(peers[i], target)
@@ -214,9 +226,11 @@ func (t *RoutingTable) FindClosestPeers(target internal.ID, count int) (peers []
 		return Less(left, right)
 	})
 
+
 	if len(peers) > count {
 		peers = peers[:count]
 	}
+
 
 	return peers
 }
