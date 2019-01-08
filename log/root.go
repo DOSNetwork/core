@@ -27,18 +27,19 @@ func init() {
 }
 
 // Info is a convenient alias for Root().Info
-func Info(msg string) {
+func Info(msg ...interface{}) {
 	root.Info(msg)
 }
-func Warn(msg string) {
+
+func Warn(msg ...interface{}) {
 	root.Warn(msg)
 }
 
-func Error(err error) {
+func Error(err ...interface{}) {
 	root.Error(err)
 }
 
-func Fatal(msg string) {
+func Fatal(msg ...interface{}) {
 	root.Fatal(msg)
 }
 

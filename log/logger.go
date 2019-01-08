@@ -35,10 +35,10 @@ type Logger interface {
 	New(key string, value interface{}) Logger
 
 	Metrics(key string, value interface{})
-	Info(msg string)
-	Warn(msg string)
-	Error(err error)
-	Fatal(msg string)
+	Info(msg ...interface{})
+	Warn(msg ...interface{})
+	Error(err ...interface{})
+	Fatal(msg ...interface{})
 }
 
 type logger struct {
@@ -51,20 +51,20 @@ func (l *logger) New(key string, value interface{}) Logger {
 	return child
 }
 
-func (l *logger) Info(msg string) {
+func (l *logger) Info(msg ...interface{}) {
 	l.entry.Info(msg)
 }
 
-func (l *logger) Warn(msg string) {
+func (l *logger) Warn(msg ...interface{}) {
 	l.entry.Warn(msg)
 }
 
-func (l *logger) Error(err error) {
+func (l *logger) Error(err ...interface{}) {
 	s := stack.Trace().TrimRuntime()
 	l.entry.WithFields(logrus.Fields{"stack": s}).Error(err)
 }
 
-func (l *logger) Fatal(msg string) {
+func (l *logger) Fatal(msg ...interface{}) {
 	l.entry.Fatal(msg)
 }
 
