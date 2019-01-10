@@ -270,6 +270,7 @@ func (r test5) StartTest(d *PeerNode) {
 	suite := suites.MustFind("bn256")
 	groupCmd := make(chan [][]byte)
 	defer close(groupCmd)
+
 	p2pDkg, dkgEvent := dkg.CreateP2PDkg(d.p, suite, d.dkgChan, groupCmd)
 
 	roundCount := uint16(1)

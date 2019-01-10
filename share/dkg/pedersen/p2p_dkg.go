@@ -1,6 +1,7 @@
 package dkg
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"time"
@@ -51,10 +52,16 @@ func CreateP2PDkg(p p2p.P2PInterface, suite suites.Suite, peerEvent chan p2p.P2P
 		chPeerEvent:    peerEvent,
 		currentState:   INIT,
 		subscribeEvent: make(chan int),
+		done:           make(chan struct{}),
 	}
 
 	go func() {
 		for groupIds := range groupCmd {
+			if d.ctx != nil {
+				d.Reset()
+			} else {
+				d.ctx, d.cancel = context.WithCancel(context.Background())
+			}
 			go d.eventLoop(groupIds)
 		}
 	}()
@@ -90,6 +97,9 @@ type P2PDkg struct {
 
 	currentState int
 	groupCmd     chan [][]byte
+	ctx          context.Context
+	cancel       context.CancelFunc
+	done         chan struct{}
 }
 
 func (d *P2PDkg) SetGroupId(id []byte) {
@@ -125,11 +135,15 @@ func (d *P2PDkg) IsCertified() bool {
 }
 
 func (d *P2PDkg) Reset() {
+	d.cancel()
+	<-d.done
+	d.done = make(chan struct{})
+	d.ctx, d.cancel = context.WithCancel(context.Background())
 	d.publicKeys = d.publicKeys[:0]
 	d.deals = d.deals[:0]
 	d.pubkeyIdMap = make(map[string]string)
-	d.partSec = d.suite.Scalar().Pick(d.suite.RandomStream())
-	d.partPub = d.suite.Point().Mul(d.partSec, nil)
+	//d.partSec = d.suite.Scalar().Pick(d.suite.RandomStream())
+	//d.partPub = d.suite.Point().Mul(d.partSec, nil)
 	d.currentState = INIT
 }
 
@@ -163,11 +177,10 @@ func (d *P2PDkg) eventLoop(groupIds [][]byte) {
 	defer close(dealCh)
 	respsCh := make(chan Responses)
 	defer close(respsCh)
-	done := make(chan struct{})
 
 	d.pipeExchangePubKey(groupIds, pubKeyCh)
 	d.pipeNewDistKeyGenerator(pubKeyCh)
-	d.pipeProcessDealAndResponses(dealCh, respsCh, done)
+	d.pipeProcessDealAndResponses(dealCh, respsCh)
 
 	for {
 		select {
@@ -199,7 +212,7 @@ func (d *P2PDkg) eventLoop(groupIds [][]byte) {
 				unknown++
 				fmt.Println("unknown", content)
 			}
-		case <-done:
+		case <-d.ctx.Done():
 			fmt.Println("eventLoop closed")
 			return
 		}
@@ -225,7 +238,13 @@ func (d *P2PDkg) pipeExchangePubKey(groupIds [][]byte, pubKeych chan<- vss.Publi
 				log.WithField("function", "setPoint").Warn(err)
 			}
 			d.broadcast(&public)
-			pubKeych <- public
+			select {
+			case <-d.ctx.Done():
+				close(d.done)
+				return
+			default:
+				pubKeych <- public
+			}
 
 			log.WithFields(logrus.Fields{
 				"function":           "enterExchangePubKey",
@@ -279,9 +298,8 @@ func (d *P2PDkg) pipeNewDistKeyGenerator(pubKeych <-chan vss.PublicKey) {
 }
 
 //This is only happened after all peers has all public keys
-func (d *P2PDkg) pipeProcessDealAndResponses(dealCh <-chan Deal, respsCh chan Responses, done chan<- struct{}) {
+func (d *P2PDkg) pipeProcessDealAndResponses(dealCh <-chan Deal, respsCh chan Responses) {
 	go func() {
-		defer close(done)
 		for {
 			select {
 			case deal := <-dealCh:
@@ -308,6 +326,9 @@ func (d *P2PDkg) pipeProcessDealAndResponses(dealCh <-chan Deal, respsCh chan Re
 						log.WithField("function", "ProcessResponse").Warn(err)
 					}
 				}
+			case <-d.ctx.Done():
+				fmt.Println("pipeProcessDealAndResponses closed")
+				return
 			}
 			if len(d.deals) == d.nbParticipants-1 && (*d.partDkg).Certified() {
 				var err error
@@ -328,6 +349,7 @@ func (d *P2PDkg) pipeProcessDealAndResponses(dealCh <-chan Deal, respsCh chan Re
 					d.subscribeEvent <- VERIFIED
 				}
 				fmt.Println("pipeProcessDealAndResponses closed")
+				d.cancel()
 				return
 			}
 		}
