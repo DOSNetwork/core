@@ -336,7 +336,7 @@ func (r test5) StartTest(d *PeerNode) {
 	suite := suites.MustFind("bn256")
 	groupCmd := make(chan [][]byte)
 	defer close(groupCmd)
-	p2pDkg, dkgEvent := dkg.CreateP2PDkg(d.p, suite, d.dkgChan, groupCmd, d.log)
+	_, dkgEvent := dkg.CreateP2PDkg(d.p, suite, d.dkgChan, groupCmd, d.log)
 
 	roundCount := uint16(1)
 	for {
@@ -355,7 +355,6 @@ func (r test5) StartTest(d *PeerNode) {
 			d.log.WithFields(logrus.Fields{
 				"eventCheckRoundDone": roundCount,
 			}).Info()
-			p2pDkg.Reset()
 			next := d.requestIsNextRoundReady(roundCount)
 			if next == byte(DKGROUNDFINISH) {
 				d.log.WithFields(logrus.Fields{
