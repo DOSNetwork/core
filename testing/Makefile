@@ -49,7 +49,12 @@ docker-peernode:
 	cd .. && docker build -t peernode -f Dockerfile.peernode .
 	rm ../Dockerfile.peernode
 
-docker-all: gen docker-bootnode docker-dosnode docker-usernode docker-peernode
+docker-peerTalk:
+	cp peerTalk/Dockerfile ../Dockerfile.peertalk
+	cd .. && docker build -t peertalk -f Dockerfile.peertalk .
+	rm ../Dockerfile.peertalk
+
+docker-all: gen docker-bootnode docker-dosnode docker-usernode docker-peernode docker-peerTalk
 	docker image prune -f
 
 update-dosenv:
