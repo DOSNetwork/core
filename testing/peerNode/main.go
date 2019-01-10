@@ -7,22 +7,10 @@ import (
 	"runtime/debug"
 	"strconv"
 	"strings"
-	"time"
-
-	"github.com/bshuster-repo/logrus-logstash-hook"
 
 	"github.com/DOSNetwork/core/configuration"
 	"github.com/DOSNetwork/core/testing/peerNode/node"
-
-	"github.com/sirupsen/logrus"
 )
-
-/*
-The purpose of meeting is to test findNode and sendMessageById
-
-*/
-
-var log *logrus.Logger
 
 func bToMb(b uint64) uint64 {
 	return b / 1024 / 1024
@@ -62,28 +50,17 @@ func main() {
 	tStrategy := os.Getenv("TESTSTRATEGY")
 
 	//0)initial log module
-	log = logrus.New()
-
-	hook, err := logrustash.NewHookWithFields("tcp", "163.172.36.173:9500", "匹凸匹test", logrus.Fields{
-		"startingTimestamp": time.Now(),
-		"testCode":          os.Getenv("TESTCODE"),
-	})
-	if err != nil {
-		log.Error(err)
-	}
-
-	log.AddHook(hook)
-
+	//	log = logrus.New()
 	//boot node
 	if noderole == "boot" {
 		b := new(node.BootNode)
-		b.Init(port, peerSize, log.WithField("testType", tStrategy))
+		b.Init(port, peerSize)
 		b.EventLoop()
 	} else {
 		s := strings.Split(bootStrapIP, ":")
 		ip, _ = s[0], s[1]
 		d := new(node.PeerNode)
-		d.Init(ip, port, peerSize, numMessages, tStrategy, log.WithField("testType", tStrategy))
+		d.Init(ip, port, peerSize, numMessages, tStrategy)
 		d.EventLoop()
 	}
 }

@@ -4,7 +4,7 @@ import (
 	"bufio"
 	"encoding/binary"
 	"errors"
-	"fmt"
+	"io"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -16,7 +16,9 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes"
+	"github.com/golang/protobuf/ptypes/any"
 
+	"github.com/DOSNetwork/core/log"
 	"github.com/dedis/kyber"
 )
 
@@ -29,15 +31,11 @@ const (
 )
 
 type PeerConn struct {
-	//TODO:remove *P2P and use sync map to manage the lifecycle of PeerConn
-	p2pnet *P2P
-	//TODO:
-	rxMessage chan P2PMessage
-	//TODO:
-	pubKey kyber.Point
-	conn   *net.Conn
-	rw     *bufio.ReadWriter
-	//TODO:Need to be refactored
+	p2pnet          *P2P
+	rxMessage       chan P2PMessage
+	pubKey          kyber.Point
+	conn            *net.Conn
+	rw              *bufio.ReadWriter
 	waitForHi       chan bool
 	done            chan bool
 	identity        internal.ID
@@ -47,6 +45,7 @@ type PeerConn struct {
 	readWriteCount  uint64
 	idelPeriodCount uint8
 	lastusedtime    time.Time
+	logger          log.Logger
 }
 
 // RequestState represents a state of a request.
@@ -64,12 +63,14 @@ func NewPeerConn(p2pnet *P2P, conn *net.Conn, rxMessage chan P2PMessage) (peer *
 		done:         make(chan bool, 1),
 		rw:           bufio.NewReadWriter(bufio.NewReader(*conn), bufio.NewWriter(*conn)),
 		lastusedtime: time.Now(),
+		logger:       p2pnet.logger,
 	}
 	if err = peer.Start(); err != nil {
+		p2pnet.logger.Error(err)
 		return
 	}
 
-	//go peer.heartBeat()
+	go peer.heartBeat()
 	return
 }
 
@@ -81,15 +82,15 @@ func (p *PeerConn) Start() (err error) {
 func (p *PeerConn) SendMessage(msg proto.Message) (err error) {
 	p.lastusedtime = time.Now()
 	var prepared *internal.Package
-	prepared, err = p.prepareMessage(msg)
-	if err != nil {
-		log.WithField("function", "prepareMessage").Warn("PeerConn sendLoop ", err)
+	if prepared, err = p.prepareMessage(msg); err != nil {
+		p.logger.Error(err)
 		return
 	}
 
 	prepared.RequestNonce = atomic.AddUint64(&p.RequestNonce, 1)
 	if err = p.SendPackage(prepared); err != nil {
-		log.WithField("function", "sendMessage").Warn("PeerConn sendLoop ", err)
+		p.logger.Error(err)
+		return
 	}
 
 	atomic.AddUint64(&p.readWriteCount, 1)
@@ -97,16 +98,21 @@ func (p *PeerConn) SendMessage(msg proto.Message) (err error) {
 }
 
 func (p *PeerConn) receiveLoop() {
+	var err error
+	var buf []byte
+	var pa *internal.Package
+	var ptr *ptypes.DynamicAny
+
 	for {
-		buf, err := p.receivePackage()
-		if err != nil {
-			log.WithField("function", "receivePackage").Warn("PeerConn ", p.identity.Id, " err ", err)
+		if buf, err = p.receivePackage(); err != nil {
+			if err != io.EOF {
+				p.logger.Error(err)
+			}
 			break
 		}
 
-		pa, ptr, err := p.decodePackage(buf)
-		if err != nil {
-			log.WithField("function", "decodePackage").Warn("PeerConn decodePackage err ", err)
+		if pa, ptr, err = p.decodePackage(buf); err != nil {
+			p.logger.Error(err)
 			continue
 		}
 
@@ -130,9 +136,10 @@ func (p *PeerConn) receiveLoop() {
 				p.identity.PublicKey = content.GetPublicKey()
 				pub := suite.G2().Point()
 				if err = pub.UnmarshalBinary(content.GetPublicKey()); err != nil {
-					log.WithField("function", "unmarshalBinary").Warn("PeerConn UnmarshalBinary err ", err)
+					p.logger.Error(err)
 				}
 				p.pubKey = pub
+				p.logger.Debug("Conn Established")
 				p.waitForHi <- true
 				response := &internal.Hi{
 					PublicKey: p.p2pnet.identity.PublicKey,
@@ -140,10 +147,8 @@ func (p *PeerConn) receiveLoop() {
 					Id:        p.p2pnet.identity.Id,
 				}
 				if err := p.Reply(pa.GetRequestNonce(), response); err != nil {
-					log.WithField("function", "reply").Warn("Reply Hi message err ", err)
+					p.logger.Error(err)
 				}
-			} else {
-				fmt.Println("Ignore Hi")
 			}
 
 			//TODO:move this to routing
@@ -158,12 +163,12 @@ func (p *PeerConn) receiveLoop() {
 			}
 
 			if err := p.Reply(pa.GetRequestNonce(), response); err != nil {
-				log.WithField("function", "reply").Warn("PeerConn LookupNodeRequest Reply err ", err)
+				p.logger.Error(err)
 			}
 		case *internal.Ping:
 			response := &internal.Pong{}
 			if err := p.Reply(pa.GetRequestNonce(), response); err != nil {
-				log.WithField("function", "reply").Warn("PeerConn Ping Reply err ", err)
+				p.logger.Error(err)
 			}
 		case *internal.Pong:
 		default:
@@ -173,21 +178,19 @@ func (p *PeerConn) receiveLoop() {
 			go func() { p.rxMessage <- msg }()
 			response := &internal.Pong{}
 			if err := p.Reply(pa.GetRequestNonce(), response); err != nil {
-				log.WithField("function", "reply").Warn("PeerConn Ping Reply err ", err)
+				p.logger.Error(err)
 			}
 		}
 	}
-
 	//if _, loaded := p.p2pnet.peers.GetPeerByID(string(p.identity.Id)); loaded {
 	p.p2pnet.peers.DeletePeer(string(p.identity.Id))
 	//}
 
 	if err := (*p.conn).Close(); err != nil {
-		log.WithField("function", "receiveLoopClose").Warn(err)
-
+		p.logger.Error(err)
 	}
 	close(p.waitForHi)
-	fmt.Println("ReceiveLoop done ", p.identity.Id, " ", p.identity.Address)
+	p.logger.Debug("Conn End")
 }
 
 func (p *PeerConn) End() {
@@ -195,7 +198,7 @@ func (p *PeerConn) End() {
 		return
 	}
 	if err := (*p.conn).Close(); err != nil {
-		log.WithField("function", "end").Warn("!!!!! End err ", err, " ", p.identity.Id, " ", p.identity.Address)
+		p.logger.Error(err)
 		p.p2pnet.peers.DeletePeer(string(p.identity.Id))
 	}
 }
@@ -209,17 +212,17 @@ func (p *PeerConn) receivePackage() ([]byte, error) {
 	bytesRead, totalBytesRead := 0, 0
 	c := *p.conn
 	for totalBytesRead < 4 && err == nil {
-		bytesRead, err = c.Read(buffer[totalBytesRead:])
-		totalBytesRead += bytesRead
-		if err != nil {
+		if bytesRead, err = c.Read(buffer[totalBytesRead:]); err != nil {
 			return nil, err
 		}
+		totalBytesRead += bytesRead
 	}
 
 	// Decode message size.
 	size := binary.BigEndian.Uint32(buffer)
 	if size == 0 {
-		return nil, errors.New("received an empty message from a peer")
+		err := errors.New("received an empty message from a peer")
+		return nil, err
 	}
 
 	// Read until all message bytes have been read.
@@ -228,7 +231,9 @@ func (p *PeerConn) receivePackage() ([]byte, error) {
 	bytesRead, totalBytesRead = 0, 0
 
 	for totalBytesRead < int(size) && err == nil {
-		bytesRead, err = c.Read(buffer[totalBytesRead:])
+		if bytesRead, err = c.Read(buffer[totalBytesRead:]); err != nil {
+			return nil, err
+		}
 		totalBytesRead += bytesRead
 	}
 
@@ -241,7 +246,6 @@ func (p *PeerConn) decodePackage(bytes []byte) (*internal.Package, *ptypes.Dynam
 		return nil, nil, err
 	}
 
-	//Todo verify pa.Signature by public key
 	pub := suite.G2().Point()
 	_ = pub.UnmarshalBinary(pa.GetPubkey())
 
@@ -265,6 +269,10 @@ func (p *PeerConn) decodePackage(bytes []byte) (*internal.Package, *ptypes.Dynam
 }
 
 func (p *PeerConn) SayHi() (err error) {
+	var response proto.Message
+	var content *internal.Hi
+	var ok bool
+
 	request := new(Request)
 	request.SetMessage(&internal.Hi{
 		PublicKey: p.p2pnet.identity.PublicKey,
@@ -273,37 +281,35 @@ func (p *PeerConn) SayHi() (err error) {
 	})
 	request.SetTimeout(HITIMEOUT * time.Second)
 
-	response, err := p.Request(request)
-	if err != nil {
-		log.WithField("function", "request").Warn("Request Hi err", err)
+	if response, err = p.Request(request); err != nil {
 		return err
 	}
 
-	content, ok := response.(*internal.Hi)
-	if !ok {
-		return errors.New("Not a Hi message")
+	if content, ok = response.(*internal.Hi); !ok {
+		err := errors.New("Not a Hi message")
+		return err
 	}
+
 	if len(p.identity.Id) == 0 {
 		p.identity.Id = content.GetId()
 		p.identity.Address = content.GetAddress()
 		p.identity.PublicKey = content.GetPublicKey()
 		pub := suite.G2().Point()
 		if err = pub.UnmarshalBinary(content.GetPublicKey()); err != nil {
-			log.WithField("function", "unmarshalBinary").Warn("PeerConn UnmarshalBinary err ", err)
+			return err
 		}
 		p.pubKey = pub
+		p.logger.Debug("Conn Established")
 	}
 	return nil
 }
 
-//Add a timer to avoid wait for Hi forever
 func (p *PeerConn) HeardHi() (err error) {
 	timer := time.NewTimer(HITIMEOUT * time.Second)
 
 	select {
 	case <-timer.C:
-		fmt.Println("Time expire")
-		err = errors.New("PeerConn: Waiting for hi time expire")
+		err = errors.New("Info Exchange Timeout")
 	case <-p.waitForHi:
 		timer.Stop()
 	}
@@ -313,12 +319,13 @@ func (p *PeerConn) HeardHi() (err error) {
 
 func (p *PeerConn) SendPackage(msg proto.Message) error {
 	if msg == nil {
-		return errors.New("network: message is null")
+		err := errors.New("Message is nil")
+		return err
 	}
 	//Encode the package
 	bytes, err := proto.Marshal(msg)
 	if err != nil {
-		log.WithField("function", "marshal").Warn("SendPackage Marshal err ", err)
+		return err
 	}
 	// Serialize size.
 	prefix := make([]byte, 4)
@@ -328,50 +335,50 @@ func (p *PeerConn) SendPackage(msg proto.Message) error {
 	defer p.mux.Unlock()
 
 	if _, err := p.rw.Write(bytes); err != nil {
-		//fmt.Println("SendPackage Write err ", err)
 		return err
 	}
 	if err := p.rw.Flush(); err != nil {
-		//fmt.Println("!!!!SendPackage Flush err ", err)
 		return err
 	}
 
 	return nil
 }
 
-func (p *PeerConn) prepareMessage(msg proto.Message) (*internal.Package, error) {
-	var err error
+func (p *PeerConn) prepareMessage(msg proto.Message) (pa *internal.Package, err error) {
+	var anything *any.Any
+	var sig, pub []byte
 	if msg == nil {
-		return nil, errors.New("network: message is null")
+		err = errors.New("network: message is null")
+		return
 	}
 
 	id := internal.ID(p.p2pnet.identity)
-	anything, err := ptypes.MarshalAny(msg)
-	if err != nil {
-		log.WithField("function", "marshalAny").Warn("ptypes.MarshalAny ", err)
-		return nil, err
+	if anything, err = ptypes.MarshalAny(msg); err != nil {
+		return
 	}
 	//TODO:change to AES256-GCM
-	sig, err := bls.Sign(p.p2pnet.suite, p.p2pnet.secKey, anything.Value)
-	if err != nil {
-		log.WithField("function", "blsSign").Warn("prepareMessage ", err)
+	if sig, err = bls.Sign(p.p2pnet.suite, p.p2pnet.secKey, anything.Value); err != nil {
+		return
 	}
-	pub, _ := p.p2pnet.pubKey.MarshalBinary()
+	if pub, err = p.p2pnet.pubKey.MarshalBinary(); err != nil {
+		return
+	}
 
-	pa := &internal.Package{
+	pa = &internal.Package{
 		Sender:    &id,
 		Anything:  anything,
 		Pubkey:    pub,
 		Signature: sig,
 	}
 
-	return pa, nil
+	return
 }
 
 // Request requests for a response for a request sent to a given peer.
 func (p *PeerConn) Request(req *Request) (proto.Message, error) {
 	prepared, err := p.prepareMessage(req.Message)
 	if err != nil {
+		p.logger.Error(err)
 		return nil, err
 	}
 
@@ -397,6 +404,7 @@ func (p *PeerConn) Request(req *Request) (proto.Message, error) {
 	defer p.Requests.Delete(prepared.GetRequestNonce())
 
 	if err := p.SendPackage(prepared); err != nil {
+		p.logger.Error(err)
 		return nil, err
 	}
 
@@ -404,8 +412,9 @@ func (p *PeerConn) Request(req *Request) (proto.Message, error) {
 	case res := <-channel:
 		return res, nil
 	case <-time.After(req.Timeout):
-		//TODO:Check to see if conn has been closed.
-		return nil, errors.New("request timed out")
+		err := errors.New("request timed out")
+		p.logger.Error(err)
+		return nil, err
 	}
 }
 
@@ -413,6 +422,7 @@ func (p *PeerConn) Request(req *Request) (proto.Message, error) {
 func (p *PeerConn) Reply(nonce uint64, message proto.Message) error {
 	prepared, err := p.prepareMessage(message)
 	if err != nil {
+		p.logger.Error(err)
 		return err
 	}
 
@@ -421,7 +431,7 @@ func (p *PeerConn) Reply(nonce uint64, message proto.Message) error {
 	prepared.ReplyFlag = true
 
 	if err := p.SendPackage(prepared); err != nil {
-		log.WithField("function", "sendPackage").Warn("PeerConn Reply err ", err)
+		p.logger.Error(err)
 		return err
 	}
 
@@ -435,12 +445,10 @@ func (p *PeerConn) Reply(nonce uint64, message proto.Message) error {
 }
 
 func (p *PeerConn) heartBeat() {
-	//fmt.Println("heartbeat started")
 	ticker := time.NewTicker(HEARTBEATINTERVAL * time.Second)
 	for {
 		select {
 		case <-ticker.C:
-			//fmt.Println(p.idelPeriodCount, p.readWriteCount, CONNIDLETIMEOUT)
 			if p.readWriteCount == 0 {
 				p.idelPeriodCount++
 			} else {
@@ -449,7 +457,7 @@ func (p *PeerConn) heartBeat() {
 
 			if p.idelPeriodCount == CONNIDLETIMEOUT {
 				if err := (*p.conn).Close(); err != nil {
-					log.Println(err)
+					p.logger.Error(err)
 				}
 				return
 			}
@@ -459,18 +467,17 @@ func (p *PeerConn) heartBeat() {
 				request := new(Request)
 				request.SetMessage(&internal.Ping{})
 				request.SetTimeout(HEARTBEATMAXWAIT * time.Second)
-				//fmt.Println("send ping")
 				if _, err := p.Request(request); err != nil {
+					p.logger.Error(err)
 					timeout = true
 				} else {
-					//fmt.Println("received pong")
 					timeout = false
 					break
 				}
 			}
 			if timeout {
 				if err := (*p.conn).Close(); err != nil {
-					log.WithField("function", "heartBeatClose").Warn(err)
+					p.logger.Error(err)
 				}
 				return
 			} else {

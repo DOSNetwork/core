@@ -5,6 +5,8 @@ services:
     deploy:
       replicas: 1
     environment:
+      - appSubject=T_TBLS
+      - appName=BootNode
       - NODEROLE=boot
       - PEERSIZE=10
       - TESTSTRATEGY=TBLS
@@ -13,8 +15,10 @@ services:
     depends_on:
       - bootstrap
     deploy:
-      replicas: 5
+      replicas: 10
     environment:
+      - appSubject=T_TBLS
+      - appName=PeerNode
       - BOOTSTRAPIP=bootstrap:44460
       - PEERSIZE=10
       - GROUPSIZE=10

@@ -5,9 +5,10 @@ import (
 	"math"
 	"sync"
 
-	"github.com/sirupsen/logrus"
 	"os"
 	"strconv"
+
+	"github.com/DOSNetwork/core/log"
 )
 
 var MAXPEERCONNCOUNT uint32 = 100000
@@ -21,15 +22,15 @@ func init() {
 }
 
 type PeerConnManager struct {
-	mu    sync.RWMutex
-	peers map[string]*PeerConn
-	log   *logrus.Entry
+	mu     sync.RWMutex
+	peers  map[string]*PeerConn
+	logger log.Logger
 }
 
-func CreatePeerConnManager(log *logrus.Entry) (pconn *PeerConnManager) {
+func CreatePeerConnManager() (pconn *PeerConnManager) {
 	pconn = &PeerConnManager{
-		peers: make(map[string]*PeerConn),
-		log:   log,
+		peers:  make(map[string]*PeerConn),
+		logger: log.New("module", "ConnManager"),
 	}
 	return pconn
 }
@@ -63,9 +64,7 @@ func (pm *PeerConnManager) LoadOrStore(id string, peer *PeerConn) (actual *PeerC
 		fmt.Println("Force delete ", p.identity.Id)
 		p.End()
 	}
-	pm.log.WithFields(logrus.Fields{
-		"countConn": pm.PeerConnNum(),
-	}).Info()
+
 	return
 }
 
@@ -93,12 +92,10 @@ func (pm *PeerConnManager) DeletePeer(id string) {
 		pm.mu.Lock()
 		defer pm.mu.Unlock()
 		delete(pm.peers, id)
-		pm.log.WithFields(logrus.Fields{
-			"countConn": pm.PeerConnNum,
-		}).Info()
 	}
 }
 
 func (pm *PeerConnManager) PeerConnNum() uint32 {
+	pm.logger.Metrics(len(pm.peers))
 	return uint32(len(pm.peers))
 }

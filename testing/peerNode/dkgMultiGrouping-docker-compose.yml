@@ -5,6 +5,8 @@ services:
     deploy:
       replicas: 1
     environment:
+      - appSubject=T_DKGMULTI
+      - appName=BootNode
       - NODEROLE=boot
       - PEERSIZE=10
       - DKGROUND=3
@@ -16,6 +18,8 @@ services:
     deploy:
       replicas: 10
     environment:
+      - appSubject=T_DKGMULTI
+      - appName=PeerNode
       - BOOTSTRAPIP=bootstrap:44460
       - PEERSIZE=10
       - GROUPSIZE=5

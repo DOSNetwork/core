@@ -3,25 +3,17 @@ package node
 import (
 	"crypto/rand"
 	"encoding/binary"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"strconv"
 	"sync"
 
-	//	"github.com/ethereum/go-ethereum/common"
-
-	//	"github.com/DOSNetwork/core/testing/peerNode/internalMsg"
-
-	"github.com/DOSNetwork/core/p2p"
-	//	"github.com/DOSNetwork/core/p2p/dht"
-	//	"github.com/golang/protobuf/proto"
-
 	"time"
 
+	"github.com/DOSNetwork/core/log"
+	"github.com/DOSNetwork/core/p2p"
 	"github.com/gorilla/mux"
-	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -57,14 +49,14 @@ func GenerateRandomBytes(n int) ([]byte, error) {
 	return b, nil
 }
 
-func (b *BootNode) Init(port, peerSize int, logger *logrus.Entry) {
+func (b *BootNode) Init(port, peerSize int) {
 	//0)prepare round count for dkg test
 	dkgRoundStr := os.Getenv("DKGROUND")
 	if len(dkgRoundStr) > 0 {
 		var err error
 		dkgRound, err = strconv.Atoi(dkgRoundStr)
 		if err != nil {
-			b.log.Fatal(err)
+			//b.log.Fatal(err)
 		}
 	}
 	//1)Generate member ID
@@ -82,7 +74,6 @@ func (b *BootNode) Init(port, peerSize int, logger *logrus.Entry) {
 	b.readynode = make(map[string]bool)
 	b.finishnode = make(map[string]bool)
 	b.dkgProgress = make(map[string]uint16)
-	b.log = logger
 
 	for i := 1; i <= b.peerSize; i++ {
 		id, _ := GenerateRandomBytes(len(bootID))
@@ -106,7 +97,7 @@ func (b *BootNode) Init(port, peerSize int, logger *logrus.Entry) {
 	go http.ListenAndServe(":8080", r)
 
 	//3)Build a p2p network
-	b.p, b.peerEvent, _ = p2p.CreateP2PNetwork(bootID, port, b.log)
+	b.p, b.peerEvent, _ = p2p.CreateP2PNetwork(bootID, port)
 
 	go b.p.Listen()
 }
@@ -122,26 +113,17 @@ func (b *BootNode) getID(w http.ResponseWriter, r *http.Request) {
 	ip := string(body)
 	if b.ipIdMap[ip] == nil {
 		if b.count >= b.peerSize {
-			fmt.Println("getID over size error!!!")
 			return
 		}
 		b.allIP = append(b.allIP, ip)
-		fmt.Println("getID count ", b.count, " peerSize", b.peerSize, " len(b.allIP)", len(b.allIP))
+		//fmt.Println("getID count ", b.count, " peerSize", b.peerSize, " len(b.allIP)", len(b.allIP))
 		b.ipIdMap[ip] = b.node.members[b.count]
 		b.dkgProgress[ip] = 0
 		b.count++
-		b.log.WithFields(logrus.Fields{
-			"eventGetID": b.count,
-		}).Info()
+		log.Progress("GetID")
 	}
 
 	w.Write(b.ipIdMap[ip])
-
-	//TODO:Send addresses and IDs after all peer node already build p2p connection to boot node
-	//if b.count == b.peerSize {
-	//	go b.sendPeerAddresses()
-	//	go b.sendPeerIDs()
-	//}
 }
 
 func (b *BootNode) getAllIDs(w http.ResponseWriter, r *http.Request) {
@@ -161,12 +143,10 @@ func (b *BootNode) getAllIPs(w http.ResponseWriter, r *http.Request) {
 }
 
 func (b *BootNode) isAllnodeready() bool {
-	fmt.Println("isAllnodeready ", len(b.readynode) >= b.peerSize, "", len(b.readynode))
 	return len(b.readynode) >= b.peerSize
 }
 
 func (b *BootNode) isAllnodefinish() bool {
-	fmt.Println("isAllnodefinish ", len(b.finishnode) >= b.peerSize, "", len(b.finishnode))
 	return len(b.finishnode) >= b.peerSize
 }
 
@@ -188,13 +168,11 @@ func (b *BootNode) isTestReady(w http.ResponseWriter, r *http.Request) {
 	b.lock.Lock()
 	if b.readynode[ip] == false {
 		b.readynode[ip] = true
+		log.Progress("TestReady")
 	}
 	b.lock.Unlock()
 
 	if b.isAllnodeready() {
-		b.log.WithFields(logrus.Fields{
-			"eventIsAllnodeready": len(b.readynode),
-		}).Info()
 		w.Write([]byte{ALLNODEREADY})
 	} else {
 		w.Write([]byte{ALLNODENOTREADY})
@@ -212,14 +190,8 @@ func (b *BootNode) isNextRoundReady(w http.ResponseWriter, r *http.Request) {
 	b.lock.Unlock()
 
 	if roundCount == uint16(dkgRound) {
-		b.log.WithFields(logrus.Fields{
-			"eventIsRoundFinished": ip,
-		}).Info()
 		w.Write([]byte{DKGROUNDFINISH})
 	} else if b.isAllNextRoundReady(roundCount) {
-		b.log.WithFields(logrus.Fields{
-			"eventIsNextRoundReady": ip,
-		}).Info()
 		w.Write([]byte{ALLNODEREADY})
 	} else {
 		w.Write([]byte{ALLNODENOTREADY})
@@ -236,9 +208,6 @@ func (b *BootNode) isTestFinish(w http.ResponseWriter, r *http.Request) {
 	b.lock.Unlock()
 
 	if b.isAllnodefinish() {
-		b.log.WithFields(logrus.Fields{
-			"eventIsAllnodefinish": len(b.finishnode),
-		}).Info()
 		w.Write([]byte{ALLNODEFINISH})
 		b.testFinishCount++
 		if b.testFinishCount >= b.peerSize {
@@ -258,11 +227,6 @@ func (b *BootNode) postHandler(w http.ResponseWriter, r *http.Request) {
 	b.lock.Lock()
 	delete(b.checkroll, string(body))
 	b.lock.Unlock()
-	fmt.Println("check done ", len(b.checkroll))
-
-	b.log.WithFields(logrus.Fields{
-		"eventTestDone": len(b.checkroll),
-	}).Info()
 }
 
 func (b *BootNode) EventLoop() {
@@ -272,8 +236,7 @@ L:
 		//event from peer
 		case _ = <-b.peerEvent:
 		case <-b.done:
-			fmt.Println("EventLoop done")
-			b.log.WithField("event", "EventLoop done").Info()
+			//fmt.Println("EventLoop done")
 			break L
 		default:
 		}

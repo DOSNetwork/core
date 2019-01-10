@@ -1,20 +1,20 @@
 package p2p
 
 import (
+	"encoding/hex"
 	"errors"
 	"net"
-	"os"
 
+	"github.com/DOSNetwork/core/log"
 	"github.com/DOSNetwork/core/suites"
 	"github.com/dedis/kyber"
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes"
-	"github.com/sirupsen/logrus"
+	"golang.org/x/crypto/sha3"
 )
 
 var (
 	suite = suites.MustFind("bn256")
-	log   *logrus.Entry
 )
 
 func genPair() (kyber.Scalar, kyber.Point) {
@@ -23,36 +23,43 @@ func genPair() (kyber.Scalar, kyber.Point) {
 	return secret, public
 }
 
-func CreateP2PNetwork(id []byte, port int, logger *logrus.Entry) (P2PInterface, chan P2PMessage, error) {
-	testStrategy := os.Getenv("TESTSTRATEGY")
-	log = logger
-	if testStrategy == "DELAY_BEFORE_RECEIVELOOP" {
-		p := &TestP2P{
-			P2P{
-				peers:    CreatePeerConnManager(log),
-				suite:    suite,
-				messages: make(chan P2PMessage, 100),
-				port:     port,
-			},
-			testStrategy,
-		}
-		return p, p.messages, nil
-	} else {
-		p := &P2P{
-			peers:    CreatePeerConnManager(log),
-			suite:    suite,
-			messages: make(chan P2PMessage, 100),
-			port:     port,
-		}
-		p.identity.Id = id
-		return p, p.messages, nil
-	}
+func Hex(a []byte) string {
+	unchecksummed := hex.EncodeToString(a[:])
+	sha := sha3.NewLegacyKeccak256()
+	sha.Write([]byte(unchecksummed))
+	hash := sha.Sum(nil)
 
+	result := []byte(unchecksummed)
+	for i := 0; i < len(result); i++ {
+		hashByte := hash[i/2]
+		if i%2 == 0 {
+			hashByte = hashByte >> 4
+		} else {
+			hashByte &= 0xf
+		}
+		if result[i] > '9' && hashByte > 7 {
+			result[i] -= 32
+		}
+	}
+	return "0x" + string(result)
 }
 
-func GetLocalIp() (string, error) {
-	addrs, err := net.InterfaceAddrs()
-	if err != nil {
+func CreateP2PNetwork(id []byte, port int) (P2PInterface, chan P2PMessage, error) {
+	p := &P2P{
+		peers:    CreatePeerConnManager(),
+		suite:    suite,
+		messages: make(chan P2PMessage, 100),
+		port:     port,
+		logger:   log.New("module", "p2p"),
+	}
+	p.identity.Id = id
+	return p, p.messages, nil
+}
+
+func GetLocalIP() (ip string, err error) {
+	var addrs []net.Addr
+
+	if addrs, err = net.InterfaceAddrs(); err != nil {
 		return "", err
 	}
 
@@ -63,7 +70,7 @@ func GetLocalIp() (string, error) {
 			}
 		}
 	}
-	return "", errors.New("ip not found")
+	return "", errors.New("IP not found")
 }
 
 type P2PMessage struct {
