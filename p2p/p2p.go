@@ -312,8 +312,8 @@ func (n *P2P) findNode(targetID internal.ID, alpha int, disjointPaths int) (resu
 
 	// Sort resulting peers by XOR distance.
 	sort.Slice(results, func(i, j int) bool {
-		left := dht.Xor(results[i], targetID)
-		right := dht.Xor(results[j], targetID)
+		left := dht.XorID(results[i], targetID)
+		right := dht.XorID(results[j], targetID)
 		return dht.Less(left, right)
 	})
 
