@@ -61,7 +61,6 @@ func (pm *PeerConnManager) LoadOrStore(id string, peer *PeerConn) (actual *PeerC
 	pm.mu.Unlock()
 	if pm.PeerConnNum() > MAXPEERCONNCOUNT {
 		p := pm.FindLessUsedPeerConn()
-		fmt.Println("Force delete ", p.identity.Id)
 		p.End()
 	}
 
@@ -69,6 +68,8 @@ func (pm *PeerConnManager) LoadOrStore(id string, peer *PeerConn) (actual *PeerC
 }
 
 func (pm *PeerConnManager) Range(f func(key, value interface{}) bool) {
+	pm.mu.RLock()
+	defer pm.mu.RUnlock()
 	for key, value := range pm.peers {
 		if !f(key, value) {
 			break
@@ -97,5 +98,7 @@ func (pm *PeerConnManager) DeletePeer(id string) {
 
 func (pm *PeerConnManager) PeerConnNum() uint32 {
 	pm.logger.Metrics(len(pm.peers))
+	pm.mu.RLock()
+	defer pm.mu.RUnlock()
 	return uint32(len(pm.peers))
 }
