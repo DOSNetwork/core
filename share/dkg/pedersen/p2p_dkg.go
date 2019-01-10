@@ -143,8 +143,8 @@ func (d *P2PDkg) Reset() {
 	d.publicKeys = d.publicKeys[:0]
 	d.deals = d.deals[:0]
 	d.pubkeyIdMap = make(map[string]string)
-	//d.partSec = d.suite.Scalar().Pick(d.suite.RandomStream())
-	//d.partPub = d.suite.Point().Mul(d.partSec, nil)
+	d.partSec = d.suite.Scalar().Pick(d.suite.RandomStream())
+	d.partPub = d.suite.Point().Mul(d.partSec, nil)
 	d.currentState = INIT
 }
 
