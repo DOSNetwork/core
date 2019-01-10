@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"math/big"
-	"net"
 	"os"
 	"strconv"
 	"time"
@@ -26,17 +25,7 @@ func main() {
 	id := uuid.New()
 	fmt.Println(id[:])
 	log := logrus.New()
-	tcpAddr, err := net.ResolveTCPAddr("tcp", "163.172.36.173:9500")
-	if err != nil {
-		log.Error(err)
-	}
-
-	conn, err := net.DialTCP("tcp", nil, tcpAddr)
-	if err != nil {
-		log.Error(err)
-	}
-
-	hook, err := logrustash.NewHookWithFieldsAndConn(conn, "匹凸匹test", logrus.Fields{
+	hook, err := logrustash.NewHookWithFields("tcp", "163.172.36.173:9500", "匹凸匹test", logrus.Fields{
 		"startingTimestamp": time.Now(),
 		"id":                new(big.Int).SetBytes(id[:]).String(),
 	})
@@ -129,30 +118,39 @@ func main() {
 				}).Info()
 				if len(idMap) == 0 {
 					logger.WithField("event", "allDone").Info()
-					//os.Exit(-100)
+					os.Exit(0)
 				}
 			}
 		}
 	} else {
 		logger.Data["role"] = "node"
 
-		suite := suites.MustFind("bn256")
-		peerEventForDKG := make(chan p2p.P2PMessage, 1)
-		defer close(peerEventForDKG)
-		p2pDkg, err := dkg.CreateP2PDkg(p, suite, peerEventForDKG, 3, logger)
-		if err != nil {
-			logger.Fatal(err)
-		}
-		go p2pDkg.EventLoop()
-		dkgEvent := make(chan string, 1)
-		p2pDkg.SubscribeEvent(dkgEvent)
-		defer close(dkgEvent)
-
 		logger.Info(os.Getenv("BOOTSTRAPIP"))
 		bootstrapId, err := p.ConnectTo(os.Getenv("BOOTSTRAPIP"))
 		if err != nil {
 			logger.Fatal(err)
 		}
+
+		suite := suites.MustFind("bn256")
+
+		peerEventForDKG := make(chan p2p.P2PMessage, 1)
+		defer close(peerEventForDKG)
+
+		groupCmd := make(chan [][]byte)
+		defer close(groupCmd)
+
+		_, dkgEvent := dkg.CreateP2PDkg(p, suite, peerEventForDKG, groupCmd, logger)
+
+		go func() {
+			if <-dkgEvent == dkg.VERIFIED {
+				if err = p.SendMessage(bootstrapId, &peerTalk.Done{Id: p.GetID()}); err != nil {
+					logger.WithField("event", "allDone").Error(err)
+				} else {
+					logger.WithField("event", "allDone").Info()
+				}
+				os.Exit(0)
+			}
+		}()
 
 		if err = p.SendMessage(bootstrapId, &peerTalk.Register{Id: p.GetID(), Address: p.GetIP()}); err != nil {
 			logger.WithFields(logrus.Fields{
@@ -187,18 +185,6 @@ func main() {
 					}).Info()
 				}
 			case *peerTalk.Grouping:
-				go func() {
-					result := <-dkgEvent
-					if result == "certified" {
-						if err = p.SendMessage(bootstrapId, &peerTalk.Done{Id: p.GetID()}); err != nil {
-							logger.WithField("event", "allDone").Error(err)
-						} else {
-							logger.WithField("event", "allDone").Info()
-						}
-						//os.Exit(-100)
-					}
-				}()
-
 				logger.WithField("event", "receiveGrouping").Info()
 
 				ids := content.GetIds()
@@ -207,18 +193,11 @@ func main() {
 				for idx, id := range ids {
 					if bytes.Compare(p.GetID(), id) == 0 {
 						start := uint32(idx) / groupSize * groupSize
-						fmt.Println("????????????", start, start+groupSize)
 						group = ids[start : start+groupSize]
+						groupCmd <- group
 						break
 					}
 				}
-				for _, id := range group {
-					fmt.Println("!!!!!!!!!!!", new(big.Int).SetBytes(id).String())
-				}
-
-				p2pDkg.SetNbParticipants(int(groupSize))
-				p2pDkg.SetGroupMembers(group)
-				p2pDkg.RunDKG()
 			}
 		}
 	}
