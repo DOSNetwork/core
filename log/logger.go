@@ -1,6 +1,9 @@
 package log
 
 import (
+	"runtime"
+	"strings"
+
 	"github.com/go-stack/stack"
 	"github.com/sirupsen/logrus"
 )
@@ -33,12 +36,14 @@ func main() {
 type Logger interface {
 	// New returns a new Logger that has this logger's context plus the given context
 	New(key string, value interface{}) Logger
-
-	Metrics(key string, value interface{})
+	AddField(key string, value interface{})
+	Debug(msg string)
 	Info(msg string)
 	Warn(msg string)
 	Error(err error)
 	Fatal(msg string)
+	Metrics(value interface{})
+	Progress(progress string)
 }
 
 type logger struct {
@@ -46,9 +51,15 @@ type logger struct {
 }
 
 func (l *logger) New(key string, value interface{}) Logger {
+	return &logger{l.entry.WithFields(logrus.Fields{key: value})}
+}
 
-	child := &logger{l.entry.WithFields(logrus.Fields{key: value})}
-	return child
+func (l *logger) AddField(key string, value interface{}) {
+	l.entry = l.entry.WithFields(logrus.Fields{key: value})
+}
+
+func (l *logger) Debug(msg string) {
+	l.entry.Debug(msg)
 }
 
 func (l *logger) Info(msg string) {
@@ -68,6 +79,20 @@ func (l *logger) Fatal(msg string) {
 	l.entry.Fatal(msg)
 }
 
-func (l *logger) Metrics(key string, value interface{}) {
-	l.entry.WithFields(logrus.Fields{key: value}).Info("")
+func (l *logger) Metrics(value interface{}) {
+
+	fpcs := make([]uintptr, 1)
+	// Skip 2 levels to get the caller
+	n := runtime.Callers(2, fpcs)
+	if n == 0 {
+		l.entry.WithFields(logrus.Fields{"M_": value}).Info("")
+	} else {
+		caller := runtime.FuncForPC(fpcs[0] - 1)
+		s := strings.Split(caller.Name(), ".")
+		l.entry.WithFields(logrus.Fields{"M_" + s[len(s)-1]: value}).Debug("")
+	}
+}
+
+func (l *logger) Progress(progress string) {
+	l.entry.WithFields(logrus.Fields{"Progress": progress}).Debug("")
 }

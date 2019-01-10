@@ -1,10 +1,9 @@
 package p2p
 
 import (
-	//	"bytes"
+	"bytes"
 	"errors"
 	"fmt"
-	//"math/big"
 	"net"
 	"sort"
 	"strconv"
@@ -15,23 +14,23 @@ import (
 
 	"github.com/golang/protobuf/proto"
 
+	"github.com/DOSNetwork/core/log"
 	"github.com/DOSNetwork/core/p2p/dht"
 	"github.com/DOSNetwork/core/p2p/internal"
 	"github.com/DOSNetwork/core/suites"
-	"github.com/sirupsen/logrus"
 )
 
 type P2P struct {
 	identity internal.ID
 	//Map of ID (string) <-> *p2p.PeerConn
-	peers *PeerConnManager //*sync.Map
-	// Todo:Add a subscrive fucntion to send message to application
+	peers        *PeerConnManager //*sync.Map
 	messages     chan P2PMessage
 	suite        suites.Suite
 	port         int
 	secKey       kyber.Scalar
 	pubKey       kyber.Point
 	routingTable *dht.RoutingTable
+	logger       log.Logger
 }
 
 func (n *P2P) SetID(id []byte) {
@@ -46,17 +45,19 @@ func (n *P2P) GetIP() string {
 	return n.identity.Address
 }
 
-func (n *P2P) Listen() error {
-	ip, err := GetLocalIp()
-	if err != nil {
-		log.WithField("function", "getLocalIp").Fatal(err)
+func (n *P2P) Listen() (err error) {
+	var ip string
+	var listener net.Listener
+	var pubKeyBytes []byte
+	if ip, err = GetLocalIP(); err != nil {
+		n.logger.Error(err)
+		return
 	}
 
 	p := fmt.Sprintf(":%d", n.port)
-
-	listener, err := net.Listen("tcp", p)
-	if err != nil {
-		return err
+	if listener, err = net.Listen("tcp", p); err != nil {
+		n.logger.Error(err)
+		return
 	}
 
 	//NAT discover
@@ -89,8 +90,8 @@ func (n *P2P) Listen() error {
 	ip = ip + ":" + strconv.Itoa(n.port)
 
 	n.secKey, n.pubKey = genPair()
-	pubKeyBytes, err := n.pubKey.MarshalBinary()
-	if err != nil {
+	if pubKeyBytes, err = n.pubKey.MarshalBinary(); err != nil {
+		n.logger.Error(err)
 		return err
 	}
 
@@ -102,33 +103,27 @@ func (n *P2P) Listen() error {
 	}
 	n.routingTable = dht.CreateRoutingTable(n.identity)
 
-	fmt.Println("listen on: ", ip, " id: ", n.identity.Id)
-	// Handle new clients.
-
 	go func() {
 		for {
-			if conn, err := listener.Accept(); err == nil {
-				//TODO CALL lenOfPeers() and rm some peerConn
-
-				//Create a peer client
-				var peer *PeerConn
-				peer, err = NewPeerConn(n, &conn, n.messages)
-				if err != nil {
-					log.WithField("function", "newPeerConn").Fatal(err)
-				}
-				go func() {
-					err = peer.HeardHi()
-					if err == nil {
-						n.peers.LoadOrStore(string(peer.identity.Id), peer)
-						n.routingTable.Update(peer.identity)
-					} else {
-						log.WithField("function", "heardHi").Fatal(err)
-					}
-				}()
-			} else {
-				fmt.Println("Failed accepting a connection request:", err)
-				log.WithField("function", "accept").Fatal(err)
+			var conn net.Conn
+			var err error
+			if conn, err = listener.Accept(); err != nil {
+				n.logger.Error(err)
+				continue
 			}
+			var peer *PeerConn
+			if peer, err = NewPeerConn(n, &conn, n.messages); err != nil {
+				n.logger.Error(err)
+				continue
+			}
+			go func() {
+				if err = peer.HeardHi(); err != nil {
+					n.logger.Error(err)
+					return
+				}
+				n.peers.LoadOrStore(string(peer.identity.Id), peer)
+				n.routingTable.Update(peer.identity)
+			}()
 		}
 	}()
 
@@ -137,7 +132,10 @@ func (n *P2P) Listen() error {
 
 func (n *P2P) Join(bootstrapIp string) (err error) {
 	//it inserts the value of some known node c into the appropriate bucket as its first contact
-	_, err = n.connectTo(bootstrapIp)
+	if _, err = n.connectTo(bootstrapIp); err != nil {
+		n.logger.Error(err)
+		return
+	}
 	//it does an iterativeFindNode for self
 	results := n.findNode(n.identity, dht.BucketSize, 20)
 	for _, result := range results {
@@ -155,41 +153,29 @@ func (n *P2P) Leave() {
 	return
 }
 
-func (n *P2P) lenOfPeers() (count int) {
-	n.peers.Range(func(key, value interface{}) bool {
-		count++
-		return true
-	})
-	return
-}
-
 func (n *P2P) findPeer(id []byte) (peer *PeerConn, found bool) {
 	var err error
 
+	startTime := time.Now()
+	defer n.logger.Metrics(time.Since(startTime).Seconds() * 1000)
+
 	// Find Peer from existing peerConn
 	if peer = n.peers.GetPeerByID(string(id)); peer != nil {
-		log.WithFields(logrus.Fields{
-			"function":       "findPeer",
-			"eventFromLocal": true,
-		}).Info()
-        found = true
+		found = true
+		n.logger.Debug("FromExisting")
 		return
 	}
 
 	// Find Peer from routing map
 	peers := n.routingTable.GetPeers()
 	if ip, ok := peers[string(id)]; ok {
-		if peer, err = n.connectTo(ip); err == nil {
-			fmt.Println("!!!! Find Peer from routing map ", id)
-			found = true
-
-			log.WithFields(logrus.Fields{
-				"function":     "findPeer",
-				"eventFromDht": true,
-			}).Info()
-
+		if peer, err = n.connectTo(ip); err != nil {
+			n.logger.Error(err)
 			return
 		}
+		n.logger.Debug("FromRoutingTable")
+		found = true
+		return
 	}
 
 	// Updating Routing table to find peer
@@ -198,23 +184,14 @@ func (n *P2P) findPeer(id []byte) (peer *PeerConn, found bool) {
 		n.routingTable.Update(result)
 	}
 
-	// Find Peer from existing peerConn
-	if peer = n.peers.GetPeerByID(string(id)); peer != nil {
-		fmt.Println("!!!! Find Peer from routing map ", id)
+	if len(results) > 0 && bytes.Equal(results[0].Id, id) {
+		if peer, err = n.connectTo(results[0].Address); err != nil {
+			n.logger.Error(err)
+			return
+		}
 		found = true
-
-		log.WithFields(logrus.Fields{
-			"function":        "findPeer",
-			"eventFromRemote": true,
-		}).Info()
-
-		return
+		n.logger.Debug("FromPeers")
 	}
-
-	log.WithFields(logrus.Fields{
-		"function":        "findPeer",
-		"eventNoFounding": true,
-	}).Info()
 
 	return
 }
@@ -223,26 +200,18 @@ func (n *P2P) SendMessage(id []byte, m proto.Message) (err error) {
 	var peer *PeerConn
 	var found bool
 	startTime := time.Now()
+	defer n.logger.Metrics(time.Since(startTime).Seconds() * 1000)
 
 	if peer, found = n.findPeer(id); found {
 		request := new(Request)
 		request.SetMessage(m)
 		request.SetTimeout(5 * time.Second)
 
-		_, err = peer.Request(request)
-		if err != nil {
-			log.WithFields(logrus.Fields{
-				"function":            "sendMessage",
-				"eventSendMessageErr": err,
-			}).Info()
+		if _, err = peer.Request(request); err != nil {
+			n.logger.Error(err)
 			return
 		}
 	}
-
-	log.WithFields(logrus.Fields{
-		"function":        "sendMessage",
-		"timeSendMessage": time.Since(startTime).Seconds(),
-	}).Info()
 
 	return
 }
@@ -252,42 +221,41 @@ This is a block call
 */
 func (n *P2P) ConnectTo(addr string) (id []byte, err error) {
 	var peer *PeerConn
-	if peer, err = n.connectTo(addr); err == nil {
-		id = peer.identity.Id
-	}
 
+	if peer, err = n.connectTo(addr); err != nil {
+		n.logger.Error(err)
+		return
+	}
+	id = peer.identity.Id
 	return
 }
 
 func (n *P2P) connectTo(addr string) (peer *PeerConn, err error) {
 	var conn net.Conn
-	//TODO CALL lenOfPeers() and rm some peerConn
 
-	//TODO Check if addr is a valid addr
 	for retry := 0; retry < 10; retry++ {
-		conn, err = net.Dial("tcp", addr)
-		if err != nil {
-			log.WithField("function", "dial").Warn("NewPeer Dial err ", err, " addr ", addr)
+		if conn, err = net.Dial("tcp", addr); err != nil {
+			n.logger.Error(err)
 			time.Sleep(1 * time.Second)
 			continue
 		}
 
-		peer, err = NewPeerConn(n, &conn, n.messages)
-		if err != nil {
-			log.WithField("function", "newPeerConn").Warn("NewPeerConn err ", err)
+		if peer, err = NewPeerConn(n, &conn, n.messages); err != nil {
+			n.logger.Error(err)
 			continue
 		}
-		if err = peer.SayHi(); err == nil {
-			n.peers.LoadOrStore(string(peer.identity.Id), peer)
-			n.routingTable.Update(peer.identity)
-		} else {
-			log.WithField("function", "newPeerConn").Warn("RequestHi err ", err)
+
+		if err = peer.SayHi(); err != nil {
+			n.logger.Error(err)
 			continue
 		}
+		n.peers.LoadOrStore(string(peer.identity.Id), peer)
+		n.routingTable.Update(peer.identity)
+
 		return
 	}
-	err = errors.New("Peer : retried over 10 times")
-
+	err = errors.New("Retry connection over the limit")
+	n.logger.Error(err)
 	return
 }
 
@@ -304,6 +272,7 @@ type lookupBucket struct {
 // Queries at most #ALPHA nodes at a time per lookup, and returns all peer IDs closest to a target peer ID.
 func (n *P2P) findNode(targetID internal.ID, alpha int, disjointPaths int) (results []internal.ID) {
 	startTime := time.Now()
+	defer n.logger.Metrics(time.Since(startTime).Seconds() * 1000)
 	visited := new(sync.Map)
 
 	var lookups []*lookupBucket
@@ -353,10 +322,7 @@ func (n *P2P) findNode(targetID internal.ID, alpha int, disjointPaths int) (resu
 	if len(results) > dht.BucketSize {
 		results = results[:dht.BucketSize]
 	}
-	log.WithFields(logrus.Fields{
-		"function":     "findNode",
-		"timeFindNode": time.Since(startTime).Seconds(),
-	}).Info()
+
 	return
 }
 
@@ -407,12 +373,14 @@ func (lookup *lookupBucket) performLookup(n *P2P, targetID internal.ID, alpha in
 
 func (n *P2P) queryPeerByID(peerID internal.ID, targetID internal.ID, responses chan []*internal.ID) {
 	var client *PeerConn
+	var response proto.Message
+	var err error
 
-	client= n.peers.GetPeerByID(string(peerID.Id))
+	client = n.peers.GetPeerByID(string(peerID.Id))
 	if client == nil {
 		var err error
-		client, err = n.connectTo(peerID.Address)
-		if err != nil {
+		if client, err = n.connectTo(peerID.Address); err != nil {
+			n.logger.Error(err)
 			responses <- []*internal.ID{}
 			return
 		}
@@ -424,16 +392,16 @@ func (n *P2P) queryPeerByID(peerID internal.ID, targetID internal.ID, responses 
 	request.SetMessage(&internal.LookupNodeRequest{Target: &targetProtoID})
 	request.SetTimeout(30 * time.Second)
 
-	response, err := client.Request(request)
-
-	if err != nil {
+	if response, err = client.Request(request); err != nil {
+		n.logger.Error(err)
 		responses <- []*internal.ID{}
 		return
 	}
-
 	if response, ok := response.(*internal.LookupNodeResponse); ok {
 		responses <- response.Peers
 	} else {
+		err = errors.New("Cast Error")
+		n.logger.Error(err)
 		responses <- []*internal.ID{}
 	}
 }

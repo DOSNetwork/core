@@ -1,6 +1,10 @@
 package log
 
 import (
+	"io/ioutil"
+	"os"
+	"time"
+
 	"github.com/bshuster-repo/logrus-logstash-hook"
 	"github.com/sirupsen/logrus"
 )
@@ -13,23 +17,46 @@ func New(key string, value interface{}) Logger {
 	return root.New(key, value)
 }
 
+type UTCFormatter struct {
+	logrus.Formatter
+}
+
+func (u UTCFormatter) Format(e *logrus.Entry) ([]byte, error) {
+	e.Time = time.Now()
+
+	return u.Formatter.Format(e)
+}
+
 func init() {
+	logrus.SetLevel(logrus.DebugLevel)
+	logrus.SetOutput(ioutil.Discard)
+	logrus.SetFormatter(UTCFormatter{&logrus.JSONFormatter{}})
 	//IP,Subject and appName should read from environment variables
 	hook, err := logrustash.NewHook("tcp", "163.172.36.173:9500", "peer")
 	if err != nil {
 		logrus.Error(err)
 	}
 	logrus.AddHook(hook)
+	appSubject := os.Getenv("appSubject")
+	appName := os.Getenv("appName")
 	root.entry = logrus.WithFields(logrus.Fields{
-		"subject": "subject",
-		"appName": "appName",
+		"appSubject": appSubject,
+		"appName":    appName,
 	})
 }
 
-// Info is a convenient alias for Root().Info
+func AddField(key string, value interface{}) {
+	root.AddField(key, value)
+}
+
+func Debug(msg string) {
+	root.Debug(msg)
+}
+
 func Info(msg string) {
 	root.Info(msg)
 }
+
 func Warn(msg string) {
 	root.Warn(msg)
 }
@@ -43,6 +70,10 @@ func Fatal(msg string) {
 }
 
 // Info is a convenient alias for Root().Info
-func Metrics(key string, value interface{}) {
-	root.Metrics(key, value)
+func Metrics(value interface{}) {
+	root.Metrics(value)
+}
+
+func Progress(progress string) {
+	root.Progress(progress)
 }

@@ -15,11 +15,7 @@ import (
 	"github.com/golang/protobuf/proto"
 
 	"github.com/looplab/fsm"
-
-	"github.com/sirupsen/logrus"
 )
-
-var log *logrus.Entry
 
 type P2PDkgInterface interface {
 	SetGroupId([]byte)
@@ -37,8 +33,7 @@ type P2PDkgInterface interface {
 	SubscribeEvent(chan string)
 }
 
-func CreateP2PDkg(p p2p.P2PInterface, suite suites.Suite, peerEvent chan p2p.P2PMessage, nbParticipants int, logger *logrus.Entry) (P2PDkgInterface, error) {
-	log = logger
+func CreateP2PDkg(p p2p.P2PInterface, suite suites.Suite, peerEvent chan p2p.P2PMessage, nbParticipants int) (P2PDkgInterface, error) {
 	sec := suite.Scalar().Pick(suite.RandomStream())
 	d := &P2PDkg{
 		suite:       suite,
@@ -145,10 +140,6 @@ func (d *P2PDkg) IsCertified() bool {
 func (d *P2PDkg) RunDKG() {
 	if d.FSM.Current() == "Init" {
 		d.chFsmEvent <- "grouping"
-		log.WithFields(logrus.Fields{
-			"function":    "runDKG",
-			"eventRunDKG": true,
-		}).Info()
 	}
 }
 
@@ -187,39 +178,21 @@ func (d *P2PDkg) EventLoop() {
 			switch content := msg.Msg.Message.(type) {
 			case *vss.PublicKey:
 				pubKeyCount++
-				log.WithFields(logrus.Fields{
-					"function":    "eventLoop",
-					"pubKeyCount": pubKeyCount,
-				}).Info()
 				pubkey := *content
 				p, err := pubkey.GetPoint(d.suite)
-				if err != nil {
-					log.WithField("function", "getPoint").Warn(err)
-				}
+				_ = err
 				d.pubkeyIdMap[p.String()] = string(pubkey.SenderId)
 				d.publicKeys = append(d.publicKeys, p)
 				d.Event("receivePubkey")
 			case *Deal:
 				dealCount++
-				log.WithFields(logrus.Fields{
-					"function":  "eventLoop",
-					"dealCount": dealCount,
-				}).Info()
 				d.deals = append(d.deals, *content)
 				d.Event("receiveDeal")
 			case *Responses:
 				responseCount++
-				log.WithFields(logrus.Fields{
-					"function":      "eventLoop",
-					"responseCount": responseCount,
-				}).Info()
 				d.chResponse <- *content
 			default:
 				unknown++
-				log.WithFields(logrus.Fields{
-					"function": "eventLoop",
-					"unknown":  unknown,
-				}).Info()
 				fmt.Println("unknown", content)
 			}
 		}
@@ -246,15 +219,8 @@ func (d *P2PDkg) enterExchangePubKey(e *fsm.Event) {
 	//send public key to groupIds
 	public := vss.PublicKey{SenderId: id}
 	err := public.SetPoint(d.suite, d.partPub)
-	if err != nil {
-		log.WithField("function", "setPoint").Warn(err)
-	}
+	_ = err
 	d.broadcast(&public)
-
-	log.WithFields(logrus.Fields{
-		"function":           "enterExchangePubKey",
-		"eventSendAllPubKey": true,
-	}).Info()
 
 	//TODO: Should check if publicKeys are all belong to the members
 	if len(d.publicKeys) == d.nbParticipants {
@@ -271,18 +237,11 @@ func (d *P2PDkg) afterReceivePubkey(e *fsm.Event) {
 
 //Can't call NewDistKeyGenerator .need to wait unitl all deal has been received
 func (d *P2PDkg) enterNewDistKeyGenerator(e *fsm.Event) {
-	log.WithFields(logrus.Fields{
-		"function":              "enterNewDistKeyGenerator",
-		"eventReceiveAllPubKey": true,
-	}).Info()
-
 	go func() {
 		for rs := range d.chResponse {
 			for _, r := range rs.GetResponse() {
 				_, err := (*d.partDkg).ProcessResponse(r)
-				if err != nil {
-					log.WithField("function", "ProcessResponse").Warn(err)
-				}
+				_ = err
 				if (*d.partDkg).Certified() && d.FSM.Current() == "ProcessDeal" {
 					fmt.Println("resp Certified ")
 					d.chFsmEvent <- "certified"
@@ -294,28 +253,17 @@ func (d *P2PDkg) enterNewDistKeyGenerator(e *fsm.Event) {
 	var err error
 	sort.Sort(d.publicKeys)
 	d.partDkg, err = NewDistKeyGenerator(d.suite, d.partSec, d.publicKeys, d.nbParticipants/2+1)
-	if err != nil {
-		log.WithField("function", "newDistKeyGenerator").Warn(err)
-	}
+	_ = err
 	deals, err := d.partDkg.Deals()
-	if err != nil {
-		log.WithField("function", "deals").Warn(err)
-	}
+
 	for i, pub := range d.publicKeys {
 		if !pub.Equal(d.partPub) {
 			err = (*d.network).SendMessage([]byte(d.pubkeyIdMap[pub.String()]), deals[i])
-			if err != nil {
-				log.WithField("function", "sendMessage").Warn(err)
-			}
+
 		} else {
 			d.dkgIndex = i
 		}
 	}
-
-	log.WithFields(logrus.Fields{
-		"function":         "enterNewDistKeyGenerator",
-		"eventSendAllDeal": true,
-	}).Info()
 
 	condition := d.nbParticipants - 1
 	if len(d.deals) == condition {
@@ -331,17 +279,11 @@ func (d *P2PDkg) afterReceiveDeal(e *fsm.Event) {
 
 //This is only happened after all peers has all public keys
 func (d *P2PDkg) enterProcessDeal(e *fsm.Event) {
-	log.WithFields(logrus.Fields{
-		"function":            "enterProcessDeal",
-		"eventReceiveAllDeal": true,
-	}).Info()
-
 	var resps []*Response
 
 	for _, deal := range d.deals {
 		resp, err := (*d.partDkg).ProcessDeal(&deal)
 		if err != nil {
-			log.WithField("function", "processDeal").Warn(err)
 		} else {
 			resps = append(resps, resp)
 		}
@@ -353,33 +295,16 @@ func (d *P2PDkg) enterProcessDeal(e *fsm.Event) {
 		fmt.Println("resp Certified ")
 		d.chFsmEvent <- "certified"
 	}
-
-	log.WithFields(logrus.Fields{
-		"function":            "enterProcessDeal",
-		"eventProcessAllDeal": true,
-	}).Info()
 }
 
 func (d *P2PDkg) enterVerified(e *fsm.Event) {
-	log.WithFields(logrus.Fields{
-		"function":                "enterVerified",
-		"eventProcessAllResponse": true,
-	}).Info()
-
 	close(d.chResponse)
 	var err error
 	d.partDks, err = d.partDkg.DistKeyShare()
-	if err != nil {
-		log.WithField("function", "distKeyShare").Warn(err)
-	}
+	_ = err
 	d.groupPubPoly = share.NewPubPoly(d.suite, d.suite.Point().Base(), d.partDks.Commitments())
 	timeCost := time.Since(d.groupingStart).Seconds()
 	fmt.Println("DistKeyShare SUCCESS ", timeCost)
-	log.WithFields(logrus.Fields{
-		"function":        "enterVerified",
-		"eventDKGSucceed": true,
-		"DKGTimeCost":     timeCost,
-	}).Info()
 	if d.subscribeEvent != nil {
 		d.subscribeEvent <- "certified"
 	}
@@ -387,16 +312,13 @@ func (d *P2PDkg) enterVerified(e *fsm.Event) {
 
 func (d *P2PDkg) Event(event string) {
 	err := d.FSM.Event(event)
-	if err != nil {
-		log.WithField("function", "event").Warn(err)
-	}
+	_ = err
 }
 
 func (d *P2PDkg) broadcast(m proto.Message) {
 	for _, member := range d.groupIds {
 		if string(member) != string((*d.network).GetID()) {
 			if err := (*d.network).SendMessage(member, m); err != nil {
-				log.WithField("function", "sendMessage").Warn("DKG SendMessage err ", err)
 			}
 		}
 	}

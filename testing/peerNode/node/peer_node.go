@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math"
-
-	"math/big"
 	"net/http"
 	"os"
 	"strings"
@@ -18,8 +16,8 @@ import (
 
 	"github.com/DOSNetwork/core/testing/peerNode/internalMsg"
 
+	"github.com/DOSNetwork/core/log"
 	"github.com/DOSNetwork/core/p2p"
-	"github.com/sirupsen/logrus"
 )
 
 type PeerNode struct {
@@ -54,7 +52,6 @@ func (d *PeerNode) MakeRequest(bootStrapIp, f string, args []byte) ([]byte, erro
 }
 
 func (d *PeerNode) requestAllIDs() {
-	fmt.Println("requestAllIDs")
 	for {
 		r, err := d.MakeRequest(d.bootStrapIp, "getAllIDs", []byte{})
 		for err != nil {
@@ -63,7 +60,6 @@ func (d *PeerNode) requestAllIDs() {
 		}
 
 		if err != nil {
-			fmt.Println(err)
 		} else {
 			if len(r) != 0 {
 				num := len(r) / len(d.nodeID)
@@ -78,11 +74,9 @@ func (d *PeerNode) requestAllIDs() {
 			}
 		}
 	}
-	//d.log.WithField("event", "requestAllIds done").Info()
 }
 
 func (d *PeerNode) requestAllIPs() {
-	fmt.Println("requestAllIPs")
 	for {
 		r, err := d.MakeRequest(d.bootStrapIp, "getAllIPs", []byte{})
 		for err != nil {
@@ -104,11 +98,10 @@ func (d *PeerNode) requestAllIPs() {
 			}
 		}
 	}
-	d.log.WithField("event", "requestAllIPs done").Info()
 }
 
 func (d *PeerNode) requestIsReady() bool {
-	ip, _ := p2p.GetLocalIp()
+	ip, _ := p2p.GetLocalIP()
 	ip += ":44460"
 
 	r, err := d.MakeRequest(d.bootStrapIp, "isTestReady", []byte(ip))
@@ -130,7 +123,7 @@ func (d *PeerNode) requestIsReady() bool {
 }
 
 func (d *PeerNode) requestIsNextRoundReady(roundCount uint16) byte {
-	ip, _ := p2p.GetLocalIp()
+	ip, _ := p2p.GetLocalIP()
 	ip += ":44460"
 	roundCountBytes := make([]byte, 2)
 	binary.LittleEndian.PutUint16(roundCountBytes, roundCount)
@@ -146,7 +139,7 @@ func (d *PeerNode) requestIsNextRoundReady(roundCount uint16) byte {
 }
 
 func (d *PeerNode) requestIsFinish() bool {
-	ip, _ := p2p.GetLocalIp()
+	ip, _ := p2p.GetLocalIP()
 	ip += ":44460"
 
 	r, err := d.MakeRequest(d.bootStrapIp, "isTestFinish", []byte(ip))
@@ -168,7 +161,7 @@ func (d *PeerNode) requestIsFinish() bool {
 
 }
 
-func (d *PeerNode) Init(bootStrapIp string, port, peerSize int, numMessages int, tStrategy string, logger *logrus.Entry) {
+func (d *PeerNode) Init(bootStrapIp string, port, peerSize int, numMessages int, tStrategy string) {
 	d.peerSize = peerSize
 	d.checkCount = 1
 	d.bootStrapIp = bootStrapIp
@@ -177,7 +170,6 @@ func (d *PeerNode) Init(bootStrapIp string, port, peerSize int, numMessages int,
 	d.dkgChan = make(chan p2p.P2PMessage)
 	d.tblsChan = make(chan vss.Signature)
 	d.numMessages = numMessages
-	d.log = logger
 
 	switch tStrategy {
 	case "SENDMESSAGE":
@@ -194,9 +186,8 @@ func (d *PeerNode) Init(bootStrapIp string, port, peerSize int, numMessages int,
 
 	//1)Wait until bootstrap node assign an ID
 	for {
-		ip, _ := p2p.GetLocalIp()
+		ip, _ := p2p.GetLocalIP()
 		ip = ip + ":44460"
-		fmt.Println("IP : ", ip)
 		r, err := d.MakeRequest(bootStrapIp, "getID", []byte(ip))
 		for err != nil {
 			time.Sleep(10 * time.Second)
@@ -214,39 +205,34 @@ func (d *PeerNode) Init(bootStrapIp string, port, peerSize int, numMessages int,
 			}
 		}
 	}
-	fmt.Println("nodeID = ", d.nodeID[:])
+	log.AddField("nodeID", p2p.Hex(d.nodeID[:]))
+
 	//2)Build a p2p network
-	d.p, d.peerEvent, _ = p2p.CreateP2PNetwork(d.nodeID[:], port, d.log)
+	d.p, d.peerEvent, _ = p2p.CreateP2PNetwork(d.nodeID[:], port)
 	d.p.Listen()
 	go func() {
 		for msg := range d.peerEvent {
 			switch content := msg.Msg.Message.(type) {
 			case *internalMsg.Cmd:
+
 				if content.Ctype == internalMsg.Cmd_SIGNIN {
 					sender := string(msg.Sender)
 					go d.tStrategy.CheckResult(sender, content, d)
 				}
 			case *vss.PublicKey:
 				d.dkgChan <- msg
-				fmt.Println("PublicKey")
 			case *dkg.Deal:
 				d.dkgChan <- msg
-				fmt.Println("Deal")
 			case *dkg.Responses:
 				d.dkgChan <- msg
-				fmt.Println("Response")
 			case *vss.Signature:
 				d.tblsChan <- *content
-				fmt.Println("Signature")
 			default:
 			}
 		}
 	}()
 
-	//d.p.Join(bootStrapIp + ":44460")
-	fmt.Println("nodeIP = ", d.p.GetIP())
-
-	d.log.Data["nodeId"] = new(big.Int).SetBytes(d.nodeID).String()
+	//fmt.Println("nodeIP = ", d.p.GetIP())
 
 	d.requestAllIDs() //get all ids
 	d.requestAllIPs() //get all ips
@@ -258,8 +244,6 @@ func (d *PeerNode) Init(bootStrapIp string, port, peerSize int, numMessages int,
 			}
 		}
 	}
-	//teststart todo
-	//send test result todo
 }
 
 func (d *PeerNode) FinishTest() {
@@ -271,7 +255,6 @@ L:
 			if d.requestIsFinish() {
 				ticker.Stop()
 				d.done <- true
-				//todo stoptest
 				break L
 			}
 		default:
@@ -287,12 +270,11 @@ L:
 		case <-ticker.C:
 			if d.requestIsReady() {
 				ticker.Stop()
+				log.Progress("StartTest")
 				go d.tStrategy.StartTest(d)
 			}
 		case <-d.done:
-			fmt.Println("done  count")
-			fmt.Println("EventLoop done")
-			d.log.WithField("event", "EventLoop done").Info()
+			log.Progress("EndTest")
 			break L
 		default:
 		}
