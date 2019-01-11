@@ -51,7 +51,7 @@ func main() {
 	}
 
 	//2)Build a p2p network
-	p, peerEvent, err := p2p.CreateP2PNetwork(chainConn.GetId(), port, log.WithField("module", "p2pConn"))
+	p, peerEvent, err := p2p.CreateP2PNetwork(chainConn.GetId(), port)
 	if err != nil {
 		mainLogger.WithField("function", "createP2PNetwork").Fatal(err)
 	}
@@ -92,15 +92,10 @@ func main() {
 	suite := suites.MustFind("bn256")
 	peerEventForDKG := make(chan p2p.P2PMessage, 1)
 	defer close(peerEventForDKG)
-	p2pDkg, err := dkg.CreateP2PDkg(p, suite, peerEventForDKG, nbParticipants, log.WithField("module", "p2pDKG"))
+	p2pDkg := dkg.CreateP2PDkg(p, suite, peerEventForDKG)
 	if err != nil {
 		mainLogger.WithField("function", "createP2PDkg").Fatal(err)
 	}
-
-	go p2pDkg.EventLoop()
-	dkgEvent := make(chan string, 1)
-	p2pDkg.SubscribeEvent(dkgEvent)
-	defer close(dkgEvent)
 
 	//5)Subscribe Event from Eth
 	eventGrouping := make(chan interface{}, 1)
@@ -169,8 +164,8 @@ func main() {
 			default:
 				mainLogger.WithField("function", "dispatchEvent").Warn("unknown", content)
 			}
-		case msg := <-dkgEvent:
-			if msg == "certified" {
+		case msg := <-p2pDkg.GetDkgEvent():
+			if msg == dkg.VERIFIED {
 				gId := new(big.Int)
 				gId.SetBytes(p2pDkg.GetGroupId())
 				if err := chainConn.UploadPubKey(p2pDkg.GetGroupPublicPoly().Commit()); err != nil {

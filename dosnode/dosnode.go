@@ -225,11 +225,8 @@ func (d *DosNode) PipeGrouping(chGroup <-chan interface{}) {
 					}
 					nbParticipants := len(groupIds)
 					d.SetParticipants(nbParticipants)
-					d.p2pDkg.SetNbParticipants(nbParticipants)
 					if isMember {
-						d.groupIds = groupIds
-						d.p2pDkg.SetGroupMembers(groupIds)
-						d.p2pDkg.RunDKG()
+						d.p2pDkg.GetGroupCmd() <- groupIds
 					}
 				default:
 					fmt.Println("DOSProxyLogUpdateRandom type mismatch")

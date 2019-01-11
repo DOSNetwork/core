@@ -35,7 +35,7 @@ func main() {
 
 	log.AddHook(hook)
 	logger := log.WithFields(logrus.Fields{})
-	p, peerEvent, err := p2p.CreateP2PNetwork(id[:], 44460, logger)
+	p, peerEvent, err := p2p.CreateP2PNetwork(id[:], 44460)
 	if err != nil {
 		logger.Fatal(err)
 	}
@@ -136,13 +136,10 @@ func main() {
 		peerEventForDKG := make(chan p2p.P2PMessage, 1)
 		defer close(peerEventForDKG)
 
-		groupCmd := make(chan [][]byte)
-		defer close(groupCmd)
-
-		_, dkgEvent := dkg.CreateP2PDkg(p, suite, peerEventForDKG, groupCmd, logger)
+		p2pdkg := dkg.CreateP2PDkg(p, suite, peerEventForDKG)
 
 		go func() {
-			if <-dkgEvent == dkg.VERIFIED {
+			if <-p2pdkg.GetDkgEvent() == dkg.VERIFIED {
 				if err = p.SendMessage(bootstrapId, &peerTalk.Done{Id: p.GetID()}); err != nil {
 					logger.WithField("event", "allDone").Error(err)
 				} else {
@@ -194,7 +191,7 @@ func main() {
 					if bytes.Compare(p.GetID(), id) == 0 {
 						start := uint32(idx) / groupSize * groupSize
 						group = ids[start : start+groupSize]
-						groupCmd <- group
+						p2pdkg.GetGroupCmd() <- group
 						break
 					}
 				}
