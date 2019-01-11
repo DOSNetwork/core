@@ -53,16 +53,12 @@ func CreateP2PDkg(p p2p.P2PInterface, suite suites.Suite, peerEvent chan p2p.P2P
 		chPeerEvent:    peerEvent,
 		currentState:   INIT,
 		subscribeEvent: make(chan int),
-		done:           make(chan struct{}),
 	}
+	d.ctx, d.cancel = context.WithCancel(context.Background())
 
 	go func() {
 		for groupIds := range groupCmd {
-			if d.ctx != nil {
-				d.Reset()
-			} else {
-				d.ctx, d.cancel = context.WithCancel(context.Background())
-			}
+			d.Reset()
 			go d.eventLoop(groupIds)
 		}
 	}()
@@ -76,6 +72,7 @@ type P2PDkg struct {
 	//Data Buffer
 	publicKeys Pubkeys
 	deals      []Deal
+	responses  []Responses
 	//Group member ID
 	groupIds [][]byte
 	//node key pair
@@ -100,7 +97,6 @@ type P2PDkg struct {
 	groupCmd     chan [][]byte
 	ctx          context.Context
 	cancel       context.CancelFunc
-	done         chan struct{}
 }
 
 func (d *P2PDkg) SetGroupId(id []byte) {
@@ -137,11 +133,10 @@ func (d *P2PDkg) IsCertified() bool {
 
 func (d *P2PDkg) Reset() {
 	d.cancel()
-	<-d.done
-	d.done = make(chan struct{})
 	d.ctx, d.cancel = context.WithCancel(context.Background())
 	d.publicKeys = d.publicKeys[:0]
 	d.deals = d.deals[:0]
+	d.responses = d.responses[:0]
 	d.pubkeyIdMap = make(map[string]string)
 	d.partSec = d.suite.Scalar().Pick(d.suite.RandomStream())
 	d.partPub = d.suite.Point().Mul(d.partSec, nil)
@@ -179,9 +174,9 @@ func (d *P2PDkg) eventLoop(groupIds [][]byte) {
 	respsCh := make(chan Responses)
 	defer close(respsCh)
 
-	d.pipeExchangePubKey(groupIds, pubKeyCh)
+	d.pipeExchangePubKey(groupIds)
 	d.pipeNewDistKeyGenerator(pubKeyCh)
-	d.pipeProcessDealAndResponses(dealCh, respsCh)
+	d.pipeProcessResponses(d.pipeProcessDeal(dealCh), respsCh)
 
 	for {
 		select {
@@ -224,7 +219,7 @@ func (d *P2PDkg) eventLoop(groupIds [][]byte) {
 	}
 }
 
-func (d *P2PDkg) pipeExchangePubKey(groupIds [][]byte, pubKeych chan<- vss.PublicKey) {
+func (d *P2PDkg) pipeExchangePubKey(groupIds [][]byte) {
 	go func() {
 		if d.currentState == INIT {
 			log.WithFields(logrus.Fields{
@@ -243,13 +238,6 @@ func (d *P2PDkg) pipeExchangePubKey(groupIds [][]byte, pubKeych chan<- vss.Publi
 				log.WithField("function", "setPoint").Warn(err)
 			}
 			d.broadcast(&public)
-			select {
-			case <-d.ctx.Done():
-				close(d.done)
-				return
-			default:
-				pubKeych <- public
-			}
 
 			log.WithFields(logrus.Fields{
 				"function":           "enterExchangePubKey",
@@ -262,6 +250,9 @@ func (d *P2PDkg) pipeExchangePubKey(groupIds [][]byte, pubKeych chan<- vss.Publi
 
 //Can't call NewDistKeyGenerator .need to wait unitl all deal has been received
 func (d *P2PDkg) pipeNewDistKeyGenerator(pubKeych <-chan vss.PublicKey) {
+	d.pubkeyIdMap[d.partPub.String()] = string((*d.network).GetID())
+	d.publicKeys = append(d.publicKeys, d.partPub)
+
 	go func() {
 		for pubKey := range pubKeych {
 			p, err := pubKey.GetPoint(d.suite)
@@ -303,61 +294,71 @@ func (d *P2PDkg) pipeNewDistKeyGenerator(pubKeych <-chan vss.PublicKey) {
 }
 
 //This is only happened after all peers has all public keys
-func (d *P2PDkg) pipeProcessDealAndResponses(dealCh <-chan Deal, respsCh chan Responses) {
+func (d *P2PDkg) pipeProcessDeal(dealCh <-chan Deal) (dealDoneCh chan bool) {
+	dealDoneCh = make(chan bool)
 	go func() {
-		for {
-			select {
-			case deal := <-dealCh:
-				d.deals = append(d.deals, deal)
-				if len(d.deals) == d.nbParticipants-1 {
-					var resps []*Response
-					for _, deal := range d.deals {
-						resp, err := (*d.partDkg).ProcessDeal(&deal)
-						if err != nil {
-							log.WithField("function", "processDeal").Warn(err)
-						} else {
-							resps = append(resps, resp)
-						}
-					}
-					d.broadcast(&Responses{Response: resps})
-				}
-			case resps := <-respsCh:
-				for _, r := range resps.GetResponse() {
-					_, err := (*d.partDkg).ProcessResponse(r)
+		for deal := range dealCh {
+			d.deals = append(d.deals, deal)
+			if len(d.deals) == d.nbParticipants-1 {
+				var resps []*Response
+				for _, deal := range d.deals {
+					resp, err := (*d.partDkg).ProcessDeal(&deal)
 					if err != nil {
-						if err.Error() == "dkg: complaint received but no deal for it" {
-							go func() { respsCh <- resps }()
-						}
-						log.WithField("function", "ProcessResponse").Warn(err)
+						log.WithField("function", "processDeal").Warn(err)
+					} else {
+						resps = append(resps, resp)
 					}
 				}
-			case <-d.ctx.Done():
-				fmt.Println("pipeProcessDealAndResponses closed")
-				return
-			}
-			if len(d.deals) == d.nbParticipants-1 && (*d.partDkg).Certified() {
-				var err error
-				d.partDks, err = d.partDkg.DistKeyShare()
-				if err != nil {
-					log.WithField("function", "distKeyShare").Warn(err)
-				}
-				d.groupPubPoly = share.NewPubPoly(d.suite, d.suite.Point().Base(), d.partDks.Commitments())
-				d.currentState = VERIFIED
-				timeCost := time.Since(d.groupingStart).Seconds()
-				fmt.Println("DistKeyShare SUCCESS ", timeCost)
-				log.WithFields(logrus.Fields{
-					"function":        "enterVerified",
-					"eventDKGSucceed": true,
-					"DKGTimeCost":     timeCost,
-				}).Info()
-				if d.subscribeEvent != nil {
-					d.subscribeEvent <- VERIFIED
-				}
-				fmt.Println("pipeProcessDealAndResponses closed")
-				d.cancel()
-				return
+				d.broadcast(&Responses{Response: resps})
+				dealDoneCh <- true
 			}
 		}
+		close(dealDoneCh)
+		fmt.Println("pipeProcessDeal closed")
+	}()
+	return dealDoneCh
+}
+
+func (d *P2PDkg) pipeProcessResponses(dealDoneCh chan bool, respsCh chan Responses) {
+	go func() {
+		for resps := range respsCh {
+			d.responses = append(d.responses, resps)
+			if len(d.responses) == d.nbParticipants-1 {
+				if <-dealDoneCh == true {
+					for _, rs := range d.responses {
+						for _, r := range rs.GetResponse() {
+							_, err := (*d.partDkg).ProcessResponse(r)
+							if err != nil {
+								log.WithField("function", "ProcessResponse").Warn(err)
+							}
+						}
+					}
+					if (*d.partDkg).Certified() {
+						var err error
+						d.partDks, err = d.partDkg.DistKeyShare()
+						if err != nil {
+							log.WithField("function", "distKeyShare").Warn(err)
+						}
+						d.groupPubPoly = share.NewPubPoly(d.suite, d.suite.Point().Base(), d.partDks.Commitments())
+						d.currentState = VERIFIED
+						timeCost := time.Since(d.groupingStart).Seconds()
+						fmt.Println("DistKeyShare SUCCESS ", timeCost)
+						log.WithFields(logrus.Fields{
+							"function":        "enterVerified",
+							"eventDKGSucceed": true,
+							"DKGTimeCost":     timeCost,
+						}).Info()
+						d.cancel()
+						fmt.Println("pipeProcessResponses closed")
+						if d.subscribeEvent != nil {
+							d.subscribeEvent <- VERIFIED
+						}
+						return
+					}
+				}
+			}
+		}
+		fmt.Println("pipeProcessResponses closed")
 	}()
 }
 
