@@ -115,7 +115,6 @@ func (p *PeerConn) receiveLoop() {
 		}
 
 		if pa, ptr, err = p.decodePackage(buf); err != nil {
-			p.logger.Error(err)
 			continue
 		}
 
@@ -246,10 +245,12 @@ func (p *PeerConn) receivePackage() ([]byte, error) {
 func (p *PeerConn) decodePackage(bytes []byte) (*internal.Package, *ptypes.DynamicAny, error) {
 	var content []byte
 	var err error
-	if content, err = p.decrypt(bytes); err != nil {
-		p.logger.Error(err)
-		return nil, nil, err
-	}
+	content = bytes
+	/*
+		if content, err = p.decrypt(bytes); err != nil {
+			p.logger.Error(err)
+			return nil, nil, err
+		}*/
 	pa := new(internal.Package)
 	if err = proto.Unmarshal(content, pa); err != nil {
 		p.logger.Error(err)
@@ -405,10 +406,12 @@ func (p *PeerConn) SendPackage(msg proto.Message) (err error) {
 		return err
 	}
 	// Serialize size.
-	if bytes, err = p.encrypt(bytes); err != nil {
-		p.logger.Error(err)
-		return err
-	}
+	/*
+		if bytes, err = p.encrypt(bytes); err != nil {
+			p.logger.Error(err)
+			return err
+		}
+	*/
 	prefix := make([]byte, 4)
 	binary.BigEndian.PutUint32(prefix, uint32(len(bytes)))
 	bytes = append(prefix, bytes...)
@@ -497,7 +500,7 @@ func (p *PeerConn) Request(req *Request) (proto.Message, error) {
 	case res := <-channel:
 		return res, nil
 	case <-time.After(req.Timeout):
-		err := errors.New("request timed out")
+		err := errors.New("Request Timeout")
 		p.logger.Error(err)
 		return nil, err
 	}
