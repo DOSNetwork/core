@@ -10,15 +10,17 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/DOSNetwork/core/log"
 	"github.com/DOSNetwork/core/p2p/dht"
 	"github.com/DOSNetwork/core/p2p/internal"
 	"github.com/DOSNetwork/core/sign/bls"
-
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes"
 	"github.com/golang/protobuf/ptypes/any"
 
-	"github.com/DOSNetwork/core/log"
+	"crypto/aes"
+	"crypto/cipher"
+
 	"github.com/dedis/kyber"
 )
 
@@ -46,6 +48,8 @@ type PeerConn struct {
 	idelPeriodCount uint8
 	lastusedtime    time.Time
 	logger          log.Logger
+	dhkey           []byte
+	nonce           []byte
 }
 
 // RequestState represents a state of a request.
@@ -89,7 +93,6 @@ func (p *PeerConn) SendMessage(msg proto.Message) (err error) {
 
 	prepared.RequestNonce = atomic.AddUint64(&p.RequestNonce, 1)
 	if err = p.SendPackage(prepared); err != nil {
-		p.logger.Error(err)
 		return
 	}
 
@@ -149,6 +152,9 @@ func (p *PeerConn) receiveLoop() {
 				if err := p.Reply(pa.GetRequestNonce(), response); err != nil {
 					p.logger.Error(err)
 				}
+				if err := p.getShareKeyAndNonce(); err != nil {
+					p.logger.Error(err)
+				}
 			}
 
 			//TODO:move this to routing
@@ -173,7 +179,6 @@ func (p *PeerConn) receiveLoop() {
 		case *internal.Pong:
 		default:
 			p.lastusedtime = time.Now()
-			//TODO
 			msg := P2PMessage{Msg: *ptr, Sender: p.identity.Id}
 			go func() { p.rxMessage <- msg }()
 			response := &internal.Pong{}
@@ -182,9 +187,7 @@ func (p *PeerConn) receiveLoop() {
 			}
 		}
 	}
-	//if _, loaded := p.p2pnet.peers.GetPeerByID(string(p.identity.Id)); loaded {
 	p.p2pnet.peers.DeletePeer(string(p.identity.Id))
-	//}
 
 	if err := (*p.conn).Close(); err != nil {
 		p.logger.Error(err)
@@ -241,20 +244,32 @@ func (p *PeerConn) receivePackage() ([]byte, error) {
 }
 
 func (p *PeerConn) decodePackage(bytes []byte) (*internal.Package, *ptypes.DynamicAny, error) {
+	var content []byte
+	var err error
+	if content, err = p.decrypt(bytes); err != nil {
+		p.logger.Error(err)
+		return nil, nil, err
+	}
 	pa := new(internal.Package)
-	if err := proto.Unmarshal(bytes, pa); err != nil {
+	if err = proto.Unmarshal(content, pa); err != nil {
+		p.logger.Error(err)
 		return nil, nil, err
 	}
 
 	pub := suite.G2().Point()
-	_ = pub.UnmarshalBinary(pa.GetPubkey())
+	if err = pub.UnmarshalBinary(pa.GetPubkey()); err != nil {
+		p.logger.Error(err)
+		return nil, nil, err
+	}
 
-	if err := bls.Verify(p.p2pnet.suite, pub, pa.GetAnything().Value, pa.GetSignature()); err != nil {
+	if err = bls.Verify(p.p2pnet.suite, pub, pa.GetAnything().Value, pa.GetSignature()); err != nil {
+		p.logger.Error(err)
 		return nil, nil, err
 	}
 
 	var ptr ptypes.DynamicAny
-	if err := ptypes.UnmarshalAny(pa.GetAnything(), &ptr); err != nil {
+	if err = ptypes.UnmarshalAny(pa.GetAnything(), &ptr); err != nil {
+		p.logger.Error(err)
 		return nil, nil, err
 	}
 
@@ -299,11 +314,71 @@ func (p *PeerConn) SayHi() (err error) {
 			return err
 		}
 		p.pubKey = pub
+		if err = p.getShareKeyAndNonce(); err != nil {
+			return err
+		}
 		p.logger.Debug("Conn Established")
+
 	}
 	return nil
 }
 
+func (p *PeerConn) getShareKeyAndNonce() (err error) {
+	var dhBytes []byte
+	dhKey := suite.Point().Mul(p.p2pnet.secKey, p.pubKey)
+	if dhBytes, err = dhKey.MarshalBinary(); err != nil {
+		return
+	}
+	p.dhkey = dhBytes[0:32]
+	p.nonce = dhBytes[32:44]
+	return
+}
+
+func (p *PeerConn) encrypt(plaintext []byte) (c []byte, err error) {
+	var block cipher.Block
+	var aesgcm cipher.AEAD
+	c = plaintext
+	if len(p.dhkey) == 0 {
+		return
+	}
+
+	if block, err = aes.NewCipher(p.dhkey); err != nil {
+		p.logger.Error(err)
+		return
+	}
+
+	if aesgcm, err = cipher.NewGCM(block); err != nil {
+		p.logger.Error(err)
+		return
+	}
+	c = aesgcm.Seal(nil, p.nonce, plaintext, nil)
+	return
+}
+
+func (p *PeerConn) decrypt(ciphertext []byte) (c []byte, err error) {
+	var block cipher.Block
+	var aesgcm cipher.AEAD
+	c = ciphertext
+	if len(p.dhkey) == 0 {
+		return
+	}
+	if block, err = aes.NewCipher(p.dhkey); err != nil {
+		p.logger.Error(err)
+		return
+	}
+
+	if aesgcm, err = cipher.NewGCM(block); err != nil {
+		p.logger.Error(err)
+		return
+	}
+
+	if c, err = aesgcm.Open(nil, p.nonce, ciphertext, nil); err != nil {
+		p.logger.Error(err)
+	}
+	return
+}
+
+//Add a timer to avoid wait for Hi forever
 func (p *PeerConn) HeardHi() (err error) {
 	timer := time.NewTimer(HITIMEOUT * time.Second)
 
@@ -317,17 +392,23 @@ func (p *PeerConn) HeardHi() (err error) {
 	return
 }
 
-func (p *PeerConn) SendPackage(msg proto.Message) error {
+func (p *PeerConn) SendPackage(msg proto.Message) (err error) {
+	var bytes []byte
 	if msg == nil {
 		err := errors.New("Message is nil")
+		p.logger.Error(err)
 		return err
 	}
 	//Encode the package
-	bytes, err := proto.Marshal(msg)
-	if err != nil {
+	if bytes, err = proto.Marshal(msg); err != nil {
+		p.logger.Error(err)
 		return err
 	}
 	// Serialize size.
+	if bytes, err = p.encrypt(bytes); err != nil {
+		p.logger.Error(err)
+		return err
+	}
 	prefix := make([]byte, 4)
 	binary.BigEndian.PutUint32(prefix, uint32(len(bytes)))
 	bytes = append(prefix, bytes...)
@@ -335,9 +416,11 @@ func (p *PeerConn) SendPackage(msg proto.Message) error {
 	defer p.mux.Unlock()
 
 	if _, err := p.rw.Write(bytes); err != nil {
+		p.logger.Error(err)
 		return err
 	}
 	if err := p.rw.Flush(); err != nil {
+		p.logger.Error(err)
 		return err
 	}
 
@@ -349,18 +432,22 @@ func (p *PeerConn) prepareMessage(msg proto.Message) (pa *internal.Package, err 
 	var sig, pub []byte
 	if msg == nil {
 		err = errors.New("network: message is null")
+		p.logger.Error(err)
 		return
 	}
 
 	id := internal.ID(p.p2pnet.identity)
 	if anything, err = ptypes.MarshalAny(msg); err != nil {
+		p.logger.Error(err)
 		return
 	}
 	//TODO:change to AES256-GCM
 	if sig, err = bls.Sign(p.p2pnet.suite, p.p2pnet.secKey, anything.Value); err != nil {
+		p.logger.Error(err)
 		return
 	}
 	if pub, err = p.p2pnet.pubKey.MarshalBinary(); err != nil {
+		p.logger.Error(err)
 		return
 	}
 
@@ -378,7 +465,6 @@ func (p *PeerConn) prepareMessage(msg proto.Message) (pa *internal.Package, err 
 func (p *PeerConn) Request(req *Request) (proto.Message, error) {
 	prepared, err := p.prepareMessage(req.Message)
 	if err != nil {
-		p.logger.Error(err)
 		return nil, err
 	}
 
@@ -404,7 +490,6 @@ func (p *PeerConn) Request(req *Request) (proto.Message, error) {
 	defer p.Requests.Delete(prepared.GetRequestNonce())
 
 	if err := p.SendPackage(prepared); err != nil {
-		p.logger.Error(err)
 		return nil, err
 	}
 
@@ -422,7 +507,6 @@ func (p *PeerConn) Request(req *Request) (proto.Message, error) {
 func (p *PeerConn) Reply(nonce uint64, message proto.Message) error {
 	prepared, err := p.prepareMessage(message)
 	if err != nil {
-		p.logger.Error(err)
 		return err
 	}
 
@@ -431,7 +515,6 @@ func (p *PeerConn) Reply(nonce uint64, message proto.Message) error {
 	prepared.ReplyFlag = true
 
 	if err := p.SendPackage(prepared); err != nil {
-		p.logger.Error(err)
 		return err
 	}
 
