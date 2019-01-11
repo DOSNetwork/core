@@ -51,19 +51,19 @@ func (pm *PeerConnManager) FindLessUsedPeerConn() (pconn *PeerConn) {
 }
 
 func (pm *PeerConnManager) LoadOrStore(id string, peer *PeerConn) (actual *PeerConn, loaded bool) {
+	pm.mu.Lock()
 	if actual, loaded = pm.peers[id]; loaded {
+		pm.mu.Unlock()
 		return
 	}
 	actual = peer
 	loaded = false
-	pm.mu.Lock()
 	pm.peers[id] = peer
 	pm.mu.Unlock()
 	if pm.PeerConnNum() > MAXPEERCONNCOUNT {
 		p := pm.FindLessUsedPeerConn()
 		p.End()
 	}
-
 	return
 }
 
