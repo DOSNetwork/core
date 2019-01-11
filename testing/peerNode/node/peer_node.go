@@ -18,6 +18,7 @@ import (
 
 	"github.com/DOSNetwork/core/log"
 	"github.com/DOSNetwork/core/p2p"
+	"math/rand"
 )
 
 type PeerNode struct {
@@ -280,4 +281,34 @@ L:
 		}
 	}
 	os.Exit(0)
+}
+
+func (d *PeerNode) CloseConnectionRandom(interval int) {
+	fmt.Println("CloseConnectionLoop begin")
+	ticker := time.NewTicker(time.Duration(interval) * time.Second)
+	for {
+		select {
+		case <-ticker.C:
+			n := d.p.GetPeerConnManager().PeerConnNum()
+			if n > 0 {
+				rn := rand.Uint32() % n
+				count := 0
+				var peerid string
+				peerid = ""
+				d.p.GetPeerConnManager().Range(func(key, value interface{}) bool {
+					if uint32(count) == rn {
+						peerid = key.(string)
+						return false
+					}
+					count++
+					return true
+				})
+				if peerid != "" {
+					d.p.GetPeerConnManager().DeletePeer(peerid)
+				}
+			}
+
+		default:
+		}
+	}
 }

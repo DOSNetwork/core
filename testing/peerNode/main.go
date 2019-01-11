@@ -61,6 +61,9 @@ func main() {
 		ip, _ = s[0], s[1]
 		d := new(node.PeerNode)
 		d.Init(ip, port, peerSize, numMessages, tStrategy)
+		if noderole == "sicknode" {
+			d.CloseConnectionRandom(5)
+		}
 		d.EventLoop()
 	}
 }

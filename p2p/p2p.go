@@ -45,6 +45,10 @@ func (n *P2P) GetIP() string {
 	return n.identity.Address
 }
 
+func (n *P2P) GetPeerConnManager() *PeerConnManager {
+	return n.peers
+}
+
 func (n *P2P) Listen() (err error) {
 	var ip string
 	var listener net.Listener
