@@ -154,21 +154,19 @@ func (r test3) StartTest(d *PeerNode) {
 	}
 
 	suite := suites.MustFind("bn256")
-	groupCmd := make(chan [][]byte)
-	defer close(groupCmd)
-	_, dkgEvent := dkg.CreateP2PDkg(d.p, suite, d.dkgChan, groupCmd)
+	p2pdkg := dkg.CreateP2PDkg(d.p, suite, d.dkgChan)
 
 	var group [][]byte
 	for idx, id := range d.nodeIDs {
 		if bytes.Compare(d.p.GetID(), id) == 0 {
 			start := idx / groupSize * groupSize
 			group = d.nodeIDs[start : start+groupSize]
-			groupCmd <- group
+			p2pdkg.GetGroupCmd() <- group
 			break
 		}
 	}
 
-	if <-dkgEvent == dkg.VERIFIED {
+	if <-p2pdkg.GetDkgEvent() == dkg.VERIFIED {
 		fmt.Println("eventCheckDone", true)
 		d.FinishTest()
 	}
@@ -183,21 +181,19 @@ func (r test4) StartTest(d *PeerNode) {
 	groupSize, err := strconv.Atoi(groupSizeStr)
 
 	suite := suites.MustFind("bn256")
-	groupCmd := make(chan [][]byte)
-	defer close(groupCmd)
-	p2pDkg, dkgEvent := dkg.CreateP2PDkg(d.p, suite, d.dkgChan, groupCmd)
+	p2pDkg := dkg.CreateP2PDkg(d.p, suite, d.dkgChan)
 
 	var group [][]byte
 	for idx, id := range d.nodeIDs {
 		if bytes.Compare(d.p.GetID(), id) == 0 {
 			start := idx / groupSize * groupSize
 			group = d.nodeIDs[start : start+groupSize]
-			groupCmd <- group
+			p2pDkg.GetGroupCmd() <- group
 			break
 		}
 	}
 
-	if <-dkgEvent != dkg.VERIFIED {
+	if <-p2pDkg.GetDkgEvent() != dkg.VERIFIED {
 		d.FinishTest()
 	}
 
@@ -268,10 +264,7 @@ func (r test5) StartTest(d *PeerNode) {
 	}
 
 	suite := suites.MustFind("bn256")
-	groupCmd := make(chan [][]byte)
-	defer close(groupCmd)
-
-	p2pDkg, dkgEvent := dkg.CreateP2PDkg(d.p, suite, d.dkgChan, groupCmd)
+	p2pDkg := dkg.CreateP2PDkg(d.p, suite, d.dkgChan)
 
 	roundCount := uint16(1)
 	for {
@@ -280,12 +273,12 @@ func (r test5) StartTest(d *PeerNode) {
 			if bytes.Compare(d.p.GetID(), id) == 0 {
 				start := idx / groupSize * groupSize
 				group = d.nodeIDs[start : start+groupSize]
-				groupCmd <- group
+				p2pDkg.GetGroupCmd() <- group
 				break
 			}
 		}
 
-		if <-dkgEvent == dkg.VERIFIED {
+		if <-p2pDkg.GetDkgEvent() == dkg.VERIFIED {
 			fmt.Println("\n certified!!!!!!")
 			fmt.Println("eventCheckRoundDone", roundCount)
 			p2pDkg.Reset()

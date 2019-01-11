@@ -30,24 +30,25 @@ type P2PDkgInterface interface {
 	GetGroupId() []byte
 	GetDKGIndex() int
 	SetGroupMembers([][]byte)
-	IsCertified() bool
-	Reset()
+	GetGroupCmd() chan [][]byte
+	GetDkgEvent() chan int
 	SetNbParticipants(int)
 	GetGroupPublicPoly() *share.PubPoly
 	GetShareSecurity() *share.PriShare
+	IsCertified() bool
+	Reset()
 	SubscribeEvent(chan int)
 }
 
-func CreateP2PDkg(p p2p.P2PInterface, suite suites.Suite, peerEvent chan p2p.P2PMessage, groupCmd chan [][]byte) (P2PDkgInterface, <-chan int) {
+func CreateP2PDkg(p p2p.P2PInterface, suite suites.Suite, peerEvent chan p2p.P2PMessage) P2PDkgInterface {
 	sec := suite.Scalar().Pick(suite.RandomStream())
 	d := &P2PDkg{
-		suite:       suite,
-		publicKeys:  Pubkeys{},
-		pubkeyIdMap: make(map[string]string),
-		partSec:     sec,
-		partPub:     suite.Point().Mul(sec, nil),
-
-		groupCmd:       groupCmd,
+		suite:          suite,
+		publicKeys:     Pubkeys{},
+		pubkeyIdMap:    make(map[string]string),
+		partSec:        sec,
+		partPub:        suite.Point().Mul(sec, nil),
+		groupCmd:       make(chan [][]byte),
 		network:        &p,
 		chPeerEvent:    peerEvent,
 		currentState:   INIT,
@@ -56,13 +57,21 @@ func CreateP2PDkg(p p2p.P2PInterface, suite suites.Suite, peerEvent chan p2p.P2P
 	d.ctx, d.cancel = context.WithCancel(context.Background())
 
 	go func() {
-		for groupIds := range groupCmd {
+		for groupIds := range d.groupCmd {
 			d.Reset()
 			go d.eventLoop(groupIds)
 		}
 	}()
 
-	return d, d.subscribeEvent
+	return d
+}
+
+func (d *P2PDkg) GetGroupCmd() chan [][]byte {
+	return d.groupCmd
+}
+
+func (d *P2PDkg) GetDkgEvent() chan int {
+	return d.subscribeEvent
 }
 
 type P2PDkg struct {
