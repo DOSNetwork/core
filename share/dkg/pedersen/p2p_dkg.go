@@ -183,8 +183,7 @@ func (d *P2PDkg) eventLoop(groupIds [][]byte) {
 	defer close(respsCh)
 
 	d.pipeExchangePubKey(groupIds)
-	d.pipeNewDistKeyGenerator(pubKeyCh)
-	d.pipeProcessResponses(d.pipeProcessDeal(dealCh), respsCh)
+	d.pipeProcessResponses(d.pipeProcessDeal(d.pipeNewDistKeyGenerator(pubKeyCh), dealCh), respsCh)
 
 	for {
 		select {
@@ -252,8 +251,8 @@ func (d *P2PDkg) pipeExchangePubKey(groupIds [][]byte) {
 	}()
 }
 
-//Can't call NewDistKeyGenerator .need to wait unitl all deal has been received
-func (d *P2PDkg) pipeNewDistKeyGenerator(pubKeych <-chan vss.PublicKey) {
+func (d *P2PDkg) pipeNewDistKeyGenerator(pubKeych <-chan vss.PublicKey) (genDoneCh chan bool) {
+	genDoneCh = make(chan bool)
 	d.pubkeyIdMap[d.partPub.String()] = string((*d.network).GetID())
 	d.publicKeys = append(d.publicKeys, d.partPub)
 
@@ -286,41 +285,44 @@ func (d *P2PDkg) pipeNewDistKeyGenerator(pubKeych <-chan vss.PublicKey) {
 						d.dkgIndex = i
 					}
 				}
-
+				genDoneCh <- true
 				log.WithFields(logrus.Fields{
 					"function":         "enterNewDistKeyGenerator",
 					"eventSendAllDeal": true,
 				}).Info()
 			}
 		}
+		close(genDoneCh)
 		fmt.Println("pipeNewDistKeyGenerator closed")
 	}()
+	return
 }
 
-//This is only happened after all peers has all public keys
-func (d *P2PDkg) pipeProcessDeal(dealCh <-chan Deal) (dealDoneCh chan bool) {
+func (d *P2PDkg) pipeProcessDeal(genDoneCh <-chan bool, dealCh <-chan Deal) (dealDoneCh chan bool) {
 	dealDoneCh = make(chan bool)
 	go func() {
 		for deal := range dealCh {
 			d.deals = append(d.deals, deal)
 			if len(d.deals) == d.nbParticipants-1 {
-				var resps []*Response
-				for _, deal := range d.deals {
-					resp, err := (*d.partDkg).ProcessDeal(&deal)
-					if err != nil {
-						log.WithField("function", "processDeal").Warn(err)
-					} else {
-						resps = append(resps, resp)
+				if <-genDoneCh == true {
+					var resps []*Response
+					for _, deal := range d.deals {
+						resp, err := (*d.partDkg).ProcessDeal(&deal)
+						if err != nil {
+							log.WithField("function", "processDeal").Warn(err)
+						} else {
+							resps = append(resps, resp)
+						}
 					}
+					d.broadcast(&Responses{Response: resps})
+					dealDoneCh <- true
 				}
-				d.broadcast(&Responses{Response: resps})
-				dealDoneCh <- true
 			}
 		}
 		close(dealDoneCh)
 		fmt.Println("pipeProcessDeal closed")
 	}()
-	return dealDoneCh
+	return
 }
 
 func (d *P2PDkg) pipeProcessResponses(dealDoneCh chan bool, respsCh chan Responses) {
