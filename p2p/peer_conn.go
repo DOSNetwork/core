@@ -143,7 +143,6 @@ func (p *PeerConn) receiveLoop() {
 				}
 				p.pubKey = pub
 				p.logger.Debug("Conn Established")
-				p.waitForHi <- true
 				response := &internal.Hi{
 					PublicKey: p.p2pnet.identity.PublicKey,
 					Address:   p.p2pnet.identity.Address,
@@ -155,6 +154,8 @@ func (p *PeerConn) receiveLoop() {
 				if err := p.getShareKeyAndNonce(); err != nil {
 					p.logger.Error(err)
 				}
+				time.Sleep(time.Second)
+				p.waitForHi <- true
 			}
 
 			//TODO:move this to routing
