@@ -14,3 +14,15 @@ message Response {
 message Responses{
     repeated Response response = 1;
 }
+
+message ReqPublicKey {
+    string sessionId = 1;
+}
+
+message ReqDeal {
+    string sessionId = 1;
+}
+
+message ReqResponses {
+    string sessionId = 1;
+}

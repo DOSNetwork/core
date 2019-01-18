@@ -154,19 +154,19 @@ func (r test3) StartTest(d *PeerNode) {
 	}
 
 	suite := suites.MustFind("bn256")
-	p2pdkg := dkg.CreateP2PDkg(d.p, suite, d.dkgChan)
+	p2pDkg := dkg.CreateP2PDkg(d.p, suite, d.dkgChan)
 
 	var group [][]byte
 	for idx, id := range d.nodeIDs {
 		if bytes.Compare(d.p.GetID(), id) == 0 {
 			start := idx / groupSize * groupSize
 			group = d.nodeIDs[start : start+groupSize]
-			p2pdkg.GetGroupCmd() <- group
+			p2pDkg.GetGroupCmd() <- dkg.DkgSession{SessionId: "0", GroupIds: group}
 			break
 		}
 	}
 
-	if <-p2pdkg.GetDkgEvent() == dkg.VERIFIED {
+	if <-p2pDkg.GetDkgEvent() == dkg.VERIFIED {
 		fmt.Println("eventCheckDone", true)
 		d.FinishTest()
 	}
@@ -188,7 +188,7 @@ func (r test4) StartTest(d *PeerNode) {
 		if bytes.Compare(d.p.GetID(), id) == 0 {
 			start := idx / groupSize * groupSize
 			group = d.nodeIDs[start : start+groupSize]
-			p2pDkg.GetGroupCmd() <- group
+			p2pDkg.GetGroupCmd() <- dkg.DkgSession{SessionId: "0", GroupIds: group}
 			break
 		}
 	}
@@ -273,7 +273,7 @@ func (r test5) StartTest(d *PeerNode) {
 			if bytes.Compare(d.p.GetID(), id) == 0 {
 				start := idx / groupSize * groupSize
 				group = d.nodeIDs[start : start+groupSize]
-				p2pDkg.GetGroupCmd() <- group
+				p2pDkg.GetGroupCmd() <- dkg.DkgSession{SessionId: strconv.Itoa(int(roundCount)), GroupIds: group}
 				break
 			}
 		}
@@ -281,7 +281,6 @@ func (r test5) StartTest(d *PeerNode) {
 		if <-p2pDkg.GetDkgEvent() == dkg.VERIFIED {
 			fmt.Println("\n certified!!!!!!")
 			fmt.Println("eventCheckRoundDone", roundCount)
-			p2pDkg.Reset()
 			next := d.requestIsNextRoundReady(roundCount)
 			if next == byte(DKGROUNDFINISH) {
 				break

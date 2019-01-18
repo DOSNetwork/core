@@ -126,11 +126,6 @@ func (p *PeerConn) receiveLoop() {
 			continue
 		}
 
-		//fmt.Println("receive", p.p2pnet.peers.peers, p.conn, p.identity.Id, pa.GetRequestNonce(), pa.GetReplyFlag(), p.Requests)
-		//for key, value := range p.p2pnet.peers.peers {
-		//	fmt.Println([]byte(key), value.conn)
-		//}
-
 		if pa.GetRequestNonce() > 0 && pa.GetReplyFlag() {
 			if _state, exists := p.Requests.Load(pa.GetRequestNonce()); exists {
 				state := _state.(*RequestState)
@@ -138,8 +133,8 @@ func (p *PeerConn) receiveLoop() {
 				case state.data <- ptr.Message:
 				case <-state.closeSignal:
 				}
-				continue
 			}
+			continue
 		}
 
 		switch content := ptr.Message.(type) {
@@ -195,8 +190,6 @@ func (p *PeerConn) receiveLoop() {
 			go func() { p.rxMessage <- msg }()
 		}
 	}
-
-	//fmt.Println("Conn End", p.identity.Id, p.conn, p.incomingConn)
 	close(p.waitForHi)
 	p.logger.Debug("Conn End")
 }
@@ -505,10 +498,6 @@ func (p *PeerConn) Request(req *Request) (proto.Message, error) {
 		closeSignal: closeSignal,
 	})
 
-	//fmt.Println("request", p.p2pnet.peers.peers, p.conn, p.identity.Id, prepared.GetRequestNonce(), prepared.GetReplyFlag(), p.Requests)
-	//for key, value := range p.p2pnet.peers.peers {
-	//	fmt.Println([]byte(key), value.conn)
-	//}
 	// Stop tracking the request.
 	defer close(closeSignal)
 	defer p.Requests.Delete(prepared.GetRequestNonce())
@@ -538,10 +527,6 @@ func (p *PeerConn) Reply(nonce uint64, message proto.Message) error {
 	prepared.RequestNonce = nonce
 	prepared.ReplyFlag = true
 
-	//fmt.Println("reply", p.p2pnet.peers.peers, p.conn, p.identity.Id, prepared.RequestNonce, prepared.ReplyFlag)
-	//for key, value := range p.p2pnet.peers.peers {
-	//	fmt.Println([]byte(key), value.conn)
-	//}
 	if err := p.SendPackage(prepared); err != nil {
 		return err
 	}

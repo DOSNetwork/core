@@ -163,6 +163,12 @@ func main() {
 
 		for event := range peerEvent {
 			switch content := event.Msg.Message.(type) {
+			case *dkg.ReqPublicKey:
+				peerEventForDKG <- event
+			case *dkg.ReqDeal:
+				peerEventForDKG <- event
+			case *dkg.ReqResponses:
+				peerEventForDKG <- event
 			case *vss.PublicKey:
 				peerEventForDKG <- event
 			case *dkg.Deal:
@@ -191,7 +197,7 @@ func main() {
 					if bytes.Compare(p.GetID(), id) == 0 {
 						start := uint32(idx) / groupSize * groupSize
 						group = ids[start : start+groupSize]
-						p2pdkg.GetGroupCmd() <- group
+						p2pdkg.GetGroupCmd() <- dkg.DkgSession{SessionId: "0", GroupIds: group}
 						break
 					}
 				}
