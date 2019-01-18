@@ -161,6 +161,9 @@ func main() {
 				peerEventForDKG <- msg
 			case *vss.Signature:
 				cSignatureFromPeer <- *content
+				if err := msg.PeerConn.Reply(msg.RequestNonce, &vss.Signature{}); err != nil {
+					mainLogger.WithField("function", "dispatchEvent").Error("signature reply", err)
+				}
 			default:
 				mainLogger.WithField("function", "dispatchEvent").Warn("unknown", content)
 			}
