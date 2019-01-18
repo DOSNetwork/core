@@ -1,0 +1,39 @@
+digraph G {
+    compound=true;
+    subgraph cluster_china {
+        label = china;
+        style = rounded;
+        "10.250.1.2/32" -> "10.250.2.2/32" [arrowhead=none, arrowtail=none, label="delay 100ms 10ms 30%\nloss 1% 10%\n"];
+        "10.250.1.2/32" -> "10.250.3.2/32" [arrowhead=none, arrowtail=none, label="delay 100ms 10ms 30%\nloss 1% 10%\n"];
+        "10.250.1.2/32" -> "10.250.4.2/32" [arrowhead=none, arrowtail=none, label="delay 100ms 10ms 30%\nloss 1% 10%\n"];
+        "10.250.2.2/32" -> "10.250.3.2/32" [arrowhead=none, arrowtail=none, label="delay 100ms 10ms 30%\nloss 1% 10%\n"];
+        "10.250.2.2/32" -> "10.250.4.2/32" [arrowhead=none, arrowtail=none, label="delay 100ms 10ms 30%\nloss 1% 10%\n"];
+        "10.250.3.2/32" -> "10.250.4.2/32" [arrowhead=none, arrowtail=none, label="delay 100ms 10ms 30%\nloss 1% 10%\n"];
+    }
+    subgraph cluster_eu {
+        label = eu;
+        style = rounded;
+        "10.250.5.2/32" -> "10.250.6.2/32" [arrowhead=none, arrowtail=none, label="delay 10ms 5ms 30%\nloss 1% 10%\n"];
+        "10.250.5.2/32" -> "10.250.7.2/32" [arrowhead=none, arrowtail=none, label="delay 10ms 5ms 30%\nloss 1% 10%\n"];
+        "10.250.6.2/32" -> "10.250.7.2/32" [arrowhead=none, arrowtail=none, label="delay 10ms 5ms 30%\nloss 1% 10%\n"];
+    }
+    subgraph cluster_jpn {
+        label = jpn;
+        style = rounded;
+        "10.250.8.2/32" -> "10.250.9.2/32" [arrowhead=none, arrowtail=none, label="delay 100ms 10ms 30%\nduplicate 1%\nrate 100mbit\n"];
+        "10.250.8.2/32" -> "10.250.10.2/32" [arrowhead=none, arrowtail=none, label="delay 100ms 10ms 30%\nduplicate 1%\nrate 100mbit\n"];
+        "10.250.8.2/32" -> "10.250.11.2/32" [arrowhead=none, arrowtail=none, label="delay 100ms 10ms 30%\nduplicate 1%\nrate 100mbit\n"];
+        "10.250.9.2/32" -> "10.250.10.2/32" [arrowhead=none, arrowtail=none, label="delay 100ms 10ms 30%\nduplicate 1%\nrate 100mbit\n"];
+        "10.250.9.2/32" -> "10.250.11.2/32" [arrowhead=none, arrowtail=none, label="delay 100ms 10ms 30%\nduplicate 1%\nrate 100mbit\n"];
+        "10.250.10.2/32" -> "10.250.11.2/32" [arrowhead=none, arrowtail=none, label="delay 100ms 10ms 30%\nduplicate 1%\nrate 100mbit\n"];
+    }
+    "10.250.1.2/32" -> "10.250.5.2/32"
+        [ltail=cluster_china, lhead=cluster_eu, arrowhead=none, arrowtail=none,
+        label="delay 200ms 10ms 1%\ncorrupt0.2%\nrate 10mbit\n"];
+    "10.250.1.2/32" -> "10.250.8.2/32"
+        [ltail=cluster_china, lhead=cluster_jpn, arrowhead=none, arrowtail=none,
+        label="delay 100ms 10ms 1%\nrate 10mbit\n"];
+    "10.250.8.2/32" -> "10.250.5.2/32"
+        [ltail=cluster_jpn, lhead=cluster_eu, arrowhead=none, arrowtail=none,
+        label="delay 30ms 5ms 1%\nrate 100mbit\n"];
+}
