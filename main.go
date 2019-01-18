@@ -34,7 +34,6 @@ func main() {
 		mainLogger.WithField("function", "loadConfig").Fatal(err)
 	}
 	role := offChainConfig.NodeRole
-	nbParticipants := offChainConfig.RandomGroupSize
 	port := offChainConfig.Port
 	bootstrapIp := offChainConfig.BootStrapIp
 
@@ -131,7 +130,7 @@ func main() {
 	}
 
 	//6)Set up a dosnode pipeline
-	d := dos.CreateDosNode(suite, nbParticipants, p, chainConn, p2pDkg, log.WithField("module", "dosNode"))
+	d := dos.CreateDosNode(suite, p, chainConn, p2pDkg, log.WithField("module", "dosNode"))
 	d.PipeGrouping(eventGrouping)
 	queriesReports := d.PipeQueries(chUrl, chUsrRandom, chRandom)
 	outForRecover, outForValidate := d.PipeSignAndBroadcast(queriesReports)
@@ -153,6 +152,12 @@ func main() {
 		//event from peer
 		case msg := <-peerEvent:
 			switch content := msg.Msg.Message.(type) {
+			case *dkg.ReqPublicKey:
+				peerEventForDKG <- msg
+			case *dkg.ReqDeal:
+				peerEventForDKG <- msg
+			case *dkg.ReqResponses:
+				peerEventForDKG <- msg
 			case *vss.PublicKey:
 				peerEventForDKG <- msg
 			case *dkg.Deal:

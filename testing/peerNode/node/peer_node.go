@@ -220,6 +220,12 @@ func (d *PeerNode) Init(bootStrapIp string, port, peerSize int, numMessages int,
 					sender := string(msg.Sender)
 					go d.tStrategy.CheckResult(sender, content, d)
 				}
+			case *dkg.ReqPublicKey:
+				d.dkgChan <- msg
+			case *dkg.ReqDeal:
+				d.dkgChan <- msg
+			case *dkg.ReqResponses:
+				d.dkgChan <- msg
 			case *vss.PublicKey:
 				d.dkgChan <- msg
 			case *dkg.Deal:

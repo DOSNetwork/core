@@ -48,7 +48,7 @@ type DosNodeInterface interface {
 	PipeRecoverAndVerify(chan vss.Signature, <-chan Report) <-chan Report
 	PipeSendToOnchain(chReport <-chan Report) <-chan Report
 	PipeCleanFinishMap(chValidation chan interface{}, request ...<-chan Report) <-chan interface{}
-	SetParticipants(int)
+	SetParticipants(groupIds [][]byte)
 }
 
 type DosNode struct {
@@ -97,13 +97,11 @@ type request struct {
 	version        uint8
 }
 
-func CreateDosNode(suite suites.Suite, nbParticipants int, p p2p.P2PInterface, chainConn onchain.ChainInterface, p2pDkg dkg.P2PDkgInterface, logger *logrus.Entry) (dosNode DosNodeInterface) {
+func CreateDosNode(suite suites.Suite, p p2p.P2PInterface, chainConn onchain.ChainInterface, p2pDkg dkg.P2PDkgInterface, logger *logrus.Entry) (dosNode DosNodeInterface) {
 	log = logger
 	return &DosNode{
 		suite:          suite,
 		quit:           make(chan struct{}),
-		nbParticipants: nbParticipants,
-		nbThreshold:    nbParticipants/2 + 1,
 		network:        &p,
 		chainConn:      chainConn,
 		p2pDkg:         p2pDkg,
@@ -112,9 +110,10 @@ func CreateDosNode(suite suites.Suite, nbParticipants int, p p2p.P2PInterface, c
 	}
 }
 
-func (d *DosNode) SetParticipants(nbParticipants int) {
-	d.nbParticipants = nbParticipants
-	d.nbThreshold = nbParticipants/2 + 1
+func (d *DosNode) SetParticipants(groupIds [][]byte) {
+	d.groupIds = groupIds
+	d.nbParticipants = len(d.groupIds)
+	d.nbThreshold = d.nbParticipants/2 + 1
 }
 
 func dataFetch(url string) (body []byte, err error) {
@@ -223,10 +222,9 @@ func (d *DosNode) PipeGrouping(chGroup <-chan interface{}) {
 						fmt.Println("DOSProxyLogGrouping member i= ", i, " id ", id, " ", isMember)
 						groupIds = append(groupIds, id)
 					}
-					nbParticipants := len(groupIds)
-					d.SetParticipants(nbParticipants)
+					d.SetParticipants(groupIds)
 					if isMember {
-						d.p2pDkg.GetGroupCmd() <- groupIds
+						d.p2pDkg.GetGroupCmd() <- dkg.DkgSession{SessionId: "0", GroupIds: groupIds}
 					}
 				default:
 					fmt.Println("DOSProxyLogUpdateRandom type mismatch")

@@ -109,30 +109,26 @@ func (n *P2P) Listen() (err error) {
 
 	go func() {
 		for {
-			var conn net.Conn
-			var err error
-			if conn, err = listener.Accept(); err != nil {
-				n.logger.Error(err)
-				continue
-			}
-			var peer *PeerConn
-			if peer, err = NewPeerConn(n, &conn, n.messages, true); err != nil {
-				peer.EndWithoutDelete()
-				n.logger.Error(err)
-				continue
-			}
-			if err = peer.HeardHi(); err != nil {
-				peer.EndWithoutDelete()
+			conn, err := listener.Accept()
+			if err != nil {
 				n.logger.Error(err)
 				continue
 			}
 
-			//fmt.Println("connect from", peer.identity.Id, peer.conn, peer.incomingConn)
-			//for key, value := range n.peers.peers {
-			//	fmt.Println("map", []byte(key), value.conn, value.shortConn)
-			//}
-
-			n.routingTable.Update(peer.identity)
+			go func() {
+				peer, err := NewPeerConn(n, &conn, n.messages, true)
+				if err != nil {
+					peer.EndWithoutDelete()
+					n.logger.Error(err)
+					return
+				}
+				if err = peer.HeardHi(); err != nil {
+					peer.EndWithoutDelete()
+					n.logger.Error(err)
+					return
+				}
+				n.routingTable.Update(peer.identity)
+			}()
 		}
 	}()
 
@@ -170,7 +166,6 @@ func (n *P2P) findPeer(id []byte) (peer *PeerConn, found bool) {
 
 	// Find Peer from existing peerConn
 	if peer = n.peers.GetPeerByID(string(id)); peer != nil {
-		//fmt.Println("FromExisting")
 		found = true
 		n.logger.Debug("FromExisting")
 		return
@@ -179,7 +174,6 @@ func (n *P2P) findPeer(id []byte) (peer *PeerConn, found bool) {
 	// Find Peer from routing map
 	peers := n.routingTable.GetPeers()
 	if ip, ok := peers[string(id)]; ok {
-		//fmt.Println("FromRoutingTable")
 		if peer, err = n.connectTo(ip); err != nil {
 			n.logger.Error(err)
 			return
@@ -196,7 +190,6 @@ func (n *P2P) findPeer(id []byte) (peer *PeerConn, found bool) {
 	}
 
 	if len(results) > 0 && bytes.Equal(results[0].Id, id) {
-		//fmt.Println("FromPeers")
 		if peer, err = n.connectTo(results[0].Address); err != nil {
 			n.logger.Error(err)
 			return
@@ -286,12 +279,6 @@ func (n *P2P) connectTo(addr string) (peer *PeerConn, err error) {
 		}
 
 		n.peers.LoadOrStore(string(peer.identity.Id), peer)
-
-		//fmt.Println("connect to", peer.identity.Id, peer.conn, peer.incomingConn, retry)
-		//for key, value := range n.peers.peers {
-		//	fmt.Println("map", []byte(key), value.conn, value.incomingConn)
-		//}
-
 		n.routingTable.Update(peer.identity)
 		return
 	}
