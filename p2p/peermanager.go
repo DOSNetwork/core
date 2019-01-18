@@ -53,6 +53,8 @@ func (pm *PeerConnManager) FindLessUsedPeerConn() (pconn *PeerConn) {
 func (pm *PeerConnManager) LoadOrStore(id string, peer *PeerConn) (actual *PeerConn, loaded bool) {
 	pm.mu.Lock()
 	if actual, loaded = pm.peers[id]; loaded {
+		//fmt.Println("duplicates", peer.identity.Id, peer.conn, peer.incomingConn)
+		peer.EndWithoutDelete()
 		pm.mu.Unlock()
 		return
 	}
@@ -93,6 +95,7 @@ func (pm *PeerConnManager) DeletePeer(id string) {
 		pm.mu.Lock()
 		defer pm.mu.Unlock()
 		delete(pm.peers, id)
+		//fmt.Println("delete", id)
 	}
 }
 

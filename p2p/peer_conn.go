@@ -2,6 +2,7 @@ package p2p
 
 import (
 	"bufio"
+	"context"
 	"encoding/binary"
 	"errors"
 	"io"
@@ -50,6 +51,9 @@ type PeerConn struct {
 	logger          log.Logger
 	dhkey           []byte
 	nonce           []byte
+	incomingConn    bool
+	ctx             context.Context
+	cancel          context.CancelFunc
 }
 
 // RequestState represents a state of a request.
@@ -58,7 +62,7 @@ type RequestState struct {
 	closeSignal chan struct{}
 }
 
-func NewPeerConn(p2pnet *P2P, conn *net.Conn, rxMessage chan P2PMessage) (peer *PeerConn, err error) {
+func NewPeerConn(p2pnet *P2P, conn *net.Conn, rxMessage chan P2PMessage, incomingConn bool) (peer *PeerConn, err error) {
 	peer = &PeerConn{
 		p2pnet:       p2pnet,
 		conn:         conn,
@@ -68,7 +72,11 @@ func NewPeerConn(p2pnet *P2P, conn *net.Conn, rxMessage chan P2PMessage) (peer *
 		rw:           bufio.NewReadWriter(bufio.NewReader(*conn), bufio.NewWriter(*conn)),
 		lastusedtime: time.Now(),
 		logger:       p2pnet.logger,
+		incomingConn: incomingConn,
 	}
+
+	peer.ctx, peer.cancel = context.WithCancel(context.Background())
+
 	if err = peer.Start(); err != nil {
 		p2pnet.logger.Error(err)
 		return
@@ -118,6 +126,11 @@ func (p *PeerConn) receiveLoop() {
 			continue
 		}
 
+		//fmt.Println("receive", p.p2pnet.peers.peers, p.conn, p.identity.Id, pa.GetRequestNonce(), pa.GetReplyFlag(), p.Requests)
+		//for key, value := range p.p2pnet.peers.peers {
+		//	fmt.Println([]byte(key), value.conn)
+		//}
+
 		if pa.GetRequestNonce() > 0 && pa.GetReplyFlag() {
 			if _state, exists := p.Requests.Load(pa.GetRequestNonce()); exists {
 				state := _state.(*RequestState)
@@ -142,7 +155,6 @@ func (p *PeerConn) receiveLoop() {
 				}
 				p.pubKey = pub
 				p.logger.Debug("Conn Established")
-				p.waitForHi <- true
 				response := &internal.Hi{
 					PublicKey: p.p2pnet.identity.PublicKey,
 					Address:   p.p2pnet.identity.Address,
@@ -154,6 +166,7 @@ func (p *PeerConn) receiveLoop() {
 				if err := p.getShareKeyAndNonce(); err != nil {
 					p.logger.Error(err)
 				}
+				p.waitForHi <- true
 			}
 
 			//TODO:move this to routing
@@ -178,19 +191,12 @@ func (p *PeerConn) receiveLoop() {
 		case *internal.Pong:
 		default:
 			p.lastusedtime = time.Now()
-			msg := P2PMessage{Msg: *ptr, Sender: p.identity.Id}
+			msg := P2PMessage{Msg: *ptr, Sender: p.identity.Id, RequestNonce: pa.GetRequestNonce(), PeerConn: p}
 			go func() { p.rxMessage <- msg }()
-			response := &internal.Pong{}
-			if err := p.Reply(pa.GetRequestNonce(), response); err != nil {
-				p.logger.Error(err)
-			}
 		}
 	}
-	p.p2pnet.peers.DeletePeer(string(p.identity.Id))
 
-	if err := (*p.conn).Close(); err != nil {
-		p.logger.Error(err)
-	}
+	//fmt.Println("Conn End", p.identity.Id, p.conn, p.incomingConn)
 	close(p.waitForHi)
 	p.logger.Debug("Conn End")
 }
@@ -201,8 +207,19 @@ func (p *PeerConn) End() {
 	}
 	if err := (*p.conn).Close(); err != nil {
 		p.logger.Error(err)
-		p.p2pnet.peers.DeletePeer(string(p.identity.Id))
 	}
+	p.cancel()
+	p.p2pnet.peers.DeletePeer(string(p.identity.Id))
+}
+
+func (p *PeerConn) EndWithoutDelete() {
+	if p.conn == nil {
+		return
+	}
+	if err := (*p.conn).Close(); err != nil {
+		p.logger.Error(err)
+	}
+	p.cancel()
 }
 
 func (p *PeerConn) receivePackage() ([]byte, error) {
@@ -246,11 +263,11 @@ func (p *PeerConn) decodePackage(bytes []byte) (*internal.Package, *ptypes.Dynam
 	var content []byte
 	var err error
 	content = bytes
-	/*
-		if content, err = p.decrypt(bytes); err != nil {
-			p.logger.Error(err)
-			return nil, nil, err
-		}*/
+
+	if content, err = p.decrypt(bytes); err != nil {
+		p.logger.Error(err)
+		return nil, nil, err
+	}
 	pa := new(internal.Package)
 	if err = proto.Unmarshal(content, pa); err != nil {
 		p.logger.Error(err)
@@ -406,12 +423,12 @@ func (p *PeerConn) SendPackage(msg proto.Message) (err error) {
 		return err
 	}
 	// Serialize size.
-	/*
-		if bytes, err = p.encrypt(bytes); err != nil {
-			p.logger.Error(err)
-			return err
-		}
-	*/
+
+	if bytes, err = p.encrypt(bytes); err != nil {
+		p.logger.Error(err)
+		return err
+	}
+
 	prefix := make([]byte, 4)
 	binary.BigEndian.PutUint32(prefix, uint32(len(bytes)))
 	bytes = append(prefix, bytes...)
@@ -488,6 +505,10 @@ func (p *PeerConn) Request(req *Request) (proto.Message, error) {
 		closeSignal: closeSignal,
 	})
 
+	//fmt.Println("request", p.p2pnet.peers.peers, p.conn, p.identity.Id, prepared.GetRequestNonce(), prepared.GetReplyFlag(), p.Requests)
+	//for key, value := range p.p2pnet.peers.peers {
+	//	fmt.Println([]byte(key), value.conn)
+	//}
 	// Stop tracking the request.
 	defer close(closeSignal)
 	defer p.Requests.Delete(prepared.GetRequestNonce())
@@ -517,6 +538,10 @@ func (p *PeerConn) Reply(nonce uint64, message proto.Message) error {
 	prepared.RequestNonce = nonce
 	prepared.ReplyFlag = true
 
+	//fmt.Println("reply", p.p2pnet.peers.peers, p.conn, p.identity.Id, prepared.RequestNonce, prepared.ReplyFlag)
+	//for key, value := range p.p2pnet.peers.peers {
+	//	fmt.Println([]byte(key), value.conn)
+	//}
 	if err := p.SendPackage(prepared); err != nil {
 		return err
 	}
@@ -534,6 +559,8 @@ func (p *PeerConn) heartBeat() {
 	ticker := time.NewTicker(HEARTBEATINTERVAL * time.Second)
 	for {
 		select {
+		case <-p.ctx.Done():
+			return
 		case <-ticker.C:
 			if p.readWriteCount == 0 {
 				p.idelPeriodCount++
@@ -562,8 +589,10 @@ func (p *PeerConn) heartBeat() {
 				}
 			}
 			if timeout {
-				if err := (*p.conn).Close(); err != nil {
-					p.logger.Error(err)
+				if p.incomingConn {
+					p.EndWithoutDelete()
+				} else {
+					p.End()
 				}
 				return
 			} else {

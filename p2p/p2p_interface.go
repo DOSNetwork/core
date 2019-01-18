@@ -74,8 +74,10 @@ func GetLocalIP() (ip string, err error) {
 }
 
 type P2PMessage struct {
-	Msg    ptypes.DynamicAny
-	Sender []byte
+	Msg          ptypes.DynamicAny
+	Sender       []byte
+	RequestNonce uint64
+	PeerConn     *PeerConn
 }
 
 type P2PInterface interface {
@@ -86,5 +88,6 @@ type P2PInterface interface {
 	ConnectTo(IpAddr string) (id []byte, err error)
 	Leave()
 	SendMessage(id []byte, msg proto.Message) error
+	Request(id []byte, m proto.Message) (msg proto.Message, err error)
 	GetPeerConnManager() *PeerConnManager
 }
