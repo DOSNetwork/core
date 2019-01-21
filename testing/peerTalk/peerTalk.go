@@ -35,15 +35,20 @@ func main() {
 
 	log.AddHook(hook)
 	logger := log.WithFields(logrus.Fields{})
-	p, peerEvent, err := p2p.CreateP2PNetwork(id[:], 44460)
+	p, err := p2p.CreateP2PNetwork(id[:], 44460)
 	if err != nil {
 		logger.Fatal(err)
 	}
+
 	if err := p.Listen(); err != nil {
 		logger.Error(err)
 	}
 
 	if os.Getenv("ROLE") == "bootstrap" {
+		peerEvent, err := p.SubscribeEvent(nil, peerTalk.Register{}, peerTalk.Done{})
+		if err != nil {
+			logger.Fatal(err)
+		}
 		logger.Data["role"] = "bootstrap"
 		logger.Info()
 
@@ -123,6 +128,10 @@ func main() {
 			}
 		}
 	} else {
+		peerEvent, err := p.SubscribeEvent(nil, peerTalk.Bootstrap{}, peerTalk.Grouping{})
+		if err != nil {
+			logger.Fatal(err)
+		}
 		logger.Data["role"] = "node"
 
 		logger.Info(os.Getenv("BOOTSTRAPIP"))
@@ -134,7 +143,10 @@ func main() {
 		suite := suites.MustFind("bn256")
 
 		peerEventForDKG := make(chan p2p.P2PMessage, 1)
-		defer close(peerEventForDKG)
+		p.SubscribeEvent(peerEventForDKG, dkg.ReqPublicKey{}, dkg.ReqDeal{}, dkg.ReqResponses{}, vss.PublicKey{},
+			dkg.Deal{}, dkg.Responses{})
+		defer p.UnSubscribeEvent(dkg.ReqPublicKey{}, dkg.ReqDeal{}, dkg.ReqResponses{}, vss.PublicKey{},
+			dkg.Deal{}, dkg.Responses{})
 
 		p2pdkg := dkg.CreateP2PDkg(p, suite, peerEventForDKG)
 
@@ -163,18 +175,6 @@ func main() {
 
 		for event := range peerEvent {
 			switch content := event.Msg.Message.(type) {
-			case *dkg.ReqPublicKey:
-				peerEventForDKG <- event
-			case *dkg.ReqDeal:
-				peerEventForDKG <- event
-			case *dkg.ReqResponses:
-				peerEventForDKG <- event
-			case *vss.PublicKey:
-				peerEventForDKG <- event
-			case *dkg.Deal:
-				peerEventForDKG <- event
-			case *dkg.Responses:
-				peerEventForDKG <- event
 			case *peerTalk.Bootstrap:
 				if err = p.Join(content.GetAddress()); err != nil {
 					logger.WithFields(logrus.Fields{

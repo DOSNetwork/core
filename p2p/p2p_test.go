@@ -25,9 +25,8 @@ func TestPeerConnEnd(t *testing.T) {
 	bId := []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 19}
 	aPort := 44457
 	bPoer := 44458
-	log := logrus.New().WithField("subject", "TestPeerConnEnd")
 
-	if a, _, err = CreateP2PNetwork(aId[:], aPort, log); err != nil {
+	if a, err = CreateP2PNetwork(aId[:], aPort); err != nil {
 		t.Error("Test Failed: CreateP2PNetwork failed ", err)
 	}
 
@@ -36,7 +35,7 @@ func TestPeerConnEnd(t *testing.T) {
 
 	}
 
-	if b, _, err = CreateP2PNetwork(bId[:], bPoer, log); err != nil {
+	if b, err = CreateP2PNetwork(bId[:], bPoer); err != nil {
 		t.Error("Test Failed: CreateP2PNetwork failed ", err)
 	}
 
@@ -104,7 +103,7 @@ func TestBootStrap(t *testing.T) {
 	peerPort := 44459
 	log := logrus.New().WithField("subject", "TestBootStrap")
 
-	boot, _, err := CreateP2PNetwork(bootid[:], bootPort, log)
+	boot, err := CreateP2PNetwork(bootid[:], bootPort)
 	if err != nil {
 		t.Error("Test Failed: CreateP2PNetwork failed ", err)
 	}
@@ -114,7 +113,7 @@ func TestBootStrap(t *testing.T) {
 
 	}
 
-	peer, _, err := CreateP2PNetwork(peerid[:], peerPort, log)
+	peer, err := CreateP2PNetwork(peerid[:], peerPort)
 	if err != nil {
 		t.Error("Test Failed: CreateP2PNetwork failed ", err)
 	}
@@ -165,7 +164,7 @@ func TestBootStrapWithMultipleNode(t *testing.T) {
 	peerIDs := make([][]byte, numOfNodes)
 
 	peerIDs[0] = []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20}
-	peer, _, err := CreateP2PNetwork(peerIDs[0][:], peerPort, log)
+	peer, err := CreateP2PNetwork(peerIDs[0][:], peerPort)
 	if err := peer.Listen(); err != nil {
 		t.Error("Test Failed: Listen failed ", err)
 	}
@@ -179,7 +178,7 @@ func TestBootStrapWithMultipleNode(t *testing.T) {
 	for i := 1; i < numOfNodes; i++ {
 		peerIDs[i] = []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12 + byte(i), 13, 14, 15, 16, 17, 18, 19, 21 + byte(i)}
 		peerPort := 55550 + i
-		peer, _, err := CreateP2PNetwork(peerIDs[i][:], peerPort, log)
+		peer, err := CreateP2PNetwork(peerIDs[i][:], peerPort)
 		if err := peer.Listen(); err != nil {
 			t.Error("Test Failed: Listen failed ", err)
 		}

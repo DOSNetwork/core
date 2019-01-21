@@ -11,6 +11,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes"
 	"golang.org/x/crypto/sha3"
+	"sync"
 )
 
 var (
@@ -44,16 +45,17 @@ func Hex(a []byte) string {
 	return "0x" + string(result)
 }
 
-func CreateP2PNetwork(id []byte, port int) (P2PInterface, chan P2PMessage, error) {
+func CreateP2PNetwork(id []byte, port int) (P2PInterface, error) {
 	p := &P2P{
-		peers:    CreatePeerConnManager(),
-		suite:    suite,
-		messages: make(chan P2PMessage, 100),
-		port:     port,
-		logger:   log.New("module", "p2p"),
+		peers:          CreatePeerConnManager(),
+		suite:          suite,
+		messages:       make(chan P2PMessage, 100),
+		port:           port,
+		logger:         log.New("module", "p2p"),
+		messageChanMap: new(sync.Map),
 	}
 	p.identity.Id = id
-	return p, p.messages, nil
+	return p, nil
 }
 
 func GetLocalIP() (ip string, err error) {
@@ -90,4 +92,7 @@ type P2PInterface interface {
 	SendMessage(id []byte, msg proto.Message) error
 	Request(id []byte, m proto.Message) (msg proto.Message, err error)
 	GetPeerConnManager() *PeerConnManager
+	SubscribeEvent(ch chan P2PMessage, messages ...interface{}) (outch chan P2PMessage, err error)
+	UnSubscribeEvent(messages ...interface{})
+	CloseMessagesChannel()
 }

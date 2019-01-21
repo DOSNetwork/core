@@ -18,19 +18,21 @@ import (
 	"github.com/DOSNetwork/core/p2p/dht"
 	"github.com/DOSNetwork/core/p2p/internal"
 	"github.com/DOSNetwork/core/suites"
+	"reflect"
 )
 
 type P2P struct {
 	identity internal.ID
 	//Map of ID (string) <-> *p2p.PeerConn
-	peers        *PeerConnManager //*sync.Map
-	messages     chan P2PMessage
-	suite        suites.Suite
-	port         int
-	secKey       kyber.Scalar
-	pubKey       kyber.Point
-	routingTable *dht.RoutingTable
-	logger       log.Logger
+	peers          *PeerConnManager //*sync.Map
+	messages       chan P2PMessage
+	suite          suites.Suite
+	port           int
+	secKey         kyber.Scalar
+	pubKey         kyber.Point
+	routingTable   *dht.RoutingTable
+	logger         log.Logger
+	messageChanMap *sync.Map
 }
 
 func (n *P2P) SetID(id []byte) {
@@ -106,7 +108,7 @@ func (n *P2P) Listen() (err error) {
 		n.identity.PublicKey = pubKeyBytes
 	}
 	n.routingTable = dht.CreateRoutingTable(n.identity)
-
+	go n.messageHanding()
 	go func() {
 		for {
 			conn, err := listener.Accept()
@@ -431,4 +433,64 @@ func (n *P2P) queryPeerByID(peerID internal.ID, targetID internal.ID, responses 
 		n.logger.Error(err)
 		responses <- []*internal.ID{}
 	}
+}
+
+func (n *P2P) messageHanding() {
+	for message := range n.messages {
+		messagetype := reflect.TypeOf(message.Msg.Message).String()
+		if len(messagetype) > 0 && messagetype[0] == '*' {
+			messagetype = messagetype[1:]
+		}
+		if ch, ok := n.messageChanMap.Load(messagetype); ok {
+			ch.(chan P2PMessage) <- message
+		}
+	}
+}
+
+func (n *P2P) SubscribeEvent(ch chan P2PMessage, messages ...interface{}) (outch chan P2PMessage, err error) {
+	if ch == nil {
+		ch = make(chan P2PMessage, 1)
+	}
+	outch = ch
+	errstr := ""
+	for _, m := range messages {
+		_, l := n.messageChanMap.LoadOrStore(reflect.TypeOf(m).String(), ch)
+		if l {
+			if errstr != "" {
+				errstr = errstr + ", " + reflect.TypeOf(m).String()
+			} else {
+				errstr = reflect.TypeOf(m).String()
+			}
+		}
+	}
+	if errstr != "" {
+		err = errors.New("The messages:[" + errstr + "]has been subscribed")
+		n.logger.Error(err)
+	}
+	return
+}
+
+func (n *P2P) UnSubscribeEvent(messages ...interface{}) {
+	for _, m := range messages {
+		ch, ok := n.messageChanMap.Load(reflect.TypeOf(m).String())
+		if ok {
+			n.messageChanMap.Delete(reflect.TypeOf(m).String())
+			find := false
+			n.messageChanMap.Range(func(key, value interface{}) bool {
+				if value.(chan P2PMessage) == ch {
+					find = true
+					return false
+				}
+				return true
+			})
+			if !find {
+				close(ch.(chan P2PMessage))
+			}
+		}
+	}
+	return
+}
+
+func (n *P2P) CloseMessagesChannel() {
+	close(n.messages)
 }

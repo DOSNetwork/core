@@ -18,8 +18,7 @@ func TestPipeCheckURL(test *testing.T) {
 	//1)Build a p2p network
 	peerEvent := make(chan p2p.P2PMessage, 100)
 	defer close(peerEvent)
-	p, _ := p2p.CreateP2PNetwork(peerEvent, 0)
-	p.SetId(id)
+	p, _ := p2p.CreateP2PNetwork(id, 0)
 	p.Listen()
 
 	peerEventForDKG := make(chan p2p.P2PMessage, 100)
