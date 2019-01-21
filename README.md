@@ -1,4 +1,6 @@
-## <img align="left" width=30 src="media/logo-white.jpg"> Core libraries
+[![godoc](https://godoc.org/github.com/DOSNetwork/core?status.svg)](https://godoc.org/github.com/DOSNetwork/core)
+[![Go Report Card](https://goreportcard.com/badge/github.com/DOSNetwork/core)](https://goreportcard.com/report/github.com/DOSNetwork/core)
+## <img align="left" width=30 src="media/logo-white.jpg"> Core libraries    
 
 
 ### Components and file structure (TODO)
