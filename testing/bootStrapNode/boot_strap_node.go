@@ -68,22 +68,14 @@ func main() {
 
 	//2)Build a p2p network
 	id := []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20}
-	p, peerEvent, _ := p2p.CreateP2PNetwork(id[:], offChainConfig.Port)
-	defer close(peerEvent)
+	p, _ := p2p.CreateP2PNetwork(id[:], offChainConfig.Port)
+	defer p.CloseMessagesChannel()
 
 	//2-2)Start to listen incoming connection
 	if err = p.Listen(); err != nil {
 		log.Fatal(err)
 	}
-	//2-3)To ignore peer event to avoid channel blocking
-	go func() {
-		for {
-			select {
-			//event from peer
-			case _ = <-peerEvent:
-			}
-		}
-	}()
+
 	//2-4) regularly check balance of each node and replenish if needed
 	go balanceMaintain()
 

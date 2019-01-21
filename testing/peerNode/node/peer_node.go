@@ -209,10 +209,12 @@ func (d *PeerNode) Init(bootStrapIp string, port, peerSize int, numMessages int,
 	log.AddField("nodeID", p2p.Hex(d.nodeID[:]))
 
 	//2)Build a p2p network
-	d.p, d.peerEvent, _ = p2p.CreateP2PNetwork(d.nodeID[:], port)
+	d.p, _ = p2p.CreateP2PNetwork(d.nodeID[:], port)
+	peerEvent, _ := d.p.SubscribeEvent(nil, internalMsg.Cmd{}, dkg.ReqPublicKey{}, dkg.ReqDeal{}, dkg.ReqResponses{},
+		vss.PublicKey{}, dkg.Deal{}, dkg.Responses{}, vss.Signature{})
 	d.p.Listen()
 	go func() {
-		for msg := range d.peerEvent {
+		for msg := range peerEvent {
 			switch content := msg.Msg.Message.(type) {
 			case *internalMsg.Cmd:
 

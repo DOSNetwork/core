@@ -45,7 +45,7 @@ type DosNodeInterface interface {
 	PipeGrouping(<-chan interface{})
 	PipeQueries(queries ...<-chan interface{}) <-chan Report
 	PipeSignAndBroadcast(reports <-chan Report) (<-chan Report, <-chan Report)
-	PipeRecoverAndVerify(chan vss.Signature, <-chan Report) <-chan Report
+	PipeRecoverAndVerify(chan p2p.P2PMessage, <-chan Report) <-chan Report
 	PipeSendToOnchain(chReport <-chan Report) <-chan Report
 	PipeCleanFinishMap(chValidation chan interface{}, request ...<-chan Report) <-chan interface{}
 	SetParticipants(groupIds [][]byte)
@@ -449,7 +449,7 @@ func (d *DosNode) PipeSignAndBroadcast(reports <-chan Report) (<-chan Report, <-
 }
 
 //receiveSignature is thread safe.
-func (d *DosNode) PipeRecoverAndVerify(cSignatureFromPeer chan vss.Signature, fromEth <-chan Report) <-chan Report {
+func (d *DosNode) PipeRecoverAndVerify(cSignatureFromPeer chan p2p.P2PMessage, fromEth <-chan Report) <-chan Report {
 	outForSubmit := make(chan Report, 100)
 	reportMap := map[string]Report{}
 	signatureAwait := map[string]time.Time{}
@@ -460,7 +460,16 @@ func (d *DosNode) PipeRecoverAndVerify(cSignatureFromPeer chan vss.Signature, fr
 			case report := <-fromEth:
 				fmt.Println("3) PipeRecoverAndVerify fromEth")
 				reportMap[report.selfSign.QueryId] = report
-			case sign := <-cSignatureFromPeer:
+			case msg := <-cSignatureFromPeer:
+				var sign *vss.Signature
+				var ok bool
+				sign, ok = msg.Msg.Message.(*vss.Signature)
+				if !ok {
+					continue
+				}
+				if err := msg.PeerConn.Reply(msg.RequestNonce, &vss.Signature{}); err != nil {
+					log.WithField("function", "dispatchEvent").Error("signature reply", err)
+				}
 				var sigShares [][]byte
 				if report, ok := reportMap[sign.QueryId]; ok {
 					delete(signatureAwait, sign.QueryId)

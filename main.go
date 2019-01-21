@@ -50,7 +50,7 @@ func main() {
 	}
 
 	//2)Build a p2p network
-	p, peerEvent, err := p2p.CreateP2PNetwork(chainConn.GetId(), port)
+	p, err := p2p.CreateP2PNetwork(chainConn.GetId(), port)
 	if err != nil {
 		mainLogger.WithField("function", "createP2PNetwork").Fatal(err)
 	}
@@ -90,7 +90,11 @@ func main() {
 	//4)Build a p2pDKG
 	suite := suites.MustFind("bn256")
 	peerEventForDKG := make(chan p2p.P2PMessage, 1)
-	defer close(peerEventForDKG)
+	p.SubscribeEvent(peerEventForDKG, dkg.ReqPublicKey{}, dkg.ReqDeal{}, dkg.ReqResponses{}, vss.PublicKey{},
+		dkg.Deal{}, dkg.Responses{})
+	defer p.UnSubscribeEvent(dkg.ReqPublicKey{}, dkg.ReqDeal{}, dkg.ReqResponses{}, vss.PublicKey{},
+		dkg.Deal{}, dkg.Responses{})
+
 	p2pDkg := dkg.CreateP2PDkg(p, suite, peerEventForDKG)
 	if err != nil {
 		mainLogger.WithField("function", "createP2PDkg").Fatal(err)
@@ -105,8 +109,9 @@ func main() {
 	defer close(chRandom)
 	chUsrRandom := make(chan interface{}, 100)
 	defer close(chUsrRandom)
-	cSignatureFromPeer := make(chan vss.Signature, 100)
-	defer close(cSignatureFromPeer)
+	cSignatureFromPeer := make(chan p2p.P2PMessage, 100)
+	p.SubscribeEvent(cSignatureFromPeer, vss.Signature{})
+	defer p.UnSubscribeEvent(vss.Signature{})
 	eventValidation := make(chan interface{}, 20)
 	defer close(eventValidation)
 	if err = chainConn.SubscribeEvent(eventGrouping, onchain.SubscribeDOSProxyLogGrouping); err != nil {
@@ -149,29 +154,6 @@ func main() {
 	//7)Dispatch events
 	for {
 		select {
-		//event from peer
-		case msg := <-peerEvent:
-			switch content := msg.Msg.Message.(type) {
-			case *dkg.ReqPublicKey:
-				peerEventForDKG <- msg
-			case *dkg.ReqDeal:
-				peerEventForDKG <- msg
-			case *dkg.ReqResponses:
-				peerEventForDKG <- msg
-			case *vss.PublicKey:
-				peerEventForDKG <- msg
-			case *dkg.Deal:
-				peerEventForDKG <- msg
-			case *dkg.Responses:
-				peerEventForDKG <- msg
-			case *vss.Signature:
-				cSignatureFromPeer <- *content
-				if err := msg.PeerConn.Reply(msg.RequestNonce, &vss.Signature{}); err != nil {
-					mainLogger.WithField("function", "dispatchEvent").Error("signature reply", err)
-				}
-			default:
-				mainLogger.WithField("function", "dispatchEvent").Warn("unknown", content)
-			}
 		case msg := <-p2pDkg.GetDkgEvent():
 			if msg == dkg.VERIFIED {
 				gId := new(big.Int)
