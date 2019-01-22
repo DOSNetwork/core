@@ -89,10 +89,9 @@ func main() {
 
 	//4)Build a p2pDKG
 	suite := suites.MustFind("bn256")
-	peerEventForDKG := make(chan p2p.P2PMessage, 1)
-	p.SubscribeEvent(peerEventForDKG, dkg.ReqPublicKey{}, dkg.ReqDeal{}, dkg.ReqResponses{}, vss.PublicKey{},
+	peerEventForDKG, _ := p.SubscribeEvent("DKG", 1, dkg.ReqPublicKey{}, dkg.ReqDeal{}, dkg.ReqResponses{}, vss.PublicKey{},
 		dkg.Deal{}, dkg.Responses{})
-	defer p.UnSubscribeEvent(dkg.ReqPublicKey{}, dkg.ReqDeal{}, dkg.ReqResponses{}, vss.PublicKey{},
+	defer p.UnSubscribeEvent("DKG", dkg.ReqPublicKey{}, dkg.ReqDeal{}, dkg.ReqResponses{}, vss.PublicKey{},
 		dkg.Deal{}, dkg.Responses{})
 
 	p2pDkg := dkg.CreateP2PDkg(p, suite, peerEventForDKG)
@@ -109,9 +108,8 @@ func main() {
 	defer close(chRandom)
 	chUsrRandom := make(chan interface{}, 100)
 	defer close(chUsrRandom)
-	cSignatureFromPeer := make(chan p2p.P2PMessage, 100)
-	p.SubscribeEvent(cSignatureFromPeer, vss.Signature{})
-	defer p.UnSubscribeEvent(vss.Signature{})
+	cSignatureFromPeer, _ := p.SubscribeEvent("DKG", 100, vss.Signature{})
+	defer p.UnSubscribeEvent("DKG", vss.Signature{})
 	eventValidation := make(chan interface{}, 20)
 	defer close(eventValidation)
 	if err = chainConn.SubscribeEvent(eventGrouping, onchain.SubscribeDOSProxyLogGrouping); err != nil {
