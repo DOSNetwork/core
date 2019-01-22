@@ -9,6 +9,7 @@ import (
 	"strconv"
 
 	"github.com/DOSNetwork/core/log"
+	"github.com/DOSNetwork/core/p2p/dht"
 )
 
 var MAXPEERCONNCOUNT uint32 = 100000
@@ -54,7 +55,19 @@ func (pm *PeerConnManager) LoadOrStore(id string, peer *PeerConn) (actual *PeerC
 	pm.mu.Lock()
 	if actual, loaded = pm.peers[id]; loaded {
 		//fmt.Println("duplicates", peer.identity.Id, peer.conn, peer.incomingConn)
-		peer.EndWithoutDelete()
+		if peer.incomingConn == actual.incomingConn {
+			peer.EndWithoutDelete()
+		} else {
+			if actual.incomingConn == !dht.Less(peer.identity, peer.p2pnet.identity) {
+				peer.EndWithoutDelete()
+			} else {
+				delete(pm.peers, id)
+				actual.EndWithoutDelete()
+				pm.peers[id] = peer
+				actual = peer
+				loaded = false
+			}
+		}
 		pm.mu.Unlock()
 		return
 	}
