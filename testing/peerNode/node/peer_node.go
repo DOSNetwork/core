@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/DOSNetwork/core/share/dkg/pedersen"
 	"github.com/DOSNetwork/core/share/vss/pedersen"
 
 	"github.com/DOSNetwork/core/testing/peerNode/internalMsg"
@@ -33,7 +32,6 @@ type PeerNode struct {
 	checkroll   map[string]int
 	numMessages int
 	tStrategy   TestStrategy
-	dkgChan     chan p2p.P2PMessage
 	tblsChan    chan vss.Signature
 }
 
@@ -169,7 +167,6 @@ func (d *PeerNode) Init(bootStrapIp string, port, peerSize int, numMessages int,
 	d.bootStrapIp = bootStrapIp
 	d.checkroll = make(map[string]int)
 	d.done = make(chan bool)
-	d.dkgChan = make(chan p2p.P2PMessage)
 	d.tblsChan = make(chan vss.Signature)
 	d.numMessages = numMessages
 
@@ -211,8 +208,7 @@ func (d *PeerNode) Init(bootStrapIp string, port, peerSize int, numMessages int,
 
 	//2)Build a p2p network
 	d.p, _ = p2p.CreateP2PNetwork(d.nodeID[:], port)
-	peerEvent, _ := d.p.SubscribeEvent("peerNode", 100, internalMsg.Cmd{}, dkg.ReqPublicKey{}, dkg.ReqDeal{}, dkg.ReqResponses{},
-		vss.PublicKey{}, dkg.Deal{}, dkg.Responses{}, vss.Signature{})
+	peerEvent, _ := d.p.SubscribeEvent("peerNode", 100, internalMsg.Cmd{}, vss.Signature{})
 	d.p.Listen()
 	go func() {
 		for msg := range peerEvent {
@@ -226,21 +222,9 @@ func (d *PeerNode) Init(bootStrapIp string, port, peerSize int, numMessages int,
 					replyNonce := msg.RequestNonce
 					d.p.Reply([]byte(sender), replyNonce, response)
 				}
-			case *dkg.ReqPublicKey:
-				d.dkgChan <- msg
-			case *dkg.ReqDeal:
-				d.dkgChan <- msg
-			case *dkg.ReqResponses:
-				d.dkgChan <- msg
-			case *vss.PublicKey:
-				d.dkgChan <- msg
-			case *dkg.Deal:
-				d.dkgChan <- msg
-			case *dkg.Responses:
-				d.dkgChan <- msg
 			case *vss.Signature:
 				go func() { d.tblsChan <- *content }()
-				if err := msg.PeerConn.Reply(msg.RequestNonce, &vss.Signature{}); err != nil {
+				if err := d.p.Reply(msg.Sender, msg.RequestNonce, &vss.Signature{}); err != nil {
 					fmt.Println("signature reply", err)
 				}
 			default:

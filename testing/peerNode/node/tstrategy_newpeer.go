@@ -154,7 +154,7 @@ func (r test3) StartTest(d *PeerNode) {
 	}
 
 	suite := suites.MustFind("bn256")
-	p2pDkg := dkg.CreateP2PDkg(d.p, suite, d.dkgChan)
+	p2pDkg := dkg.CreateP2PDkg(d.p, suite)
 
 	var (
 		group    [][]byte
@@ -189,7 +189,7 @@ func (r test4) StartTest(d *PeerNode) {
 	groupSize, err := strconv.Atoi(groupSizeStr)
 
 	suite := suites.MustFind("bn256")
-	p2pDkg := dkg.CreateP2PDkg(d.p, suite, d.dkgChan)
+	p2pDkg := dkg.CreateP2PDkg(d.p, suite)
 
 	var (
 		group    [][]byte
@@ -284,7 +284,7 @@ func (r test5) StartTest(d *PeerNode) {
 	}
 
 	suite := suites.MustFind("bn256")
-	p2pDkg := dkg.CreateP2PDkg(d.p, suite, d.dkgChan)
+	p2pDkg := dkg.CreateP2PDkg(d.p, suite)
 
 	roundCount := uint16(1)
 	for {
