@@ -16,9 +16,10 @@ import (
 
 	"github.com/DOSNetwork/core/testing/peerNode/internalMsg"
 
+	"math/rand"
+
 	"github.com/DOSNetwork/core/log"
 	"github.com/DOSNetwork/core/p2p"
-	"math/rand"
 )
 
 type PeerNode struct {
@@ -221,6 +222,9 @@ func (d *PeerNode) Init(bootStrapIp string, port, peerSize int, numMessages int,
 				if content.Ctype == internalMsg.Cmd_SIGNIN {
 					sender := string(msg.Sender)
 					go d.tStrategy.CheckResult(sender, content, d)
+					response := &internalMsg.Cmd{}
+					replyNonce := msg.RequestNonce
+					d.p.Reply([]byte(sender), replyNonce, response)
 				}
 			case *dkg.ReqPublicKey:
 				d.dkgChan <- msg
