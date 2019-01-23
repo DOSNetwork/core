@@ -40,6 +40,7 @@ type PeerConn struct {
 	conn            *net.Conn
 	rw              *bufio.ReadWriter
 	waitForHi       chan bool
+	waitForLookup   chan bool
 	done            chan bool
 	identity        internal.ID
 	RequestNonce    uint64
@@ -64,15 +65,16 @@ type RequestState struct {
 
 func NewPeerConn(p2pnet *P2P, conn *net.Conn, rxMessage chan P2PMessage, incomingConn bool) (peer *PeerConn, err error) {
 	peer = &PeerConn{
-		p2pnet:       p2pnet,
-		conn:         conn,
-		rxMessage:    rxMessage,
-		waitForHi:    make(chan bool, 2),
-		done:         make(chan bool, 1),
-		rw:           bufio.NewReadWriter(bufio.NewReader(*conn), bufio.NewWriter(*conn)),
-		lastusedtime: time.Now(),
-		logger:       p2pnet.logger,
-		incomingConn: incomingConn,
+		p2pnet:        p2pnet,
+		conn:          conn,
+		rxMessage:     rxMessage,
+		waitForHi:     make(chan bool, 2),
+		waitForLookup: make(chan bool, 2),
+		done:          make(chan bool, 1),
+		rw:            bufio.NewReadWriter(bufio.NewReader(*conn), bufio.NewWriter(*conn)),
+		lastusedtime:  time.Now(),
+		logger:        p2pnet.logger,
+		incomingConn:  incomingConn,
 	}
 
 	peer.ctx, peer.cancel = context.WithCancel(context.Background())
@@ -83,6 +85,8 @@ func NewPeerConn(p2pnet *P2P, conn *net.Conn, rxMessage chan P2PMessage, incomin
 	}
 
 	go peer.heartBeat()
+
+	p2pnet.logger.Event("NewPeerConn")
 	return
 }
 
@@ -118,6 +122,8 @@ func (p *PeerConn) receiveLoop() {
 		if buf, err = p.receivePackage(); err != nil {
 			if err != io.EOF {
 				p.logger.Error(err)
+			} else {
+				p.logger.Event("EndEof")
 			}
 			break
 		}
@@ -178,6 +184,7 @@ func (p *PeerConn) receiveLoop() {
 			if err := p.Reply(pa.GetRequestNonce(), response); err != nil {
 				p.logger.Error(err)
 			}
+			p.waitForLookup <- true
 		case *internal.Ping:
 			response := &internal.Pong{}
 			if err := p.Reply(pa.GetRequestNonce(), response); err != nil {
@@ -191,7 +198,8 @@ func (p *PeerConn) receiveLoop() {
 		}
 	}
 	close(p.waitForHi)
-	p.logger.Debug("Conn End")
+	close(p.waitForLookup)
+	p.logger.Event("EndConn")
 }
 
 func (p *PeerConn) End() {
@@ -203,6 +211,7 @@ func (p *PeerConn) End() {
 	}
 	p.cancel()
 	p.p2pnet.peers.DeletePeer(string(p.identity.Id))
+	p.logger.Event("End")
 }
 
 func (p *PeerConn) EndWithoutDelete() {
@@ -213,6 +222,7 @@ func (p *PeerConn) EndWithoutDelete() {
 		p.logger.Error(err)
 	}
 	p.cancel()
+	p.logger.Event("EndWithoutDelete")
 }
 
 func (p *PeerConn) receivePackage() ([]byte, error) {
@@ -390,7 +400,7 @@ func (p *PeerConn) decrypt(ciphertext []byte) (c []byte, err error) {
 }
 
 //Add a timer to avoid wait for Hi forever
-func (p *PeerConn) HeardHi() (err error) {
+func (p *PeerConn) HeardConnType() (r int, err error) {
 	timer := time.NewTimer(HITIMEOUT * time.Second)
 
 	select {
@@ -398,6 +408,10 @@ func (p *PeerConn) HeardHi() (err error) {
 		err = errors.New("Info Exchange Timeout")
 	case <-p.waitForHi:
 		timer.Stop()
+		r = 0
+	case <-p.waitForLookup:
+		timer.Stop()
+		r = 1
 	}
 
 	return
@@ -574,11 +588,7 @@ func (p *PeerConn) heartBeat() {
 				}
 			}
 			if timeout {
-				if p.incomingConn {
-					p.EndWithoutDelete()
-				} else {
-					p.End()
-				}
+				p.End()
 				return
 			} else {
 				atomic.StoreUint64(&p.readWriteCount, 0)
