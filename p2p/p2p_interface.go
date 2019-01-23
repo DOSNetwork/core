@@ -91,7 +91,7 @@ type P2PInterface interface {
 	Request(id []byte, m proto.Message) (msg proto.Message, err error)
 	Reply(id []byte, nonce uint64, m proto.Message) (err error)
 	GetPeerConnManager() *PeerConnManager
-	SubscribeEvent(modelName string, chanBuffer int, messages ...interface{}) (outch chan P2PMessage, err error)
-	UnSubscribeEvent(modelName string, messages ...interface{})
+	SubscribeEvent(chanBuffer int, messages ...interface{}) (outch chan P2PMessage, err error)
+	UnSubscribeEvent(messages ...interface{})
 	CloseMessagesChannel()
 }

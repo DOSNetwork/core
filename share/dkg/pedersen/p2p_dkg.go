@@ -167,8 +167,8 @@ func (d *P2PDkg) pipReplyContentRequest(newSession *DkgSession) (<-chan *DkgSess
 	go func() {
 		defer close(errc)
 		defer close(out)
-		defer (*d.network).UnSubscribeEvent("dkg", 100, ReqPublicKey{}, ReqDeal{}, ReqResponses{})
-		peerEvent, err := (*d.network).SubscribeEvent("dkg", 100, ReqPublicKey{}, ReqDeal{}, ReqResponses{})
+		defer (*d.network).UnSubscribeEvent(ReqPublicKey{}, ReqDeal{}, ReqResponses{})
+		peerEvent, err := (*d.network).SubscribeEvent(100, ReqPublicKey{}, ReqDeal{}, ReqResponses{})
 		if err != nil {
 			select {
 			case errc <- err:

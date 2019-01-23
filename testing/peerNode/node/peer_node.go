@@ -208,7 +208,7 @@ func (d *PeerNode) Init(bootStrapIp string, port, peerSize int, numMessages int,
 
 	//2)Build a p2p network
 	d.p, _ = p2p.CreateP2PNetwork(d.nodeID[:], port)
-	peerEvent, _ := d.p.SubscribeEvent("peerNode", 100, internalMsg.Cmd{}, vss.Signature{})
+	peerEvent, _ := d.p.SubscribeEvent(100, internalMsg.Cmd{}, vss.Signature{})
 	d.p.Listen()
 	go func() {
 		for msg := range peerEvent {
