@@ -44,7 +44,7 @@ func main() {
 	}
 
 	if os.Getenv("ROLE") == "bootstrap" {
-		peerEvent, err := p.SubscribeEvent("peerTalk", 100, peerTalk.Register{}, peerTalk.Done{})
+		peerEvent, err := p.SubscribeEvent(100, peerTalk.Register{}, peerTalk.Done{})
 		if err != nil {
 			logger.Fatal(err)
 		}
@@ -127,7 +127,7 @@ func main() {
 			}
 		}
 	} else {
-		peerEvent, err := p.SubscribeEvent("peerTalk", 100, peerTalk.Bootstrap{}, peerTalk.Grouping{})
+		peerEvent, err := p.SubscribeEvent(100, peerTalk.Bootstrap{}, peerTalk.Grouping{})
 		if err != nil {
 			logger.Fatal(err)
 		}

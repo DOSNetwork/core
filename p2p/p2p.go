@@ -14,7 +14,6 @@ import (
 
 	"github.com/golang/protobuf/proto"
 
-	"container/list"
 	"reflect"
 
 	"github.com/DOSNetwork/core/log"
@@ -36,8 +35,7 @@ type P2P struct {
 	pubKey       kyber.Point
 	routingTable *dht.RoutingTable
 	logger       log.Logger
-	msgMap       sync.Map
-	chanMap      sync.Map
+	msgChanMap   sync.Map
 }
 
 func (n *P2P) SetID(id []byte) {
@@ -350,22 +348,9 @@ func (n *P2P) findNode(targetID internal.ID, alpha int, disjointPaths int) (resu
 		results = append(results, peerID)
 	}
 
-	wait, mutex := &sync.WaitGroup{}, &sync.Mutex{}
-
 	for _, lookup := range lookups {
-		wait.Add(1)
-		go func(lookup *lookupBucket) {
-			mutex.Lock()
-			results = append(results, lookup.performLookup(n, targetID, alpha, visited)...)
-			mutex.Unlock()
-
-			wait.Done()
-		}(lookup)
-
+		results = append(results, lookup.performLookup(n, targetID, alpha, visited)...)
 	}
-
-	// Wait until all #D parallel lookups have been completed.
-	wait.Wait()
 
 	// Sort resulting peers by XOR distance.
 	sort.Slice(results, func(i, j int) bool {
@@ -470,32 +455,20 @@ func (n *P2P) messageHanding() {
 		if len(messagetype) > 0 && messagetype[0] == '*' {
 			messagetype = messagetype[1:]
 		}
-		if lst, l := n.msgMap.Load(messagetype); l {
-			ls, ok := lst.(*list.List)
-			if ok {
-				for e := ls.Front(); e != nil; e = e.Next() {
-					ch, l := n.chanMap.Load(e.Value.(string) + messagetype)
-					if l {
-						go func() {
-							select {
-							case ch.(chan P2PMessage) <- message:
-							case <-time.After(5 * time.Second):
-								n.chanMap.Delete(e.Value.(string) + messagetype)
-								close(ch.(chan P2PMessage))
-								fmt.Println("messageHanding timeout")
-							}
-						}()
-					}
+		if ch, ok := n.msgChanMap.Load(messagetype); ok {
+			go func() {
+				select {
+				case ch.(chan P2PMessage) <- message:
+				case <-time.After(5 * time.Second):
+					fmt.Println("messageHanding timeout")
 				}
-			}
+			}()
 		}
+
 	}
 }
 
-func (n *P2P) SubscribeEvent(modelName string, chanBuffer int, messages ...interface{}) (outch chan P2PMessage, err error) {
-	if modelName == "" {
-		modelName = DefaultModelName
-	}
+func (n *P2P) SubscribeEvent(chanBuffer int, messages ...interface{}) (outch chan P2PMessage, err error) {
 	var ch chan P2PMessage
 	if chanBuffer > 0 {
 		ch = make(chan P2PMessage, chanBuffer)
@@ -504,52 +477,39 @@ func (n *P2P) SubscribeEvent(modelName string, chanBuffer int, messages ...inter
 	}
 
 	outch = ch
+	errstr := ""
 	for _, m := range messages {
-		lst, ok := n.msgMap.Load(reflect.TypeOf(m).String())
-		if ok {
-			lst.(*list.List).PushBack(modelName)
-		} else {
-			lst := list.New()
-			lst.PushBack(modelName)
-			n.msgMap.Store(reflect.TypeOf(m).String(), lst)
-		}
-		_, l := n.chanMap.LoadOrStore(modelName+reflect.TypeOf(m).String(), ch)
+		_, l := n.msgChanMap.LoadOrStore(reflect.TypeOf(m).String(), ch)
 		if l {
-			err = errors.New("The messages has been subscribed")
-			n.logger.Error(err)
-			return
+			if errstr != "" {
+				errstr = errstr + ", " + reflect.TypeOf(m).String()
+			} else {
+				errstr = reflect.TypeOf(m).String()
+			}
 		}
+	}
+	if errstr != "" {
+		err = errors.New("The messages:[" + errstr + "]has been subscribed")
+		n.logger.Error(err)
 	}
 	return
 }
 
-func (n *P2P) UnSubscribeEvent(modelName string, messages ...interface{}) {
-	if modelName == "" {
-		modelName = DefaultModelName
-	}
+func (n *P2P) UnSubscribeEvent(messages ...interface{}) {
 	for _, m := range messages {
-		lst, ok := n.msgMap.Load(reflect.TypeOf(m).String())
+		ch, ok := n.msgChanMap.Load(reflect.TypeOf(m).String())
 		if ok {
-			for e := lst.(*list.List).Front(); e != nil; e = e.Next() {
-				if e.Value.(string) == modelName {
-					lst.(*list.List).Remove(e)
-					break
+			n.msgChanMap.Delete(reflect.TypeOf(m).String())
+			find := false
+			n.msgChanMap.Range(func(key, value interface{}) bool {
+				if value.(chan P2PMessage) == ch.(chan P2PMessage) {
+					find = true
+					return false
 				}
-			}
-			ch, l := n.chanMap.Load(modelName + reflect.TypeOf(m).String())
-			if l {
-				n.chanMap.Delete(modelName + reflect.TypeOf(m).String())
-				find := false
-				n.chanMap.Range(func(key, value interface{}) bool {
-					if value.(chan P2PMessage) == ch.(chan P2PMessage) {
-						find = true
-						return false
-					}
-					return true
-				})
-				if !find {
-					close(ch.(chan P2PMessage))
-				}
+				return true
+			})
+			if !find {
+				close(ch.(chan P2PMessage))
 			}
 		}
 	}

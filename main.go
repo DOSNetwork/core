@@ -89,9 +89,6 @@ func main() {
 	//4)Build a p2pDKG
 	suite := suites.MustFind("bn256")
 	p2pDkg := dkg.CreateP2PDkg(p, suite)
-	if err != nil {
-		mainLogger.WithField("function", "createP2PDkg").Fatal(err)
-	}
 
 	//5)Subscribe Event from Eth
 	eventGrouping := make(chan interface{}, 1)
@@ -102,8 +99,8 @@ func main() {
 	defer close(chRandom)
 	chUsrRandom := make(chan interface{}, 100)
 	defer close(chUsrRandom)
-	cSignatureFromPeer, _ := p.SubscribeEvent("DOSNODE", 100, vss.Signature{})
-	defer p.UnSubscribeEvent("DKG", vss.Signature{})
+	cSignatureFromPeer, _ := p.SubscribeEvent(100, vss.Signature{})
+	defer p.UnSubscribeEvent(vss.Signature{})
 	eventValidation := make(chan interface{}, 20)
 	defer close(eventValidation)
 	if err = chainConn.SubscribeEvent(eventGrouping, onchain.SubscribeDOSProxyLogGrouping); err != nil {
