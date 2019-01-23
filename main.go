@@ -2,17 +2,16 @@ package main
 
 import (
 	"bytes"
-	"github.com/bshuster-repo/logrus-logstash-hook"
-	"math/big"
-	_ "net/http/pprof"
 	"runtime/debug"
+
+	"github.com/bshuster-repo/logrus-logstash-hook"
 
 	"github.com/ethereum/go-ethereum/common"
 
 	"github.com/sirupsen/logrus"
 
 	"github.com/DOSNetwork/core/configuration"
-	dos "github.com/DOSNetwork/core/dosnode"
+	"github.com/DOSNetwork/core/dosnode"
 	"github.com/DOSNetwork/core/onchain"
 	"github.com/DOSNetwork/core/p2p"
 	"github.com/DOSNetwork/core/share/dkg/pedersen"
@@ -89,12 +88,7 @@ func main() {
 
 	//4)Build a p2pDKG
 	suite := suites.MustFind("bn256")
-	peerEventForDKG, _ := p.SubscribeEvent("DKG", 1, dkg.ReqPublicKey{}, dkg.ReqDeal{}, dkg.ReqResponses{}, vss.PublicKey{},
-		dkg.Deal{}, dkg.Responses{})
-	defer p.UnSubscribeEvent("DKG", dkg.ReqPublicKey{}, dkg.ReqDeal{}, dkg.ReqResponses{}, vss.PublicKey{},
-		dkg.Deal{}, dkg.Responses{})
-
-	p2pDkg := dkg.CreateP2PDkg(p, suite, peerEventForDKG)
+	p2pDkg := dkg.CreateP2PDkg(p, suite)
 	if err != nil {
 		mainLogger.WithField("function", "createP2PDkg").Fatal(err)
 	}
@@ -108,7 +102,7 @@ func main() {
 	defer close(chRandom)
 	chUsrRandom := make(chan interface{}, 100)
 	defer close(chUsrRandom)
-	cSignatureFromPeer, _ := p.SubscribeEvent("DKG", 100, vss.Signature{})
+	cSignatureFromPeer, _ := p.SubscribeEvent("DOSNODE", 100, vss.Signature{})
 	defer p.UnSubscribeEvent("DKG", vss.Signature{})
 	eventValidation := make(chan interface{}, 20)
 	defer close(eventValidation)
@@ -133,7 +127,7 @@ func main() {
 	}
 
 	//6)Set up a dosnode pipeline
-	d := dos.CreateDosNode(suite, p, chainConn, p2pDkg, log.WithField("module", "dosNode"))
+	d := dosnode.CreateDosNode(suite, p, chainConn, p2pDkg, log.WithField("module", "dosNode"))
 	d.PipeGrouping(eventGrouping)
 	queriesReports := d.PipeQueries(chUrl, chUsrRandom, chRandom)
 	outForRecover, outForValidate := d.PipeSignAndBroadcast(queriesReports)
@@ -152,14 +146,6 @@ func main() {
 	//7)Dispatch events
 	for {
 		select {
-		case msg := <-p2pDkg.GetDkgEvent():
-			if msg == dkg.VERIFIED {
-				gId := new(big.Int)
-				gId.SetBytes(p2pDkg.GetGroupId())
-				if err := chainConn.UploadPubKey(p2pDkg.GetGroupPublicPoly().Commit()); err != nil {
-					mainLogger.WithField("function", "uploadPubKey").Warn(err)
-				}
-			}
 		//For re-trigger query
 		case msg := <-chRetrigerUrl:
 			chUrl <- msg

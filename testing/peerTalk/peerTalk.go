@@ -10,7 +10,6 @@ import (
 
 	"github.com/DOSNetwork/core/p2p"
 	"github.com/DOSNetwork/core/share/dkg/pedersen"
-	"github.com/DOSNetwork/core/share/vss/pedersen"
 	"github.com/DOSNetwork/core/suites"
 	"github.com/DOSNetwork/core/testing/peerTalk/msg"
 
@@ -139,27 +138,8 @@ func main() {
 		if err != nil {
 			logger.Fatal(err)
 		}
-
 		suite := suites.MustFind("bn256")
-
-		peerEventForDKG, _ := p.SubscribeEvent("peerTalk", 1, dkg.ReqPublicKey{}, dkg.ReqDeal{}, dkg.ReqResponses{}, vss.PublicKey{},
-			dkg.Deal{}, dkg.Responses{})
-		defer p.UnSubscribeEvent("peerTalk", dkg.ReqPublicKey{}, dkg.ReqDeal{}, dkg.ReqResponses{}, vss.PublicKey{},
-			dkg.Deal{}, dkg.Responses{})
-
-		p2pdkg := dkg.CreateP2PDkg(p, suite, peerEventForDKG)
-
-		go func() {
-			if <-p2pdkg.GetDkgEvent() == dkg.VERIFIED {
-				if err = p.SendMessage(bootstrapId, &peerTalk.Done{Id: p.GetID()}); err != nil {
-					logger.WithField("event", "allDone").Error(err)
-				} else {
-					logger.WithField("event", "allDone").Info()
-				}
-				os.Exit(0)
-			}
-		}()
-
+		p2pdkg := dkg.CreateP2PDkg(p, suite)
 		if err = p.SendMessage(bootstrapId, &peerTalk.Register{Id: p.GetID(), Address: p.GetIP()}); err != nil {
 			logger.WithFields(logrus.Fields{
 				"event": "sendMessage",
@@ -196,7 +176,24 @@ func main() {
 					if bytes.Compare(p.GetID(), id) == 0 {
 						start := uint32(idx) / groupSize * groupSize
 						group = ids[start : start+groupSize]
-						p2pdkg.GetGroupCmd() <- dkg.DkgSession{SessionId: "0", GroupIds: group}
+						dkgEvent, errc := p2pdkg.Start(&dkg.DkgSession{SessionId: "0", GroupIds: group})
+						go func() {
+							for err := range errc {
+								logger.WithFields(logrus.Fields{
+									"event": "dkg",
+								}).Warn(err)
+							}
+						}()
+						go func() {
+							if <-dkgEvent == dkg.VERIFIED {
+								if err = p.SendMessage(bootstrapId, &peerTalk.Done{Id: p.GetID()}); err != nil {
+									logger.WithField("event", "allDone").Error(err)
+								} else {
+									logger.WithField("event", "allDone").Info()
+								}
+								os.Exit(0)
+							}
+						}()
 						break
 					}
 				}
