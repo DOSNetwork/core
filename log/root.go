@@ -77,3 +77,10 @@ func Metrics(value interface{}) {
 func Progress(progress string) {
 	root.Progress(progress)
 }
+
+func Event(e string) {
+	root.Event(e)
+}
+func Fields(f map[string]interface{}) {
+	root.Fields(f)
+}

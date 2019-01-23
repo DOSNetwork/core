@@ -44,6 +44,8 @@ type Logger interface {
 	Fatal(msg string)
 	Metrics(value interface{})
 	Progress(progress string)
+	Event(e string)
+	Fields(f map[string]interface{})
 }
 
 type logger struct {
@@ -95,4 +97,23 @@ func (l *logger) Metrics(value interface{}) {
 
 func (l *logger) Progress(progress string) {
 	l.entry.WithFields(logrus.Fields{"Progress": progress}).Debug("")
+}
+
+func (l *logger) Event(e string) {
+	fpcs := make([]uintptr, 1)
+	// Skip 3 levels to get the caller
+	n := runtime.Callers(3, fpcs)
+	if n == 0 {
+		l.entry.WithFields(logrus.Fields{"EVENT": e}).Info("")
+	} else {
+		caller := runtime.FuncForPC(fpcs[0] - 1)
+		s := strings.Split(caller.Name(), ".")
+		l.entry.WithFields(logrus.Fields{"EVENT": e + s[len(s)-1]}).Debug("")
+	}
+}
+
+func (l *logger) Fields(f map[string]interface{}) {
+	var a logrus.Fields
+	a = f
+	l.entry.WithFields(a).Debug("")
 }
