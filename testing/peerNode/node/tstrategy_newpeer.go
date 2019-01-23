@@ -156,17 +156,25 @@ func (r test3) StartTest(d *PeerNode) {
 	suite := suites.MustFind("bn256")
 	p2pDkg := dkg.CreateP2PDkg(d.p, suite, d.dkgChan)
 
-	var group [][]byte
+	var (
+		group    [][]byte
+		dkgEvent chan int
+		errChan  <-chan error
+	)
 	for idx, id := range d.nodeIDs {
 		if bytes.Compare(d.p.GetID(), id) == 0 {
 			start := idx / groupSize * groupSize
 			group = d.nodeIDs[start : start+groupSize]
-			p2pDkg.GetGroupCmd() <- dkg.DkgSession{SessionId: "0", GroupIds: group}
+			dkgEvent, errChan = p2pDkg.Start(&dkg.DkgSession{SessionId: "0", GroupIds: group})
+			go func() {
+				for err := range errChan {
+					fmt.Println("errorChan", err)
+				}
+			}()
 			break
 		}
 	}
-
-	if <-p2pDkg.GetDkgEvent() == dkg.VERIFIED {
+	if <-dkgEvent == dkg.VERIFIED {
 		fmt.Println("eventCheckDone", true)
 		d.FinishTest()
 	}
@@ -183,27 +191,39 @@ func (r test4) StartTest(d *PeerNode) {
 	suite := suites.MustFind("bn256")
 	p2pDkg := dkg.CreateP2PDkg(d.p, suite, d.dkgChan)
 
-	var group [][]byte
+	var (
+		group    [][]byte
+		dkgEvent chan int
+		errChan  <-chan error
+	)
 	for idx, id := range d.nodeIDs {
 		if bytes.Compare(d.p.GetID(), id) == 0 {
 			start := idx / groupSize * groupSize
 			group = d.nodeIDs[start : start+groupSize]
-			p2pDkg.GetGroupCmd() <- dkg.DkgSession{SessionId: "0", GroupIds: group}
+			dkgEvent, errChan = p2pDkg.Start(&dkg.DkgSession{SessionId: "0", GroupIds: group})
+			go func() {
+				for err := range errChan {
+					fmt.Println("errorChan", err)
+				}
+			}()
 			break
 		}
 	}
 
-	if <-p2pDkg.GetDkgEvent() != dkg.VERIFIED {
-		d.FinishTest()
+	if <-dkgEvent != dkg.VERIFIED {
+		fmt.Println("dkg error")
 	}
 
 	rawMsg, err := dataFetch(os.Getenv("URL"))
 	if err != nil {
-
+		fmt.Println(err)
 	}
 
 	var signatures [][]byte
 	sig, err := tbls.Sign(suite, p2pDkg.GetShareSecurity(), rawMsg)
+	if err != nil {
+		fmt.Println(err)
+	}
 	sign := &vss.Signature{
 		Content:   rawMsg,
 		Signature: sig,
@@ -212,7 +232,7 @@ func (r test4) StartTest(d *PeerNode) {
 	for _, id := range d.nodeIDs {
 		if bytes.Compare(d.p.GetID(), id) != 0 {
 			if err = d.p.SendMessage(id, sign); err != nil {
-
+				fmt.Println(err)
 			}
 		}
 	}
@@ -221,14 +241,14 @@ func (r test4) StartTest(d *PeerNode) {
 		if len(signatures) > groupSize/2 {
 			finalSig, err := tbls.Recover(suite, p2pDkg.GetGroupPublicPoly(), sig.Content, signatures, groupSize/2+1, groupSize)
 			if err != nil {
-
+				fmt.Println(err)
 				continue
 			}
 			if err = bls.Verify(suite, p2pDkg.GetGroupPublicPoly().Commit(), sig.Content, finalSig); err != nil {
-
+				fmt.Println(err)
 				continue
 			} else {
-
+				fmt.Println("TBLS SUCCESS!!!")
 				d.FinishTest()
 				break
 			}
@@ -268,17 +288,25 @@ func (r test5) StartTest(d *PeerNode) {
 
 	roundCount := uint16(1)
 	for {
-		var group [][]byte
+		var (
+			group    [][]byte
+			dkgEvent chan int
+			errChan  <-chan error
+		)
 		for idx, id := range d.nodeIDs {
 			if bytes.Compare(d.p.GetID(), id) == 0 {
 				start := idx / groupSize * groupSize
 				group = d.nodeIDs[start : start+groupSize]
-				p2pDkg.GetGroupCmd() <- dkg.DkgSession{SessionId: strconv.Itoa(int(roundCount)), GroupIds: group}
+				dkgEvent, errChan = p2pDkg.Start(&dkg.DkgSession{SessionId: strconv.Itoa(int(roundCount)), GroupIds: group})
+				go func() {
+					for err := range errChan {
+						fmt.Println("errorChan", err)
+					}
+				}()
 				break
 			}
 		}
-
-		if <-p2pDkg.GetDkgEvent() == dkg.VERIFIED {
+		if <-dkgEvent == dkg.VERIFIED {
 			fmt.Println("\n certified!!!!!!")
 			fmt.Println("eventCheckRoundDone", roundCount)
 			next := d.requestIsNextRoundReady(roundCount)

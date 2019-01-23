@@ -239,7 +239,10 @@ func (d *PeerNode) Init(bootStrapIp string, port, peerSize int, numMessages int,
 			case *dkg.Responses:
 				d.dkgChan <- msg
 			case *vss.Signature:
-				d.tblsChan <- *content
+				go func() { d.tblsChan <- *content }()
+				if err := msg.PeerConn.Reply(msg.RequestNonce, &vss.Signature{}); err != nil {
+					fmt.Println("signature reply", err)
+				}
 			default:
 			}
 		}
