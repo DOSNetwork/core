@@ -224,10 +224,23 @@ func (d *DosNode) PipeGrouping(chGroup <-chan interface{}) {
 					}
 					d.SetParticipants(groupIds)
 					if isMember {
-						d.p2pDkg.GetGroupCmd() <- dkg.DkgSession{SessionId: "0", GroupIds: groupIds}
+						dkgRes, errc := d.p2pDkg.Start(&dkg.DkgSession{SessionId: "0", GroupIds: groupIds})
+						go func() {
+							for err := range errc {
+								fmt.Println(err)
+							}
+						}()
+						select {
+						case msg := <-dkgRes:
+							if msg == dkg.VERIFIED {
+								if err := d.chainConn.UploadPubKey(d.p2pDkg.GetGroupPublicPoly().Commit()); err != nil {
+									log.WithField("function", "uploadPubKey").Warn(err)
+								}
+							}
+						}
 					}
 				default:
-					fmt.Println("DOSProxyLogUpdateRandom type mismatch")
+					fmt.Println("DOSProxyLogGrouping type mismatch")
 				}
 			case <-d.quit:
 				break
@@ -461,14 +474,12 @@ func (d *DosNode) PipeRecoverAndVerify(cSignatureFromPeer chan p2p.P2PMessage, f
 				fmt.Println("3) PipeRecoverAndVerify fromEth")
 				reportMap[report.selfSign.QueryId] = report
 			case msg := <-cSignatureFromPeer:
-				var sign *vss.Signature
-				var ok bool
-				sign, ok = msg.Msg.Message.(*vss.Signature)
+				if err := (*d.network).Reply(msg.Sender, msg.RequestNonce, &vss.Signature{}); err != nil {
+					log.WithField("function", "dispatchEvent").Error("signature reply", err)
+				}
+				sign, ok := msg.Msg.Message.(*vss.Signature)
 				if !ok {
 					continue
-				}
-				if err := msg.PeerConn.Reply(msg.RequestNonce, &vss.Signature{}); err != nil {
-					log.WithField("function", "dispatchEvent").Error("signature reply", err)
 				}
 				var sigShares [][]byte
 				if report, ok := reportMap[sign.QueryId]; ok {
@@ -533,9 +544,8 @@ func (d *DosNode) PipeRecoverAndVerify(cSignatureFromPeer chan p2p.P2PMessage, f
 					} else {
 						signatureAwait[sign.QueryId] = time.Now()
 					}
-
 					go func() {
-						cSignatureFromPeer <- sign
+						cSignatureFromPeer <- msg
 					}()
 				}
 			case <-d.quit:
