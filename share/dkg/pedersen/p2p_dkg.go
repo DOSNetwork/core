@@ -45,7 +45,6 @@ type P2PDkg struct {
 	groupPubPoly   *share.PubPoly
 	currentState   int
 	currentSession string
-	chPeerEvent    chan p2p.P2PMessage
 	groupCmd       chan *DkgSession
 	network        *p2p.P2PInterface
 	logger         log.Logger
@@ -70,12 +69,11 @@ type DkgSession struct {
 	err            chan error
 }
 
-func CreateP2PDkg(p p2p.P2PInterface, suite suites.Suite, peerEvent chan p2p.P2PMessage) P2PDkgInterface {
+func CreateP2PDkg(p p2p.P2PInterface, suite suites.Suite) P2PDkgInterface {
 	d := &P2PDkg{
 		groupId:      p.GetID(),
 		suite:        suite,
 		currentState: INIT,
-		chPeerEvent:  peerEvent,
 		groupCmd:     make(chan *DkgSession),
 		network:      &p,
 		logger:       log.New("module", "dkg"),
@@ -123,7 +121,8 @@ func (d *P2PDkg) eventLoop() {
 			}
 		}
 		var errcList []<-chan error
-		outForPubKey := d.pipReplyContentRequest(newSession)
+		outForPubKey, requestErrc := d.pipReplyContentRequest(newSession)
+		errcList = append(errcList, requestErrc)
 		outForDeal, pubKeyErrc := d.pipeExchangePubKey(outForPubKey)
 		errcList = append(errcList, pubKeyErrc)
 		outForResponse, genErrc := d.pipeNewDistKeyGenerator(outForDeal)
@@ -159,36 +158,49 @@ func merge(out chan error, cs ...<-chan error) <-chan error {
 	return out
 }
 
-func (d *P2PDkg) pipReplyContentRequest(newSession *DkgSession) <-chan *DkgSession {
+func (d *P2PDkg) pipReplyContentRequest(newSession *DkgSession) (<-chan *DkgSession, <-chan error) {
 	out := make(chan *DkgSession)
+	errc := make(chan error)
 	d.currentState = INIT
 	d.groupingStart = time.Now()
 
 	go func() {
+		defer close(errc)
 		defer close(out)
+		defer (*d.network).UnSubscribeEvent("dkg", 100, ReqPublicKey{}, ReqDeal{}, ReqResponses{})
+		peerEvent, err := (*d.network).SubscribeEvent("dkg", 100, ReqPublicKey{}, ReqDeal{}, ReqResponses{})
+		if err != nil {
+			select {
+			case errc <- err:
+				newSession.cancel()
+			case <-newSession.ctx.Done():
+			}
+			fmt.Println("pipReplyContentRequest closed")
+			return
+		}
 		out <- newSession
 		for {
 			select {
 			//event from peer
-			case msg := <-d.chPeerEvent:
+			case msg := <-peerEvent:
 				switch content := msg.Msg.Message.(type) {
 				case *ReqPublicKey:
 					if d.currentState >= PUBLICKEYDONE && newSession.SessionId == content.SessionId {
-						msg.PeerConn.Reply(msg.RequestNonce, &newSession.selfPubKey)
+						(*d.network).Reply(msg.Sender, msg.RequestNonce, &newSession.selfPubKey)
 					} else {
-						msg.PeerConn.Reply(msg.RequestNonce, &vss.PublicKey{})
+						(*d.network).Reply(msg.Sender, msg.RequestNonce, &vss.PublicKey{})
 					}
 				case *ReqDeal:
 					if d.currentState >= DEALDONE && newSession.SessionId == content.SessionId {
-						msg.PeerConn.Reply(msg.RequestNonce, newSession.selfDeals[string(msg.Sender)])
+						(*d.network).Reply(msg.Sender, msg.RequestNonce, newSession.selfDeals[string(msg.Sender)])
 					} else {
-						msg.PeerConn.Reply(msg.RequestNonce, &Deal{})
+						(*d.network).Reply(msg.Sender, msg.RequestNonce, &Deal{})
 					}
 				case *ReqResponses:
 					if d.currentState >= RESPONSEDONE && newSession.SessionId == content.SessionId {
-						msg.PeerConn.Reply(msg.RequestNonce, &newSession.selfResps)
+						(*d.network).Reply(msg.Sender, msg.RequestNonce, &newSession.selfResps)
 					} else {
-						msg.PeerConn.Reply(msg.RequestNonce, &Responses{})
+						(*d.network).Reply(msg.Sender, msg.RequestNonce, &Responses{})
 					}
 				default:
 				}
@@ -200,7 +212,7 @@ func (d *P2PDkg) pipReplyContentRequest(newSession *DkgSession) <-chan *DkgSessi
 		}
 	}()
 
-	return out
+	return out, errc
 }
 
 func (d *P2PDkg) pipeExchangePubKey(dkgSession <-chan *DkgSession) (<-chan *DkgSession, <-chan error) {
@@ -208,8 +220,8 @@ func (d *P2PDkg) pipeExchangePubKey(dkgSession <-chan *DkgSession) (<-chan *DkgS
 	errc := make(chan error)
 
 	go func() {
-		defer close(out)
 		defer close(errc)
+		defer close(out)
 		for newSession := range dkgSession {
 			newSession.pubkeyIdMap = make(map[string]string)
 			newSession.pubkeyIdMap[newSession.partPub.String()] = string(d.groupId)
@@ -238,10 +250,8 @@ func (d *P2PDkg) pipeExchangePubKey(dkgSession <-chan *DkgSession) (<-chan *DkgS
 			for len(groupPeers) > 0 {
 				for key, id := range groupPeers {
 					if d.currentSession == newSession.SessionId {
-						fmt.Println("requesting pubkey")
 						pubkey, err := (*d.network).Request(id, &ReqPublicKey{SessionId: newSession.SessionId})
 						if err != nil {
-							fmt.Println(err)
 							select {
 							case <-timer.C:
 								errc <- errors.New("pipeExchangePubKey request timeout")
@@ -256,7 +266,6 @@ func (d *P2PDkg) pipeExchangePubKey(dkgSession <-chan *DkgSession) (<-chan *DkgS
 						}
 						switch content := pubkey.(type) {
 						case *vss.PublicKey:
-							fmt.Println(content)
 							if content.GetBinary() != nil {
 								p, err := content.GetPoint(d.suite)
 								if err != nil {
@@ -288,6 +297,7 @@ func (d *P2PDkg) pipeExchangePubKey(dkgSession <-chan *DkgSession) (<-chan *DkgS
 				return
 			}
 		}
+		fmt.Println("pipeExchangePubKey closed")
 	}()
 
 	return out, errc
@@ -298,8 +308,8 @@ func (d *P2PDkg) pipeNewDistKeyGenerator(dkgSession <-chan *DkgSession) (<-chan 
 	errc := make(chan error)
 
 	go func() {
-		defer close(out)
 		defer close(errc)
+		defer close(out)
 		for newSession := range dkgSession {
 			var err error
 			sort.Sort(newSession.pubKeys)
@@ -344,10 +354,8 @@ func (d *P2PDkg) pipeNewDistKeyGenerator(dkgSession <-chan *DkgSession) (<-chan 
 			for len(groupPeers) > 0 {
 				for key, id := range groupPeers {
 					if d.currentSession == newSession.SessionId {
-						fmt.Println("requesting ReqDeal")
 						deal, err := (*d.network).Request(id, &ReqDeal{SessionId: newSession.SessionId})
 						if err != nil {
-							fmt.Println(err)
 							select {
 							case <-timer.C:
 								errc <- errors.New("pipeNewDistKeyGenerator request timeout")
@@ -362,7 +370,6 @@ func (d *P2PDkg) pipeNewDistKeyGenerator(dkgSession <-chan *DkgSession) (<-chan 
 						}
 						switch content := deal.(type) {
 						case *Deal:
-							fmt.Println(content)
 							if content.GetDeal() != nil {
 								newSession.deals = append(newSession.deals, *content)
 								delete(groupPeers, key)
@@ -382,6 +389,7 @@ func (d *P2PDkg) pipeNewDistKeyGenerator(dkgSession <-chan *DkgSession) (<-chan 
 				return
 			}
 		}
+		fmt.Println("pipeNewDistKeyGenerator closed")
 	}()
 
 	return out, errc
@@ -393,7 +401,6 @@ func (d *P2PDkg) pipeProcessDealAndResponses(dkgSession <-chan *DkgSession) <-ch
 	go func() {
 		defer close(errc)
 		for newSession := range dkgSession {
-			fmt.Println("starting pipeProcessDealAndResponses")
 			var resps []*Response
 			for _, deal := range newSession.deals {
 				resp, err := (*newSession.partDkg).ProcessDeal(&deal)
@@ -423,10 +430,8 @@ func (d *P2PDkg) pipeProcessDealAndResponses(dkgSession <-chan *DkgSession) <-ch
 			for len(groupPeers) > 0 {
 				for key, id := range groupPeers {
 					if d.currentSession == newSession.SessionId {
-						fmt.Println("requesting ReqResponses")
 						responses, err := (*d.network).Request(id, &ReqResponses{SessionId: newSession.SessionId})
 						if err != nil {
-							fmt.Println(err)
 							select {
 							case <-timer.C:
 								errc <- errors.New("pipeProcessDealAndResponses request timeout")
@@ -500,6 +505,7 @@ func (d *P2PDkg) pipeProcessDealAndResponses(dkgSession <-chan *DkgSession) <-ch
 				return
 			}
 		}
+		fmt.Println("pipeProcessDealAndResponses closed")
 	}()
 
 	return errc
