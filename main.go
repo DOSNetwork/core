@@ -88,7 +88,10 @@ func main() {
 
 	//4)Build a p2pDKG
 	suite := suites.MustFind("bn256")
-	p2pDkg := dkg.CreateP2PDkg(p, suite)
+	p2pDkg, err := dkg.CreateP2PDkg(p, suite)
+	if err != nil {
+		mainLogger.WithField("function", "CreateP2PDkg").Fatal(err)
+	}
 
 	//5)Subscribe Event from Eth
 	eventGrouping := make(chan interface{}, 1)

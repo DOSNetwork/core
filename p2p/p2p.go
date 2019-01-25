@@ -469,17 +469,15 @@ func (n *P2P) messageHanding() {
 }
 
 func (n *P2P) SubscribeEvent(chanBuffer int, messages ...interface{}) (outch chan P2PMessage, err error) {
-	var ch chan P2PMessage
 	if chanBuffer > 0 {
-		ch = make(chan P2PMessage, chanBuffer)
+		outch = make(chan P2PMessage, chanBuffer)
 	} else {
-		ch = make(chan P2PMessage)
+		outch = make(chan P2PMessage)
 	}
 
-	outch = ch
 	errstr := ""
 	for _, m := range messages {
-		_, l := n.msgChanMap.LoadOrStore(reflect.TypeOf(m).String(), ch)
+		_, l := n.msgChanMap.LoadOrStore(reflect.TypeOf(m).String(), outch)
 		if l {
 			if errstr != "" {
 				errstr = errstr + ", " + reflect.TypeOf(m).String()

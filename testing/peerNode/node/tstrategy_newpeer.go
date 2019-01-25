@@ -154,11 +154,14 @@ func (r test3) StartTest(d *PeerNode) {
 	}
 
 	suite := suites.MustFind("bn256")
-	p2pDkg := dkg.CreateP2PDkg(d.p, suite)
+	p2pDkg, err := dkg.CreateP2PDkg(d.p, suite)
+	if err != nil {
+		fmt.Println(err)
+	}
 
 	var (
 		group    [][]byte
-		dkgEvent chan int
+		dkgEvent chan bool
 		errChan  <-chan error
 	)
 	for idx, id := range d.nodeIDs {
@@ -174,7 +177,7 @@ func (r test3) StartTest(d *PeerNode) {
 			break
 		}
 	}
-	if <-dkgEvent == dkg.VERIFIED {
+	if <-dkgEvent == true {
 		fmt.Println("eventCheckDone", true)
 		d.FinishTest()
 	}
@@ -189,11 +192,14 @@ func (r test4) StartTest(d *PeerNode) {
 	groupSize, err := strconv.Atoi(groupSizeStr)
 
 	suite := suites.MustFind("bn256")
-	p2pDkg := dkg.CreateP2PDkg(d.p, suite)
+	p2pDkg, err := dkg.CreateP2PDkg(d.p, suite)
+	if err != nil {
+		fmt.Println(err)
+	}
 
 	var (
 		group    [][]byte
-		dkgEvent chan int
+		dkgEvent chan bool
 		errChan  <-chan error
 	)
 	for idx, id := range d.nodeIDs {
@@ -210,7 +216,7 @@ func (r test4) StartTest(d *PeerNode) {
 		}
 	}
 
-	if <-dkgEvent != dkg.VERIFIED {
+	if <-dkgEvent != true {
 		fmt.Println("dkg error")
 	}
 
@@ -284,13 +290,16 @@ func (r test5) StartTest(d *PeerNode) {
 	}
 
 	suite := suites.MustFind("bn256")
-	p2pDkg := dkg.CreateP2PDkg(d.p, suite)
+	p2pDkg, err := dkg.CreateP2PDkg(d.p, suite)
+	if err != nil {
+		fmt.Println(err)
+	}
 
 	roundCount := uint16(1)
 	for {
 		var (
 			group    [][]byte
-			dkgEvent chan int
+			dkgEvent chan bool
 			errChan  <-chan error
 		)
 		for idx, id := range d.nodeIDs {
@@ -306,7 +315,7 @@ func (r test5) StartTest(d *PeerNode) {
 				break
 			}
 		}
-		if <-dkgEvent == dkg.VERIFIED {
+		if <-dkgEvent == true {
 			fmt.Println("\n certified!!!!!!")
 			fmt.Println("eventCheckRoundDone", roundCount)
 			next := d.requestIsNextRoundReady(roundCount)
