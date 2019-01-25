@@ -14,11 +14,11 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:1fbd965b520b6a56a5d0da24a061e8b8ffd8d27579323eddfe0540c55d3c5ddf"
+  digest = "1:4fa9a984402f16a3fcb2c3380c696c6045ef3807dcf456a079a201882021b1fd"
   name = "github.com/antchfx/xmlquery"
   packages = ["."]
   pruneopts = ""
-  revision = "431a9e9e7c449f15251e3bb64faeb5565b188990"
+  revision = "355641961c927f5151e1e0ac437a5f8613f5be8b"
 
 [[projects]]
   branch = "master"
@@ -30,11 +30,11 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:7b01d90474e5bb2274e12ed233f232b382cfb5f78d834421bbf313a01170b00b"
+  digest = "1:385cf128935cdc661f0d73b341dbc65fecf4f83ec8c80f62089c2d477ce82f26"
   name = "github.com/aristanetworks/goarista"
   packages = ["monotime"]
   pruneopts = ""
-  revision = "aa2a42e13be68c4a95fe9e58003adaf63fe6476f"
+  revision = "8f049bdb8feb7d7d5f1a9b9cd854396112fb0c0e"
 
 [[projects]]
   digest = "1:4193e2871b655bdfc423d23d309bf45a97ff75399c2fe923e79cb15eefb985d7"
@@ -46,11 +46,11 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:21a9825a1a506ff2029235f07641cd1e48711d048dcda3a1a91e3c9742091dda"
+  digest = "1:057aee12ac2f820c94b04da39a3ebcd865bee3bdda697ee0e6bbf75e00476b5f"
   name = "github.com/btcsuite/btcd"
   packages = ["btcec"]
   pruneopts = ""
-  revision = "7d2daa5bfef28c5e282571bc06416516936115ee"
+  revision = "ed77733ec07dfc8a513741138419b8d9d3de9d2d"
 
 [[projects]]
   digest = "1:0deddd908b6b4b768cfc272c16ee61e7088a60f7fe2f06c547bd3d8e1f8b8e77"
@@ -78,7 +78,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:2eb77ec8561ec0ae6fb3ad3172335337ce4b0e32fa9210a0f9cbce248b7f9a92"
+  digest = "1:dad8e1350d130968ee2369622ce9d2d9914f72443149e9001817fcd05e8fc7c9"
   name = "github.com/dedis/kyber"
   packages = [
     ".",
@@ -93,15 +93,15 @@
     "xof/blake2xb",
   ]
   pruneopts = ""
-  revision = "59837fd0c24b7e3307d8edaf9080ec96544d26ff"
+  revision = "5cc64601919b0945d10aba014129cdfef5fdda46"
 
 [[projects]]
-  digest = "1:78b43854563eac465e590a41cdd2f615e0352823cceec2e708fde72af2bb23bb"
+  digest = "1:96a06fabff574afdb3fda8e4568b327b524c5559558af3309fe77a5df37e78b6"
   name = "github.com/dedis/protobuf"
   packages = ["."]
   pruneopts = ""
-  revision = "ed0d97d677d4dc2485814e88dcacaa1637c46c8e"
-  version = "v1.0.3"
+  revision = "078743448b3fa55f6c540b14e3cd60e23a88ae8d"
+  version = "v1.0.4"
 
 [[projects]]
   digest = "1:a9c8210eb5d36a9a6e66953dc3d3cabd3afbbfb4f50baab0db1af1b723254b82"
@@ -252,14 +252,6 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:915c56ca290fa3512d4bdc6cc958e5da5c8be0f3f5ca87f98a5f520c122ed3c6"
-  name = "github.com/looplab/fsm"
-  packages = ["."]
-  pruneopts = ""
-  revision = "f980bdb68a8962823200eafe6c0aa99e917be0d7"
-
-[[projects]]
-  branch = "master"
   digest = "1:563cb49ec2d3da93eb4a0f49ba5d0aca4d3edd09e668d23d0f6f71df73a7e534"
   name = "github.com/oliveagle/jsonpath"
   packages = ["."]
@@ -299,23 +291,23 @@
   version = "v1.6.0"
 
 [[projects]]
-  digest = "1:9d57e200ef5ccc4217fe0a34287308bac652435e7c6513f6263e0493d2245c56"
+  digest = "1:9a3c631555e0351fdc4e696577bb63afd90c399d782a8462dba9d100d7021db3"
   name = "github.com/sirupsen/logrus"
   packages = ["."]
   pruneopts = ""
-  revision = "bcd833dfe83d3cebad139e4a29ed79cb2318bf95"
-  version = "v1.2.0"
+  revision = "e1e72e9de974bd926e5c56f83753fba2df402ce5"
+  version = "v1.3.0"
 
 [[projects]]
-  digest = "1:c587772fb8ad29ad4db67575dad25ba17a51f072ff18a22b4f0257a4d9c24f75"
+  digest = "1:381bcbeb112a51493d9d998bbba207a529c73dbb49b3fd789e48c63fac1f192c"
   name = "github.com/stretchr/testify"
   packages = [
     "assert",
     "require",
   ]
   pruneopts = ""
-  revision = "f35b8ab0b5a2cef36673838d662e249dd9c94686"
-  version = "v1.2.2"
+  revision = "ffdc059bfe9ce6a4e144ba849dbedead332c6053"
+  version = "v1.3.0"
 
 [[projects]]
   branch = "master"
@@ -340,7 +332,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:887074c37fcefc2f49b5ae9c6f9f36107341aec23185613d0e9f1ee81db7f94a"
+  digest = "1:278d561dd1f1743e1b8995f202f56314e33364b395b95514d7df91df48b267da"
   name = "golang.org/x/crypto"
   packages = [
     "blake2b",
@@ -348,14 +340,15 @@
     "pbkdf2",
     "ripemd160",
     "scrypt",
+    "sha3",
     "ssh/terminal",
   ]
   pruneopts = ""
-  revision = "505ab145d0a99da450461ae2c1a9f6cd10d1f447"
+  revision = "057139ce5d2bdbe6fe73c53679e24e9cf007f637"
 
 [[projects]]
   branch = "master"
-  digest = "1:6728b48c3404cbbebd73186cb2de79bf03395e8c3a8e5fe2079367f2c3fa85b0"
+  digest = "1:dda39369f6846cc2f8ca8611e7bdd81637835f790943caf9c7bc0c150edd483c"
   name = "golang.org/x/net"
   packages = [
     "html",
@@ -364,11 +357,11 @@
     "websocket",
   ]
   pruneopts = ""
-  revision = "610586996380ceef02dd726cc09df7e00a3f8e56"
+  revision = "4b62a64f59f73840b9ab79204c94fee61cd1ba2c"
 
 [[projects]]
   branch = "master"
-  digest = "1:1762d94528e8f2d138a1ee746b1fc23a6ea81ff5d3db85a077ab1a05060a852e"
+  digest = "1:7e3b61f51ebcb58b3894928ed7c63aae68820dec1dd57166e5d6e65ef2868f40"
   name = "golang.org/x/sys"
   packages = [
     "cpu",
@@ -376,7 +369,7 @@
     "windows",
   ]
   pruneopts = ""
-  revision = "73d4af5aa059c8c2dfcf25aad4efd6ce7bc9adc1"
+  revision = "b90733256f2e882e81d52f9126de08df5615afd9"
 
 [[projects]]
   digest = "1:5acd3512b047305d49e8763eef7ba423901e85d5dd2fd1e71778a0ea8de10bd4"
@@ -431,6 +424,7 @@
     "github.com/dedis/kyber/xof/blake2xb",
     "github.com/dedis/protobuf",
     "github.com/ethereum/go-ethereum",
+    "github.com/ethereum/go-ethereum/accounts/abi",
     "github.com/ethereum/go-ethereum/accounts/abi/bind",
     "github.com/ethereum/go-ethereum/accounts/keystore",
     "github.com/ethereum/go-ethereum/common",
@@ -439,23 +433,26 @@
     "github.com/ethereum/go-ethereum/crypto/bn256",
     "github.com/ethereum/go-ethereum/crypto/sha3",
     "github.com/ethereum/go-ethereum/ethclient",
+    "github.com/ethereum/go-ethereum/event",
     "github.com/ethereum/go-ethereum/p2p/netutil",
+    "github.com/go-stack/stack",
     "github.com/golang/protobuf/proto",
     "github.com/golang/protobuf/ptypes",
     "github.com/golang/protobuf/ptypes/any",
+    "github.com/google/uuid",
     "github.com/gorilla/mux",
     "github.com/huin/goupnp",
     "github.com/huin/goupnp/dcps/internetgateway1",
     "github.com/huin/goupnp/dcps/internetgateway2",
     "github.com/jackpal/gateway",
     "github.com/jackpal/go-nat-pmp",
-    "github.com/looplab/fsm",
     "github.com/oliveagle/jsonpath",
     "github.com/sirupsen/logrus",
     "github.com/stretchr/testify/assert",
     "github.com/stretchr/testify/require",
     "golang.org/x/crypto/blake2b",
     "golang.org/x/crypto/hkdf",
+    "golang.org/x/crypto/sha3",
     "golang.org/x/sys/cpu",
   ]
   solver-name = "gps-cdcl"

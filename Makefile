@@ -7,8 +7,7 @@
 .DEFAULT_GOAL := build
 DOSPROXY_PATH := onchain/eth/contracts/DOSProxy.sol
 CONTRACTS_GOPATH := onchain/dosproxy
-TEST_CONTRACTS_GOPATH := testing/dosUser/contract
-GENERATED_FILES := $(shell find $(CONTRACTS_GOPATH) $(TEST_CONTRACTS_GOPATH) -name '*.go')
+GENERATED_FILES := $(shell find $(CONTRACTS_GOPATH) -name '*.go')
 ETH_CONTRACTS := onchain/eth/contracts
 BOOT_CREDENTIAL := testAccounts/bootCredential
 
