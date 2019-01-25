@@ -139,7 +139,11 @@ func main() {
 			logger.Fatal(err)
 		}
 		suite := suites.MustFind("bn256")
-		p2pdkg := dkg.CreateP2PDkg(p, suite)
+		p2pdkg, err := dkg.CreateP2PDkg(p, suite)
+		if err != nil {
+			logger.Fatal(err)
+		}
+
 		if err = p.SendMessage(bootstrapId, &peerTalk.Register{Id: p.GetID(), Address: p.GetIP()}); err != nil {
 			logger.WithFields(logrus.Fields{
 				"event": "sendMessage",
@@ -185,7 +189,7 @@ func main() {
 							}
 						}()
 						go func() {
-							if <-dkgEvent == dkg.VERIFIED {
+							if <-dkgEvent == true {
 								if err = p.SendMessage(bootstrapId, &peerTalk.Done{Id: p.GetID()}); err != nil {
 									logger.WithField("event", "allDone").Error(err)
 								} else {

@@ -231,8 +231,8 @@ func (d *DosNode) PipeGrouping(chGroup <-chan interface{}) {
 							}
 						}()
 						select {
-						case msg := <-dkgRes:
-							if msg == dkg.VERIFIED {
+						case certified := <-dkgRes:
+							if certified == true {
 								if err := d.chainConn.UploadPubKey(d.p2pDkg.GetGroupPublicPoly().Commit()); err != nil {
 									log.WithField("function", "uploadPubKey").Warn(err)
 								}
