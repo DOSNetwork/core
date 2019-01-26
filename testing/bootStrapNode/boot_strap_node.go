@@ -4,7 +4,6 @@ import (
 	// Import the gorilla/mux library we just installed
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"strconv"
 	"sync"
@@ -13,6 +12,7 @@ import (
 	"github.com/gorilla/mux"
 
 	"github.com/DOSNetwork/core/configuration"
+	"github.com/DOSNetwork/core/log"
 	"github.com/DOSNetwork/core/onchain"
 	"github.com/DOSNetwork/core/p2p"
 )
@@ -47,7 +47,9 @@ func main() {
 	chainConfig := onChainConfig.GetChainConfig()
 
 	adaptor = &onchain.EthAdaptor{}
-	if err = adaptor.Init(&chainConfig); err != nil {
+	adaptor.SetAccount("testAccounts/bootCredential/fundKey")
+	log.Init(adaptor.GetId()[:])
+	if err = adaptor.Init(chainConfig); err != nil {
 		log.Fatal(err)
 	}
 

@@ -9,18 +9,15 @@ import (
 	"github.com/dedis/kyber"
 
 	"github.com/ethereum/go-ethereum/common"
-
-	"github.com/sirupsen/logrus"
 )
 
 const (
 	ETH = "ETH"
 )
 
-var log *logrus.Entry
-
 type ChainInterface interface {
-	Init(chainConfig *configuration.ChainConfig) (err error)
+	SetAccount(credentialPath string) (err error)
+	Init(chainConfig configuration.ChainConfig) (err error)
 	SubscribeEvent(ch chan interface{}, subscribeType int) (err error)
 	InitialWhiteList() (err error)
 	GetWhitelist() (address common.Address, err error)
@@ -38,14 +35,12 @@ type ChainInterface interface {
 	WhitelistInitialized() (initialized bool, err error)
 }
 
-func AdaptTo(chainName string, chainConfig *configuration.ChainConfig, logger *logrus.Entry) (conn ChainInterface, err error) {
-	log = logger
-	switch chainConfig.ChainType {
+func AdaptTo(ChainType string) (conn ChainInterface, err error) {
+	switch ChainType {
 	case ETH:
 		conn = &EthAdaptor{}
-		err = conn.Init(chainConfig)
 	default:
-		err = fmt.Errorf("Chain %s not supported error\n", chainName)
+		err = fmt.Errorf("Chain %s not supported error\n", ChainType)
 	}
 	return conn, err
 }

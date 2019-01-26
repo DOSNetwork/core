@@ -4,14 +4,9 @@ import (
 	"bytes"
 	"runtime/debug"
 
-	"github.com/bshuster-repo/logrus-logstash-hook"
-
-	"github.com/ethereum/go-ethereum/common"
-
-	"github.com/sirupsen/logrus"
-
 	"github.com/DOSNetwork/core/configuration"
 	"github.com/DOSNetwork/core/dosnode"
+	"github.com/DOSNetwork/core/log"
 	"github.com/DOSNetwork/core/onchain"
 	"github.com/DOSNetwork/core/p2p"
 	"github.com/DOSNetwork/core/share/dkg/pedersen"
@@ -19,18 +14,12 @@ import (
 	"github.com/DOSNetwork/core/suites"
 )
 
-var log *logrus.Logger
-
 // main
 func main() {
-	//0)initial log module
-	log = logrus.New()
-	mainLogger := log.WithField("module", "main")
-
-	//0.5)Read Config
+	//Read Configuration
 	offChainConfig := configuration.OffChainConfig{}
 	if err := offChainConfig.LoadConfig(); err != nil {
-		mainLogger.WithField("function", "loadConfig").Fatal(err)
+		log.Fatal(err)
 	}
 	role := offChainConfig.NodeRole
 	port := offChainConfig.Port
@@ -38,62 +27,59 @@ func main() {
 
 	onChainConfig := configuration.OnChainConfig{}
 	if err := onChainConfig.LoadConfig(); err != nil {
-		mainLogger.WithField("function", "loadConfig").Fatal(err)
+		log.Fatal(err)
 	}
 	chainConfig := onChainConfig.GetChainConfig()
 
-	//1)Connect to Eth
-	chainConn, err := onchain.AdaptTo(chainConfig.ChainType, &chainConfig, log.WithField("module", "chainConn"))
+	//Set up an onchain adapter
+	chainConn, err := onchain.AdaptTo(chainConfig.ChainType)
 	if err != nil {
-		mainLogger.WithField("function", "adaptTo").Fatal(err)
+		log.Fatal(err)
 	}
+	chainConn.SetAccount(onChainConfig.CredentialPath)
+	//Init log module with nodeID that is an onchain account address
+	log.Init(chainConn.GetId()[:])
+	chainConn.Init(chainConfig)
 
-	//2)Build a p2p network
+	//Build a p2p network
 	p, err := p2p.CreateP2PNetwork(chainConn.GetId(), port)
 	if err != nil {
-		mainLogger.WithField("function", "createP2PNetwork").Fatal(err)
+		log.Fatal(err)
 	}
 	if err := p.Listen(); err != nil {
-		mainLogger.WithField("function", "listen").Error(err)
+		log.Fatal(err)
 	}
 
-	//2.5)Add hook to log module
-	hook, err := logrustash.NewHookWithFields("tcp", "163.172.36.173:9500", "DOS_node", logrus.Fields{
-		"DOS_node_ip": p.GetIP(),
-		"Serial":      string(common.BytesToAddress(p.GetID()).String()),
-	})
 	if err != nil {
-		mainLogger.WithField("function", "newHookWithFields").Error(err)
+		log.Fatal(err)
 	}
 
-	log.Hooks.Add(hook)
-
-	//3)Dial to peers to build peerClient and Set node ID
+	//Dial to peers to build peerClient and Set node ID
 	if role == "BootstrapNode" {
 		address, err := chainConn.GetWhitelist()
 		if err != nil {
-			mainLogger.WithField("function", "getWhitelist").Fatal(err)
+			log.Fatal(err)
 		}
 
 		if bytes.Compare(address.Bytes(), chainConn.GetId()) != 0 {
 			if err = chainConn.InitialWhiteList(); err != nil {
-				mainLogger.WithField("function", "initialWhiteList").Fatal(err)
+				log.Fatal(err)
 			}
 		}
 	} else {
 		if err = p.Join(bootstrapIp); err != nil {
-			mainLogger.WithField("function", "join").Fatal(err)
+			log.Fatal(err)
 		}
 	}
 
-	//4)Build a p2pDKG
+	//Build a p2pDKG
 	suite := suites.MustFind("bn256")
 	p2pDkg, err := dkg.CreateP2PDkg(p, suite)
 	if err != nil {
-		mainLogger.WithField("function", "CreateP2PDkg").Fatal(err)
+		log.Fatal(err)
 	}
 
-	//5)Subscribe Event from Eth
+	//Subscribe Event from Eth
 	eventGrouping := make(chan interface{}, 1)
 	defer close(eventGrouping)
 	chUrl := make(chan interface{}, 100)
@@ -107,27 +93,27 @@ func main() {
 	eventValidation := make(chan interface{}, 20)
 	defer close(eventValidation)
 	if err = chainConn.SubscribeEvent(eventGrouping, onchain.SubscribeDOSProxyLogGrouping); err != nil {
-		mainLogger.WithField("function", "subscribeEvent").Fatal(err)
+		log.Fatal(err)
 	}
 
 	if err = chainConn.SubscribeEvent(chUrl, onchain.SubscribeDOSProxyLogUrl); err != nil {
-		mainLogger.WithField("function", "subscribeEvent").Fatal(err)
+		log.Fatal(err)
 	}
 
 	if err = chainConn.SubscribeEvent(chRandom, onchain.SubscribeDOSProxyLogUpdateRandom); err != nil {
-		mainLogger.WithField("function", "subscribeEvent").Fatal(err)
+		log.Fatal(err)
 	}
 
 	if err = chainConn.SubscribeEvent(chUsrRandom, onchain.SubscribeDOSProxyLogRequestUserRandom); err != nil {
-		mainLogger.WithField("function", "subscribeEvent").Fatal(err)
+		log.Fatal(err)
 	}
 
 	if err = chainConn.SubscribeEvent(eventValidation, onchain.SubscribeDOSProxyLogValidationResult); err != nil {
-		mainLogger.WithField("function", "subscribeEvent").Fatal(err)
+		log.Fatal(err)
 	}
 
-	//6)Set up a dosnode pipeline
-	d := dosnode.CreateDosNode(suite, p, chainConn, p2pDkg, log.WithField("module", "dosNode"))
+	//Set up a dosnode pipeline
+	d := dosnode.CreateDosNode(suite, p, chainConn, p2pDkg)
 	d.PipeGrouping(eventGrouping)
 	queriesReports := d.PipeQueries(chUrl, chUsrRandom, chRandom)
 	outForRecover, outForValidate := d.PipeSignAndBroadcast(queriesReports)
@@ -136,14 +122,15 @@ func main() {
 	chRetrigerUrl := d.PipeCleanFinishMap(eventValidation, outForValidate, submitForValidate)
 
 	if err = chainConn.UploadID(); err != nil {
-		mainLogger.WithField("function", "uploadID").Fatal(err)
+		log.Fatal(err)
 	}
 	//TODO:/crypto/scrypt: memory not released after hash is calculated
 	//https://github.com/golang/go/issues/20000
 	//This caused dosnode take over 500MB memory usage.
 	//Need to check to see if there is other way to trigger GC
 	debug.FreeOSMemory()
-	//7)Dispatch events
+
+	//Dispatch events
 	for {
 		select {
 		//For re-trigger query

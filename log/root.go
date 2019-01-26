@@ -1,12 +1,15 @@
 package log
 
 import (
+	"encoding/hex"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"time"
 
 	"github.com/bshuster-repo/logrus-logstash-hook"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/crypto/sha3"
 )
 
 var (
@@ -14,6 +17,9 @@ var (
 )
 
 func New(key string, value interface{}) Logger {
+	if root == nil {
+		fmt.Println("root nit")
+	}
 	return root.New(key, value)
 }
 
@@ -27,22 +33,49 @@ func (u UTCFormatter) Format(e *logrus.Entry) ([]byte, error) {
 	return u.Formatter.Format(e)
 }
 
-func init() {
+func Init(id []byte) {
+	fmt.Println("lgo Init")
+	appSession := os.Getenv("appSession")
+	appName := os.Getenv("appName")
+	nodId := byteTohex(id)
+	logIp := os.Getenv("logIp")
+	_ = logIp
 	logrus.SetLevel(logrus.DebugLevel)
 	logrus.SetOutput(ioutil.Discard)
 	logrus.SetFormatter(UTCFormatter{&logrus.JSONFormatter{}})
 	//IP,Subject and appName should read from environment variables
-	hook, err := logrustash.NewHook("tcp", "163.172.36.173:9500", "peer")
+	hook, err := logrustash.NewHook("tcp", "163.172.36.173:9500", appSession)
 	if err != nil {
+		fmt.Println(err)
 		logrus.Error(err)
 	}
 	logrus.AddHook(hook)
-	appSubject := os.Getenv("appSubject")
-	appName := os.Getenv("appName")
 	root.entry = logrus.WithFields(logrus.Fields{
-		"appSubject": appSubject,
+		"appSession": appSession,
 		"appName":    appName,
+		"nodeID":     nodId,
 	})
+}
+
+func byteTohex(a []byte) string {
+	unchecksummed := hex.EncodeToString(a[:])
+	sha := sha3.NewLegacyKeccak256()
+	sha.Write([]byte(unchecksummed))
+	hash := sha.Sum(nil)
+
+	result := []byte(unchecksummed)
+	for i := 0; i < len(result); i++ {
+		hashByte := hash[i/2]
+		if i%2 == 0 {
+			hashByte = hashByte >> 4
+		} else {
+			hashByte &= 0xf
+		}
+		if result[i] > '9' && hashByte > 7 {
+			result[i] -= 32
+		}
+	}
+	return "0x" + string(result)
 }
 
 func AddField(key string, value interface{}) {
@@ -65,8 +98,8 @@ func Error(err error) {
 	root.Error(err)
 }
 
-func Fatal(msg string) {
-	root.Fatal(msg)
+func Fatal(err error) {
+	root.Fatal(err)
 }
 
 // Info is a convenient alias for Root().Info
@@ -78,9 +111,6 @@ func Progress(progress string) {
 	root.Progress(progress)
 }
 
-func Event(e string) {
-	root.Event(e)
-}
-func Fields(f map[string]interface{}) {
-	root.Fields(f)
+func Event(e string, f map[string]interface{}) {
+	root.Event(e, f)
 }

@@ -25,15 +25,4 @@ services:
      - NODEROLE=testNode
      - CHAINNODE=rinkebyPrivateNode
      - BOOTSTRAPIP=bootstrap:44460
-     - QUERYTIMES=2
-     - QUERYTYPE=random
- urlnode:
-   image: usernode
-   deploy:
-     replicas: 1
-   environment:
-     - NODEROLE=testNode
-     - CHAINNODE=rinkebyPrivateNode
-     - BOOTSTRAPIP=bootstrap:44460
-     - QUERYTIMES=2
-     - QUERYTYPE=url
+     - QUERYTIMES=10

@@ -2,12 +2,12 @@ package eth
 
 import (
 	"fmt"
-	"log"
 	"math/big"
 	"sync"
 	"time"
 
 	"github.com/DOSNetwork/core/configuration"
+	"github.com/DOSNetwork/core/log"
 	"github.com/DOSNetwork/core/onchain"
 	"github.com/DOSNetwork/core/testing/dosUser/contract"
 
@@ -35,10 +35,11 @@ type EthUserAdaptor struct {
 	lock      *sync.Mutex
 	logFilter *sync.Map
 	address   string
+	logger    log.Logger
 }
 
-func (e *EthUserAdaptor) Init(address string, config *configuration.ChainConfig) (err error) {
-	e.EthCommon.Init("./credential", config)
+func (e *EthUserAdaptor) Init(address string, config configuration.ChainConfig) (err error) {
+	e.EthCommon.Init(config)
 	e.logFilter = new(sync.Map)
 	go e.logMapTimeout()
 
@@ -46,6 +47,7 @@ func (e *EthUserAdaptor) Init(address string, config *configuration.ChainConfig)
 	fmt.Println("onChainConn initialization finished.")
 	e.lock = new(sync.Mutex)
 	e.dialToEth()
+	e.logger = log.New("module", "EthUser")
 	return
 }
 
@@ -62,6 +64,10 @@ func (e *EthUserAdaptor) dialToEth() (err error) {
 	}
 	e.lock.Unlock()
 	return
+}
+
+func (e *EthUserAdaptor) GetId() (id []byte) {
+	return e.GetAddress().Bytes()
 }
 
 func (e *EthUserAdaptor) SubscribeEvent(ch chan interface{}, subscribeType int) (err error) {
@@ -130,13 +136,20 @@ func (e *EthUserAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.Wa
 			case err := <-sub.Err():
 				log.Fatal(err)
 			case i := <-transitChan:
-				if !i.Raw.Removed {
-					ch <- &AskMeAnythingQueryResponseReady{
-						QueryId: i.QueryId,
-						Result:  i.Result,
-						Tx:      i.Raw.TxHash.Hex(),
-						BlockN:  i.Raw.BlockNumber,
-					}
+				f := map[string]interface{}{
+					"RequestId": fmt.Sprintf("%x", i.QueryId),
+					"Message":   i.Result,
+					"Removed":   i.Raw.Removed,
+					"Tx":        i.Raw.TxHash.Hex(),
+					"BlockN":    i.Raw.BlockNumber,
+					"Time":      time.Now()}
+				e.logger.Event("EthUserQueryReady", f)
+				ch <- &AskMeAnythingQueryResponseReady{
+					QueryId: i.QueryId,
+					Result:  i.Result,
+					Tx:      i.Raw.TxHash.Hex(),
+					BlockN:  i.Raw.BlockNumber,
+					Removed: i.Raw.Removed,
 				}
 			}
 		}
@@ -157,14 +170,22 @@ func (e *EthUserAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.Wa
 			case err := <-sub.Err():
 				log.Fatal(err)
 			case i := <-transitChan:
-				if !i.Raw.Removed {
-					ch <- &AskMeAnythingRequestSent{
-						InternalSerial: i.InternalSerial,
-						Succ:           i.Succ,
-						RequestId:      i.RequestId,
-						Tx:             i.Raw.TxHash.Hex(),
-						BlockN:         i.Raw.BlockNumber,
-					}
+				f := map[string]interface{}{
+					"Event":     "EthUserRequestSent",
+					"RequestId": fmt.Sprintf("%x", i.RequestId),
+					"Succ":      i.Succ,
+					"Removed":   i.Raw.Removed,
+					"Tx":        i.Raw.TxHash.Hex(),
+					"BlockN":    i.Raw.BlockNumber,
+					"Time":      time.Now()}
+				e.logger.Event("EthUserRequestSent", f)
+				ch <- &AskMeAnythingRequestSent{
+					InternalSerial: i.InternalSerial,
+					Succ:           i.Succ,
+					RequestId:      i.RequestId,
+					Tx:             i.Raw.TxHash.Hex(),
+					BlockN:         i.Raw.BlockNumber,
+					Removed:        i.Raw.Removed,
 				}
 			}
 		}
@@ -185,13 +206,20 @@ func (e *EthUserAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.Wa
 			case err := <-sub.Err():
 				log.Fatal(err)
 			case i := <-transitChan:
-				if !i.Raw.Removed {
-					ch <- &AskMeAnythingRandomReady{
-						GeneratedRandom: i.GeneratedRandom,
-						RequestId:       i.RequestId,
-						Tx:              i.Raw.TxHash.Hex(),
-						BlockN:          i.Raw.BlockNumber,
-					}
+				f := map[string]interface{}{
+					"RequestId":       fmt.Sprintf("%x", i.RequestId),
+					"GeneratedRandom": fmt.Sprintf("%x", i.GeneratedRandom),
+					"Removed":         i.Raw.Removed,
+					"Tx":              i.Raw.TxHash.Hex(),
+					"BlockN":          i.Raw.BlockNumber,
+					"Time":            time.Now()}
+				e.logger.Event("EthUserRandomReady", f)
+				ch <- &AskMeAnythingRandomReady{
+					GeneratedRandom: i.GeneratedRandom,
+					RequestId:       i.RequestId,
+					Tx:              i.Raw.TxHash.Hex(),
+					BlockN:          i.Raw.BlockNumber,
+					Removed:         i.Raw.Removed,
 				}
 			}
 		}

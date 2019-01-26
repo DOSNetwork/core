@@ -134,10 +134,10 @@ func (n *P2P) Listen() (err error) {
 					return
 				}
 				if r == 0 {
-					n.logger.Event("AcceptLongConn")
+					n.logger.Event("AcceptLongConn", nil)
 					peer, _ = n.peers.LoadOrStore(string(peer.identity.Id), peer)
 				} else {
-					n.logger.Event("AcceptShortConn")
+					n.logger.Event("AcceptShortConn", nil)
 				}
 				n.routingTable.Update(peer.identity)
 			}()
@@ -279,9 +279,9 @@ func (n *P2P) ConnectTo(addr string) (id []byte, err error) {
 
 func (n *P2P) connectTo(addr string, longConn bool) (peer *PeerConn, err error) {
 	if longConn {
-		n.logger.Event("ConnectToLong")
+		n.logger.Event("ConnectToLong", nil)
 	} else {
-		n.logger.Event("ConnectToShort")
+		n.logger.Event("ConnectToShort", nil)
 	}
 	var conn net.Conn
 

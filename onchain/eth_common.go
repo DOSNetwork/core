@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/DOSNetwork/core/configuration"
+	"github.com/DOSNetwork/core/log"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -22,7 +23,7 @@ import (
 
 const (
 	GASLIMIT            = 3000000
-	REPLENISHTHRESHOLD  = 0.7
+	REPLENISHTHRESHOLD  = 1.0
 	REPLENISHAMOUNT     = 800000000000000000 //0.8 Eth
 	STOPSUBMITTHRESHOLD = 0.1
 )
@@ -32,7 +33,8 @@ type EthCommon struct {
 	Client *ethclient.Client
 	lock   *sync.Mutex
 	//ethNonce uint64
-	config *configuration.ChainConfig
+	config configuration.ChainConfig
+	logger log.Logger
 }
 
 func (e *EthCommon) DialToEth() (err error) {
@@ -46,28 +48,24 @@ func (e *EthCommon) DialToEth() (err error) {
 	return
 }
 
-func (e *EthCommon) Init(credentialPath string, config *configuration.ChainConfig) (err error) {
+func (e *EthCommon) Init(config configuration.ChainConfig) (err error) {
 	e.config = config
 	e.lock = new(sync.Mutex)
-
+	e.logger = log.New("module", "EthCommon")
 	fmt.Println("start initial onChainConn...", config.DOSProxyAddress)
 
 	if err = e.DialToEth(); err != nil {
-		//log.WithField("function", "dialToEth").Warn(err)
 		fmt.Println("dialToEth err ", err)
-	}
-	if err = e.setAccount(credentialPath); err != nil {
-		//log.WithField("function", "setAccount").Warn(err)
-		fmt.Println("setAccount err ", err)
 	}
 	return
 }
 
-func (e *EthCommon) setAccount(credentialPath string) (err error) {
+func (e *EthCommon) SetAccount(credentialPath string) (err error) {
 	fmt.Println("credentialPath: ", credentialPath)
 
 	passPhraseBytes, err := ioutil.ReadFile(credentialPath + "/passPhrase")
 	if err != nil {
+		fmt.Println(err)
 		return
 	}
 
@@ -77,6 +75,7 @@ func (e *EthCommon) setAccount(credentialPath string) (err error) {
 	if len(newKeyStore.Accounts()) < 1 {
 		_, err = newKeyStore.NewAccount(passPhrase)
 		if err != nil {
+			fmt.Println(err)
 			return
 		}
 	}
@@ -84,21 +83,17 @@ func (e *EthCommon) setAccount(credentialPath string) (err error) {
 	usrKeyPath := newKeyStore.Accounts()[0].URL.Path
 	usrKeyJson, err := ioutil.ReadFile(usrKeyPath)
 	if err != nil {
+		fmt.Println(err)
 		return
 	}
 
 	usrKey, err := keystore.DecryptKey(usrKeyJson, passPhrase)
 	if err != nil {
+		fmt.Println(err)
 		return
 	}
 
 	e.key = usrKey
-	//e.ethNonce, err = e.Client.PendingNonceAt(context.Background(), e.key.Address)
-	//if err != nil {
-	//	return
-	//}
-	////for correctness of the first call of GetAuth, because GetAuth always ++,
-	//e.ethNonce--
 
 	return
 }
@@ -108,21 +103,6 @@ func (e *EthCommon) GetAuth() (auth *bind.TransactOpts, err error) {
 	if err != nil {
 		return
 	}
-
-	//e.lock.Lock()
-	//e.ethNonce++
-	//automatedNonce, err := e.Client.PendingNonceAt(context.Background(), e.key.Address)
-	//if err != nil {
-	//	return
-	//}
-	//
-	//if automatedNonce > e.ethNonce {
-	//	e.ethNonce = automatedNonce
-	//}
-	//
-	//auth.Nonce = big.NewInt(int64(e.ethNonce))
-	//fmt.Println(e.ethNonce)
-	//e.lock.Unlock()
 
 	auth.GasLimit = uint64(GASLIMIT)
 	return
@@ -187,7 +167,7 @@ func (e *EthCommon) balanceMaintain(usrKey, rootKey *keystore.Key) (err error) {
 func (e *EthCommon) EnoughBalance(address common.Address) (isEnough bool) {
 	balance, err := e.getBalance(&keystore.Key{Address: address})
 	if err != nil {
-		log.Warn(err)
+		log.Error(err)
 		return
 	}
 

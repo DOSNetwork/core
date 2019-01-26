@@ -179,6 +179,12 @@ func (c *OnChainConfig) LoadConfig() (err error) {
 		}
 	}
 	c.path = workingDir + "/onChain.json"
+	err = LoadConfig(c.path, c)
+	if err != nil {
+		fmt.Println("read config err ", err)
+		return
+	}
+
 	chainType := os.Getenv(ENVCHAINTYPE)
 	if chainType == "" {
 		fmt.Println("No CHAINTYPE Environment variable.")
@@ -194,17 +200,13 @@ func (c *OnChainConfig) LoadConfig() (err error) {
 	c.currentNode = chainNode
 
 	credentialPath := os.Getenv(ENVCREDENTIALPATH)
-	if chainNode == "" {
+	if credentialPath == "" {
 		fmt.Println("No ENVCREDENTIALPATH Environment variable.")
-		credentialPath = "."
+		credentialPath = "./credential"
 	}
 	c.CredentialPath = credentialPath
+	fmt.Println("c.CredentialPath ", c.CredentialPath, " ", credentialPath)
 
-	err = LoadConfig(c.path, c)
-	if err != nil {
-		fmt.Println("read config err ", err)
-		return
-	}
 	return
 }
 

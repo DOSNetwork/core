@@ -10,8 +10,8 @@ import (
 	"github.com/DOSNetwork/core/p2p/dht"
 
 	"github.com/DOSNetwork/core/p2p/internal"
+	"github.com/DOSNetwork/core/log"
 
-	"github.com/sirupsen/logrus"
 )
 
 func TestPeerConnEnd(t *testing.T) {
@@ -51,7 +51,7 @@ func TestPeerConnEnd(t *testing.T) {
 		t.Error("Test Failed: ")
 	}
 
-	aPeerConn, err := aP2P.connectTo("localhost:" + strconv.Itoa(bPoer))
+	aPeerConn, err := aP2P.connectTo("localhost:" + strconv.Itoa(bPoer),true)
 	timeout := false
 	wg.Add(1)
 	go func() {
@@ -101,7 +101,6 @@ func TestBootStrap(t *testing.T) {
 	peerid := []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 19}
 	bootPort := 44460
 	peerPort := 44459
-	log := logrus.New().WithField("subject", "TestBootStrap")
 
 	boot, err := CreateP2PNetwork(bootid[:], bootPort)
 	if err != nil {
@@ -157,7 +156,6 @@ func TestBootStrap(t *testing.T) {
 //test scenario:numOfNodes is dht.BucketSize ,so any of nodeID should existing in every routing table.
 func TestBootStrapWithMultipleNode(t *testing.T) {
 	numOfNodes := dht.BucketSize
-	log := logrus.New().WithField("subject", "TestBootStrapWithMultipleNode")
 	var ok bool
 	peerPort := 55550
 	peers := make([]*P2P, numOfNodes)

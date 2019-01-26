@@ -204,7 +204,7 @@ func (d *PeerNode) Init(bootStrapIp string, port, peerSize int, numMessages int,
 			}
 		}
 	}
-	log.AddField("nodeID", p2p.Hex(d.nodeID[:]))
+	log.Init(d.nodeID[:])
 
 	//2)Build a p2p network
 	d.p, _ = p2p.CreateP2PNetwork(d.nodeID[:], port)

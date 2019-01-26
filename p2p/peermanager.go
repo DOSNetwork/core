@@ -51,7 +51,7 @@ func (pm *PeerConnManager) FindLessUsedPeerConn() (pconn *PeerConn) {
 }
 
 func (pm *PeerConnManager) LoadOrStore(id string, peer *PeerConn) (actual *PeerConn, loaded bool) {
-	pm.logger.Event("LoadOrStore")
+	pm.logger.Event("LoadOrStore", nil)
 	pm.mu.Lock()
 	if actual, loaded = pm.peers[id]; loaded {
 		if peer.incomingConn == actual.incomingConn {
@@ -60,7 +60,7 @@ func (pm *PeerConnManager) LoadOrStore(id string, peer *PeerConn) (actual *PeerC
 			if actual.incomingConn == !dht.Less(peer.identity, peer.p2pnet.identity) {
 				peer.EndWithoutDelete()
 			} else {
-				pm.logger.Event("PMReplaceNewPeer")
+				pm.logger.Event("PMReplaceNewPeer", nil)
 				delete(pm.peers, id)
 				actual.EndWithoutDelete()
 				pm.peers[id] = peer
@@ -71,7 +71,7 @@ func (pm *PeerConnManager) LoadOrStore(id string, peer *PeerConn) (actual *PeerC
 		pm.mu.Unlock()
 		return
 	}
-	pm.logger.Event("PMInsertNewPeer")
+	pm.logger.Event("PMInsertNewPeer", nil)
 	actual = peer
 	loaded = false
 	pm.peers[id] = peer

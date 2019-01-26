@@ -1,7 +1,6 @@
 package p2p
 
 import (
-	"encoding/hex"
 	"errors"
 	"net"
 
@@ -10,7 +9,6 @@ import (
 	"github.com/dedis/kyber"
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes"
-	"golang.org/x/crypto/sha3"
 )
 
 var (
@@ -21,27 +19,6 @@ func genPair() (kyber.Scalar, kyber.Point) {
 	secret := suite.Scalar().Pick(suite.RandomStream())
 	public := suite.Point().Mul(secret, nil)
 	return secret, public
-}
-
-func Hex(a []byte) string {
-	unchecksummed := hex.EncodeToString(a[:])
-	sha := sha3.NewLegacyKeccak256()
-	sha.Write([]byte(unchecksummed))
-	hash := sha.Sum(nil)
-
-	result := []byte(unchecksummed)
-	for i := 0; i < len(result); i++ {
-		hashByte := hash[i/2]
-		if i%2 == 0 {
-			hashByte = hashByte >> 4
-		} else {
-			hashByte &= 0xf
-		}
-		if result[i] > '9' && hashByte > 7 {
-			result[i] -= 32
-		}
-	}
-	return "0x" + string(result)
 }
 
 func CreateP2PNetwork(id []byte, port int) (P2PInterface, error) {

@@ -16,6 +16,7 @@ type AskMeAnythingQueryResponseReady struct {
 	Result  string
 	Tx      string
 	BlockN  uint64
+	Removed bool
 }
 
 type AskMeAnythingRequestSent struct {
@@ -24,6 +25,7 @@ type AskMeAnythingRequestSent struct {
 	RequestId      *big.Int
 	Tx             string
 	BlockN         uint64
+	Removed        bool
 }
 
 type AskMeAnythingRandomReady struct {
@@ -31,4 +33,5 @@ type AskMeAnythingRandomReady struct {
 	GeneratedRandom *big.Int
 	Tx              string
 	BlockN          uint64
+	Removed         bool
 }

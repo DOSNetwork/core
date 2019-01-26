@@ -86,7 +86,7 @@ func NewPeerConn(p2pnet *P2P, conn *net.Conn, rxMessage chan P2PMessage, incomin
 
 	go peer.heartBeat()
 
-	p2pnet.logger.Event("NewPeerConn")
+	p2pnet.logger.Event("NewPeerConn", nil)
 	return
 }
 
@@ -123,7 +123,7 @@ func (p *PeerConn) receiveLoop() {
 			if err != io.EOF {
 				p.logger.Error(err)
 			} else {
-				p.logger.Event("EndEof")
+				p.logger.Event("EndEof", nil)
 			}
 			break
 		}
@@ -199,7 +199,7 @@ func (p *PeerConn) receiveLoop() {
 	}
 	close(p.waitForHi)
 	close(p.waitForLookup)
-	p.logger.Event("EndConn")
+	p.logger.Event("EndConn", nil)
 }
 
 func (p *PeerConn) End() {
@@ -211,7 +211,7 @@ func (p *PeerConn) End() {
 	}
 	p.cancel()
 	p.p2pnet.peers.DeletePeer(string(p.identity.Id))
-	p.logger.Event("End")
+	p.logger.Event("End", nil)
 }
 
 func (p *PeerConn) EndWithoutDelete() {
@@ -222,7 +222,7 @@ func (p *PeerConn) EndWithoutDelete() {
 		p.logger.Error(err)
 	}
 	p.cancel()
-	p.logger.Event("EndWithoutDelete")
+	p.logger.Event("EndWithoutDelete", nil)
 }
 
 func (p *PeerConn) receivePackage() ([]byte, error) {

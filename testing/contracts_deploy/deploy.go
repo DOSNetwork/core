@@ -169,7 +169,7 @@ func main() {
 	configPath := *configPathPtr
 
 	os.Setenv("CONFIGPATH", "..")
-
+	os.Setenv("CREDENTIALPATH", credentialPath)
 	//Get
 	onChainConfig := configuration.OnChainConfig{}
 	onChainConfig.LoadConfig()
@@ -178,7 +178,9 @@ func main() {
 
 	//Dial to blockchain
 	conn := &onchain.EthCommon{}
-	_ = conn.Init(credentialPath, &chainConfig)
+	conn.SetAccount(onChainConfig.CredentialPath)
+
+	_ = conn.Init(chainConfig)
 
 	if contract == "DOSProxy" {
 		chainConfig.DOSProxyAddress = deployContract(conn, DOSProxy)

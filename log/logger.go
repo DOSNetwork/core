@@ -41,11 +41,10 @@ type Logger interface {
 	Info(msg string)
 	Warn(msg string)
 	Error(err error)
-	Fatal(msg string)
+	Fatal(err error)
 	Metrics(value interface{})
 	Progress(progress string)
-	Event(e string)
-	Fields(f map[string]interface{})
+	Event(e string, f map[string]interface{})
 }
 
 type logger struct {
@@ -53,36 +52,60 @@ type logger struct {
 }
 
 func (l *logger) New(key string, value interface{}) Logger {
-	return &logger{l.entry.WithFields(logrus.Fields{key: value})}
+	if l.entry != nil {
+		return &logger{l.entry.WithFields(logrus.Fields{key: value})}
+	} else {
+		return nil
+	}
 }
 
 func (l *logger) AddField(key string, value interface{}) {
+	if l.entry == nil {
+		return
+	}
 	l.entry = l.entry.WithFields(logrus.Fields{key: value})
 }
 
 func (l *logger) Debug(msg string) {
+	if l.entry == nil {
+		return
+	}
 	l.entry.Debug(msg)
 }
 
 func (l *logger) Info(msg string) {
+	if l.entry == nil {
+		return
+	}
 	l.entry.Info(msg)
 }
 
 func (l *logger) Warn(msg string) {
+	if l.entry == nil {
+		return
+	}
 	l.entry.Warn(msg)
 }
 
 func (l *logger) Error(err error) {
+	if l.entry == nil {
+		return
+	}
 	s := stack.Trace().TrimRuntime()
 	l.entry.WithFields(logrus.Fields{"stack": s}).Error(err)
 }
 
-func (l *logger) Fatal(msg string) {
-	l.entry.Fatal(msg)
+func (l *logger) Fatal(err error) {
+	if l.entry == nil {
+		return
+	}
+	l.entry.Fatal(err)
 }
 
 func (l *logger) Metrics(value interface{}) {
-
+	if l.entry == nil {
+		return
+	}
 	fpcs := make([]uintptr, 1)
 	// Skip 2 levels to get the caller
 	n := runtime.Callers(2, fpcs)
@@ -96,24 +119,33 @@ func (l *logger) Metrics(value interface{}) {
 }
 
 func (l *logger) Progress(progress string) {
+	if l.entry == nil {
+		return
+	}
 	l.entry.WithFields(logrus.Fields{"Progress": progress}).Debug("")
 }
 
-func (l *logger) Event(e string) {
+func (l *logger) Event(e string, info map[string]interface{}) {
+	if l.entry == nil {
+		return
+	}
+	var caller string
+
 	fpcs := make([]uintptr, 1)
 	// Skip 3 levels to get the caller
 	n := runtime.Callers(3, fpcs)
 	if n == 0 {
+		caller = ""
 		l.entry.WithFields(logrus.Fields{"EVENT": e}).Info("")
 	} else {
-		caller := runtime.FuncForPC(fpcs[0] - 1)
-		s := strings.Split(caller.Name(), ".")
-		l.entry.WithFields(logrus.Fields{"EVENT": e + s[len(s)-1]}).Debug("")
+		c := runtime.FuncForPC(fpcs[0] - 1)
+		s := strings.Split(c.Name(), ".")
+		caller = s[len(s)-1] + "_"
 	}
-}
+	if info != nil {
+		l.entry.WithFields(logrus.Fields{"EVENT": caller + e}).WithFields(info).Debug("")
+	} else {
+		l.entry.WithFields(logrus.Fields{"EVENT": caller + e}).Debug("")
 
-func (l *logger) Fields(f map[string]interface{}) {
-	var a logrus.Fields
-	a = f
-	l.entry.WithFields(a).Debug("")
+	}
 }
