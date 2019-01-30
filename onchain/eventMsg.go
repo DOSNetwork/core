@@ -64,14 +64,19 @@ type DOSProxyLogValidationResult struct {
 type DOSProxyLogInsufficientGroupNumber struct{}
 
 type DOSProxyLogGrouping struct {
-	NodeId []*big.Int
+	NodeId []common.Address
+}
+
+type DOSProxyLogDuplicatePubKey struct {
+	PubKey [4]*big.Int
+}
+
+type DOSProxyLogAddressNotFound struct {
+	PubKey [4]*big.Int
 }
 
 type DOSProxyLogPublicKeyAccepted struct {
-	X1 *big.Int
-	X2 *big.Int
-	Y1 *big.Int
-	Y2 *big.Int
+	PubKey [4]*big.Int
 }
 
 type DOSProxyWhitelistAddressTransferred struct {

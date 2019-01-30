@@ -15,8 +15,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
-
-	"github.com/dedis/kyber"
 )
 
 const (
@@ -30,6 +28,8 @@ const (
 	SubscribeDOSProxyLogValidationResult
 	SubscribeDOSProxyLogInsufficientGroupNumber
 	SubscribeDOSProxyLogGrouping
+	SubscribeDOSProxyLogDuplicatePubKey
+	SubscribeDOSProxyLogAddressNotFound
 	SubscribeDOSProxyLogPublicKeyAccepted
 	SubscribeDOSProxyWhitelistAddressTransferred
 )
@@ -441,6 +441,54 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 				}
 			}
 		}
+	case SubscribeDOSProxyLogDuplicatePubKey:
+		fmt.Println("subscribing DOSProxyLogDuplicatePubKey event...")
+		transitChan := make(chan *dosproxy.DOSProxyLogDuplicatePubKey)
+		sub, err := e.proxy.DOSProxyFilterer.WatchLogDuplicatePubKey(opt, transitChan)
+		if err != nil {
+			//log.WithField("function", "WatchLogDuplicatePubKey").Warn(err)
+			fmt.Println("Network fail, will retry shortly")
+			return
+		}
+		fmt.Println("DOSProxyLogDuplicatePubKey event subscribed")
+
+		done <- true
+		for {
+			select {
+			case err := <-sub.Err():
+				log.Fatal(err)
+			case i := <-transitChan:
+				if !e.filterLog(i.Raw) {
+					ch <- &DOSProxyLogDuplicatePubKey{
+						PubKey: i.PubKey,
+					}
+				}
+			}
+		}
+	case SubscribeDOSProxyLogAddressNotFound:
+		fmt.Println("subscribing DOSProxyLogAddressNotFound event...")
+		transitChan := make(chan *dosproxy.DOSProxyLogAddressNotFound)
+		sub, err := e.proxy.DOSProxyFilterer.WatchLogAddressNotFound(opt, transitChan)
+		if err != nil {
+			//log.WithField("function", "WatchLogAddressNotFound").Warn(err)
+			fmt.Println("Network fail, will retry shortly")
+			return
+		}
+		fmt.Println("DOSProxyLogAddressNotFound event subscribed")
+
+		done <- true
+		for {
+			select {
+			case err := <-sub.Err():
+				log.Fatal(err)
+			case i := <-transitChan:
+				if !e.filterLog(i.Raw) {
+					ch <- &DOSProxyLogAddressNotFound{
+						PubKey: i.PubKey,
+					}
+				}
+			}
+		}
 	case SubscribeDOSProxyLogPublicKeyAccepted:
 		fmt.Println("subscribing DOSProxyLogPublicKeyAccepted event...")
 		transitChan := make(chan *dosproxy.DOSProxyLogPublicKeyAccepted)
@@ -460,10 +508,7 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 			case i := <-transitChan:
 				if !e.filterLog(i.Raw) {
 					ch <- &DOSProxyLogPublicKeyAccepted{
-						X1: i.X1,
-						X2: i.X2,
-						Y1: i.Y1,
-						Y2: i.Y2,
+						PubKey: i.PubKey,
 					}
 				}
 			}
@@ -561,12 +606,12 @@ func (e *EthAdaptor) Grouping(size int) (err error) {
 		return
 	}
 
-	tx, err := e.proxy.Grouping(auth, big.NewInt(int64(size)))
+	tx, err := e.proxy.Grouping(auth, nil, big.NewInt(int64(size)))
 	for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
 		//log.WithField("function", "grouping").Warn(err)
 		time.Sleep(time.Second)
 		fmt.Println("transaction retry...")
-		tx, err = e.proxy.Grouping(auth, big.NewInt(int64(size)))
+		tx, err = e.proxy.Grouping(auth, nil, big.NewInt(int64(size)))
 	}
 	if err != nil {
 		return
@@ -589,12 +634,12 @@ func (e *EthAdaptor) UploadID() (err error) {
 		return
 	}
 
-	tx, err := e.proxy.UploadNodeId(auth, new(big.Int).SetBytes(e.GetId()))
+	tx, err := e.proxy.UploadNodeId(auth)
 	for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
 		//log.WithField("function", "uploadNodeId").Warn(err)
 		time.Sleep(time.Second)
 		fmt.Println("transaction retry...")
-		tx, err = e.proxy.UploadNodeId(auth, new(big.Int).SetBytes(e.GetId()))
+		tx, err = e.proxy.UploadNodeId(auth)
 	}
 	if err != nil {
 		fmt.Println("UploadNodeId error", err)
@@ -653,34 +698,29 @@ func (e *EthAdaptor) SetRandomNum(sig []byte, version uint8) (err error) {
 	return
 }
 
-func (e *EthAdaptor) UploadPubKey(pubKey kyber.Point) (err error) {
+func (e *EthAdaptor) UploadPubKey(pubKeyCoor [4]*big.Int) (err error) {
 	fmt.Println("Starting submitting group public key...")
 	auth, err := e.GetAuth()
 	if err != nil {
 		return
 	}
 
-	x0, x1, y0, y1, err := DecodePubKey(pubKey)
-	if err != nil {
-		return
-	}
-
-	tx, err := e.proxy.SetPublicKey(auth, x0, x1, y0, y1)
+	tx, err := e.proxy.SetPublicKey(auth, pubKeyCoor)
 	for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
 		//log.WithField("function", "setPublicKey").Warn(err)
 		time.Sleep(time.Second)
 		fmt.Println("transaction retry...")
-		tx, err = e.proxy.SetPublicKey(auth, x0, x1, y0, y1)
+		tx, err = e.proxy.SetPublicKey(auth, pubKeyCoor)
 	}
 	if err != nil {
 		return
 	}
 
 	fmt.Println("tx sent: ", tx.Hash().Hex())
-	fmt.Println("x0: ", x0)
-	fmt.Println("x1: ", x1)
-	fmt.Println("y0: ", y0)
-	fmt.Println("y1: ", y1)
+	fmt.Println("x0: ", pubKeyCoor[0])
+	fmt.Println("x1: ", pubKeyCoor[1])
+	fmt.Println("y0: ", pubKeyCoor[2])
+	fmt.Println("y1: ", pubKeyCoor[3])
 	fmt.Println("Group public key submitted")
 
 	//err = e.CheckTransaction(tx)
@@ -730,23 +770,6 @@ func (e *EthAdaptor) RandomNumberTimeOut() (err error) {
 
 	//err = e.CheckTransaction(tx)
 	return
-}
-
-func DecodePubKey(pubKey kyber.Point) (*big.Int, *big.Int, *big.Int, *big.Int, error) {
-	pubKeyMar, err := pubKey.MarshalBinary()
-	if err != nil {
-		return nil, nil, nil, nil, err
-	}
-
-	x0 := new(big.Int)
-	x1 := new(big.Int)
-	y0 := new(big.Int)
-	y1 := new(big.Int)
-	x0.SetBytes(pubKeyMar[1:33])
-	x1.SetBytes(pubKeyMar[33:65])
-	y0.SetBytes(pubKeyMar[65:97])
-	y1.SetBytes(pubKeyMar[97:])
-	return x0, x1, y0, y1, nil
 }
 
 func (e *EthAdaptor) DataReturn(requestId *big.Int, trafficType uint8, data, sig []byte, version uint8) (err error) {

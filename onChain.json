@@ -16,7 +16,7 @@
         },
         {
             "RemoteNodeType": "privateNode",
-            "RemoteNodeAddress": "ws://13.52.16.14:8546",
+            "RemoteNodeAddress": "ws://163.172.36.173:8546",
             "ChainType": "ETH",
             "DOSProxyAddress": "0x0AF3Bc78e6F53AFe23D95Eb95e6D6Ef7CeD00798",
             "DOSAddressBridgeAddress": "0x0c2A0f910683cE36fe7Ff097866fE398c4Ef359e"

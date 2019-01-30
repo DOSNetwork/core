@@ -6,8 +6,6 @@ import (
 
 	"github.com/DOSNetwork/core/configuration"
 
-	"github.com/dedis/kyber"
-
 	"github.com/ethereum/go-ethereum/common"
 )
 
@@ -22,7 +20,7 @@ type ChainInterface interface {
 	InitialWhiteList() (err error)
 	GetWhitelist() (address common.Address, err error)
 	UploadID() (err error)
-	UploadPubKey(pubKey kyber.Point) (err error)
+	UploadPubKey(pubKey [4]*big.Int) (err error)
 	GetId() (id []byte)
 	GetBlockHashByNumber(blknum *big.Int) (hash common.Hash, err error)
 	SetRandomNum(sig []byte, version uint8) (err error)

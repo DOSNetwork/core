@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"math/big"
 	"os"
@@ -180,7 +181,7 @@ func main() {
 					if bytes.Compare(p.GetID(), id) == 0 {
 						start := uint32(idx) / groupSize * groupSize
 						group = ids[start : start+groupSize]
-						dkgEvent, errc := p2pdkg.Start(&dkg.DkgSession{SessionId: "0", GroupIds: group})
+						dkgEvent, errc := p2pdkg.Start(context.Background(), group)
 						go func() {
 							for err := range errc {
 								logger.WithFields(logrus.Fields{
@@ -189,7 +190,7 @@ func main() {
 							}
 						}()
 						go func() {
-							if <-dkgEvent == true {
+							if <-dkgEvent != nil {
 								if err = p.SendMessage(bootstrapId, &peerTalk.Done{Id: p.GetID()}); err != nil {
 									logger.WithField("event", "allDone").Error(err)
 								} else {
