@@ -2,6 +2,7 @@ package dosnode
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -65,11 +66,12 @@ type DosNode struct {
 }
 
 type Report struct {
-	submitter  []byte
-	signShares [][]byte
-	signGroup  []byte
-	selfSign   vss.Signature
-	timeStamp  time.Time
+	dispatchedGroup [4]*big.Int
+	submitter       []byte
+	signShares      [][]byte
+	signGroup       []byte
+	selfSign        vss.Signature
+	timeStamp       time.Time
 	//For retrigger
 	backupTask interface{}
 }
@@ -160,27 +162,7 @@ func dataParse(rawMsg []byte, pathStr string) (msg []byte, err error) {
 }
 
 func (d *DosNode) isMember(dispatchedGroup [4]*big.Int) bool {
-	if d.p2pDkg.IsCertified() {
-		temp := append(padOrTrim(dispatchedGroup[2].Bytes(), UINT256SIZE), padOrTrim(dispatchedGroup[3].Bytes(), UINT256SIZE)...)
-		temp = append(padOrTrim(dispatchedGroup[1].Bytes(), UINT256SIZE), temp...)
-		temp = append(padOrTrim(dispatchedGroup[0].Bytes(), UINT256SIZE), temp...)
-		temp = append([]byte{0x01}, temp...)
-
-		groupPub, err := d.p2pDkg.GetGroupPublicPoly().Commit().MarshalBinary()
-		if err != nil {
-			return false
-		}
-
-		fmt.Println(groupPub)
-		fmt.Println(temp)
-
-		if r := bytes.Compare(groupPub, temp); r == 0 {
-			fmt.Println("isMember TRUE")
-			return true
-		}
-	}
-	fmt.Println("isMember false, isCertified:", d.p2pDkg.IsCertified())
-	return false
+	return d.p2pDkg.GetShareSecurity(dispatchedGroup) != nil
 }
 
 func (d *DosNode) choseSubmitter(r *big.Int) (id []byte) {
@@ -213,15 +195,15 @@ func (d *DosNode) PipeGrouping(chGroup <-chan interface{}) {
 					var groupIds [][]byte
 					for i, node := range content.NodeId {
 						id := node.Bytes()
-						if string(id) == string((*d.network).GetID()) {
+						if bytes.Compare(id, d.chainConn.GetId()) == 0 {
 							isMember = true
 						}
 						fmt.Println("DOSProxyLogGrouping member i= ", i, " id ", id, " ", isMember)
 						groupIds = append(groupIds, id)
 					}
-					d.SetParticipants(groupIds)
 					if isMember {
-						dkgRes, errc := d.p2pDkg.Start(&dkg.DkgSession{SessionId: "0", GroupIds: groupIds})
+						d.SetParticipants(groupIds)
+						dkgRes, errc := d.p2pDkg.Start(context.Background(), groupIds)
 						go func() {
 							for err := range errc {
 								fmt.Println(err)
@@ -229,8 +211,8 @@ func (d *DosNode) PipeGrouping(chGroup <-chan interface{}) {
 						}()
 						select {
 						case certified := <-dkgRes:
-							if certified == true {
-								if err := d.chainConn.UploadPubKey(d.p2pDkg.GetGroupPublicPoly().Commit()); err != nil {
+							if certified != nil {
+								if err := d.chainConn.UploadPubKey(*certified); err != nil {
 								}
 							}
 						}
@@ -308,6 +290,7 @@ func (d *DosNode) PipeQueries(queries ...<-chan interface{}) <-chan Report {
 							Content: msgReturn,
 						}
 						report := &Report{}
+						report.dispatchedGroup = content.DispatchedGroup
 						report.selfSign = *sign
 						report.submitter = submitter
 						report.backupTask = *content
@@ -341,6 +324,7 @@ func (d *DosNode) PipeQueries(queries ...<-chan interface{}) <-chan Report {
 							Content: msgReturn,
 						}
 						report := &Report{}
+						report.dispatchedGroup = content.DispatchedGroup
 						report.selfSign = *sign
 						report.submitter = submitter
 						report.backupTask = *content
@@ -374,6 +358,7 @@ func (d *DosNode) PipeQueries(queries ...<-chan interface{}) <-chan Report {
 							Content: randomNum,
 						}
 						report := &Report{}
+						report.dispatchedGroup = content.DispatchedGroup
 						report.selfSign = *sign
 						report.submitter = submitter
 						out <- *report
@@ -414,7 +399,7 @@ func (d *DosNode) PipeSignAndBroadcast(reports <-chan Report) (<-chan Report, <-
 			case report := <-reports:
 				fmt.Println("2) PipeSignAndBroadcast")
 				sign := report.selfSign
-				sig, err := tbls.Sign(d.suite, d.p2pDkg.GetShareSecurity(), sign.Content)
+				sig, err := tbls.Sign(d.suite, d.p2pDkg.GetShareSecurity(report.dispatchedGroup), sign.Content)
 				if err != nil {
 					continue
 				}
@@ -484,7 +469,7 @@ func (d *DosNode) PipeRecoverAndVerify(cSignatureFromPeer chan p2p.P2PMessage, f
 					sigShares = report.signShares
 					if report.signGroup == nil && len(sigShares) >= d.nbThreshold {
 						fmt.Println("4) PipeRecoverAndVerify recover")
-						sig, err := tbls.Recover(d.suite, d.p2pDkg.GetGroupPublicPoly(), sign.Content, sigShares, d.nbThreshold, d.nbParticipants)
+						sig, err := tbls.Recover(d.suite, d.p2pDkg.GetGroupPublicPoly(report.dispatchedGroup), sign.Content, sigShares, d.nbThreshold, d.nbParticipants)
 						if err != nil {
 							fmt.Println("recover failed!!!!!!!!!!!!!!!!! report Content ", report.selfSign.Content, string(report.selfSign.Content))
 							fmt.Println("recover failed!!!!!!!!!!!!!!!!! len(sigShares) = ", len(sigShares), " Content ", sign.Content, string(sign.Content))
@@ -492,7 +477,7 @@ func (d *DosNode) PipeRecoverAndVerify(cSignatureFromPeer chan p2p.P2PMessage, f
 							continue
 						}
 
-						if err = bls.Verify(d.suite, d.p2pDkg.GetGroupPublicPoly().Commit(), sign.Content, sig); err != nil {
+						if err = bls.Verify(d.suite, d.p2pDkg.GetGroupPublicPoly(report.dispatchedGroup).Commit(), sign.Content, sig); err != nil {
 							fmt.Println("Verify failed!!!!!!!!!!!!!!!!!")
 							continue
 						}
@@ -652,8 +637,7 @@ func (d *DosNode) PipeCleanFinishMap(chValidation chan interface{}, request ...<
 							fmt.Println("DOSProxyLogValidationResult GroupKey ", content.PubKey)
 							fmt.Println("DOSProxyLogValidationResult Message ", content.Message)
 							fmt.Println("DOSProxyLogValidationResult Version ", content.Version)
-							x, y, z, t, _ := onchain.DecodePubKey(d.p2pDkg.GetGroupPublicPoly().Commit())
-							fmt.Println("GroupKey ", x.String(), y.String(), z.String(), t.String())
+							fmt.Println("GroupKey ", report.dispatchedGroup)
 							fmt.Println("Signature", report.selfSign.Signature)
 							fmt.Println("Content", report.selfSign.Content)
 
@@ -704,13 +688,11 @@ func (d *DosNode) PipeCleanFinishMap(chValidation chan interface{}, request ...<
 					fmt.Println("DOSProxyLogValidationResult type mismatch")
 				}
 			case <-ticker.C:
-				if d.p2pDkg.IsCertified() {
-					dur := time.Since(lastValidatedRandom)
-					if dur.Minutes() >= WATCHDOGTIMEOUT {
-						fmt.Println("WatchDog Random timeout.........")
-						if err := d.chainConn.RandomNumberTimeOut(); err != nil {
+				dur := time.Since(lastValidatedRandom)
+				if dur.Minutes() >= WATCHDOGTIMEOUT {
+					fmt.Println("WatchDog Random timeout.........")
+					if err := d.chainConn.RandomNumberTimeOut(); err != nil {
 
-						}
 					}
 				}
 				for queryId, report := range validateMap {

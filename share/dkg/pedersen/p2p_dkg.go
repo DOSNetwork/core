@@ -3,8 +3,10 @@ package dkg
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
+	"math/big"
 	"sort"
 	"sync"
 	"time"
@@ -24,25 +26,23 @@ const (
 )
 
 type P2PDkgInterface interface {
-	GetGroupPublicPoly() *share.PubPoly
-	GetShareSecurity() *share.PriShare
-	IsCertified() bool
-	Start(dkgSession *DkgSession) (chan bool, <-chan error)
+	GetGroupPublicPoly(pubKeyCoor [4]*big.Int) *share.PubPoly
+	GetShareSecurity(pubKeyCoor [4]*big.Int) *share.PriShare
+	Start(ctx context.Context, groupIds [][]byte) (chan *[4]*big.Int, <-chan error)
 }
 
 type P2PDkg struct {
-	groupId        []byte
-	suite          suites.Suite
-	groupCmd       chan *DkgSession
-	network        *p2p.P2PInterface
-	logger         log.Logger
-	currentSession *DkgSession
+	groupId     []byte
+	suite       suites.Suite
+	finSessions sync.Map
+	outputChan  chan packageToLoop
+	network     *p2p.P2PInterface
+	logger      log.Logger
 }
 
 type DkgSession struct {
 	SessionId      string
 	GroupIds       [][]byte
-	certified      bool
 	partSec        kyber.Scalar
 	partPub        kyber.Point
 	partDkg        *DistKeyGenerator
@@ -51,50 +51,78 @@ type DkgSession struct {
 	deals          []Deal
 	partDks        *DistKeyShare
 	groupPubPoly   *share.PubPoly
-	subscribeEvent chan bool
+	subscribeEvent chan *[4]*big.Int
 	ctx            context.Context
-	cancel         context.CancelFunc
 	errc           chan error
 	groupingStart  time.Time
 }
 
 func CreateP2PDkg(p p2p.P2PInterface, suite suites.Suite) (P2PDkgInterface, error) {
 	d := &P2PDkg{
-		groupId:  p.GetID(),
-		suite:    suite,
-		groupCmd: make(chan *DkgSession),
-		network:  &p,
-		logger:   log.New("module", "dkg"),
+		groupId:    p.GetID(),
+		suite:      suite,
+		outputChan: make(chan packageToLoop),
+		network:    &p,
+		logger:     log.New("module", "dkg"),
 	}
 	return d, d.eventLoop()
 }
 
-func (d *P2PDkg) Start(newSession *DkgSession) (chan bool, <-chan error) {
-	newSession.partSec = d.suite.Scalar().Pick(d.suite.RandomStream())
-	newSession.partPub = d.suite.Point().Mul(newSession.partSec, nil)
-	newSession.ctx, newSession.cancel = context.WithCancel(context.Background())
-	newSession.subscribeEvent = make(chan bool)
-	newSession.errc = make(chan error)
-	d.groupCmd <- newSession
+func (d *P2PDkg) Start(ctx context.Context, groupIds [][]byte) (chan *[4]*big.Int, <-chan error) {
+	var sessionIdBytes []byte
+	for _, groupId := range groupIds {
+		sessionIdBytes = append(sessionIdBytes, groupId...)
+	}
+	sessionIdhash := sha256.Sum256(sessionIdBytes)
+	partSec := d.suite.Scalar().Pick(d.suite.RandomStream())
+	newSession := &DkgSession{
+		SessionId:      new(big.Int).SetBytes(sessionIdhash[:]).String(),
+		GroupIds:       groupIds,
+		partSec:        partSec,
+		partPub:        d.suite.Point().Mul(partSec, nil),
+		subscribeEvent: make(chan *[4]*big.Int),
+		ctx:            ctx,
+		errc:           make(chan error),
+	}
+
+	go func() {
+		var errcList []<-chan error
+		outForDeal, pubKeyErrc := d.pipeExchangePubKey(newSession, d.outputChan)
+		errcList = append(errcList, pubKeyErrc)
+		outForResponse, genErrc := d.pipeNewDistKeyGenerator(outForDeal, d.outputChan)
+		errcList = append(errcList, genErrc)
+		RespErrc := d.pipeProcessDealAndResponses(outForResponse, d.outputChan)
+		errcList = append(errcList, RespErrc)
+		merge(newSession.errc, errcList...)
+		newSession.groupingStart = time.Now()
+	}()
+
 	return newSession.subscribeEvent, newSession.errc
 }
 
-func (d *P2PDkg) IsCertified() bool {
-	return d.currentSession.certified
-}
-
-func (d *P2PDkg) GetGroupPublicPoly() *share.PubPoly {
-	if d.currentSession.certified {
-		return d.currentSession.groupPubPoly
+func (d *P2PDkg) GetGroupPublicPoly(pubKeyCoor [4]*big.Int) *share.PubPoly {
+	if targetSession, loaded := d.finSessions.Load(hashPoint(pubKeyCoor)); loaded {
+		return targetSession.(*DkgSession).groupPubPoly
 	}
 	return nil
 }
 
-func (d *P2PDkg) GetShareSecurity() *share.PriShare {
-	if d.currentSession.certified {
-		return d.currentSession.partDks.Share
+func (d *P2PDkg) GetShareSecurity(pubKeyCoor [4]*big.Int) *share.PriShare {
+	if targetSession, loaded := d.finSessions.Load(hashPoint(pubKeyCoor)); loaded {
+		return targetSession.(*DkgSession).partDks.Share
 	}
 	return nil
+}
+
+type packageToLoop struct {
+	sessionId string
+	content   interface{}
+}
+
+type packageToPeer struct {
+	pubKey *vss.PublicKey
+	deals  map[string]*Deal
+	resps  *Responses
 }
 
 func (d *P2PDkg) eventLoop() (err error) {
@@ -102,66 +130,51 @@ func (d *P2PDkg) eventLoop() (err error) {
 	if err == nil {
 		go func() {
 			defer (*d.network).UnSubscribeEvent(ReqPublicKey{}, ReqDeal{}, ReqResponses{})
-			selfPubKey := vss.PublicKey{}
-			selfDeals := make(map[string]*Deal)
-			selfResps := Responses{}
-			pubKeyResult := make(chan vss.PublicKey)
-			dealResult := make(chan map[string]*Deal)
-			responseResult := make(chan Responses)
-			dkgResultChan := make(chan *DkgSession)
+			peerPackageMap := make(map[string]packageToPeer)
 			for {
 				select {
-				case newSession := <-d.groupCmd:
-					if d.currentSession != nil {
-						d.currentSession.cancel()
-						for range d.currentSession.errc {
-						}
-					}
-					selfPubKey = vss.PublicKey{}
-					selfDeals = make(map[string]*Deal)
-					selfResps = Responses{}
-					var errcList []<-chan error
-					outForDeal, pubKeyErrc := d.pipeExchangePubKey(newSession, pubKeyResult)
-					errcList = append(errcList, pubKeyErrc)
-					outForResponse, genErrc := d.pipeNewDistKeyGenerator(outForDeal, dealResult)
-					errcList = append(errcList, genErrc)
-					RespErrc := d.pipeProcessDealAndResponses(outForResponse, responseResult, dkgResultChan)
-					errcList = append(errcList, RespErrc)
-					merge(newSession.errc, errcList...)
-					d.currentSession = newSession
-					newSession.groupingStart = time.Now()
 				case msg := <-peerEvent:
 					switch content := msg.Msg.Message.(type) {
 					case *ReqPublicKey:
-						if d.currentSession != nil && d.currentSession.SessionId == content.SessionId {
-							(*d.network).Reply(msg.Sender, msg.RequestNonce, &selfPubKey)
-						} else {
-							(*d.network).Reply(msg.Sender, msg.RequestNonce, &vss.PublicKey{})
-						}
+						(*d.network).Reply(msg.Sender, msg.RequestNonce, peerPackageMap[content.SessionId].pubKey)
 					case *ReqDeal:
-						if d.currentSession != nil && d.currentSession.SessionId == content.SessionId {
-							(*d.network).Reply(msg.Sender, msg.RequestNonce, selfDeals[string(msg.Sender)])
-						} else {
-							(*d.network).Reply(msg.Sender, msg.RequestNonce, &Deal{})
-						}
+						(*d.network).Reply(msg.Sender, msg.RequestNonce, peerPackageMap[content.SessionId].deals[string(msg.Sender)])
 					case *ReqResponses:
-						if d.currentSession != nil && d.currentSession.SessionId == content.SessionId {
-							(*d.network).Reply(msg.Sender, msg.RequestNonce, &selfResps)
-						} else {
-							(*d.network).Reply(msg.Sender, msg.RequestNonce, &Responses{})
-						}
+						(*d.network).Reply(msg.Sender, msg.RequestNonce, peerPackageMap[content.SessionId].resps)
 					default:
+						fmt.Println("unknown request type")
 					}
-				case finishedSession := <-dkgResultChan:
-					finishedSession.certified = true
-					timeCost := time.Since(finishedSession.groupingStart).Seconds()
-					fmt.Println("DistKeyShare SUCCESS ", timeCost)
-					if finishedSession.subscribeEvent != nil {
-						finishedSession.subscribeEvent <- finishedSession.certified
+				case msg := <-d.outputChan:
+					switch content := msg.content.(type) {
+					case *DkgSession:
+						pubKey := content.groupPubPoly.Commit()
+						pubKeyCoor, err := decodePubKey(pubKey)
+						if err != nil {
+							content.subscribeEvent <- nil
+							continue
+						}
+						if _, loaded := d.finSessions.LoadOrStore(hashPoint(pubKeyCoor), content); loaded {
+							content.subscribeEvent <- nil
+							continue
+						}
+						timeCost := time.Since(content.groupingStart).Seconds()
+						fmt.Println("DistKeyShare SUCCESS ", timeCost)
+						if content.subscribeEvent != nil {
+							content.subscribeEvent <- &pubKeyCoor
+						}
+					case vss.PublicKey:
+						peerPackageMap[msg.sessionId] = packageToPeer{pubKey: &content}
+					case map[string]*Deal:
+						pack, _ := peerPackageMap[msg.sessionId]
+						pack.deals = content
+						peerPackageMap[msg.sessionId] = pack
+					case Responses:
+						pack, _ := peerPackageMap[msg.sessionId]
+						pack.resps = &content
+						peerPackageMap[msg.sessionId] = pack
+					default:
+						fmt.Println("unknown output type")
 					}
-				case selfPubKey = <-pubKeyResult:
-				case selfDeals = <-dealResult:
-				case selfResps = <-responseResult:
 				}
 			}
 		}()
@@ -192,7 +205,29 @@ func merge(out chan error, cs ...<-chan error) <-chan error {
 	return out
 }
 
-func (d *P2PDkg) pipeExchangePubKey(newSession *DkgSession, outToEventloop chan<- vss.PublicKey) (<-chan *DkgSession, <-chan error) {
+func decodePubKey(pubKey kyber.Point) (pubKeyCoor [4]*big.Int, err error) {
+	pubKeyMar, err := pubKey.MarshalBinary()
+	if err != nil {
+		return
+	}
+
+	for i := 0; i < 4; i++ {
+		pubKeyCoor[i] = new(big.Int).SetBytes(pubKeyMar[32*i+1 : 32*i+33])
+	}
+
+	return
+}
+
+func hashPoint(pubKeyCoor [4]*big.Int) string {
+	var pointBytes []byte
+	for _, coor := range pubKeyCoor {
+		pointBytes = append(pointBytes, coor.Bytes()...)
+	}
+	pubKeyhash := sha256.Sum256(pointBytes)
+	return string(pubKeyhash[:])
+}
+
+func (d *P2PDkg) pipeExchangePubKey(newSession *DkgSession, outToEventloop chan<- packageToLoop) (<-chan *DkgSession, <-chan error) {
 	out := make(chan *DkgSession)
 	errc := make(chan error)
 
@@ -207,14 +242,13 @@ func (d *P2PDkg) pipeExchangePubKey(newSession *DkgSession, outToEventloop chan<
 			d.logger.Error(err)
 			select {
 			case errc <- err:
-				newSession.cancel()
 			case <-newSession.ctx.Done():
 			}
 			fmt.Println("pipeExchangePubKey closed")
 			return
 		}
 		select {
-		case outToEventloop <- public:
+		case outToEventloop <- packageToLoop{sessionId: newSession.SessionId, content: public}:
 		case <-newSession.ctx.Done():
 			fmt.Println("pipeExchangePubKey closed")
 			return
@@ -240,7 +274,6 @@ func (d *P2PDkg) pipeExchangePubKey(newSession *DkgSession, outToEventloop chan<
 					select {
 					case <-timer.C:
 						errc <- errors.New("pipeExchangePubKey request timeout")
-						newSession.cancel()
 						return
 					case <-newSession.ctx.Done():
 						fmt.Println("pipeExchangePubKey closed")
@@ -257,7 +290,6 @@ func (d *P2PDkg) pipeExchangePubKey(newSession *DkgSession, outToEventloop chan<
 							d.logger.Error(err)
 							select {
 							case errc <- err:
-								newSession.cancel()
 							case <-newSession.ctx.Done():
 							}
 							fmt.Println("pipeExchangePubKey closed")
@@ -283,7 +315,7 @@ func (d *P2PDkg) pipeExchangePubKey(newSession *DkgSession, outToEventloop chan<
 	return out, errc
 }
 
-func (d *P2PDkg) pipeNewDistKeyGenerator(dkgSession <-chan *DkgSession, outToEventloop chan<- map[string]*Deal) (<-chan *DkgSession, <-chan error) {
+func (d *P2PDkg) pipeNewDistKeyGenerator(dkgSession <-chan *DkgSession, outToEventloop chan<- packageToLoop) (<-chan *DkgSession, <-chan error) {
 	out := make(chan *DkgSession)
 	errc := make(chan error)
 
@@ -298,7 +330,6 @@ func (d *P2PDkg) pipeNewDistKeyGenerator(dkgSession <-chan *DkgSession, outToEve
 				d.logger.Error(err)
 				select {
 				case errc <- err:
-					newSession.cancel()
 				case <-newSession.ctx.Done():
 				}
 				fmt.Println("pipeNewDistKeyGenerator closed")
@@ -310,7 +341,6 @@ func (d *P2PDkg) pipeNewDistKeyGenerator(dkgSession <-chan *DkgSession, outToEve
 				d.logger.Error(err)
 				select {
 				case errc <- err:
-					newSession.cancel()
 				case <-newSession.ctx.Done():
 				}
 				fmt.Println("pipeNewDistKeyGenerator closed")
@@ -322,7 +352,7 @@ func (d *P2PDkg) pipeNewDistKeyGenerator(dkgSession <-chan *DkgSession, outToEve
 				idDealMap[newSession.pubkeyIdMap[pub.String()]] = idxDealMap[i]
 			}
 			select {
-			case outToEventloop <- idDealMap:
+			case outToEventloop <- packageToLoop{sessionId: newSession.SessionId, content: idDealMap}:
 			case <-newSession.ctx.Done():
 				fmt.Println("pipeExchangePubKey closed")
 				return
@@ -348,7 +378,6 @@ func (d *P2PDkg) pipeNewDistKeyGenerator(dkgSession <-chan *DkgSession, outToEve
 						select {
 						case <-timer.C:
 							errc <- errors.New("pipeNewDistKeyGenerator request timeout")
-							newSession.cancel()
 							return
 						case <-newSession.ctx.Done():
 							fmt.Println("pipeNewDistKeyGenerator closed")
@@ -380,7 +409,7 @@ func (d *P2PDkg) pipeNewDistKeyGenerator(dkgSession <-chan *DkgSession, outToEve
 	return out, errc
 }
 
-func (d *P2PDkg) pipeProcessDealAndResponses(dkgSession <-chan *DkgSession, RespsToEventloop chan<- Responses, finishToEventloop chan<- *DkgSession) <-chan error {
+func (d *P2PDkg) pipeProcessDealAndResponses(dkgSession <-chan *DkgSession, outToEventloop chan<- packageToLoop) <-chan error {
 	errc := make(chan error)
 
 	go func() {
@@ -393,7 +422,6 @@ func (d *P2PDkg) pipeProcessDealAndResponses(dkgSession <-chan *DkgSession, Resp
 					d.logger.Error(err)
 					select {
 					case errc <- err:
-						newSession.cancel()
 					case <-newSession.ctx.Done():
 					}
 					fmt.Println("pipeProcessDealAndResponses closed")
@@ -403,7 +431,7 @@ func (d *P2PDkg) pipeProcessDealAndResponses(dkgSession <-chan *DkgSession, Resp
 				}
 			}
 			select {
-			case RespsToEventloop <- Responses{Response: resps}:
+			case outToEventloop <- packageToLoop{sessionId: newSession.SessionId, content: Responses{Response: resps}}:
 			case <-newSession.ctx.Done():
 				fmt.Println("pipeExchangePubKey closed")
 				return
@@ -429,7 +457,6 @@ func (d *P2PDkg) pipeProcessDealAndResponses(dkgSession <-chan *DkgSession, Resp
 						select {
 						case <-timer.C:
 							errc <- errors.New("pipeProcessDealAndResponses request timeout")
-							newSession.cancel()
 							return
 						case <-newSession.ctx.Done():
 							fmt.Println("pipeProcessDealAndResponses closed")
@@ -446,7 +473,6 @@ func (d *P2PDkg) pipeProcessDealAndResponses(dkgSession <-chan *DkgSession, Resp
 									d.logger.Error(err)
 									select {
 									case errc <- err:
-										newSession.cancel()
 									case <-newSession.ctx.Done():
 									}
 									fmt.Println("pipeProcessDealAndResponses closed")
@@ -466,7 +492,6 @@ func (d *P2PDkg) pipeProcessDealAndResponses(dkgSession <-chan *DkgSession, Resp
 					d.logger.Error(err)
 					select {
 					case errc <- err:
-						newSession.cancel()
 					case <-newSession.ctx.Done():
 					}
 					fmt.Println("pipeProcessDealAndResponses closed")
@@ -474,13 +499,16 @@ func (d *P2PDkg) pipeProcessDealAndResponses(dkgSession <-chan *DkgSession, Resp
 				}
 				newSession.groupPubPoly = share.NewPubPoly(d.suite, d.suite.Point().Base(), newSession.partDks.Commitments())
 				select {
-				case finishToEventloop <- newSession:
+				case outToEventloop <- packageToLoop{content: newSession}:
 				case <-newSession.ctx.Done():
 					fmt.Println("pipeNewDistKeyGenerator closed")
 					return
 				}
 			} else {
-				newSession.cancel()
+				select {
+				case errc <- errors.New("partDkg not certified"):
+				case <-newSession.ctx.Done():
+				}
 				fmt.Println("pipeProcessDealAndResponses closed")
 				return
 			}

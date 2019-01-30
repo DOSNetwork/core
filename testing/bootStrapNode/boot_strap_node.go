@@ -47,7 +47,9 @@ func main() {
 	chainConfig := onChainConfig.GetChainConfig()
 
 	adaptor = &onchain.EthAdaptor{}
-	adaptor.SetAccount("testAccounts/bootCredential/fundKey")
+	if err = adaptor.SetAccount("testAccounts/bootCredential/fundKey"); err != nil {
+		log.Fatal(err)
+	}
 	log.Init(adaptor.GetId()[:])
 	if err = adaptor.Init(chainConfig); err != nil {
 		log.Fatal(err)

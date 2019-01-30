@@ -143,7 +143,9 @@ func main() {
 			break
 		}
 	}
-	userTestAdaptor.SetAccount(onChainConfig.CredentialPath)
+	if err = userTestAdaptor.SetAccount(onChainConfig.CredentialPath); err != nil {
+		log.Fatal(err)
+	}
 	log.Init(userTestAdaptor.GetId()[:])
 	err = userTestAdaptor.Init(config.AskMeAnythingAddress, chainConfig)
 	if err != nil {
