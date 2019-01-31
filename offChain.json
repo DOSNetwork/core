@@ -1,7 +1,5 @@
 {
     "NodeRole": "BootstrapNode",
     "BootStrapIp": "127.0.0.1",
-    "Port": 44460,
-    "RandomGroupSize": 3,
-    "QueryGroupSize": 3
+    "Port": 44460
 }
