@@ -26,7 +26,7 @@ const (
 )
 
 type AMAConfig struct {
-	AskMeAnythingAddress string
+	AskMeAnythingAddressPool []string
 }
 
 type EthUserAdaptor struct {

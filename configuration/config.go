@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"net/http"
 	"os"
 	"strconv"
@@ -11,15 +12,18 @@ import (
 	"time"
 )
 
-const ENVCHAINTYPE = "CHAINTYPE"
-const ENVCHAINNODE = "CHAINNODE"
-const ENVCONFIGPATH = "CONFIGPATH"
-const ENVNODEROLE = "NODEROLE"
-const ENVBOOTSTRAPIP = "BOOTSTRAPIP"
-const ENVNODEPORT = "NODEPORT"
-const CONFIGMODE = "TESTMODE"
-const ENVGROUPSIZE = "GROUPSIZE"
-const ENVCREDENTIALPATH = "CREDENTIALPATH"
+const (
+	ENVCHAINTYPE      = "CHAINTYPE"
+	ENVCHAINNODE      = "CHAINNODE"
+	ENVRANDOMCONNECT  = "RANDOMCONNECT"
+	ENVCONFIGPATH     = "CONFIGPATH"
+	ENVNODEROLE       = "NODEROLE"
+	ENVBOOTSTRAPIP    = "BOOTSTRAPIP"
+	ENVNODEPORT       = "NODEPORT"
+	CONFIGMODE        = "TESTMODE"
+	ENVGROUPSIZE      = "GROUPSIZE"
+	ENVCREDENTIALPATH = "CREDENTIALPATH"
+)
 
 type OffChainConfig struct {
 	NodeRole        string
@@ -30,21 +34,18 @@ type OffChainConfig struct {
 }
 
 type OnChainConfig struct {
-	ChainConfigs   []ChainConfig
-	CredentialPath string
+	ChainConfigs   map[string]map[string]ChainConfig
+	credentialPath string
 	path           string
 	currentType    string
 	currentNode    string
 }
 
 type ChainConfig struct {
-	// TODO: Refactor out of ChainConfig
-	RemoteNodeType    string
-	RemoteNodeAddress string
-
-	ChainType               string
 	DOSProxyAddress         string
 	DOSAddressBridgeAddress string
+	RemoteNodeAddressPool   []string
+	RemoteNodeAddress       string
 }
 
 func LoadConfig(path string, c interface{}) (err error) {
@@ -163,6 +164,14 @@ func (c *OffChainConfig) overWrite() (err error) {
 	return
 }
 
+func (c *OnChainConfig) GetCredentialPath() string {
+	return c.credentialPath
+}
+
+func (c *OnChainConfig) GetCurrentType() string {
+	return c.currentType
+}
+
 func (c *OnChainConfig) LoadConfig() (err error) {
 	var workingDir string
 
@@ -199,36 +208,35 @@ func (c *OnChainConfig) LoadConfig() (err error) {
 	}
 	c.currentNode = chainNode
 
+	if config, loaded := c.ChainConfigs[c.currentType][c.currentNode]; loaded {
+		source := rand.NewSource(time.Now().UnixNano())
+		random := rand.New(source)
+		if os.Getenv(ENVRANDOMCONNECT) == "true" {
+			config.RemoteNodeAddress = config.RemoteNodeAddressPool[random.Intn(len(config.RemoteNodeAddressPool))]
+		} else {
+			config.RemoteNodeAddress = config.RemoteNodeAddressPool[0]
+		}
+		c.ChainConfigs[c.currentType][c.currentNode] = config
+	}
+
 	credentialPath := os.Getenv(ENVCREDENTIALPATH)
 	if credentialPath == "" {
 		fmt.Println("No ENVCREDENTIALPATH Environment variable.")
 		credentialPath = "./credential"
 	}
-	c.CredentialPath = credentialPath
-	fmt.Println("c.CredentialPath ", c.CredentialPath, " ", credentialPath)
+	c.credentialPath = credentialPath
+	fmt.Println("c.credentialPath ", c.credentialPath, " ", credentialPath)
 
 	return
 }
 
 func (c *OnChainConfig) GetChainConfig() (config ChainConfig) {
-	for _, config := range c.ChainConfigs {
-		if c.currentNode == config.RemoteNodeType &&
-			c.currentType == config.ChainType {
-			fmt.Println("Use : ", config)
-			return config
-		}
-	}
-	return
+	return c.ChainConfigs[c.currentType][c.currentNode]
 }
 
 func (c *OnChainConfig) UpdateConfig(updated ChainConfig) (err error) {
-	for i, config := range c.ChainConfigs {
-		if c.currentNode == config.RemoteNodeType &&
-			c.currentType == config.ChainType {
-			c.ChainConfigs[i] = updated
-		}
+	if _, loaded := c.ChainConfigs[c.currentType][c.currentNode]; loaded {
+		c.ChainConfigs[c.currentType][c.currentNode] = updated
 	}
-	configsJson, _ := json.MarshalIndent(c, "", "    ")
-	err = ioutil.WriteFile(c.path, configsJson, 0644)
-	return nil
+	return UpdateConfig(c.path, c)
 }

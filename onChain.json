@@ -1,26 +1,31 @@
 {
-    "ChainConfigs": [
-        {
-            "RemoteNodeType": "rinkebyInfura",
-            "RemoteNodeAddress": "wss://rinkeby.infura.io/ws/8e609c76fce442f8a1735fbea9999747",
-            "ChainType": "ETH",
-            "DOSProxyAddress": "0x1882d681b01e13F2CB3A5b1F8c05496EC02Ea035",
-            "DOSAddressBridgeAddress": "0xe987926A226932DFB1f71FA316461db272E05317"
-        },
-        {
-            "RemoteNodeType": "rinkebyPrivateNode",
-            "RemoteNodeAddress": "ws://51.15.0.157:8546",
-            "ChainType": "ETH",
-            "DOSProxyAddress": "0x204b1A377266A2767422B1dfa9e3a164680d7f6F",
-            "DOSAddressBridgeAddress": "0xF21Bd784b2F5aB0984523Db975E3c20989d56a2c"
-        },
-        {
-            "RemoteNodeType": "privateNode",
-            "RemoteNodeAddress": "ws://163.172.36.173:8546",
-            "ChainType": "ETH",
-            "DOSProxyAddress": "0x0AF3Bc78e6F53AFe23D95Eb95e6D6Ef7CeD00798",
-            "DOSAddressBridgeAddress": "0x0c2A0f910683cE36fe7Ff097866fE398c4Ef359e"
+    "ChainConfigs": {
+        "ETH": {
+            "privateNode": {
+                "DOSProxyAddress": "0x0AF3Bc78e6F53AFe23D95Eb95e6D6Ef7CeD00798",
+                "DOSAddressBridgeAddress": "0x0c2A0f910683cE36fe7Ff097866fE398c4Ef359e",
+                "RemoteNodeAddressPool": [
+                    "ws://163.172.36.173:8546"
+                ],
+                "RemoteNodeAddress": ""
+            },
+            "rinkebyInfura": {
+                "DOSProxyAddress": "0x1882d681b01e13F2CB3A5b1F8c05496EC02Ea035",
+                "DOSAddressBridgeAddress": "0xe987926A226932DFB1f71FA316461db272E05317",
+                "RemoteNodeAddressPool": [
+                    "wss://rinkeby.infura.io/ws/8e609c76fce442f8a1735fbea9999747"
+                ],
+                "RemoteNodeAddress": ""
+            },
+            "rinkebyPrivateNode": {
+                "DOSProxyAddress": "0x693C7de2e12fB7Ac7AAB1b3Aa353Bd24FD95Cfaf",
+                "DOSAddressBridgeAddress": "0xA008E094f56bCecD8516170CfEDE00F9C19FBDE5",
+                "RemoteNodeAddressPool": [
+                    "ws://51.15.0.157:8546",
+                    "ws://51.159.4.51:8546"
+                ],
+                "RemoteNodeAddress": "ws://51.15.0.157:8546"
+            }
         }
-    ],
-    "CredentialPath": ""
+    }
 }
