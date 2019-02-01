@@ -1,3 +1,6 @@
 {
-    "AskMeAnythingAddress": "0x2942aCA4B176c82A7a6c7d34552A4Cb5d174C723"
+    "AskMeAnythingAddressPool": [
+        "0x0b328CEF925715EC10F4B70a4d1fc26973eaF680",
+        "0xdcC46A5fe0224128F9999D7FCDEf74871851F4ec"
+    ]
 }
