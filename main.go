@@ -28,11 +28,11 @@ func main() {
 	chainConfig := onChainConfig.GetChainConfig()
 
 	//Set up an onchain adapter
-	chainConn, err := onchain.AdaptTo(chainConfig.ChainType)
+	chainConn, err := onchain.AdaptTo(onChainConfig.GetCurrentType())
 	if err != nil {
 		log.Fatal(err)
 	}
-	chainConn.SetAccount(onChainConfig.CredentialPath)
+	chainConn.SetAccount(onChainConfig.GetCredentialPath())
 	//Init log module with nodeID that is an onchain account address
 	log.Init(chainConn.GetId()[:])
 	chainConn.Init(chainConfig)

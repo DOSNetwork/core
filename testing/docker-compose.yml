@@ -17,6 +17,7 @@ services:
      - NODEROLE=testNode
      - CHAINNODE=rinkebyPrivateNode
      - BOOTSTRAPIP=bootstrap:44460
+     - RANDOMCONNECT=true
  randomnode:
    image: usernode
    deploy:
@@ -27,6 +28,8 @@ services:
      - BOOTSTRAPIP=bootstrap:44460
      - QUERYTIMES=50
      - QUERYTYPE=random
+     - RANDOMCONNECT=true
+     - AMA=0
  urlnode:
    image: usernode
    deploy:
@@ -37,3 +40,5 @@ services:
      - BOOTSTRAPIP=bootstrap:44460
      - QUERYTIMES=50
      - QUERYTYPE=url
+     - RANDOMCONNECT=true
+     - AMA=0

@@ -146,11 +146,13 @@ func main() {
 			break
 		}
 	}
-	if err = userTestAdaptor.SetAccount(onChainConfig.CredentialPath); err != nil {
+	if err = userTestAdaptor.SetAccount(onChainConfig.GetCredentialPath()); err != nil {
 		log.Fatal(err)
 	}
 	log.Init(userTestAdaptor.GetId()[:])
-	err = userTestAdaptor.Init(config.AskMeAnythingAddress, chainConfig)
+	source := rand.NewSource(time.Now().UnixNano())
+	random := rand.New(source)
+	err = userTestAdaptor.Init(config.AskMeAnythingAddressPool[random.Intn(len(config.AskMeAnythingAddressPool))], chainConfig)
 	if err != nil {
 		log.Fatal(err)
 	}

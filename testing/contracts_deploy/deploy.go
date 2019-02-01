@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -174,11 +175,12 @@ func main() {
 	onChainConfig := configuration.OnChainConfig{}
 	onChainConfig.LoadConfig()
 	chainConfig := onChainConfig.GetChainConfig()
+	fmt.Println("Use : ", chainConfig)
 	fmt.Println(" address ", chainConfig.RemoteNodeAddress)
 
 	//Dial to blockchain
 	conn := &onchain.EthCommon{}
-	conn.SetAccount(onChainConfig.CredentialPath)
+	conn.SetAccount(onChainConfig.GetCredentialPath())
 
 	_ = conn.Init(chainConfig)
 
@@ -197,7 +199,22 @@ func main() {
 		}
 	} else if contract == "AMA" {
 		amaConfig := eth.AMAConfig{}
-		amaConfig.AskMeAnythingAddress = deployContract(conn, AMA)
+		amaCount := os.Getenv("AMACOUNT")
+		if amaCount == "" {
+			fmt.Println("No AMACOUNT Environment variable.")
+			amaCount = "1"
+		}
+		count, err := strconv.Atoi(amaCount)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		var amaAdd []string
+		for i := 0; i < count; i++ {
+			amaAdd = append(amaAdd, deployContract(conn, AMA))
+		}
+		amaConfig.AskMeAnythingAddressPool = amaAdd
 		configuration.UpdateConfig(configPath, amaConfig)
 	}
 }
