@@ -8,6 +8,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/DOSNetwork/core/log"
@@ -45,7 +46,7 @@ var querySets = []querySet{
 	{"https://api.coinbase.com/v2/prices/ETH-USD/spot", "$.data.base"},
 	{"https://api.coinbase.com/v2/prices/ETH-USD/spot", "$.data.currency"},
 	{"https://api.coinbase.com/v2/prices/ETH-USD/spot", "$.data.amount"},
-	{"https://api.coinbase.com/v2/prices/ETH-USD/spot", "$.data.NOTVALID"},
+	//{"https://api.coinbase.com/v2/prices/ETH-USD/spot", "$.data.NOTVALID"},
 	{"https://api.coinmarketcap.com/v1/global/", ""},
 	{"https://api.coinmarketcap.com/v1/global/", "$"},
 	{"https://api.coinmarketcap.com/v1/global/", "$.total_market_cap_usd"},
@@ -55,7 +56,7 @@ var querySets = []querySet{
 	{"https://api.coinmarketcap.com/v1/global/", "$.active_assets"},
 	{"https://api.coinmarketcap.com/v1/global/", "$.active_markets"},
 	{"https://api.coinmarketcap.com/v1/global/", "$.last_updated"},
-	{"https://api.coinmarketcap.com/v1/global/", "$.NOTVALID"},
+	//{"https://api.coinmarketcap.com/v1/global/", "$.NOTVALID"},
 
 	//frequent-update queries
 	//{"https://min-api.cryptocompare.com/data/price?fsym=BTC&tsyms=USD,JPY,EUR", "$"},
@@ -77,9 +78,11 @@ var (
 	done            = make(chan struct{})
 )
 var logger log.Logger
+var wg sync.WaitGroup
 
 func main() {
 	var err error
+
 	envTypes = os.Getenv(ENVQUERYTYPE)
 	if envTypes == "" {
 		envTypes = "random"
@@ -204,6 +207,7 @@ func main() {
 					if i.Removed {
 						delete(rMap, fmt.Sprintf("%x", i.RequestId))
 					} else {
+
 						rMap[fmt.Sprintf("%x", i.RequestId)] = "0"
 					}
 				case *eth.AskMeAnythingRandomReady:
@@ -249,7 +253,9 @@ func main() {
 		}
 	}()
 	for i := 0; i < counter; i++ {
-		go query(i)
+		wg.Add(1)
+		query(i)
+		wg.Wait()
 	}
 	<-done
 }
@@ -266,10 +272,12 @@ func VerifyResult(requestId string, rType string) {
 				"rMapLen":    len(rMap),
 				"Removed":    false}
 			logger.Event("AMA"+rType+"Done", f)
+			wg.Done()
 		}
 	case <-canceled:
 		// timer aborted
 	}
+
 }
 
 func query(counter int) {

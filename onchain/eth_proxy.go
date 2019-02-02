@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/DOSNetwork/core/share/vss/pedersen"
+
 	"github.com/DOSNetwork/core/configuration"
 	"github.com/DOSNetwork/core/log"
 	"github.com/DOSNetwork/core/onchain/dosproxy"
@@ -41,6 +43,8 @@ const (
 	TrafficUserQuery
 )
 
+const SubscribeTimeout = 60 //in second
+
 type EthAdaptor struct {
 	EthCommon
 	proxy     *dosproxy.DOSProxy
@@ -58,49 +62,60 @@ func (e *EthAdaptor) Init(config configuration.ChainConfig) (err error) {
 	go e.logMapTimeout()
 
 	fmt.Println("onChainConn initialization finished.")
-	e.lock = new(sync.Mutex)
-	err = e.dialToEth()
+	err = e.dialToProxy()
 	e.logger = log.New("module", "EthProxy")
-
 	return
 }
 
 func (e *EthAdaptor) SubscribeEvent(ch chan interface{}, subscribeType int) (err error) {
 	opt := &bind.WatchOpts{}
+	var cancel context.CancelFunc
+	opt.Context, cancel = context.WithCancel(context.Background())
 	done := make(chan bool)
+	ticker := time.NewTicker(SubscribeTimeout * time.Second)
 
 	go e.subscribeEventAttempt(ch, opt, subscribeType, done)
 
 	for {
 		select {
-		case <-done:
-			fmt.Println("subscribing done.")
-			return
-		case <-time.After(60 * time.Second):
-			fmt.Println("retry...")
-			if err = e.dialToEth(); err != nil {
+		case succ := <-done:
+			if succ {
+				fmt.Println("subscribe done")
 				return
 			} else {
-				go e.subscribeEventAttempt(ch, opt, subscribeType, done)
+				fmt.Println("retry...")
+				if err = e.resetOnChainConn(); err != nil {
+					return
+				} else {
+					go e.subscribeEventAttempt(ch, opt, subscribeType, done)
+				}
 			}
-
+		case <-ticker.C:
+			cancel()
+			fmt.Println("subscribe timeout")
+			return
 		}
 	}
 }
 
-func (e *EthAdaptor) dialToEth() (err error) {
-	e.lock.Lock()
-	if err = e.EthCommon.DialToEth(); err != nil {
-		e.logger.Error(err)
-		return
-	}
+func (e *EthAdaptor) dialToProxy() (err error) {
 	addr := common.HexToAddress(e.config.DOSProxyAddress)
 	e.proxy, err = dosproxy.NewDOSProxy(addr, e.Client)
 	for err != nil {
 		e.logger.Error(err)
 		e.proxy, err = dosproxy.NewDOSProxy(addr, e.Client)
 	}
-	e.lock.Unlock()
+	return
+}
+
+func (e *EthAdaptor) resetOnChainConn() (err error) {
+	e.lock.Lock()
+	defer e.lock.Unlock()
+	if err = e.EthCommon.DialToEth(); err != nil {
+		e.logger.Error(err)
+		return
+	}
+	err = e.dialToProxy()
 	return
 }
 
@@ -112,23 +127,24 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 		transitChan := make(chan *dosproxy.DOSProxyLogGrouping)
 		sub, err := e.proxy.DOSProxyFilterer.WatchLogGrouping(opt, transitChan)
 		if err != nil {
+			done <- false
 			e.logger.Error(err)
 			fmt.Println("Network fail, will retry shortly")
 			return
 		}
-		fmt.Println("DOSProxyLogGrouping event subscribed")
 
+		fmt.Println("DOSProxyLogGrouping event subscribed")
 		done <- true
 		for {
 			select {
 			case err := <-sub.Err():
 				e.logger.Error(err)
 			case i := <-transitChan:
-				if !e.filterLog(i.Raw) {
-					ch <- &DOSProxyLogGrouping{
-						NodeId: i.NodeId,
-					}
+				//if !e.filterLog(i.Raw) {
+				ch <- &DOSProxyLogGrouping{
+					NodeId: i.NodeId,
 				}
+				//}
 			}
 		}
 	case SubscribeDOSProxyLogUrl:
@@ -136,12 +152,13 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 		transitChan := make(chan *dosproxy.DOSProxyLogUrl)
 		sub, err := e.proxy.DOSProxyFilterer.WatchLogUrl(opt, transitChan)
 		if err != nil {
+			done <- false
 			e.logger.Error(err)
 			fmt.Println("Network fail, will retry shortly")
 			return
 		}
-		fmt.Println("DOSProxyLogUrl event subscribed")
 
+		fmt.Println("DOSProxyLogUrl event subscribed")
 		done <- true
 		for {
 			select {
@@ -181,12 +198,13 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 		transitChan := make(chan *dosproxy.DOSProxyLogRequestUserRandom)
 		sub, err := e.proxy.DOSProxyFilterer.WatchLogRequestUserRandom(opt, transitChan)
 		if err != nil {
+			done <- false
 			//log.WithField("function", "watchLogRequestUserRandom").Warn(err)
 			fmt.Println("Network fail, will retry shortly")
 			return
 		}
-		fmt.Println("DOSProxyLogRequestUserRandom event subscribed")
 
+		fmt.Println("DOSProxyLogRequestUserRandom event subscribed")
 		done <- true
 		for {
 			select {
@@ -222,12 +240,13 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 		transitChan := make(chan *dosproxy.DOSProxyLogUpdateRandom)
 		sub, err := e.proxy.DOSProxyFilterer.WatchLogUpdateRandom(opt, transitChan)
 		if err != nil {
+			done <- false
 			//log.WithField("function", "watchLogRequestUserRandom").Warn(err)
 			fmt.Println("Network fail, will retry shortly")
 			return
 		}
-		fmt.Println("DOSProxyLogUpdateRandom event subscribed")
 
+		fmt.Println("DOSProxyLogUpdateRandom event subscribed")
 		done <- true
 		for {
 			select {
@@ -260,12 +279,13 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 		transitChan := make(chan *dosproxy.DOSProxyLogValidationResult)
 		sub, err := e.proxy.DOSProxyFilterer.WatchLogValidationResult(opt, transitChan)
 		if err != nil {
+			done <- false
 			//log.WithField("function", "watchLogValidationResult").Warn(err)
 			fmt.Println("Network fail, will retry shortly")
 			return
 		}
-		fmt.Println("DOSProxyLogValidationResult event subscribed")
 
+		fmt.Println("SubscribeDOSProxyLogValidationResult event subscribed")
 		done <- true
 		for {
 			select {
@@ -277,25 +297,33 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 					z := new(big.Int)
 					z.SetBytes(i.Message)
 					f := map[string]interface{}{
-						"RequestId":      fmt.Sprintf("%x", i.TrafficId),
-						"QueryResult":    string(i.Message),
-						"ValidationPass": i.Pass,
-						"Removed":        i.Raw.Removed,
-						"Tx":             i.Raw.TxHash.Hex(),
-						"BlockN":         i.Raw.BlockNumber,
-						"Time":           time.Now()}
+						"RequestId":         fmt.Sprintf("%x", i.TrafficId),
+						"QueryResult":       string(i.Message),
+						"ValidationPass":    i.Pass,
+						"DispatchedGroup_1": fmt.Sprintf("%x", i.PubKey[0]),
+						"DispatchedGroup_2": fmt.Sprintf("%x", i.PubKey[1]),
+						"DispatchedGroup_3": fmt.Sprintf("%x", i.PubKey[2]),
+						"DispatchedGroup_4": fmt.Sprintf("%x", i.PubKey[3]),
+						"Removed":           i.Raw.Removed,
+						"Tx":                i.Raw.TxHash.Hex(),
+						"BlockN":            i.Raw.BlockNumber,
+						"Time":              time.Now()}
 					e.logger.Event("EthProxyQueryResult", f)
 				} else if i.TrafficType == TrafficUserRandom {
 					z := new(big.Int)
 					z.SetBytes(i.Message)
 					f := map[string]interface{}{
-						"RequestId":       fmt.Sprintf("%x", i.TrafficId),
-						"GeneratedRandom": fmt.Sprintf("%x", z),
-						"ValidationPass":  i.Pass,
-						"Removed":         i.Raw.Removed,
-						"Tx":              i.Raw.TxHash.Hex(),
-						"BlockN":          i.Raw.BlockNumber,
-						"Time":            time.Now()}
+						"RequestId":         fmt.Sprintf("%x", i.TrafficId),
+						"GeneratedRandom":   fmt.Sprintf("%x", z),
+						"ValidationPass":    i.Pass,
+						"DispatchedGroup_1": fmt.Sprintf("%x", i.PubKey[0]),
+						"DispatchedGroup_2": fmt.Sprintf("%x", i.PubKey[1]),
+						"DispatchedGroup_3": fmt.Sprintf("%x", i.PubKey[2]),
+						"DispatchedGroup_4": fmt.Sprintf("%x", i.PubKey[3]),
+						"Removed":           i.Raw.Removed,
+						"Tx":                i.Raw.TxHash.Hex(),
+						"BlockN":            i.Raw.BlockNumber,
+						"Time":              time.Now()}
 					e.logger.Event("EthProxyRandomResult", f)
 				} else if i.TrafficType == TrafficSystemRandom {
 					z := new(big.Int)
@@ -330,12 +358,13 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 		transitChan := make(chan *dosproxy.DOSProxyLogNonSupportedType)
 		sub, err := e.proxy.DOSProxyFilterer.WatchLogNonSupportedType(opt, transitChan)
 		if err != nil {
+			done <- false
 			//log.WithField("function", "watchLogNonSupportedType").Warn(err)
 			fmt.Println("Network fail, will retry shortly")
 			return
 		}
-		fmt.Println("DOSProxyLogNonSupportedType event subscribed")
 
+		fmt.Println("DOSProxyLogNonSupportedType event subscribed")
 		done <- true
 		for {
 			select {
@@ -354,12 +383,13 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 		transitChan := make(chan *dosproxy.DOSProxyLogNonContractCall)
 		sub, err := e.proxy.DOSProxyFilterer.WatchLogNonContractCall(opt, transitChan)
 		if err != nil {
+			done <- false
 			//log.WithField("function", "watchLogNonContractCall").Warn(err)
 			fmt.Println("Network fail, will retry shortly")
 			return
 		}
-		fmt.Println("DOSProxyLogNonContractCall event subscribed")
 
+		fmt.Println("DOSProxyLogNonContractCall event subscribed")
 		done <- true
 		for {
 			select {
@@ -378,12 +408,13 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 		transitChan := make(chan *dosproxy.DOSProxyLogCallbackTriggeredFor)
 		sub, err := e.proxy.DOSProxyFilterer.WatchLogCallbackTriggeredFor(opt, transitChan)
 		if err != nil {
+			done <- false
 			//log.WithField("function", "watchLogCallbackTriggeredFor").Warn(err)
 			fmt.Println("Network fail, will retry shortly")
 			return
 		}
-		fmt.Println("DOSProxyLogCallbackTriggeredFor event subscribed")
 
+		fmt.Println("DOSProxyLogCallbackTriggeredFor event subscribed")
 		done <- true
 		for {
 			select {
@@ -402,12 +433,13 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 		transitChan := make(chan *dosproxy.DOSProxyLogRequestFromNonExistentUC)
 		sub, err := e.proxy.DOSProxyFilterer.WatchLogRequestFromNonExistentUC(opt, transitChan)
 		if err != nil {
+			done <- false
 			//log.WithField("function", "watchLogRequestFromNonExistentUC").Warn(err)
 			fmt.Println("Network fail, will retry shortly")
 			return
 		}
-		fmt.Println("DOSProxyLogQueryFromNonExistentUC event subscribed")
 
+		fmt.Println("DOSProxyLogQueryFromNonExistentUC event subscribed")
 		done <- true
 		for {
 			select {
@@ -424,12 +456,13 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 		transitChan := make(chan *dosproxy.DOSProxyLogInsufficientGroupNumber)
 		sub, err := e.proxy.DOSProxyFilterer.WatchLogInsufficientGroupNumber(opt, transitChan)
 		if err != nil {
+			done <- false
 			//log.WithField("function", "watchLogInsufficientGroupNumber").Warn(err)
 			fmt.Println("Network fail, will retry shortly")
 			return
 		}
-		fmt.Println("DOSProxyLogInsufficientGroupNumber event subscribed")
 
+		fmt.Println("DOSProxyLogInsufficientGroupNumber event subscribed")
 		done <- true
 		for {
 			select {
@@ -446,12 +479,13 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 		transitChan := make(chan *dosproxy.DOSProxyLogDuplicatePubKey)
 		sub, err := e.proxy.DOSProxyFilterer.WatchLogDuplicatePubKey(opt, transitChan)
 		if err != nil {
+			done <- false
 			//log.WithField("function", "WatchLogDuplicatePubKey").Warn(err)
 			fmt.Println("Network fail, will retry shortly")
 			return
 		}
-		fmt.Println("DOSProxyLogDuplicatePubKey event subscribed")
 
+		fmt.Println("DOSProxyLogDuplicatePubKey event subscribed")
 		done <- true
 		for {
 			select {
@@ -470,12 +504,13 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 		transitChan := make(chan *dosproxy.DOSProxyLogAddressNotFound)
 		sub, err := e.proxy.DOSProxyFilterer.WatchLogAddressNotFound(opt, transitChan)
 		if err != nil {
+			done <- false
 			//log.WithField("function", "WatchLogAddressNotFound").Warn(err)
 			fmt.Println("Network fail, will retry shortly")
 			return
 		}
-		fmt.Println("DOSProxyLogAddressNotFound event subscribed")
 
+		fmt.Println("DOSProxyLogAddressNotFound event subscribed")
 		done <- true
 		for {
 			select {
@@ -494,12 +529,13 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 		transitChan := make(chan *dosproxy.DOSProxyLogPublicKeyAccepted)
 		sub, err := e.proxy.DOSProxyFilterer.WatchLogPublicKeyAccepted(opt, transitChan)
 		if err != nil {
+			done <- false
 			//log.WithField("function", "watchLogPublicKeyAccepted").Warn(err)
 			fmt.Println("Network fail, will retry shortly")
 			return
 		}
-		fmt.Println("DOSProxyLogPublicKeyAccepted event subscribed")
 
+		fmt.Println("DOSProxyLogPublicKeyAccepted event subscribed")
 		done <- true
 		for {
 			select {
@@ -518,12 +554,13 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 		transitChan := make(chan *dosproxy.DOSProxyWhitelistAddressTransferred)
 		sub, err := e.proxy.DOSProxyFilterer.WatchWhitelistAddressTransferred(opt, transitChan)
 		if err != nil {
+			done <- false
 			//log.WithField("function", "watchWhitelistAddressTransferred").Warn(err)
 			fmt.Println("Network fail, will retry shortly")
 			return
 		}
-		fmt.Println("DOSProxyWhitelistAddressTransferred event subscribed")
 
+		fmt.Println("DOSProxyWhitelistAddressTransferred event subscribed")
 		done <- true
 		for {
 			select {
@@ -603,6 +640,7 @@ func (e *EthAdaptor) Grouping(size int) (err error) {
 	fmt.Println("!!!!!!Starting Grouping ", size)
 	auth, err := e.GetAuth()
 	if err != nil {
+		fmt.Println("!!! err ", err)
 		return
 	}
 
@@ -610,10 +648,12 @@ func (e *EthAdaptor) Grouping(size int) (err error) {
 	for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
 		//log.WithField("function", "grouping").Warn(err)
 		time.Sleep(time.Second)
-		fmt.Println("transaction retry...")
+		fmt.Println("transaction retry...,err ", err)
 		tx, err = e.proxy.Grouping(auth, nil, big.NewInt(int64(size)))
 	}
 	if err != nil {
+		fmt.Println("!!! err2 ", err)
+
 		return
 	}
 
@@ -669,63 +709,126 @@ func (e *EthAdaptor) GetBlockHashByNumber(blknum *big.Int) (hash common.Hash, er
 	return
 }
 
-func (e *EthAdaptor) SetRandomNum(sig []byte, version uint8) (err error) {
+func (e *EthAdaptor) SetRandomNum(ctx context.Context, signatures <-chan *vss.Signature) <-chan error {
+	errc := make(chan error, 1)
+	go func() {
+		defer close(errc)
+		fmt.Println("Starting submitting random number...")
+		select {
+		case signature := <-signatures:
+			auth, err := e.GetAuth()
+			if err != nil {
+				fmt.Println("GetAuth() error")
+				e.logger.Error(err)
+				errc <- err
+				return
+			}
+			x, y := DecodeSig(signature.Signature)
+			tx, err := e.proxy.UpdateRandomness(auth, [2]*big.Int{x, y}, 0)
+			if err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
+				ticker := time.NewTicker(1 * time.Second)
+				retryCount := 0
+			l:
+				for {
+					select {
+					case <-ticker.C:
+						fmt.Println("transaction retry...")
+						retryCount++
+						auth, err = e.GetAuth()
+						if err != nil {
+							fmt.Println("GetAuth() error")
+							e.logger.Error(err)
+							errc <- err
+							ticker.Stop()
+							return
+						}
+						tx, err = e.proxy.UpdateRandomness(auth, [2]*big.Int{x, y}, 0)
+						if err == nil || retryCount >= 10 || (err.Error() != core.ErrNonceTooLow.Error() && err.Error() != core.ErrReplaceUnderpriced.Error()) {
+							ticker.Stop()
+							break l
+						}
+					case <-ctx.Done():
+						ticker.Stop()
+						return
+					}
+				}
+			}
+			if err != nil {
+				fmt.Println("SetRandomNum error", err)
+				e.logger.Error(err)
+				errc <- err
+				return
+			}
 
-	fmt.Println("Starting submitting random number...")
-	auth, err := e.GetAuth()
-	if err != nil {
-		return
-	}
+			fmt.Println("tx sent: ", tx.Hash().Hex())
+			fmt.Println("SetRandomNum success")
+			//err = e.CheckTransaction(tx)
+		case <-ctx.Done():
+			return
+		}
+	}()
 
-	x, y := DecodeSig(sig)
-
-	tx, err := e.proxy.UpdateRandomness(auth, [2]*big.Int{x, y}, version)
-	for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
-		//log.WithField("function", "updateRandomness").Warn(err)
-		time.Sleep(time.Second)
-		fmt.Println("transaction retry...")
-		tx, err = e.proxy.UpdateRandomness(auth, [2]*big.Int{x, y}, version)
-	}
-	if err != nil {
-		return
-	}
-
-	fmt.Println("tx sent: ", tx.Hash().Hex())
-	fmt.Println("new random number submitted")
-
-	//err = e.CheckTransaction(tx)
-
-	return
+	return errc
 }
 
-func (e *EthAdaptor) UploadPubKey(pubKeyCoor [4]*big.Int) (err error) {
-	fmt.Println("Starting submitting group public key...")
-	auth, err := e.GetAuth()
-	if err != nil {
-		return
-	}
+func (e *EthAdaptor) UploadPubKey(ctx context.Context, pubKeys chan [4]*big.Int) <-chan error {
+	errc := make(chan error, 1)
+	go func() {
+		defer close(errc)
+		fmt.Println("Starting UploadPubKey...")
+		select {
+		case pubKey := <-pubKeys:
+			auth, err := e.GetAuth()
+			if err != nil {
+				fmt.Println("GetAuth() error")
+				e.logger.Error(err)
+				errc <- err
+				return
+			}
+			tx, err := e.proxy.SetPublicKey(auth, pubKey)
+			if err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
+				ticker := time.NewTicker(1 * time.Second)
+				retryCount := 0
+			l:
+				for {
+					select {
+					case <-ticker.C:
+						fmt.Println("transaction retry...")
+						retryCount++
+						auth, err = e.GetAuth()
+						if err != nil {
+							fmt.Println("GetAuth() error")
+							e.logger.Error(err)
+							errc <- err
+							ticker.Stop()
+							return
+						}
+						tx, err = e.proxy.SetPublicKey(auth, pubKey)
+						if err == nil || retryCount >= 10 || (err.Error() != core.ErrNonceTooLow.Error() && err.Error() != core.ErrReplaceUnderpriced.Error()) {
+							ticker.Stop()
+							break l
+						}
+					case <-ctx.Done():
+						ticker.Stop()
+						return
+					}
+				}
+			}
+			if err != nil {
+				fmt.Println("UploadPubKey error", err)
+				e.logger.Error(err)
+				errc <- err
+				return
+			}
 
-	tx, err := e.proxy.SetPublicKey(auth, pubKeyCoor)
-	for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
-		//log.WithField("function", "setPublicKey").Warn(err)
-		time.Sleep(time.Second)
-		fmt.Println("transaction retry...")
-		tx, err = e.proxy.SetPublicKey(auth, pubKeyCoor)
-	}
-	if err != nil {
-		return
-	}
-
-	fmt.Println("tx sent: ", tx.Hash().Hex())
-	fmt.Println("x0: ", pubKeyCoor[0])
-	fmt.Println("x1: ", pubKeyCoor[1])
-	fmt.Println("y0: ", pubKeyCoor[2])
-	fmt.Println("y1: ", pubKeyCoor[3])
-	fmt.Println("Group public key submitted")
-
-	//err = e.CheckTransaction(tx)
-
-	return
+			fmt.Println("tx sent: ", tx.Hash().Hex())
+			fmt.Println("UploadPubKey success")
+			//err = e.CheckTransaction(tx)
+		case <-ctx.Done():
+			return
+		}
+	}()
+	return errc
 }
 
 func (e *EthAdaptor) ResetNodeIDs() (err error) {
@@ -772,33 +875,75 @@ func (e *EthAdaptor) RandomNumberTimeOut() (err error) {
 	return
 }
 
-func (e *EthAdaptor) DataReturn(requestId *big.Int, trafficType uint8, data, sig []byte, version uint8) (err error) {
-	//startingTime := time.Now()
+func (e *EthAdaptor) DataReturn(ctx context.Context, signatures <-chan *vss.Signature) <-chan error {
+	errc := make(chan error)
+	go func() {
+		defer close(errc)
+		fmt.Println("Starting DataReturn...")
+		select {
+		case signature := <-signatures:
+			auth, err := e.GetAuth()
+			if err != nil {
+				fmt.Println("GetAuth() error")
+				e.logger.Error(err)
+				errc <- err
+				return
+			}
+			x, y := DecodeSig(signature.Signature)
+			requestId, _ := new(big.Int).SetString(signature.QueryId, 10)
 
-	auth, err := e.GetAuth()
-	if err != nil {
-		return
-	}
+			t := len(signature.Content) - 20
+			if t < 0 {
+				t = len(signature.Content)
+			}
+			queryResult := make([]byte, t)
+			copy(queryResult, signature.Content)
 
-	x, y := DecodeSig(sig)
+			tx, err := e.proxy.TriggerCallback(auth, requestId, uint8(signature.Index), queryResult, [2]*big.Int{x, y}, 0)
+			if err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
+				ticker := time.NewTicker(1 * time.Second)
+				retryCount := 0
+			l:
+				for {
+					select {
+					case <-ticker.C:
+						fmt.Println("transaction retry...")
+						retryCount++
+						auth, err = e.GetAuth()
+						if err != nil {
+							fmt.Println("GetAuth() error")
+							e.logger.Error(err)
+							errc <- err
+							ticker.Stop()
+							return
+						}
+						tx, err = e.proxy.TriggerCallback(auth, requestId, uint8(signature.Index), signature.Content, [2]*big.Int{x, y}, 0)
+						if err == nil || retryCount >= 10 || (err.Error() != core.ErrNonceTooLow.Error() && err.Error() != core.ErrReplaceUnderpriced.Error()) {
+							ticker.Stop()
+							break l
+						}
+					case <-ctx.Done():
+						ticker.Stop()
+						return
+					}
+				}
+			}
+			if err != nil {
+				fmt.Println("DataReturn error", err)
+				e.logger.Error(err)
+				errc <- err
+				return
+			}
 
-	tx, err := e.proxy.TriggerCallback(auth, requestId, trafficType, data, [2]*big.Int{x, y}, version)
-	for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
-		//log.WithField("function", "triggerCallback").Warn(err)
-		time.Sleep(time.Second)
-		fmt.Println("transaction retry...")
-		tx, err = e.proxy.TriggerCallback(auth, requestId, trafficType, data, [2]*big.Int{x, y}, version)
-	}
-	if err != nil {
-		return
-	}
+			fmt.Println("tx sent: ", tx.Hash().Hex())
+			fmt.Println("DataReturn success")
+			//err = e.CheckTransaction(tx)
+		case <-ctx.Done():
+			return
+		}
+	}()
 
-	fmt.Println("tx sent: ", tx.Hash().Hex())
-	fmt.Printf("Request with id(%v) type(%v) fulfilled", requestId, trafficType)
-
-	//err = e.CheckTransaction(tx)
-
-	return
+	return errc
 }
 
 func DecodeSig(sig []byte) (x, y *big.Int) {

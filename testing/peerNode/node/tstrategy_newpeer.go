@@ -165,16 +165,18 @@ func (r test3) StartTest(d *PeerNode) {
 		if bytes.Compare(d.p.GetID(), id) == 0 {
 			start := idx / groupSize * groupSize
 			group := d.nodeIDs[start : start+groupSize]
-			dkgEvent, errChan := p2pDkg.Start(context.Background(), group)
+			dkgEvent, errChan := p2pDkg.Start(context.Background(), group, dkg.GIdsToSessionID(group))
 			go func() {
 				for err := range errChan {
 					fmt.Println("errorChan", err)
 				}
 			}()
-			if pubKey := <-dkgEvent; pubKey != nil {
-				fmt.Println("eventCheckDone", pubKey)
-				d.FinishTest()
-			}
+			<-dkgEvent
+			d.FinishTest()
+			//if pubKey := <-dkgEvent; pubKey != nil {
+			//	fmt.Println("eventCheckDone", pubKey)
+			//d.FinishTest()
+			//}
 			break
 		}
 	}
@@ -200,15 +202,16 @@ func (r test4) StartTest(d *PeerNode) {
 		if bytes.Compare(d.p.GetID(), id) == 0 {
 			start := idx / groupSize * groupSize
 			group := d.nodeIDs[start : start+groupSize]
-			dkgEvent, errChan := p2pDkg.Start(context.Background(), group)
+			dkgEvent, errChan := p2pDkg.Start(context.Background(), group, dkg.GIdsToSessionID(group))
 			go func() {
 				for err := range errChan {
 					fmt.Println("errorChan", err)
 				}
 			}()
-			if pubKey = <-dkgEvent; pubKey == nil {
-				fmt.Println("dkg error")
-			}
+			//			if pubKey = <-dkgEvent; pubKey == nil {
+			//			fmt.Println("dkg error")
+			//		}
+			<-dkgEvent
 			break
 		}
 	}
@@ -292,14 +295,14 @@ func (r test5) StartTest(d *PeerNode) {
 	for {
 		var (
 			group    [][]byte
-			dkgEvent chan *[4]*big.Int
+			dkgEvent chan [4]*big.Int
 			errChan  <-chan error
 		)
 		for idx, id := range d.nodeIDs {
 			if bytes.Compare(d.p.GetID(), id) == 0 {
 				start := idx / groupSize * groupSize
 				group = d.nodeIDs[start : start+groupSize]
-				dkgEvent, errChan = p2pDkg.Start(context.Background(), group)
+				dkgEvent, errChan = p2pDkg.Start(context.Background(), group, dkg.GIdsToSessionID(group))
 				go func() {
 					for err := range errChan {
 						fmt.Println("errorChan", err)
@@ -308,18 +311,17 @@ func (r test5) StartTest(d *PeerNode) {
 				break
 			}
 		}
-		if <-dkgEvent != nil {
-			fmt.Println("\n certified!!!!!!")
-			fmt.Println("eventCheckRoundDone", roundCount)
-			next := d.requestIsNextRoundReady(roundCount)
-			if next == byte(DKGROUNDFINISH) {
-				break
-			} else {
-				roundCount++
-				rand.Shuffle(len(d.nodeIDs), func(i, j int) {
-					d.nodeIDs[i], d.nodeIDs[j] = d.nodeIDs[j], d.nodeIDs[i]
-				})
-			}
+		<-dkgEvent
+		fmt.Println("\n certified!!!!!!")
+		fmt.Println("eventCheckRoundDone", roundCount)
+		next := d.requestIsNextRoundReady(roundCount)
+		if next == byte(DKGROUNDFINISH) {
+			break
+		} else {
+			roundCount++
+			rand.Shuffle(len(d.nodeIDs), func(i, j int) {
+				d.nodeIDs[i], d.nodeIDs[j] = d.nodeIDs[j], d.nodeIDs[i]
+			})
 		}
 	}
 	d.FinishTest()

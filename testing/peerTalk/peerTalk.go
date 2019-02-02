@@ -181,7 +181,7 @@ func main() {
 					if bytes.Compare(p.GetID(), id) == 0 {
 						start := uint32(idx) / groupSize * groupSize
 						group = ids[start : start+groupSize]
-						dkgEvent, errc := p2pdkg.Start(context.Background(), group)
+						dkgEvent, errc := p2pdkg.Start(context.Background(), group, dkg.GIdsToSessionID(group))
 						go func() {
 							for err := range errc {
 								logger.WithFields(logrus.Fields{
@@ -190,14 +190,15 @@ func main() {
 							}
 						}()
 						go func() {
-							if <-dkgEvent != nil {
-								if err = p.SendMessage(bootstrapId, &peerTalk.Done{Id: p.GetID()}); err != nil {
-									logger.WithField("event", "allDone").Error(err)
-								} else {
-									logger.WithField("event", "allDone").Info()
-								}
-								os.Exit(0)
+							//if <-dkgEvent != nil {
+							<-dkgEvent
+							if err = p.SendMessage(bootstrapId, &peerTalk.Done{Id: p.GetID()}); err != nil {
+								logger.WithField("event", "allDone").Error(err)
+							} else {
+								logger.WithField("event", "allDone").Info()
 							}
+							os.Exit(0)
+							//}
 						}()
 						break
 					}

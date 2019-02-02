@@ -1,10 +1,12 @@
 package onchain
 
 import (
+	"context"
 	"fmt"
 	"math/big"
 
 	"github.com/DOSNetwork/core/configuration"
+	"github.com/DOSNetwork/core/share/vss/pedersen"
 
 	"github.com/ethereum/go-ethereum/common"
 )
@@ -20,11 +22,11 @@ type ChainInterface interface {
 	InitialWhiteList() (err error)
 	GetWhitelist() (address common.Address, err error)
 	UploadID() (err error)
-	UploadPubKey(pubKey [4]*big.Int) (err error)
+	UploadPubKey(ctx context.Context, pubKey chan [4]*big.Int) <-chan error
 	GetId() (id []byte)
 	GetBlockHashByNumber(blknum *big.Int) (hash common.Hash, err error)
-	SetRandomNum(sig []byte, version uint8) (err error)
-	DataReturn(requestId *big.Int, trafficType uint8, data, sig []byte, version uint8) (err error)
+	SetRandomNum(ctx context.Context, signatures <-chan *vss.Signature) <-chan error
+	DataReturn(ctx context.Context, signatures <-chan *vss.Signature) <-chan error
 	SubscribeToAll(msgChan chan interface{}) (err error)
 	//For test
 	ResetNodeIDs() (err error)

@@ -64,7 +64,8 @@ type DOSProxyLogValidationResult struct {
 type DOSProxyLogInsufficientGroupNumber struct{}
 
 type DOSProxyLogGrouping struct {
-	NodeId []common.Address
+	NodeId  []common.Address
+	Removed bool
 }
 
 type DOSProxyLogDuplicatePubKey struct {
