@@ -341,7 +341,7 @@ func dataParse(rawMsg []byte, pathStr string) (msg []byte, err error) {
 	return
 }
 
-func (d *DosNode) genQueryResult(ctx context.Context, url string, pathStr string) (<-chan []byte, chan error) {
+func (d *DosNode) genQueryResult(ctx context.Context, submitterc chan []byte, url string, pathStr string) (<-chan []byte, chan error) {
 	out := make(chan []byte, 1)
 	errc := make(chan error, 1)
 	go func() {
@@ -362,7 +362,14 @@ func (d *DosNode) genQueryResult(ctx context.Context, url string, pathStr string
 			return
 		}
 		fmt.Println("genQueryResult ", msgReturn)
-		out <- msgReturn
+		select {
+		case submitter := <-submitterc:
+			// signed message = concat(msgReturn, submitter address)
+			msgReturn = append(msgReturn, submitter...)
+			out <- msgReturn
+		case <-ctx.Done():
+			return
+		}
 	}()
 	return out, errc
 }
@@ -475,10 +482,19 @@ func (d *DosNode) recoverSignature(ctx context.Context, signc <-chan *vss.Signat
 						x, y := onchain.DecodeSig(sig)
 						fmt.Println("Verify success signature ", x.String(), y.String())
 
+						//Contract will append sender address to content to verify if it is a right submitter
+						t := len(sign.Content) - 20
+						if t < 0 {
+							fmt.Println("Error : length of content less than 0", t)
+						}
+
+						queryResult := make([]byte, t)
+						copy(queryResult, sign.Content)
+
 						out <- &vss.Signature{
 							Index:     sign.Index,
 							QueryId:   sign.QueryId,
-							Content:   sign.Content,
+							Content:   queryResult,
 							Signature: sig,
 						}
 					}
@@ -641,7 +657,7 @@ func (d *DosNode) listen() (err error) {
 					pubPoly := d.dkg.GetGroupPublicPoly(pubkey)
 
 					//Build a pipeline
-					submitterc, errc := d.choseSubmitter(ctx, lastRand, ids, len(ids))
+					submitterc, errc := d.choseSubmitter(ctx, lastRand, ids, len(ids)+1)
 					errcList = append(errcList, errc)
 					for i, id := range ids {
 						var signc <-chan *vss.Signature
@@ -650,7 +666,7 @@ func (d *DosNode) listen() (err error) {
 						if r := bytes.Compare(d.chain.GetId(), id); r != 0 {
 							signc, errc = d.requestSign(ctx, submitterc[i], requestID.String(), uint32(onchain.TrafficUserQuery), id)
 						} else {
-							contentc, errc = d.genQueryResult(ctx, url, selector)
+							contentc, errc = d.genQueryResult(ctx, submitterc[len(ids)], url, selector)
 							errcList = append(errcList, errc)
 							signc, errc = d.generateSign(ctx, submitterc[i], contentc, d.signc, pubkey, requestID, uint32(onchain.TrafficUserQuery))
 						}

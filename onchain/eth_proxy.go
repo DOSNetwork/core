@@ -892,14 +892,7 @@ func (e *EthAdaptor) DataReturn(ctx context.Context, signatures <-chan *vss.Sign
 			x, y := DecodeSig(signature.Signature)
 			requestId, _ := new(big.Int).SetString(signature.QueryId, 10)
 
-			t := len(signature.Content) - 20
-			if t < 0 {
-				t = len(signature.Content)
-			}
-			queryResult := make([]byte, t)
-			copy(queryResult, signature.Content)
-
-			tx, err := e.proxy.TriggerCallback(auth, requestId, uint8(signature.Index), queryResult, [2]*big.Int{x, y}, 0)
+			tx, err := e.proxy.TriggerCallback(auth, requestId, uint8(signature.Index), signature.Content, [2]*big.Int{x, y}, 0)
 			if err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
 				ticker := time.NewTicker(1 * time.Second)
 				retryCount := 0
