@@ -151,7 +151,7 @@ func (d *DosNode) waitForGrouping(errs ...<-chan error) {
 	}
 }
 
-func (d *DosNode) choseSubmitter(ctx context.Context, lastSysRand *big.Int, ids [][]byte, outCount int) ([]chan []byte, <-chan error) {
+func choseSubmitter(ctx context.Context, chain onchain.ChainInterface, lastSysRand *big.Int, ids [][]byte, outCount int) ([]chan []byte, <-chan error) {
 	x := int(lastSysRand.Uint64())
 	if x < 0 {
 		x = 0 - x
@@ -183,7 +183,7 @@ func (d *DosNode) choseSubmitter(ctx context.Context, lastSysRand *big.Int, ids 
 					errc <- errors.New("No Suitable Submitter")
 					return
 				}
-				if !d.chain.EnoughBalance(common.BytesToAddress(ids[idx])) {
+				if !chain.EnoughBalance(common.BytesToAddress(ids[idx])) {
 					reChose++
 					idx = (idx + 1) % y
 					checkBalance <- idx
@@ -212,9 +212,11 @@ func (d *DosNode) choseSubmitter(ctx context.Context, lastSysRand *big.Int, ids 
 	checkBalance <- submitter
 	return outs, errc
 }
-func (d *DosNode) requestSign(
+func requestSign(
 	ctx context.Context,
 	submitterc <-chan []byte,
+	p p2p.P2PInterface,
+	nodeId []byte,
 	requestId string,
 	trafficType uint32,
 	id []byte) (<-chan *vss.Signature, <-chan error) {
@@ -229,7 +231,7 @@ func (d *DosNode) requestSign(
 		defer fmt.Println("End requestSign")
 		retryCount := 0
 		submitter := <-submitterc
-		if r := bytes.Compare(d.chain.GetId(), submitter); r != 0 {
+		if r := bytes.Compare(nodeId, submitter); r != 0 {
 			fmt.Println("requestSign : Not a Submitter ")
 			return
 		}
@@ -244,10 +246,9 @@ func (d *DosNode) requestSign(
 			case <-retry:
 				fmt.Println("requestSign from ", id)
 				retryCount++
-				msg, err := d.p.Request(id, sign)
+				msg, err := p.Request(id, sign)
 				if err != nil {
 					fmt.Println("requestSign err ", err)
-					d.logger.Error(err)
 					if retryCount < 5 {
 						retry <- true
 					} else {
@@ -273,7 +274,7 @@ func (d *DosNode) requestSign(
 	return out, errc
 }
 
-func (d *DosNode) generateRandom(
+func generateRandom(
 	ctx context.Context,
 	submitterc <-chan []byte,
 	requestId []byte,
@@ -341,7 +342,7 @@ func dataParse(rawMsg []byte, pathStr string) (msg []byte, err error) {
 	return
 }
 
-func (d *DosNode) genQueryResult(ctx context.Context, submitterc chan []byte, url string, pathStr string) (<-chan []byte, chan error) {
+func genQueryResult(ctx context.Context, submitterc chan []byte, url string, pathStr string) (<-chan []byte, chan error) {
 	out := make(chan []byte, 1)
 	errc := make(chan error, 1)
 	go func() {
@@ -373,11 +374,14 @@ func (d *DosNode) genQueryResult(ctx context.Context, submitterc chan []byte, ur
 	}()
 	return out, errc
 }
-func (d *DosNode) generateSign(
+func generateSign(
 	ctx context.Context,
 	submitterc <-chan []byte,
 	contentc <-chan []byte,
 	signc chan *vss.Signature,
+	dkg dkg.P2PDkgInterface,
+	suite suites.Suite,
+	nodeID []byte,
 	pubkey [4]*big.Int,
 	requestId *big.Int,
 	index uint32) (<-chan *vss.Signature, <-chan error) {
@@ -412,9 +416,9 @@ func (d *DosNode) generateSign(
 				}
 			case <-wait:
 
-				sig, err := tbls.Sign(d.suite, d.dkg.GetShareSecurity(pubkey), content)
+				sig, err := tbls.Sign(suite, dkg.GetShareSecurity(pubkey), content)
 				if err != nil {
-					d.logger.Error(err)
+					//					d.logger.Error(err)
 					errc <- err
 				}
 
@@ -425,7 +429,7 @@ func (d *DosNode) generateSign(
 					Signature: sig,
 				}
 				signc <- sign
-				if r := bytes.Compare(d.chain.GetId(), submitter); r == 0 {
+				if r := bytes.Compare(nodeID, submitter); r == 0 {
 					fmt.Println("generateSign : I'm a submitter ")
 					out <- sign
 				} else {
@@ -441,7 +445,7 @@ func (d *DosNode) generateSign(
 	return out, errc
 }
 
-func (d *DosNode) recoverSignature(ctx context.Context, signc <-chan *vss.Signature, pubPoly *share.PubPoly, nbThreshold int, nbParticipants int) (<-chan *vss.Signature, <-chan error) {
+func recoverSignature(ctx context.Context, signc <-chan *vss.Signature, suite suites.Suite, pubPoly *share.PubPoly, nbThreshold int, nbParticipants int) (<-chan *vss.Signature, <-chan error) {
 	out := make(chan *vss.Signature, 1)
 	errc := make(chan error, 1)
 	go func() {
@@ -459,7 +463,7 @@ func (d *DosNode) recoverSignature(ctx context.Context, signc <-chan *vss.Signat
 
 					if len(signShares) >= nbThreshold {
 						sig, err := tbls.Recover(
-							d.suite,
+							suite,
 							pubPoly,
 							sign.Content,
 							signShares,
@@ -472,7 +476,7 @@ func (d *DosNode) recoverSignature(ctx context.Context, signc <-chan *vss.Signat
 						}
 
 						if err = bls.Verify(
-							d.suite,
+							suite,
 							pubPoly.Commit(),
 							sign.Content,
 							sig); err != nil {
@@ -617,21 +621,22 @@ func (d *DosNode) listen() (err error) {
 					pubPoly := d.dkg.GetGroupPublicPoly(pubkey)
 
 					//Build a pipeline
-					submitterc, errc := d.choseSubmitter(ctx, lastRand, ids, len(ids)+1)
+					submitterc, errc := choseSubmitter(ctx, d.chain, lastRand, ids, len(ids)+1)
 					errcList = append(errcList, errc)
 					for i, id := range ids {
 						var signc <-chan *vss.Signature
 						var errc <-chan error
 						if r := bytes.Compare(d.chain.GetId(), id); r != 0 {
-							signc, errc = d.requestSign(ctx, submitterc[i], requestID.String(), uint32(onchain.TrafficUserRandom), id)
+							signc, errc = requestSign(ctx, submitterc[i], d.p, d.chain.GetId(), requestID.String(), uint32(onchain.TrafficUserRandom), id)
 						} else {
-							contentc := d.generateRandom(ctx, submitterc[len(ids)], requestID.Bytes(), lastRand.Bytes(), useSeed.Bytes())
-							signc, errc = d.generateSign(ctx, submitterc[i], contentc, d.signc, pubkey, requestID, uint32(onchain.TrafficUserRandom))
+							contentc := generateRandom(ctx, submitterc[len(ids)], requestID.Bytes(), lastRand.Bytes(), useSeed.Bytes())
+							signc, errc = generateSign(ctx, submitterc[i], contentc, d.signc, d.dkg, d.suite, d.chain.GetId(), pubkey, requestID, uint32(onchain.TrafficUserRandom))
 						}
+
 						signShares = append(signShares, signc)
 						errcList = append(errcList, errc)
 					}
-					signc, errc := d.recoverSignature(ctx, fanIn(ctx, signShares...), pubPoly, (len(ids)/2 + 1), len(ids))
+					signc, errc := recoverSignature(ctx, fanIn(ctx, signShares...), d.suite, pubPoly, (len(ids)/2 + 1), len(ids))
 					errcList = append(errcList, errc)
 					errc = d.chain.DataReturn(ctx, signc)
 					errcList = append(errcList, errc)
@@ -657,23 +662,23 @@ func (d *DosNode) listen() (err error) {
 					pubPoly := d.dkg.GetGroupPublicPoly(pubkey)
 
 					//Build a pipeline
-					submitterc, errc := d.choseSubmitter(ctx, lastRand, ids, len(ids)+1)
+					submitterc, errc := choseSubmitter(ctx, d.chain, lastRand, ids, len(ids)+1)
 					errcList = append(errcList, errc)
 					for i, id := range ids {
 						var signc <-chan *vss.Signature
 						var contentc <-chan []byte
 						var errc <-chan error
 						if r := bytes.Compare(d.chain.GetId(), id); r != 0 {
-							signc, errc = d.requestSign(ctx, submitterc[i], requestID.String(), uint32(onchain.TrafficUserQuery), id)
+							signc, errc = requestSign(ctx, submitterc[i], d.p, d.chain.GetId(), requestID.String(), uint32(onchain.TrafficUserQuery), id)
 						} else {
-							contentc, errc = d.genQueryResult(ctx, submitterc[len(ids)], url, selector)
+							contentc, errc = genQueryResult(ctx, submitterc[len(ids)], url, selector)
 							errcList = append(errcList, errc)
-							signc, errc = d.generateSign(ctx, submitterc[i], contentc, d.signc, pubkey, requestID, uint32(onchain.TrafficUserQuery))
+							signc, errc = generateSign(ctx, submitterc[i], contentc, d.signc, d.dkg, d.suite, d.chain.GetId(), pubkey, requestID, uint32(onchain.TrafficUserQuery))
 						}
 						signShares = append(signShares, signc)
 						errcList = append(errcList, errc)
 					}
-					signc, errc := d.recoverSignature(ctx, fanIn(ctx, signShares...), pubPoly, (len(ids)/2 + 1), len(ids))
+					signc, errc := recoverSignature(ctx, fanIn(ctx, signShares...), d.suite, pubPoly, (len(ids)/2 + 1), len(ids))
 					errcList = append(errcList, errc)
 					errc = d.chain.DataReturn(ctx, signc)
 					errcList = append(errcList, errc)
