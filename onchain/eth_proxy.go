@@ -165,30 +165,16 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 			case err := <-sub.Err():
 				e.logger.Error(err)
 			case i := <-transitChan:
-				f := map[string]interface{}{
-					"RequestId":         fmt.Sprintf("%x", i.QueryId),
-					"Randomness":        fmt.Sprintf("%x", i.Randomness),
-					"DataSource":        fmt.Sprintf("%x", i.DataSource),
-					"DispatchedGroup_1": fmt.Sprintf("%x", i.DispatchedGroup[0]),
-					"DispatchedGroup_2": fmt.Sprintf("%x", i.DispatchedGroup[1]),
-					"DispatchedGroup_3": fmt.Sprintf("%x", i.DispatchedGroup[2]),
-					"DispatchedGroup_4": fmt.Sprintf("%x", i.DispatchedGroup[3]),
-					"Removed":           i.Raw.Removed,
-					"Tx":                i.Raw.TxHash.Hex(),
-					"BlockN":            i.Raw.BlockNumber,
-					"Time":              time.Now()}
-				e.logger.Event("EthProxyQueryURL", f)
-				if i.Raw.Removed == false {
-					ch <- &DOSProxyLogUrl{
-						QueryId:         i.QueryId,
-						Timeout:         i.Timeout,
-						DataSource:      i.DataSource,
-						Selector:        i.Selector,
-						Randomness:      i.Randomness,
-						DispatchedGroup: i.DispatchedGroup,
-						Tx:              i.Raw.TxHash.Hex(),
-						BlockN:          i.Raw.BlockNumber,
-					}
+				ch <- &DOSProxyLogUrl{
+					QueryId:         i.QueryId,
+					Timeout:         i.Timeout,
+					DataSource:      i.DataSource,
+					Selector:        i.Selector,
+					Randomness:      i.Randomness,
+					DispatchedGroup: i.DispatchedGroup,
+					Tx:              i.Raw.TxHash.Hex(),
+					BlockN:          i.Raw.BlockNumber,
+					Removed:         i.Raw.Removed,
 				}
 			}
 		}
@@ -211,27 +197,14 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 			case err := <-sub.Err():
 				log.Fatal(err)
 			case i := <-transitChan:
-				f := map[string]interface{}{
-					"RequestId":            fmt.Sprintf("%x", i.RequestId),
-					"LastSystemRandomness": fmt.Sprintf("%x", i.LastSystemRandomness),
-					"DispatchedGroup_1":    fmt.Sprintf("%x", i.DispatchedGroup[0]),
-					"DispatchedGroup_2":    fmt.Sprintf("%x", i.DispatchedGroup[1]),
-					"DispatchedGroup_3":    fmt.Sprintf("%x", i.DispatchedGroup[2]),
-					"DispatchedGroup_4":    fmt.Sprintf("%x", i.DispatchedGroup[3]),
-					"Removed":              i.Raw.Removed,
-					"Tx":                   i.Raw.TxHash.Hex(),
-					"BlockN":               i.Raw.BlockNumber,
-					"Time":                 time.Now()}
-				e.logger.Event("EthProxyRequestRandom", f)
-				if i.Raw.Removed == false {
-					ch <- &DOSProxyLogRequestUserRandom{
-						RequestId:            i.RequestId,
-						LastSystemRandomness: i.LastSystemRandomness,
-						UserSeed:             i.UserSeed,
-						DispatchedGroup:      i.DispatchedGroup,
-						Tx:                   i.Raw.TxHash.Hex(),
-						BlockN:               i.Raw.BlockNumber,
-					}
+				ch <- &DOSProxyLogRequestUserRandom{
+					RequestId:            i.RequestId,
+					LastSystemRandomness: i.LastSystemRandomness,
+					UserSeed:             i.UserSeed,
+					DispatchedGroup:      i.DispatchedGroup,
+					Tx:                   i.Raw.TxHash.Hex(),
+					BlockN:               i.Raw.BlockNumber,
+					Removed:              i.Raw.Removed,
 				}
 			}
 		}
@@ -253,24 +226,12 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 			case err := <-sub.Err():
 				log.Fatal(err)
 			case i := <-transitChan:
-				f := map[string]interface{}{
-					"LastSystemRandomness": fmt.Sprintf("%x", i.LastRandomness),
-					"DispatchedGroup_1":    fmt.Sprintf("%x", i.DispatchedGroup[0]),
-					"DispatchedGroup_2":    fmt.Sprintf("%x", i.DispatchedGroup[1]),
-					"DispatchedGroup_3":    fmt.Sprintf("%x", i.DispatchedGroup[2]),
-					"DispatchedGroup_4":    fmt.Sprintf("%x", i.DispatchedGroup[3]),
-					"Removed":              i.Raw.Removed,
-					"Tx":                   i.Raw.TxHash.Hex(),
-					"BlockN":               i.Raw.BlockNumber,
-					"Time":                 time.Now()}
-				e.logger.Event("EthProxyUpdateSysRandom", f)
-				if i.Raw.Removed == false {
-					ch <- &DOSProxyLogUpdateRandom{
-						LastRandomness:  i.LastRandomness,
-						DispatchedGroup: i.DispatchedGroup,
-						Tx:              i.Raw.TxHash.Hex(),
-						BlockN:          i.Raw.BlockNumber,
-					}
+				ch <- &DOSProxyLogUpdateRandom{
+					LastRandomness:  i.LastRandomness,
+					DispatchedGroup: i.DispatchedGroup,
+					Tx:              i.Raw.TxHash.Hex(),
+					BlockN:          i.Raw.BlockNumber,
+					Removed:         i.Raw.Removed,
 				}
 			}
 		}
@@ -292,65 +253,20 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 			case err := <-sub.Err():
 				log.Fatal(err)
 			case i := <-transitChan:
-				if i.TrafficType == TrafficUserQuery {
-					//trafficType == TrafficUserRandom
-					z := new(big.Int)
-					z.SetBytes(i.Message)
-					f := map[string]interface{}{
-						"RequestId":         fmt.Sprintf("%x", i.TrafficId),
-						"QueryResult":       string(i.Message),
-						"ValidationPass":    i.Pass,
-						"DispatchedGroup_1": fmt.Sprintf("%x", i.PubKey[0]),
-						"DispatchedGroup_2": fmt.Sprintf("%x", i.PubKey[1]),
-						"DispatchedGroup_3": fmt.Sprintf("%x", i.PubKey[2]),
-						"DispatchedGroup_4": fmt.Sprintf("%x", i.PubKey[3]),
-						"Removed":           i.Raw.Removed,
-						"Tx":                i.Raw.TxHash.Hex(),
-						"BlockN":            i.Raw.BlockNumber,
-						"Time":              time.Now()}
-					e.logger.Event("EthProxyQueryResult", f)
-				} else if i.TrafficType == TrafficUserRandom {
-					z := new(big.Int)
-					z.SetBytes(i.Message)
-					f := map[string]interface{}{
-						"RequestId":         fmt.Sprintf("%x", i.TrafficId),
-						"GeneratedRandom":   fmt.Sprintf("%x", z),
-						"ValidationPass":    i.Pass,
-						"DispatchedGroup_1": fmt.Sprintf("%x", i.PubKey[0]),
-						"DispatchedGroup_2": fmt.Sprintf("%x", i.PubKey[1]),
-						"DispatchedGroup_3": fmt.Sprintf("%x", i.PubKey[2]),
-						"DispatchedGroup_4": fmt.Sprintf("%x", i.PubKey[3]),
-						"Removed":           i.Raw.Removed,
-						"Tx":                i.Raw.TxHash.Hex(),
-						"BlockN":            i.Raw.BlockNumber,
-						"Time":              time.Now()}
-					e.logger.Event("EthProxyRandomResult", f)
-				} else if i.TrafficType == TrafficSystemRandom {
-					z := new(big.Int)
-					z.SetBytes(i.Message)
-					f := map[string]interface{}{
-						"RequestId":       fmt.Sprintf("%x", i.TrafficId),
-						"GeneratedRandom": fmt.Sprintf("%x", z),
-						"ValidationPass":  i.Pass,
-						"Removed":         i.Raw.Removed,
-						"Tx":              i.Raw.TxHash.Hex(),
-						"BlockN":          i.Raw.BlockNumber,
-						"Time":            time.Now()}
-					e.logger.Event("EthProxySysRandomResult", f)
+				//if i.Raw.Removed == false {
+				ch <- &DOSProxyLogValidationResult{
+					TrafficType: i.TrafficType,
+					TrafficId:   i.TrafficId,
+					Message:     i.Message,
+					Signature:   i.Signature,
+					PubKey:      i.PubKey,
+					Pass:        i.Pass,
+					Version:     i.Version,
+					Tx:          i.Raw.TxHash.Hex(),
+					BlockN:      i.Raw.BlockNumber,
+					Removed:     i.Raw.Removed,
 				}
-				if i.Raw.Removed == false {
-					ch <- &DOSProxyLogValidationResult{
-						TrafficType: i.TrafficType,
-						TrafficId:   i.TrafficId,
-						Message:     i.Message,
-						Signature:   i.Signature,
-						PubKey:      i.PubKey,
-						Pass:        i.Pass,
-						Version:     i.Version,
-						Tx:          i.Raw.TxHash.Hex(),
-						BlockN:      i.Raw.BlockNumber,
-					}
-				}
+				//}
 			}
 		}
 	case SubscribeDOSProxyLogNonSupportedType:
@@ -650,6 +566,31 @@ func (e *EthAdaptor) Grouping(size int) (err error) {
 		time.Sleep(time.Second)
 		fmt.Println("transaction retry...,err ", err)
 		tx, err = e.proxy.Grouping(auth, nil, big.NewInt(int64(size)))
+	}
+	if err != nil {
+		fmt.Println("!!! err2 ", err)
+
+		return
+	}
+
+	err = e.CheckTransaction(tx)
+	return
+}
+
+func (e *EthAdaptor) FireRandom() (err error) {
+	fmt.Println("!!!!!!FireRandom ")
+	auth, err := e.GetAuth()
+	if err != nil {
+		fmt.Println("!!! err ", err)
+		return
+	}
+
+	tx, err := e.proxy.FireRandom(auth)
+	for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
+		//log.WithField("function", "grouping").Warn(err)
+		time.Sleep(time.Second)
+		fmt.Println("transaction retry...,err ", err)
+		tx, err = e.proxy.FireRandom(auth)
 	}
 	if err != nil {
 		fmt.Println("!!! err2 ", err)

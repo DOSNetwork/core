@@ -131,7 +131,11 @@ func hasGroupPubkey(w http.ResponseWriter, r *http.Request) {
 		if _, err = fmt.Fprintf(w, "yes"); err != nil {
 			fmt.Println(err)
 		}
+		//if err = (*adaptor).FireRandom(); err != nil {
+		//	fmt.Println(err)
+		//}
 	}
+
 }
 
 func reset(w http.ResponseWriter, r *http.Request) {

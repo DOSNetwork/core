@@ -17,6 +17,7 @@ type DOSProxyLogUrl struct {
 	DispatchedGroup [4]*big.Int
 	Tx              string
 	BlockN          uint64
+	Removed         bool
 }
 
 type DOSProxyLogRequestUserRandom struct {
@@ -26,6 +27,7 @@ type DOSProxyLogRequestUserRandom struct {
 	DispatchedGroup      [4]*big.Int
 	Tx                   string
 	BlockN               uint64
+	Removed              bool
 }
 
 type DOSProxyLogNonSupportedType struct {
@@ -47,6 +49,7 @@ type DOSProxyLogUpdateRandom struct {
 	DispatchedGroup [4]*big.Int
 	Tx              string
 	BlockN          uint64
+	Removed         bool
 }
 
 type DOSProxyLogValidationResult struct {
@@ -59,6 +62,7 @@ type DOSProxyLogValidationResult struct {
 	Version     uint8
 	Tx          string
 	BlockN      uint64
+	Removed     bool
 }
 
 type DOSProxyLogInsufficientGroupNumber struct{}
