@@ -656,7 +656,10 @@ func (e *EthAdaptor) SetRandomNum(ctx context.Context, signatures <-chan *vss.Si
 		defer close(errc)
 		fmt.Println("Starting submitting random number...")
 		select {
-		case signature := <-signatures:
+		case signature, ok := <-signatures:
+			if !ok {
+				return
+			}
 			auth, err := e.GetAuth()
 			if err != nil {
 				fmt.Println("GetAuth() error")
@@ -822,7 +825,10 @@ func (e *EthAdaptor) DataReturn(ctx context.Context, signatures <-chan *vss.Sign
 		defer close(errc)
 		fmt.Println("Starting DataReturn...")
 		select {
-		case signature := <-signatures:
+		case signature, ok := <-signatures:
+			if !ok {
+				return
+			}
 			auth, err := e.GetAuth()
 			if err != nil {
 				fmt.Println("GetAuth() error")
