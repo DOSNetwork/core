@@ -29,6 +29,7 @@ type P2PDkgInterface interface {
 	GetGroupPublicPoly(pubKeyCoor [4]*big.Int) *share.PubPoly
 	GetGroupIDs(pubKeyCoor [4]*big.Int) [][]byte
 	GetShareSecurity(pubKeyCoor [4]*big.Int) *share.PriShare
+	GroupDismiss(pubKeyCoor [4]*big.Int) bool
 	Start(ctx context.Context, groupIds [][]byte, sessionID string) (chan [4]*big.Int, <-chan error)
 }
 
@@ -125,6 +126,16 @@ func (d *P2PDkg) GetShareSecurity(pubKeyCoor [4]*big.Int) *share.PriShare {
 		return targetSession.(*DkgSession).partDks.Share
 	}
 	return nil
+}
+
+func (d *P2PDkg) GroupDismiss(pubKeyCoor [4]*big.Int) bool {
+	d.finSessions.Delete(hashPoint(pubKeyCoor))
+	length := 0
+	d.finSessions.Range(func(_, _ interface{}) bool {
+		length++
+		return true
+	})
+	return length == 0
 }
 
 type packageToLoop struct {

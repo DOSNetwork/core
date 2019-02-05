@@ -70,11 +70,15 @@ func (d *DosNode) waitForGrouping(errs ...<-chan error) {
 
 func (d *DosNode) listen() (err error) {
 	eventGrouping := make(chan interface{})
+	eventGroupDismiss := make(chan interface{})
 	chUrl := make(chan interface{})
 	chRandom := make(chan interface{})
 	chUsrRandom := make(chan interface{})
 	eventValidation := make(chan interface{})
 	if err = d.chain.SubscribeEvent(eventGrouping, onchain.SubscribeDOSProxyLogGrouping); err != nil {
+		return err
+	}
+	if err = d.chain.SubscribeEvent(eventGroupDismiss, onchain.SubscribeDOSProxyLogGroupDismiss); err != nil {
 		return err
 	}
 	if err = d.chain.SubscribeEvent(chUrl, onchain.SubscribeDOSProxyLogUrl); err != nil {
@@ -140,6 +144,18 @@ func (d *DosNode) listen() (err error) {
 						if pipeCancel[sessionId] != nil {
 							pipeCancel[sessionId]()
 						}
+					}
+				}
+			case msg := <-eventGroupDismiss:
+				content, ok := msg.(*onchain.DOSProxyLogGroupDismiss)
+				if !ok {
+					log.Error(err)
+					continue
+				}
+
+				if d.isMember(content.PubKey) && d.dkg.GroupDismiss(content.PubKey) {
+					if err = d.chain.UploadID(); err != nil {
+						logger.Error(err)
 					}
 				}
 			case msg := <-chUsrRandom:

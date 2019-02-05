@@ -33,6 +33,7 @@ const (
 	SubscribeDOSProxyLogDuplicatePubKey
 	SubscribeDOSProxyLogAddressNotFound
 	SubscribeDOSProxyLogPublicKeyAccepted
+	SubscribeDOSProxyLogGroupDismiss
 	SubscribeDOSProxyWhitelistAddressTransferred
 )
 
@@ -460,6 +461,31 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 			case i := <-transitChan:
 				if !e.filterLog(i.Raw) {
 					ch <- &DOSProxyLogPublicKeyAccepted{
+						PubKey: i.PubKey,
+					}
+				}
+			}
+		}
+	case SubscribeDOSProxyLogGroupDismiss:
+		fmt.Println("subscribing DOSProxyLogGroupDismiss event...")
+		transitChan := make(chan *dosproxy.DOSProxyLogGroupDismiss)
+		sub, err := e.proxy.DOSProxyFilterer.WatchLogGroupDismiss(opt, transitChan)
+		if err != nil {
+			done <- false
+			//log.WithField("function", "watchLogPublicKeyAccepted").Warn(err)
+			fmt.Println("Network fail, will retry shortly")
+			return
+		}
+
+		fmt.Println("DOSProxyLogGroupDismiss event subscribed")
+		done <- true
+		for {
+			select {
+			case err := <-sub.Err():
+				log.Fatal(err)
+			case i := <-transitChan:
+				if !e.filterLog(i.Raw) {
+					ch <- &DOSProxyLogGroupDismiss{
 						PubKey: i.PubKey,
 					}
 				}

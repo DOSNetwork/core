@@ -84,6 +84,10 @@ type DOSProxyLogPublicKeyAccepted struct {
 	PubKey [4]*big.Int
 }
 
+type DOSProxyLogGroupDismiss struct {
+	PubKey [4]*big.Int
+}
+
 type DOSProxyWhitelistAddressTransferred struct {
 	Previous common.Address
 	Curr     common.Address
