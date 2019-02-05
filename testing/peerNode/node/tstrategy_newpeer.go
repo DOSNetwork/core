@@ -3,6 +3,7 @@ package node
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"math/big"
@@ -171,12 +172,13 @@ func (r test3) StartTest(d *PeerNode) {
 					fmt.Println("errorChan", err)
 				}
 			}()
-			<-dkgEvent
-			d.FinishTest()
-			//if pubKey := <-dkgEvent; pubKey != nil {
-			//	fmt.Println("eventCheckDone", pubKey)
-			//d.FinishTest()
-			//}
+			if pubKey, succ := <-dkgEvent; succ {
+				fmt.Println("eventCheckDone", pubKey)
+				d.FinishTest()
+			} else {
+				fmt.Println(errors.New("err: dkg fail"))
+				return
+			}
 			break
 		}
 	}
@@ -196,7 +198,8 @@ func (r test4) StartTest(d *PeerNode) {
 		fmt.Println(err)
 	}
 
-	var pubKey *[4]*big.Int
+	var pubKey [4]*big.Int
+	var succ bool
 
 	for idx, id := range d.nodeIDs {
 		if bytes.Compare(d.p.GetID(), id) == 0 {
@@ -208,10 +211,10 @@ func (r test4) StartTest(d *PeerNode) {
 					fmt.Println("errorChan", err)
 				}
 			}()
-			//			if pubKey = <-dkgEvent; pubKey == nil {
-			//			fmt.Println("dkg error")
-			//		}
-			<-dkgEvent
+			if pubKey, succ = <-dkgEvent; !succ {
+				fmt.Println(errors.New("err: dkg fail"))
+				return
+			}
 			break
 		}
 	}
@@ -222,7 +225,7 @@ func (r test4) StartTest(d *PeerNode) {
 	}
 
 	var signatures [][]byte
-	sig, err := tbls.Sign(suite, p2pDkg.GetShareSecurity(*pubKey), rawMsg)
+	sig, err := tbls.Sign(suite, p2pDkg.GetShareSecurity(pubKey), rawMsg)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -241,12 +244,12 @@ func (r test4) StartTest(d *PeerNode) {
 	for sig := range d.tblsChan {
 		signatures = append(signatures, sig.Signature)
 		if len(signatures) > groupSize/2 {
-			finalSig, err := tbls.Recover(suite, p2pDkg.GetGroupPublicPoly(*pubKey), sig.Content, signatures, groupSize/2+1, groupSize)
+			finalSig, err := tbls.Recover(suite, p2pDkg.GetGroupPublicPoly(pubKey), sig.Content, signatures, groupSize/2+1, groupSize)
 			if err != nil {
 				fmt.Println(err)
 				continue
 			}
-			if err = bls.Verify(suite, p2pDkg.GetGroupPublicPoly(*pubKey).Commit(), sig.Content, finalSig); err != nil {
+			if err = bls.Verify(suite, p2pDkg.GetGroupPublicPoly(pubKey).Commit(), sig.Content, finalSig); err != nil {
 				fmt.Println(err)
 				continue
 			} else {
@@ -311,7 +314,10 @@ func (r test5) StartTest(d *PeerNode) {
 				break
 			}
 		}
-		<-dkgEvent
+		if _, succ := <-dkgEvent; !succ {
+			fmt.Println(errors.New("err: dkg fail"))
+			return
+		}
 		fmt.Println("\n certified!!!!!!")
 		fmt.Println("eventCheckRoundDone", roundCount)
 		next := d.requestIsNextRoundReady(roundCount)
