@@ -16,6 +16,11 @@ import (
 	"github.com/DOSNetwork/core/suites"
 )
 
+const (
+	WATCHDOGINTERVAL = 10 //In minutes
+	SYSRANDOMNTERVAL = 5  //In block numbers
+)
+
 var logger log.Logger
 
 type DosNode struct {
@@ -47,7 +52,6 @@ func (d *DosNode) Start() (err error) {
 		logger.Error(err)
 		return
 	}
-	//Register nodeID to onchain
 	if err = d.chain.UploadID(); err != nil {
 		logger.Error(err)
 	}
@@ -98,14 +102,37 @@ func (d *DosNode) listen() (err error) {
 	go func() {
 		pipeCancel := make(map[string]context.CancelFunc)
 		peerSignMap := make(map[string]*vss.Signature)
+		watchdog := time.NewTicker(WATCHDOGINTERVAL * time.Minute)
+
 		defer close(eventGrouping)
 		defer close(chUrl)
 		defer close(chRandom)
 		defer close(chUsrRandom)
 		defer close(eventValidation)
+		defer watchdog.Stop()
 		defer d.p.UnSubscribeEvent(vss.Signature{})
 		for {
 			select {
+			case <-watchdog.C:
+				ids := d.dkg.GetAnyGroupIDs()
+				if len(ids) != 0 {
+					lastUpdatedBlock, err := d.chain.GetLastUpdatedBlock()
+					if err != nil {
+						logger.Error(err)
+						continue
+					}
+					currentBlockNumber, err := d.chain.GetCurrentBlock()
+					if err != nil {
+						logger.Error(err)
+						continue
+					}
+					diff := big.NewInt(0)
+					diff = diff.Sub(currentBlockNumber, lastUpdatedBlock)
+					expired := big.NewInt(SYSRANDOMNTERVAL)
+					if diff.Cmp(expired) == 1 {
+						d.chain.RandomNumberTimeOut()
+					}
+				}
 			case msg := <-d.signc:
 				peerSignMap[msg.QueryId] = msg
 			case msg := <-peerEvent:

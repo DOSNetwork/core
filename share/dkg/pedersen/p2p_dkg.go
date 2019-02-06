@@ -28,6 +28,7 @@ const (
 type P2PDkgInterface interface {
 	GetGroupPublicPoly(pubKeyCoor [4]*big.Int) *share.PubPoly
 	GetGroupIDs(pubKeyCoor [4]*big.Int) [][]byte
+	GetAnyGroupIDs() [][]byte
 	GetShareSecurity(pubKeyCoor [4]*big.Int) *share.PriShare
 	GroupDismiss(pubKeyCoor [4]*big.Int) bool
 	Start(ctx context.Context, groupIds [][]byte, sessionID string) (chan [4]*big.Int, <-chan error)
@@ -112,6 +113,16 @@ func (d *P2PDkg) GetGroupPublicPoly(pubKeyCoor [4]*big.Int) *share.PubPoly {
 		return targetSession.(*DkgSession).groupPubPoly
 	}
 	return nil
+}
+
+func (d *P2PDkg) GetAnyGroupIDs() [][]byte {
+	var ids [][]byte
+	d.finSessions.Range(func(_, targetSession interface{}) bool {
+		ids = make([][]byte, len(targetSession.(*DkgSession).GroupIds))
+		copy(ids, targetSession.(*DkgSession).GroupIds)
+		return false
+	})
+	return ids
 }
 
 func (d *P2PDkg) GetGroupIDs(pubKeyCoor [4]*big.Int) [][]byte {

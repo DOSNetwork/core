@@ -676,6 +676,25 @@ func (e *EthAdaptor) GetBlockHashByNumber(blknum *big.Int) (hash common.Hash, er
 	return
 }
 
+func (e *EthAdaptor) GetLastRandomness() (rand *big.Int, err error) {
+	rand, err = e.proxy.LastRandomness(nil)
+	return
+}
+
+func (e *EthAdaptor) GetLastUpdatedBlock() (blknum *big.Int, err error) {
+	blknum, err = e.proxy.LastUpdatedBlock(nil)
+	return
+}
+
+func (e *EthAdaptor) GetCurrentBlock() (blknum *big.Int, err error) {
+	var header *types.Header
+	header, err = e.Client.HeaderByNumber(context.Background(), nil)
+	if err == nil {
+		blknum = header.Number
+	}
+	return
+}
+
 func (e *EthAdaptor) SetRandomNum(ctx context.Context, signatures <-chan *vss.Signature) <-chan error {
 	errc := make(chan error, 1)
 	go func() {
