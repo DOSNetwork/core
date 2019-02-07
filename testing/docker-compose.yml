@@ -5,6 +5,9 @@ services:
    deploy:
      replicas: 1
    environment:
+     - APPSESSION=Beta
+     - APPNAME=BootNode
+     - LOGIP=163.172.36.173:9500
      - CHAINNODE=rinkebyPrivateNode
      - GROUPSIZE=3
  dosnode:
@@ -14,6 +17,9 @@ services:
    deploy:
      replicas: 3
    environment:
+     - APPSESSION=Beta
+     - APPNAME=DosNode
+     - LOGIP=163.172.36.173:9500
      - NODEROLE=testNode
      - CHAINNODE=rinkebyPrivateNode
      - BOOTSTRAPIP=bootstrap:44460
@@ -23,6 +29,9 @@ services:
    deploy:
      replicas: 1
    environment:
+     - APPSESSION=Beta
+     - APPNAME=RandomNode
+     - LOGIP=163.172.36.173:9500
      - NODEROLE=testNode
      - CHAINNODE=rinkebyPrivateNode
      - BOOTSTRAPIP=bootstrap:44460
@@ -35,6 +44,9 @@ services:
    deploy:
      replicas: 1
    environment:
+     - APPSESSION=Beta
+     - APPNAME=UrlNode
+     - LOGIP=163.172.36.173:9500
      - NODEROLE=testNode
      - CHAINNODE=rinkebyPrivateNode
      - BOOTSTRAPIP=bootstrap:44460

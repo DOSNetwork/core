@@ -13,32 +13,27 @@ import (
 )
 
 const (
-	ENVCHAINTYPE      = "CHAINTYPE"
-	ENVCHAINNODE      = "CHAINNODE"
-	ENVRANDOMCONNECT  = "RANDOMCONNECT"
-	ENVCONFIGPATH     = "CONFIGPATH"
-	ENVNODEROLE       = "NODEROLE"
-	ENVBOOTSTRAPIP    = "BOOTSTRAPIP"
-	ENVNODEPORT       = "NODEPORT"
-	CONFIGMODE        = "TESTMODE"
-	ENVGROUPSIZE      = "GROUPSIZE"
-	ENVCREDENTIALPATH = "CREDENTIALPATH"
+	ENVCHAINTYPE     = "CHAINTYPE"
+	ENVCHAINNODE     = "CHAINNODE"
+	ENVRANDOMCONNECT = "RANDOMCONNECT"
+	ENVCONFIGPATH    = "CONFIGPATH"
+	ENVNODEROLE      = "NODEROLE"
+	ENVBOOTSTRAPIP   = "BOOTSTRAPIP"
+	ENVNODEPORT      = "NODEPORT"
+	ENVGROUPSIZE     = "GROUPSIZE"
 )
 
-type OffChainConfig struct {
+type Config struct {
 	NodeRole        string
 	BootStrapIp     string
 	Port            int
-	RandomGroupSize int
-	QueryGroupSize  int
-}
-
-type OnChainConfig struct {
-	ChainConfigs   map[string]map[string]ChainConfig
-	credentialPath string
-	path           string
-	currentType    string
-	currentNode    string
+	ChainConfigs    map[string]map[string]ChainConfig
+	randomGroupSize int
+	queryGroupSize  int
+	credentialPath  string
+	path            string
+	currentType     string
+	currentNode     string
 }
 
 type ChainConfig struct {
@@ -66,6 +61,10 @@ func LoadConfig(path string, c interface{}) (err error) {
 
 	// read our opened xmlFile as a byte array.
 	byteValue, err = ioutil.ReadAll(jsonFile)
+	if err != nil {
+		fmt.Println("ReadAll error ", err)
+		return
+	}
 
 	err = json.Unmarshal(byteValue, &c)
 	if err != nil {
@@ -81,7 +80,7 @@ func UpdateConfig(path string, c interface{}) (err error) {
 	return
 }
 
-func (c *OffChainConfig) LoadConfig() (err error) {
+func (c *Config) LoadConfig() (err error) {
 	var workingDir string
 	path := os.Getenv(ENVCONFIGPATH)
 	if path != "" {
@@ -95,14 +94,15 @@ func (c *OffChainConfig) LoadConfig() (err error) {
 			workingDir = "."
 		}
 	}
-	err = LoadConfig(workingDir+"/offChain.json", c)
+	c.path = workingDir + "/config.json"
+	err = LoadConfig(c.path, c)
 	if err != nil {
 		fmt.Println("LoadConfig  err", err)
 		return
 	}
 
 	err = c.overWrite()
-	//---------------------------------
+
 	if c.NodeRole == "testNode" {
 		var credential []byte
 		var resp *http.Response
@@ -120,19 +120,19 @@ func (c *OffChainConfig) LoadConfig() (err error) {
 		if err != nil {
 			return
 		}
-		fmt.Println("credential : ", string(credential))
-		credentialPath := workingDir + "/credential/usrKey"
-		err = ioutil.WriteFile(credentialPath, []byte(credential), 0644)
-		resp.Body.Close()
-		if err != nil {
+
+		if err = resp.Body.Close(); err != nil {
 			return
 		}
+
+		c.credentialPath = workingDir + "/testAccounts/" + string(credential) + "/credential"
+		fmt.Println("credential : ", c.credentialPath)
+
 	}
-	//---------------------------------
 	return
 }
 
-func (c *OffChainConfig) overWrite() (err error) {
+func (c *Config) overWrite() (err error) {
 	bootStrapIP := os.Getenv(ENVBOOTSTRAPIP)
 	if bootStrapIP != "" {
 		c.BootStrapIp = bootStrapIP
@@ -145,8 +145,8 @@ func (c *OffChainConfig) overWrite() (err error) {
 		if err != nil {
 			return
 		}
-		c.RandomGroupSize = size
-		c.QueryGroupSize = size
+		c.randomGroupSize = size
+		c.queryGroupSize = size
 	}
 
 	nodeRole := os.Getenv(ENVNODEROLE)
@@ -160,38 +160,6 @@ func (c *OffChainConfig) overWrite() (err error) {
 		if err == nil {
 			c.Port = i
 		}
-	}
-	return
-}
-
-func (c *OnChainConfig) GetCredentialPath() string {
-	return c.credentialPath
-}
-
-func (c *OnChainConfig) GetCurrentType() string {
-	return c.currentType
-}
-
-func (c *OnChainConfig) LoadConfig() (err error) {
-	var workingDir string
-
-	path := os.Getenv(ENVCONFIGPATH)
-	if path != "" {
-		workingDir = path
-	} else {
-		workingDir, err = os.Getwd()
-		if err != nil {
-			return
-		}
-		if workingDir == "/" {
-			workingDir = "."
-		}
-	}
-	c.path = workingDir + "/onChain.json"
-	err = LoadConfig(c.path, c)
-	if err != nil {
-		fmt.Println("read config err ", err)
-		return
 	}
 
 	chainType := os.Getenv(ENVCHAINTYPE)
@@ -219,22 +187,26 @@ func (c *OnChainConfig) LoadConfig() (err error) {
 		c.ChainConfigs[c.currentType][c.currentNode] = config
 	}
 
-	credentialPath := os.Getenv(ENVCREDENTIALPATH)
-	if credentialPath == "" {
-		fmt.Println("No ENVCREDENTIALPATH Environment variable.")
-		credentialPath = "./credential"
-	}
-	c.credentialPath = credentialPath
-	fmt.Println("c.credentialPath ", c.credentialPath, " ", credentialPath)
-
 	return
 }
 
-func (c *OnChainConfig) GetChainConfig() (config ChainConfig) {
+func (c *Config) GetRandomGroupSize() int {
+	return c.randomGroupSize
+}
+
+func (c *Config) GetCredentialPath() string {
+	return c.credentialPath
+}
+
+func (c *Config) GetCurrentType() string {
+	return c.currentType
+}
+
+func (c *Config) GetChainConfig() (config ChainConfig) {
 	return c.ChainConfigs[c.currentType][c.currentNode]
 }
 
-func (c *OnChainConfig) UpdateConfig(updated ChainConfig) (err error) {
+func (c *Config) UpdateConfig(updated ChainConfig) (err error) {
 	if _, loaded := c.ChainConfigs[c.currentType][c.currentNode]; loaded {
 		c.ChainConfigs[c.currentType][c.currentNode] = updated
 	}

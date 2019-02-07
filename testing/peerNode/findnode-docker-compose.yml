@@ -5,9 +5,11 @@ services:
    deploy:
      replicas: 1
    environment:
-     - appSubject=T_FindNode
-     - appName=BootNode
+     - APPSESSION=T_FindNode
+     - APPNAME=BootNode
+     - LOGIP=163.172.36.173:9500
      - NODEROLE=boot
+     - NODEPORT=44460
      - PEERSIZE=10
      - NUMOFMESSAGS=1
      - TESTSTRATEGY=FINDNODE
@@ -18,9 +20,11 @@ services:
    deploy:
      replicas: 10
    environment:
-     - appSubject=T_FindNode
-     - appName=PeerNode
+     - APPSESSION=T_FindNode
+     - APPNAME=PeerNode
+     - LOGIP=163.172.36.173:9500
      - BOOTSTRAPIP=bootstrap:44460
+     - NODEPORT=44460
      - PEERSIZE=10
      - NUMOFMESSAGS=1
      - TESTSTRATEGY=FINDNODE

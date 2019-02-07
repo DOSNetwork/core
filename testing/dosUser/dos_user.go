@@ -108,19 +108,12 @@ func main() {
 		log.Fatal(err)
 	}
 
-	onChainConfig := configuration.OnChainConfig{}
-	err = onChainConfig.LoadConfig()
-	if err != nil {
+	onChainConfig := configuration.Config{}
+	if err = onChainConfig.LoadConfig(); err != nil {
 		log.Fatal(err)
 	}
 
 	chainConfig := onChainConfig.GetChainConfig()
-
-	offChainConfig := configuration.OffChainConfig{}
-	err = offChainConfig.LoadConfig()
-	if err != nil {
-		log.Fatal(err)
-	}
 
 	//Wait until contract has group public key
 	for {
@@ -149,13 +142,29 @@ func main() {
 	if err = userTestAdaptor.SetAccount(onChainConfig.GetCredentialPath()); err != nil {
 		log.Fatal(err)
 	}
+
 	log.Init(userTestAdaptor.GetId()[:])
 	source := rand.NewSource(time.Now().UnixNano())
 	random := rand.New(source)
-	err = userTestAdaptor.Init(config.AskMeAnythingAddressPool[random.Intn(len(config.AskMeAnythingAddressPool))], chainConfig)
-	if err != nil {
+	if err = userTestAdaptor.Init(config.AskMeAnythingAddressPool[random.Intn(len(config.AskMeAnythingAddressPool))], chainConfig); err != nil {
 		log.Fatal(err)
 	}
+
+	rootCredentialPath := "testAccounts/bootCredential/fundKey"
+	if err := userTestAdaptor.BalanceMaintain(rootCredentialPath); err != nil {
+		log.Fatal(err)
+	}
+
+	go func() {
+		fmt.Println("regular balanceMaintain started")
+		ticker := time.NewTicker(time.Hour * 8)
+		for range ticker.C {
+			if err := userTestAdaptor.BalanceMaintain(rootCredentialPath); err != nil {
+				log.Fatal(err)
+			}
+		}
+	}()
+
 	logger = log.New("module", "AMAUser")
 	events := make(chan interface{}, 5)
 	if err = userTestAdaptor.SubscribeToAll(events); err != nil {

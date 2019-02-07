@@ -6,9 +6,8 @@ RUN env CGO_ENABLED=0 GOOS=linux GOARCH=amd64 && go build -ldflags "-linkmode ex
 
 FROM scratch
 COPY --from=builder /go/src/github.com/DOSNetwork/core/userNode /
-COPY --from=builder /go/src/github.com/DOSNetwork/core/onChain.json /
-COPY --from=builder /go/src/github.com/DOSNetwork/core/offChain.json /
+COPY --from=builder /go/src/github.com/DOSNetwork/core/config.json /
 COPY --from=builder /go/src/github.com/DOSNetwork/core/testing/dosUser/ama.json /
-COPY --from=builder /go/src/github.com/DOSNetwork/core/credential /credential/
+COPY --from=builder /go/src/github.com/DOSNetwork/core/testAccounts /testAccounts
 CMD ["/userNode"]
 

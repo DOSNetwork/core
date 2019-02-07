@@ -31,6 +31,7 @@ type ChainInterface interface {
 	SetRandomNum(ctx context.Context, signatures <-chan *vss.Signature) <-chan error
 	DataReturn(ctx context.Context, signatures <-chan *vss.Signature) <-chan error
 	SubscribeToAll(msgChan chan interface{}) (err error)
+	BalanceMaintain(rootCredentialPath string) (err error)
 	//For test
 	ResetNodeIDs() (err error)
 	RandomNumberTimeOut() (err error)
