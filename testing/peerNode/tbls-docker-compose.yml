@@ -5,9 +5,11 @@ services:
     deploy:
       replicas: 1
     environment:
-      - appSubject=T_TBLS
-      - appName=BootNode
+      - APPSESSION=T_TBLS
+      - APPNAME=BootNode
+      - LOGIP=163.172.36.173:9500
       - NODEROLE=boot
+      - NODEPORT=44460
       - PEERSIZE=10
       - TESTSTRATEGY=TBLS
   peernode:
@@ -17,9 +19,11 @@ services:
     deploy:
       replicas: 10
     environment:
-      - appSubject=T_TBLS
-      - appName=PeerNode
+      - APPSESSION=T_TBLS
+      - APPNAME=PeerNode
+      - LOGIP=163.172.36.173:9500
       - BOOTSTRAPIP=bootstrap:44460
+      - NODEPORT=44460
       - PEERSIZE=10
       - GROUPSIZE=10
       - TESTSTRATEGY=TBLS

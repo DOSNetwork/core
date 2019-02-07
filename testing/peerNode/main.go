@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/DOSNetwork/core/configuration"
 	"github.com/DOSNetwork/core/testing/peerNode/node"
 )
 
@@ -32,13 +31,13 @@ func main() {
 	var peerSize int
 	var numMessages int
 	debug.FreeOSMemory()
-	//1)Load config
-	offChainConfig := configuration.OffChainConfig{}
-	offChainConfig.LoadConfig()
-	port := offChainConfig.Port
-	//It also need to connect to bootstrape node to get crential
-	bootStrapIP := os.Getenv("BOOTSTRAPIP")
+	//need to connect to bootstrap node to get credential
 	noderole := os.Getenv("NODEROLE")
+	bootStrapIP := os.Getenv("BOOTSTRAPIP")
+	port, err := strconv.Atoi(os.Getenv("NODEPORT"))
+	if err != nil {
+		fmt.Println("NODEPORT ", err)
+	}
 	peerSize, err = strconv.Atoi(os.Getenv("PEERSIZE"))
 	if err != nil {
 		fmt.Println("PEERSIZE ", err)

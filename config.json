@@ -1,13 +1,16 @@
 {
+    "NodeRole": "BootstrapNode",
+    "BootStrapIp": "127.0.0.1",
+    "Port": 44460,
     "ChainConfigs": {
         "ETH": {
             "privateNode": {
-                "DOSProxyAddress": "0x0AF3Bc78e6F53AFe23D95Eb95e6D6Ef7CeD00798",
-                "DOSAddressBridgeAddress": "0x0c2A0f910683cE36fe7Ff097866fE398c4Ef359e",
+                "DOSProxyAddress": "0x68E0E5EF62bc80309128cbaD087d779822035d57",
+                "DOSAddressBridgeAddress": "0x6E9A8cb8Fb1b24569F4FbF16672c4835eF5C96D9",
                 "RemoteNodeAddressPool": [
                     "ws://163.172.36.173:8546"
                 ],
-                "RemoteNodeAddress": ""
+                "RemoteNodeAddress": "ws://163.172.36.173:8546"
             },
             "rinkebyInfura": {
                 "DOSProxyAddress": "0x1882d681b01e13F2CB3A5b1F8c05496EC02Ea035",
@@ -18,11 +21,10 @@
                 "RemoteNodeAddress": ""
             },
             "rinkebyPrivateNode": {
-                "DOSProxyAddress": "0x693C7de2e12fB7Ac7AAB1b3Aa353Bd24FD95Cfaf",
-                "DOSAddressBridgeAddress": "0xA008E094f56bCecD8516170CfEDE00F9C19FBDE5",
+                "DOSProxyAddress": "0xEaf6917171fA093a5879ffEAAFc3a7D52C931D13",
+                "DOSAddressBridgeAddress": "0xa52039D37520D5dd00aCC6B0D7C34DA01563F9CD",
                 "RemoteNodeAddressPool": [
-                    "ws://51.15.0.157:8546",
-                    "ws://51.159.4.51:8546"
+                    "ws://51.15.0.157:8546"
                 ],
                 "RemoteNodeAddress": "ws://51.15.0.157:8546"
             }

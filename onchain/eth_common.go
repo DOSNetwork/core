@@ -81,20 +81,14 @@ func (e *EthCommon) SetAccount(credentialPath string) (err error) {
 	}
 
 	usrKeyPath := newKeyStore.Accounts()[0].URL.Path
-	usrKeyJson, err := ioutil.ReadFile(usrKeyPath)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
 
-	usrKey, err := keystore.DecryptKey(usrKeyJson, passPhrase)
+	usrKey, err := e.getKey(usrKeyPath, passPhrase)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 
 	e.key = usrKey
-
 	return
 }
 
@@ -126,18 +120,24 @@ func (e *EthCommon) GetAddress() (key common.Address) {
 	return e.key.Address
 }
 
-func (e *EthCommon) BalanceMaintain(rootKeyPath, usrKeyPath, rPassPhrase, uPassPhrase string) (err error) {
+func (e *EthCommon) BalanceMaintain(rootCredentialPath string) (err error) {
 	fmt.Println("EthCommon BalanceMaintain")
+	fmt.Println("rootCredentialPath: ", rootCredentialPath)
+	passPhraseBytes, err := ioutil.ReadFile(rootCredentialPath + "/passPhrase")
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 
-	rootKey, err := e.getKey(rootKeyPath, rPassPhrase)
+	passPhrase := string(passPhraseBytes)
+	newKeyStore := keystore.NewKeyStore(rootCredentialPath, keystore.StandardScryptN, keystore.StandardScryptP)
+	rootKeyPath := newKeyStore.Accounts()[0].URL.Path
+	rootKey, err := e.getKey(rootKeyPath, passPhrase)
 	if err != nil {
 		return
 	}
-	usrKey, err := e.getKey(usrKeyPath, uPassPhrase)
-	if err != nil {
-		return
-	}
-	err = e.balanceMaintain(usrKey, rootKey)
+
+	err = e.balanceMaintain(e.key, rootKey)
 	return
 }
 

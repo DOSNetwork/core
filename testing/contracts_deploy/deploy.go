@@ -169,27 +169,37 @@ func main() {
 	contract := *contractPtr
 	configPath := *configPathPtr
 
-	os.Setenv("CONFIGPATH", "..")
-	os.Setenv("CREDENTIALPATH", credentialPath)
+	if err := os.Setenv("CONFIGPATH", ".."); err != nil {
+		log.Fatal(err)
+	}
 	//Get
-	onChainConfig := configuration.OnChainConfig{}
-	onChainConfig.LoadConfig()
-	chainConfig := onChainConfig.GetChainConfig()
+	config := configuration.Config{}
+	if err := config.LoadConfig(); err != nil {
+		log.Fatal(err)
+	}
+
+	chainConfig := config.GetChainConfig()
 	fmt.Println("Use : ", chainConfig)
 	fmt.Println(" address ", chainConfig.RemoteNodeAddress)
 
 	//Dial to blockchain
 	conn := &onchain.EthCommon{}
-	conn.SetAccount(onChainConfig.GetCredentialPath())
+	if err := conn.SetAccount(credentialPath); err != nil {
+		log.Fatal(err)
+	}
 
 	_ = conn.Init(chainConfig)
 
 	if contract == "DOSProxy" {
 		chainConfig.DOSProxyAddress = deployContract(conn, DOSProxy)
 		chainConfig.DOSAddressBridgeAddress = deployContract(conn, DOSAddressBridge)
-		onChainConfig.UpdateConfig(chainConfig)
+		if err := config.UpdateConfig(chainConfig); err != nil {
+			log.Fatal(err)
+		}
 
-		updateSDK(contractPath, chainConfig.DOSAddressBridgeAddress)
+		if err := updateSDK(contractPath, chainConfig.DOSAddressBridgeAddress); err != nil {
+			log.Fatal(err)
+		}
 
 		bridgeAddress := common.HexToAddress(chainConfig.DOSAddressBridgeAddress)
 		proxyAddress := common.HexToAddress(chainConfig.DOSProxyAddress)
@@ -215,6 +225,8 @@ func main() {
 			amaAdd = append(amaAdd, deployContract(conn, AMA))
 		}
 		amaConfig.AskMeAnythingAddressPool = amaAdd
-		configuration.UpdateConfig(configPath, amaConfig)
+		if err := configuration.UpdateConfig(configPath, amaConfig); err != nil {
+			log.Fatal(err)
+		}
 	}
 }

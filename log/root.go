@@ -35,16 +35,15 @@ func (u UTCFormatter) Format(e *logrus.Entry) ([]byte, error) {
 
 func Init(id []byte) {
 	fmt.Println("lgo Init")
-	appSession := os.Getenv("appSession")
-	appName := os.Getenv("appName")
+	appSession := os.Getenv("APPSESSION")
+	appName := os.Getenv("APPNAME")
 	nodId := byteTohex(id)
-	logIp := os.Getenv("logIp")
-	_ = logIp
+	logIp := os.Getenv("LOGIP")
 	logrus.SetLevel(logrus.DebugLevel)
 	logrus.SetOutput(ioutil.Discard)
 	logrus.SetFormatter(UTCFormatter{&logrus.JSONFormatter{}})
 	//IP,Subject and appName should read from environment variables
-	hook, err := logrustash.NewHook("tcp", "163.172.36.173:9500", appSession)
+	hook, err := logrustash.NewHook("tcp", logIp, appSession)
 	if err != nil {
 		fmt.Println(err)
 		logrus.Error(err)

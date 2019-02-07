@@ -6,5 +6,5 @@ RUN env CGO_ENABLED=0 GOOS=linux GOARCH=amd64 && go build -ldflags "-linkmode ex
 
 FROM scratch
 COPY --from=builder /go/src/github.com/DOSNetwork/core/peerNode /
-COPY --from=builder /go/src/github.com/DOSNetwork/core/offChain.json /
+COPY --from=builder /go/src/github.com/DOSNetwork/core/config.json /
 CMD ["/peerNode"]
