@@ -44,7 +44,11 @@ const (
 	TrafficUserQuery
 )
 
-const SubscribeTimeout = 60 //in second
+const (
+	LogBlockDiff        = 10
+	LogCheckingInterval = 15 //in second
+	SubscribeTimeout    = 60 //in second
+)
 
 type EthAdaptor struct {
 	EthCommon
@@ -54,6 +58,7 @@ type EthAdaptor struct {
 }
 
 func (e *EthAdaptor) Init(config configuration.ChainConfig) (err error) {
+	e.logger = log.New("module", "EthProxy")
 	if err = e.EthCommon.Init(config); err != nil {
 		e.logger.Error(err)
 		return
@@ -64,7 +69,6 @@ func (e *EthAdaptor) Init(config configuration.ChainConfig) (err error) {
 
 	fmt.Println("onChainConn initialization finished.")
 	err = e.dialToProxy()
-	e.logger = log.New("module", "EthProxy")
 	return
 }
 
@@ -120,33 +124,114 @@ func (e *EthAdaptor) resetOnChainConn() (err error) {
 	return
 }
 
+func (e *EthAdaptor) fetchMatureLogs(ctx context.Context, subscribeType int, ch chan interface{}) (err error) {
+	targetBlockN, err := e.GetCurrentBlock()
+	if err != nil {
+		return
+	}
+
+	duplicates := make(map[string]struct{})
+
+	ticker := time.NewTicker(LogCheckingInterval * time.Second)
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				currentBlockN, err := e.GetCurrentBlock()
+				if err != nil {
+					e.logger.Error(err)
+				}
+				for ; new(big.Int).Sub(currentBlockN, big.NewInt(LogBlockDiff)).Cmp(targetBlockN) >= 0; targetBlockN.Add(targetBlockN, big.NewInt(1)) {
+					switch subscribeType {
+					case SubscribeDOSProxyLogGrouping:
+						target64 := targetBlockN.Uint64()
+						logs, err := e.proxy.DOSProxyFilterer.FilterLogGrouping(&bind.FilterOpts{
+							Start:   target64,
+							End:     &target64,
+							Context: ctx,
+						})
+						if err != nil {
+							e.logger.Error(err)
+						}
+						for logs.Next() {
+							ch <- &DOSProxyLogGrouping{
+								NodeId: logs.Event.NodeId,
+							}
+
+							f := map[string]interface{}{
+								"logName": "Grouping",
+								"Removed": logs.Event.Raw.Removed,
+								"Tx":      logs.Event.Raw.TxHash.String(),
+								"BlockN":  logs.Event.Raw.BlockNumber}
+							if _, loaded := duplicates[logs.Event.Raw.TxHash.String()]; loaded {
+								f["duplicate"] = true
+							} else {
+								duplicates[logs.Event.Raw.TxHash.String()] = struct{}{}
+								f["duplicate"] = false
+							}
+							e.logger.Event("FetchMatureLog", f)
+						}
+						if logs.Error() != nil {
+							e.logger.Error(logs.Error())
+						}
+						if logs.Close() != nil {
+							e.logger.Error(logs.Error())
+						}
+					case SubscribeDOSProxyLogGroupDismiss:
+						target64 := targetBlockN.Uint64()
+						logs, err := e.proxy.DOSProxyFilterer.FilterLogGroupDismiss(&bind.FilterOpts{
+							Start:   target64,
+							End:     &target64,
+							Context: ctx,
+						})
+						if err != nil {
+							e.logger.Error(err)
+						}
+						for logs.Next() {
+							ch <- &DOSProxyLogGroupDismiss{
+								PubKey: logs.Event.PubKey,
+							}
+
+							f := map[string]interface{}{
+								"logName": "Dismissing",
+								"Removed": logs.Event.Raw.Removed,
+								"Tx":      logs.Event.Raw.TxHash.String(),
+								"BlockN":  logs.Event.Raw.BlockNumber}
+							if _, loaded := duplicates[logs.Event.Raw.TxHash.String()]; loaded {
+								f["duplicate"] = true
+							} else {
+								duplicates[logs.Event.Raw.TxHash.String()] = struct{}{}
+								f["duplicate"] = false
+							}
+							e.logger.Event("FetchMatureLog", f)
+						}
+						if logs.Error() != nil {
+							e.logger.Error(logs.Error())
+						}
+						if logs.Close() != nil {
+							e.logger.Error(logs.Error())
+						}
+					}
+				}
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	return
+}
+
 func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchOpts, subscribeType int, done chan bool) {
 	fmt.Println("attempt to subscribe event...")
 	switch subscribeType {
 	case SubscribeDOSProxyLogGrouping:
-		fmt.Println("subscribing DOSProxyLogGrouping event...")
-		transitChan := make(chan *dosproxy.DOSProxyLogGrouping)
-		sub, err := e.proxy.DOSProxyFilterer.WatchLogGrouping(opt, transitChan)
-		if err != nil {
+		if err := e.fetchMatureLogs(opt.Context, SubscribeDOSProxyLogGrouping, ch); err != nil {
 			done <- false
 			e.logger.Error(err)
 			fmt.Println("Network fail, will retry shortly")
 			return
-		}
-
-		fmt.Println("DOSProxyLogGrouping event subscribed")
-		done <- true
-		for {
-			select {
-			case err := <-sub.Err():
-				e.logger.Error(err)
-			case i := <-transitChan:
-				//if !e.filterLog(i.Raw) {
-				ch <- &DOSProxyLogGrouping{
-					NodeId: i.NodeId,
-				}
-				//}
-			}
+		} else {
+			done <- true
 		}
 	case SubscribeDOSProxyLogUrl:
 		fmt.Println("subscribing DOSProxyLogUrl event...")
@@ -467,29 +552,13 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 			}
 		}
 	case SubscribeDOSProxyLogGroupDismiss:
-		fmt.Println("subscribing DOSProxyLogGroupDismiss event...")
-		transitChan := make(chan *dosproxy.DOSProxyLogGroupDismiss)
-		sub, err := e.proxy.DOSProxyFilterer.WatchLogGroupDismiss(opt, transitChan)
-		if err != nil {
+		if err := e.fetchMatureLogs(opt.Context, SubscribeDOSProxyLogGroupDismiss, ch); err != nil {
 			done <- false
-			//log.WithField("function", "watchLogPublicKeyAccepted").Warn(err)
+			e.logger.Error(err)
 			fmt.Println("Network fail, will retry shortly")
 			return
-		}
-
-		fmt.Println("DOSProxyLogGroupDismiss event subscribed")
-		done <- true
-		for {
-			select {
-			case err := <-sub.Err():
-				log.Fatal(err)
-			case i := <-transitChan:
-				if !e.filterLog(i.Raw) {
-					ch <- &DOSProxyLogGroupDismiss{
-						PubKey: i.PubKey,
-					}
-				}
-			}
+		} else {
+			done <- true
 		}
 	case SubscribeDOSProxyWhitelistAddressTransferred:
 		fmt.Println("subscribing DOSProxyWhitelistAddressTransferred event...")
