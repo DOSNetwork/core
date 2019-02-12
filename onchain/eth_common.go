@@ -17,13 +17,14 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 )
 
 const (
 	GASLIMIT            = 5000000
-	REPLENISHTHRESHOLD  = 1.0
+	REPLENISHTHRESHOLD  = 0.6
 	REPLENISHAMOUNT     = 800000000000000000 //0.8 Eth
 	STOPSUBMITTHRESHOLD = 0.1
 )
@@ -156,9 +157,16 @@ func (e *EthCommon) balanceMaintain(usrKey, rootKey *keystore.Key) (err error) {
 
 	if usrKeyBalance.Cmp(big.NewFloat(REPLENISHTHRESHOLD)) == -1 {
 		fmt.Println("userKey account replenishing...")
-		if err = e.transferEth(rootKey, usrKey); err == nil {
-			fmt.Println("userKey account replenished.")
+		err = e.transferEth(rootKey, usrKey)
+		for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
+			time.Sleep(time.Second)
+			fmt.Println("transaction retry...")
+			err = e.transferEth(rootKey, usrKey)
 		}
+		if err != nil {
+			return
+		}
+		fmt.Println("userKey account replenished.")
 	}
 
 	return
