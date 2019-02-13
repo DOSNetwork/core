@@ -57,17 +57,20 @@ func mergeErrors(cs ...<-chan error) <-chan error {
 	go func() {
 		wg.Wait()
 		close(out)
+		defer logger.Event("Close_mergeErrors", map[string]interface{}{
+			"DOSEVENT": "Close_mergeErrors",
+			"Time":     time.Now()})
 	}()
 	return out
 }
 
 func fanIn(ctx context.Context, channels ...<-chan *vss.Signature) <-chan *vss.Signature {
+	startTime := time.Now()
 	var wg sync.WaitGroup
 	multiplexedStream := make(chan *vss.Signature)
 
 	multiplex := func(c <-chan *vss.Signature) {
 		defer wg.Done()
-
 		for i := range c {
 			select {
 			case <-ctx.Done():
@@ -79,14 +82,17 @@ func fanIn(ctx context.Context, channels ...<-chan *vss.Signature) <-chan *vss.S
 
 	// Select from all the channels
 	wg.Add(len(channels))
+
 	for _, c := range channels {
 		go multiplex(c)
 	}
 
 	// Wait for all the reads to complete
 	go func() {
-		defer logger.Event("EndFanIn", nil)
-
+		defer logger.Event("Close_fanIn", map[string]interface{}{
+			"DOSEVENT": "Close_fanIn",
+			"TFanIn":   (time.Since(startTime).Nanoseconds() / 1000),
+			"Time":     time.Now()})
 		wg.Wait()
 		close(multiplexedStream)
 	}()
@@ -95,61 +101,58 @@ func fanIn(ctx context.Context, channels ...<-chan *vss.Signature) <-chan *vss.S
 }
 
 func choseSubmitter(ctx context.Context, chain onchain.ChainInterface, lastSysRand *big.Int, ids [][]byte, outCount int) ([]chan []byte, <-chan error) {
-	x := int(lastSysRand.Uint64())
-	if x < 0 {
-		x = 0 - x
-	}
-	y := len(ids)
-	submitter := x % y
-	reChose := 0
-	checkBalance := make(chan int, 1)
-	checkAlive := make(chan int, 1)
-	errc := make(chan error, 1)
+	errc := make(chan error)
 	var outs []chan []byte
 	for i := 0; i < outCount; i++ {
 		outs = append(outs, make(chan []byte, 1))
 	}
 	go func() {
-		defer close(checkBalance)
-		defer close(checkAlive)
+		defer logger.TimeTrack(time.Now(), "TChoseSubmitter")
 		defer close(errc)
 
-		for {
+		f := map[string]interface{}{
+			"DOSEVENT": "Start_1_ChoseSubmitter",
+			"Time":     time.Now()}
+		logger.Event("Start_1_ChoseSubmitter", f)
+		lastRand := int(lastSysRand.Uint64())
+		if lastRand < 0 {
+			lastRand = 0 - lastRand
+		}
+		lastRand = lastRand - len(ids)
+		submitter := -1
+		//Check Balance
+		for i := 0; i < len(ids); i++ {
+			idx := (lastRand + i) % len(ids)
+			if chain.EnoughBalance(common.BytesToAddress(ids[idx])) {
+				submitter = idx
+				break
+			}
 			select {
-			case idx := <-checkBalance:
-				fmt.Println("checkBalance ")
-				if reChose == y {
-					errc <- errors.New("No Suitable Submitter")
-					return
-				}
-				if !chain.EnoughBalance(common.BytesToAddress(ids[idx])) {
-					reChose++
-					idx = (idx + 1) % y
-					checkBalance <- idx
-				} else {
-					checkAlive <- idx
-				}
-			case idx := <-checkAlive:
-
-				if reChose == y {
-					errc <- errors.New("No Suitable Submitter")
-					return
-				}
-				//TODO: Use ping/pong to check if submitter is alive
-				//out <- ids[idx]
-				for _, out := range outs {
-					out <- ids[idx]
-					close(out)
-				}
-				return
 			case <-ctx.Done():
 				return
+			default:
 			}
 		}
+
+		if submitter == -1 {
+			select {
+			case errc <- errors.New("All member doen't have enough balance"):
+			case <-ctx.Done():
+			}
+		} else {
+			for _, out := range outs {
+				select {
+				case out <- ids[submitter]:
+				case <-ctx.Done():
+				}
+				close(out)
+			}
+		}
+		return
 	}()
-	checkBalance <- submitter
 	return outs, errc
 }
+
 func requestSign(
 	ctx context.Context,
 	submitterc <-chan []byte,
@@ -160,47 +163,127 @@ func requestSign(
 	id []byte) (<-chan *vss.Signature, <-chan error) {
 	out := make(chan *vss.Signature)
 	errc := make(chan error)
-	retry := make(chan bool, 1)
 	go func() {
-		defer close(retry)
 		defer close(out)
 		defer close(errc)
+		defer logger.Event("Close_2_RequestSign", map[string]interface{}{
+			"DOSEVENT": "Close_2_RequestSign",
+			"Time":     time.Now()})
 
-		retryCount := 0
-		submitter := <-submitterc
-		if r := bytes.Compare(nodeId, submitter); r != 0 {
-			return
-		}
+		select {
+		case submitter, ok := <-submitterc:
+			if !ok {
+				return
+			}
+			if r := bytes.Compare(nodeId, submitter); r != 0 {
+				return
+			}
+			defer logger.TimeTrack(time.Now(), "TRequestSign")
 
-		sign := &vss.Signature{
-			Index:   trafficType,
-			QueryId: requestId,
-		}
-		retry <- true
-		for {
-			select {
-			case <-retry:
-				retryCount++
-				msg, err := p.Request(id, sign)
-				if err != nil {
-					if retryCount < 5 {
-						retry <- true
-					} else {
-						return
-					}
-				} else {
+			f := map[string]interface{}{
+				"DOSEVENT":  "Start_2_RequestSign",
+				"RequestId": fmt.Sprintf("%x", requestId),
+				"Time":      time.Now()}
+			logger.Event("Start_2_RequestSign", f)
+
+			sign := &vss.Signature{
+				Index:   trafficType,
+				QueryId: requestId,
+			}
+			retryCount := 0
+			for retryCount < 10 {
+				if msg, err := p.Request(id, sign); err == nil {
 					switch content := msg.(type) {
 					case *vss.Signature:
 						sign.Content = content.Content
 						sign.Signature = content.Signature
-						out <- sign
+						select {
+						case out <- sign:
+						case <-ctx.Done():
+						}
 						return
 					default:
 					}
 				}
+				retryCount++
+			}
+
+			select {
+			case errc <- errors.New("Retry limit exceeded"):
 			case <-ctx.Done():
+			}
+			return
+		case <-ctx.Done():
+			return
+		}
+	}()
+	return out, errc
+}
+
+func genSign(
+	ctx context.Context,
+	contentc <-chan []byte,
+	cSignToPeer chan *vss.Signature,
+	dkg dkg.P2PDkgInterface,
+	suite suites.Suite,
+	nodeID []byte,
+	pubkey [4]*big.Int,
+	requestId string,
+	index uint32) (<-chan *vss.Signature, <-chan error) {
+	out := make(chan *vss.Signature)
+	errc := make(chan error)
+	go func() {
+		var submitter []byte
+		var content []byte
+		defer logger.Event("Close_2_GenSign", map[string]interface{}{
+			"DOSEVENT": "Close_2_GenSign",
+			"Time":     time.Now()})
+		defer close(out)
+		defer close(errc)
+
+		select {
+		case value, ok := <-contentc:
+			if !ok {
 				return
 			}
+			defer logger.TimeTrack(time.Now(), "TGenSign")
+
+			content = value
+			submitter = content[len(content)-20:]
+			f := map[string]interface{}{
+				"DOSEVENT":  "Start_2_GenSign",
+				"RequestId": fmt.Sprintf("%x", requestId),
+				"Time":      time.Now()}
+			logger.Event("Start_2_GenSign", f)
+			sig, err := tbls.Sign(suite, dkg.GetShareSecurity(pubkey), content)
+			if err != nil {
+				select {
+				case errc <- err:
+				case <-ctx.Done():
+					return
+				}
+			}
+
+			sign := &vss.Signature{
+				Index:     index,
+				QueryId:   requestId,
+				Content:   content,
+				Signature: sig,
+			}
+			select {
+			case cSignToPeer <- sign:
+			case <-ctx.Done():
+			}
+			if r := bytes.Compare(nodeID, submitter); r == 0 {
+				select {
+				case out <- sign:
+				case <-ctx.Done():
+				}
+			}
+			return
+
+		case <-ctx.Done():
+			return
 		}
 	}()
 	return out, errc
@@ -215,16 +298,33 @@ func genUserRandom(
 ) <-chan []byte {
 	out := make(chan []byte)
 	go func() {
+		defer logger.Event("Close_2_GenUserRandom", map[string]interface{}{
+			"DOSEVENT": "Close_2_GenUserRandom",
+			"Time":     time.Now()})
 		defer close(out)
 
 		select {
-		case submitter := <-submitterc:
+		case submitter, ok := <-submitterc:
+			if !ok {
+				return
+			}
+			defer logger.TimeTrack(time.Now(), "TGenSign")
+
+			f := map[string]interface{}{
+				"DOSEVENT":  "Start_2_GenUserRandom",
+				"RequestId": fmt.Sprintf("%x", requestId),
+				"Time":      time.Now()}
+			logger.Event("Start_2_GenUserRandom", f)
 			// signed message: concat(requestId, lastSystemRandom, userSeed, submitter address)
 			random := append(requestId, lastSysRand...)
 			random = append(random, userSeed...)
 			random = append(random, submitter...)
-			out <- random
+			select {
+			case out <- random:
+			case <-ctx.Done():
+			}
 			return
+
 		case <-ctx.Done():
 			return
 		}
@@ -239,14 +339,29 @@ func genSysRandom(
 ) <-chan []byte {
 	out := make(chan []byte)
 	go func() {
+		defer logger.Event("Close_2_GenSysRandom", map[string]interface{}{
+			"DOSEVENT": "Close_2_GenSysRandom",
+			"Time":     time.Now()})
 		defer close(out)
 
 		select {
-		case submitter := <-submitterc:
+		case submitter, ok := <-submitterc:
+			if !ok {
+				return
+			}
+			defer logger.TimeTrack(time.Now(), "TGenSysRandom")
+
+			f := map[string]interface{}{
+				"DOSEVENT": "Start_2_GenSysRandom",
+				"Time":     time.Now()}
+			logger.Event("Start_2_GenSysRandom", f)
 			// signed message: concat(lastSystemRandom, submitter address)
 			paddedLastSysRand := padOrTrim(lastSysRand, RANDOMNUMBERSIZE)
 			random := append(paddedLastSysRand, submitter...)
-			out <- random
+			select {
+			case out <- random:
+			case <-ctx.Done():
+			}
 			return
 		case <-ctx.Done():
 			return
@@ -304,6 +419,10 @@ func genQueryResult(ctx context.Context, submitterc chan []byte, url string, pat
 	out := make(chan []byte)
 	errc := make(chan error)
 	go func() {
+		startTime := time.Now()
+		defer logger.Event("Close_2_GenQueryResult", map[string]interface{}{
+			"DOSEVENT": "Close_2_GenQueryResult",
+			"Time":     time.Now()})
 		defer close(out)
 		defer close(errc)
 
@@ -317,77 +436,27 @@ func genQueryResult(ctx context.Context, submitterc chan []byte, url string, pat
 			errc <- err
 			return
 		}
+		logger.TimeTrack(startTime, "TFetch")
 		select {
-		case submitter := <-submitterc:
+		case submitter, ok := <-submitterc:
+			if !ok {
+				return
+			}
+			defer logger.TimeTrack(time.Now(), "TGenQueryResult")
+
+			f := map[string]interface{}{
+				"DOSEVENT": "Start_2_genQueryResult",
+				"Time":     time.Now()}
+			logger.Event("Start_2_genQueryResult", f)
 			// signed message = concat(msgReturn, submitter address)
 			msgReturn = append(msgReturn, submitter...)
-			out <- msgReturn
+			select {
+			case out <- msgReturn:
+			case <-ctx.Done():
+			}
 			return
 		case <-ctx.Done():
 			return
-		}
-	}()
-	return out, errc
-}
-func genSign(
-	ctx context.Context,
-	submitterc <-chan []byte,
-	contentc <-chan []byte,
-	signc chan *vss.Signature,
-	dkg dkg.P2PDkgInterface,
-	suite suites.Suite,
-	nodeID []byte,
-	pubkey [4]*big.Int,
-	requestId string,
-	index uint32) (<-chan *vss.Signature, <-chan error) {
-	out := make(chan *vss.Signature)
-	errc := make(chan error)
-	wait := make(chan bool, 1)
-	go func() {
-		var submitter []byte
-		var content []byte
-		defer close(out)
-		defer close(errc)
-		defer close(wait)
-
-		for {
-			select {
-			case value, ok := <-submitterc:
-				if ok {
-					submitter = value
-					if len(submitter) != 0 && len(content) != 0 {
-						wait <- true
-					}
-				}
-			case value, ok := <-contentc:
-				if ok {
-					content = value
-
-					if len(submitter) != 0 && len(content) != 0 {
-						wait <- true
-					}
-				}
-			case <-wait:
-
-				sig, err := tbls.Sign(suite, dkg.GetShareSecurity(pubkey), content)
-				if err != nil {
-					errc <- err
-				}
-
-				sign := &vss.Signature{
-					Index:     index,
-					QueryId:   requestId,
-					Content:   content,
-					Signature: sig,
-				}
-				signc <- sign
-				if r := bytes.Compare(nodeID, submitter); r == 0 {
-					out <- sign
-				}
-				return
-			case <-ctx.Done():
-				return
-			}
 		}
 	}()
 	return out, errc
@@ -398,57 +467,70 @@ func recoverSign(ctx context.Context, signc <-chan *vss.Signature, suite suites.
 	errc := make(chan error)
 	go func() {
 		var signShares [][]byte
+		defer logger.Event("Close_4_RecoverSign", map[string]interface{}{
+			"DOSEVENT": "Close_4_RecoverSign",
+			"Time":     time.Now()})
 		defer close(out)
 		defer close(errc)
 
 		for {
 			select {
 			case sign, ok := <-signc:
-				if ok {
-					signShares = append(signShares, sign.Signature)
-
-					if len(signShares) >= nbThreshold {
-						sig, err := tbls.Recover(
-							suite,
-							pubPoly,
-							sign.Content,
-							signShares,
-							nbThreshold,
-							nbParticipants)
-						if err != nil {
-							continue
-						}
-
-						if err = bls.Verify(
-							suite,
-							pubPoly.Commit(),
-							sign.Content,
-							sig); err != nil {
-							continue
-						}
-						x, y := onchain.DecodeSig(sig)
-						fmt.Println("Verify success signature ", x.String(), y.String())
-
-						//Contract will append sender address to content to verify if it is a right submitter
-						t := len(sign.Content) - ADDRESSLENGTH
-						if t < 0 {
-							fmt.Println("Error : length of content less than 0", t)
-						}
-
-						queryResult := make([]byte, t)
-						copy(queryResult, sign.Content)
-
-						out <- &vss.Signature{
-							Index:     sign.Index,
-							QueryId:   sign.QueryId,
-							Content:   queryResult,
-							Signature: sig,
-						}
-					}
-					if len(signShares) == nbParticipants {
-						return
-					}
+				if !ok {
+					return
 				}
+				if len(signShares) == 0 {
+					defer logger.TimeTrack(time.Now(), "TRecoverSign")
+				}
+				f := map[string]interface{}{
+					"DOSEVENT":  "Start_4_RecoverSign",
+					"RequestId": fmt.Sprintf("%x", sign.QueryId),
+					"Time":      time.Now()}
+				logger.Event("Start_4_RecoverSign", f)
+				signShares = append(signShares, sign.Signature)
+
+				if len(signShares) >= nbThreshold {
+					sig, err := tbls.Recover(
+						suite,
+						pubPoly,
+						sign.Content,
+						signShares,
+						nbThreshold,
+						nbParticipants)
+					if err != nil {
+						continue
+					}
+
+					if err = bls.Verify(
+						suite,
+						pubPoly.Commit(),
+						sign.Content,
+						sig); err != nil {
+						continue
+					}
+					x, y := onchain.DecodeSig(sig)
+					fmt.Println("Verify success signature ", x.String(), y.String())
+
+					//Contract will append sender address to content to verify if it is a right submitter
+					t := len(sign.Content) - ADDRESSLENGTH
+					if t < 0 {
+						fmt.Println("Error : length of content less than 0", t)
+					}
+
+					queryResult := make([]byte, t)
+					copy(queryResult, sign.Content)
+					select {
+					case out <- &vss.Signature{
+						Index:     sign.Index,
+						QueryId:   sign.QueryId,
+						Content:   queryResult,
+						Signature: sig,
+					}:
+					case <-ctx.Done():
+					}
+					return
+				}
+
 			case <-ctx.Done():
 				return
 			}

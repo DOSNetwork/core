@@ -141,13 +141,12 @@ func (e *EthAdaptor) fetchMatureLogs(ctx context.Context, subscribeType int, ch 
 				if err != nil {
 					e.logger.Error(err)
 				}
-				for ; new(big.Int).Sub(currentBlockN, big.NewInt(LogBlockDiff)).Cmp(targetBlockN) >= 0; targetBlockN.Add(targetBlockN, big.NewInt(1)) {
+				for ; currentBlockN-LogBlockDiff >= targetBlockN; targetBlockN++ {
 					switch subscribeType {
 					case SubscribeDOSProxyLogGrouping:
-						target64 := targetBlockN.Uint64()
 						logs, err := e.proxy.DOSProxyFilterer.FilterLogGrouping(&bind.FilterOpts{
-							Start:   target64,
-							End:     &target64,
+							Start:   targetBlockN,
+							End:     &targetBlockN,
 							Context: ctx,
 						})
 						if err != nil {
@@ -155,7 +154,10 @@ func (e *EthAdaptor) fetchMatureLogs(ctx context.Context, subscribeType int, ch 
 						}
 						for logs.Next() {
 							ch <- &DOSProxyLogGrouping{
-								NodeId: logs.Event.NodeId,
+								NodeId:  logs.Event.NodeId,
+								Tx:      logs.Event.Raw.TxHash.Hex(),
+								BlockN:  logs.Event.Raw.BlockNumber,
+								Removed: logs.Event.Raw.Removed,
 							}
 
 							f := map[string]interface{}{
@@ -178,10 +180,9 @@ func (e *EthAdaptor) fetchMatureLogs(ctx context.Context, subscribeType int, ch 
 							e.logger.Error(logs.Error())
 						}
 					case SubscribeDOSProxyLogGroupDismiss:
-						target64 := targetBlockN.Uint64()
 						logs, err := e.proxy.DOSProxyFilterer.FilterLogGroupDismiss(&bind.FilterOpts{
-							Start:   target64,
-							End:     &target64,
+							Start:   targetBlockN,
+							End:     &targetBlockN,
 							Context: ctx,
 						})
 						if err != nil {
@@ -189,7 +190,10 @@ func (e *EthAdaptor) fetchMatureLogs(ctx context.Context, subscribeType int, ch 
 						}
 						for logs.Next() {
 							ch <- &DOSProxyLogGroupDismiss{
-								PubKey: logs.Event.PubKey,
+								PubKey:  logs.Event.PubKey,
+								Tx:      logs.Event.Raw.TxHash.Hex(),
+								BlockN:  logs.Event.Raw.BlockNumber,
+								Removed: logs.Event.Raw.Removed,
 							}
 
 							f := map[string]interface{}{
@@ -750,16 +754,17 @@ func (e *EthAdaptor) GetLastRandomness() (rand *big.Int, err error) {
 	return
 }
 
-func (e *EthAdaptor) GetLastUpdatedBlock() (blknum *big.Int, err error) {
-	blknum, err = e.proxy.LastUpdatedBlock(nil)
+func (e *EthAdaptor) GetLastUpdatedBlock() (blknum uint64, err error) {
+	lastBlk, err := e.proxy.LastUpdatedBlock(nil)
+	blknum = lastBlk.Uint64()
 	return
 }
 
-func (e *EthAdaptor) GetCurrentBlock() (blknum *big.Int, err error) {
+func (e *EthAdaptor) GetCurrentBlock() (blknum uint64, err error) {
 	var header *types.Header
 	header, err = e.Client.HeaderByNumber(context.Background(), nil)
 	if err == nil {
-		blknum = header.Number
+		blknum = header.Number.Uint64()
 	}
 	return
 }
@@ -936,6 +941,9 @@ func (e *EthAdaptor) RandomNumberTimeOut() (err error) {
 func (e *EthAdaptor) DataReturn(ctx context.Context, signatures <-chan *vss.Signature) <-chan error {
 	errc := make(chan error)
 	go func() {
+		defer e.logger.Event("Close_DataReturn", map[string]interface{}{
+			"DOSEVENT": "Close_DataReturn",
+			"Time":     time.Now()})
 		defer close(errc)
 		fmt.Println("Starting DataReturn...")
 		select {
@@ -943,6 +951,11 @@ func (e *EthAdaptor) DataReturn(ctx context.Context, signatures <-chan *vss.Sign
 			if !ok {
 				return
 			}
+			defer e.logger.TimeTrack(time.Now(), "TDataReturn")
+
+			e.logger.Event("DataReturn", map[string]interface{}{
+				"DOSEVENT": "DataReturn",
+				"Time":     time.Now()})
 			auth, err := e.GetAuth()
 			if err != nil {
 				fmt.Println("GetAuth() error")

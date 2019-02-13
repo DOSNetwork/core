@@ -113,3 +113,6 @@ func Progress(progress string) {
 func Event(e string, f map[string]interface{}) {
 	root.Event(e, f)
 }
+func TimeTrack(start time.Time, name string) {
+	root.TimeTrack(start, name)
+}

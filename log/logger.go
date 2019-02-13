@@ -3,6 +3,7 @@ package log
 import (
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/go-stack/stack"
 	"github.com/sirupsen/logrus"
@@ -43,6 +44,7 @@ type Logger interface {
 	Error(err error)
 	Fatal(err error)
 	Metrics(value interface{})
+	TimeTrack(time.Time, string)
 	Progress(progress string)
 	Event(e string, f map[string]interface{})
 }
@@ -129,23 +131,15 @@ func (l *logger) Event(e string, info map[string]interface{}) {
 	if l.entry == nil {
 		return
 	}
-	var caller string
-
-	fpcs := make([]uintptr, 1)
-	// Skip 3 levels to get the caller
-	n := runtime.Callers(3, fpcs)
-	if n == 0 {
-		caller = ""
-		l.entry.WithFields(logrus.Fields{"EVENT": e}).Info("")
-	} else {
-		c := runtime.FuncForPC(fpcs[0] - 1)
-		s := strings.Split(c.Name(), ".")
-		caller = s[len(s)-1] + "_"
-	}
 	if info != nil {
-		l.entry.WithFields(logrus.Fields{"EVENT": caller + e}).WithFields(info).Debug("")
+		l.entry.WithFields(logrus.Fields{"EVENT": e}).WithFields(info).Debug("")
 	} else {
-		l.entry.WithFields(logrus.Fields{"EVENT": caller + e}).Debug("")
+		l.entry.WithFields(logrus.Fields{"EVENT": e}).Debug("")
 
 	}
+}
+
+func (l *logger) TimeTrack(start time.Time, name string) {
+	elapsed := time.Since(start).Nanoseconds() / 1000
+	l.entry.WithFields(logrus.Fields{name: elapsed}).Debug("")
 }

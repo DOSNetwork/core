@@ -26,8 +26,8 @@ type ChainInterface interface {
 	GetId() (id []byte)
 	GetBlockHashByNumber(blknum *big.Int) (hash common.Hash, err error)
 	GetLastRandomness() (*big.Int, error)
-	GetLastUpdatedBlock() (*big.Int, error)
-	GetCurrentBlock() (*big.Int, error)
+	GetLastUpdatedBlock() (uint64, error)
+	GetCurrentBlock() (uint64, error)
 	SetRandomNum(ctx context.Context, signatures <-chan *vss.Signature) <-chan error
 	DataReturn(ctx context.Context, signatures <-chan *vss.Signature) <-chan error
 	SubscribeToAll(msgChan chan interface{}) (err error)
