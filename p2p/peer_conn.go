@@ -27,8 +27,8 @@ import (
 
 const (
 	HEARTBEATINTERVAL = 60 //In seconds
-	HEARTBEATMAXWAIT  = 10 //In seconds
-	HEARTBEATMAXCOUNT = 6
+	HEARTBEATMAXWAIT  = 5  //In seconds
+	HEARTBEATMAXCOUNT = 1
 	CONNIDLETIMEOUT   = 5
 	HITIMEOUT         = 60 //In seconds
 )
@@ -568,9 +568,7 @@ func (p *PeerConn) heartBeat() {
 			}
 
 			if p.idelPeriodCount == CONNIDLETIMEOUT {
-				if err := (*p.conn).Close(); err != nil {
-					p.logger.Error(err)
-				}
+				p.End()
 				return
 			}
 

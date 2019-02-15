@@ -44,7 +44,7 @@ type Logger interface {
 	Error(err error)
 	Fatal(err error)
 	Metrics(value interface{})
-	TimeTrack(time.Time, string)
+	TimeTrack(time.Time, string, map[string]interface{})
 	Progress(progress string)
 	Event(e string, f map[string]interface{})
 }
@@ -139,7 +139,15 @@ func (l *logger) Event(e string, info map[string]interface{}) {
 	}
 }
 
-func (l *logger) TimeTrack(start time.Time, name string) {
+func (l *logger) TimeTrack(start time.Time, e string, info map[string]interface{}) {
 	elapsed := time.Since(start).Nanoseconds() / 1000
-	l.entry.WithFields(logrus.Fields{name: elapsed}).Debug("")
+
+	if l.entry == nil {
+		return
+	}
+	if info != nil {
+		l.entry.WithFields(logrus.Fields{"EVENT": e, e: elapsed, "Time": time.Now()}).WithFields(info).Debug("")
+	} else {
+		l.entry.WithFields(logrus.Fields{"EVENT": e, e: elapsed, "Time": time.Now()}).Debug("")
+	}
 }

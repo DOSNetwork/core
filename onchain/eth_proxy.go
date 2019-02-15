@@ -2,6 +2,7 @@ package onchain
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"math/big"
 	"sync"
@@ -45,7 +46,7 @@ const (
 )
 
 const (
-	LogBlockDiff        = 10
+	LogBlockDiff        = 1
 	LogCheckingInterval = 15 //in second
 	SubscribeTimeout    = 60 //in second
 )
@@ -77,7 +78,7 @@ func (e *EthAdaptor) SubscribeEvent(ch chan interface{}, subscribeType int) (err
 	var cancel context.CancelFunc
 	opt.Context, cancel = context.WithCancel(context.Background())
 	done := make(chan bool)
-	ticker := time.NewTicker(SubscribeTimeout * time.Second)
+	timer := time.NewTimer(SubscribeTimeout * time.Second)
 
 	go e.subscribeEventAttempt(ch, opt, subscribeType, done)
 
@@ -95,7 +96,7 @@ func (e *EthAdaptor) SubscribeEvent(ch chan interface{}, subscribeType int) (err
 					go e.subscribeEventAttempt(ch, opt, subscribeType, done)
 				}
 			}
-		case <-ticker.C:
+		case <-timer.C:
 			cancel()
 			fmt.Println("subscribe timeout")
 			return
@@ -132,11 +133,11 @@ func (e *EthAdaptor) fetchMatureLogs(ctx context.Context, subscribeType int, ch 
 
 	duplicates := make(map[string]struct{})
 
-	ticker := time.NewTicker(LogCheckingInterval * time.Second)
+	timer := time.NewTimer(LogCheckingInterval * time.Second)
 	go func() {
 		for {
 			select {
-			case <-ticker.C:
+			case <-timer.C:
 				currentBlockN, err := e.GetCurrentBlock()
 				if err != nil {
 					e.logger.Error(err)
@@ -165,10 +166,22 @@ func (e *EthAdaptor) fetchMatureLogs(ctx context.Context, subscribeType int, ch 
 								"Removed": logs.Event.Raw.Removed,
 								"Tx":      logs.Event.Raw.TxHash.String(),
 								"BlockN":  logs.Event.Raw.BlockNumber}
-							if _, loaded := duplicates[logs.Event.Raw.TxHash.String()]; loaded {
+
+							var toHash []byte
+							for _, add := range logs.Event.NodeId {
+								toHash = append(toHash, add.Bytes()...)
+							}
+							toHash = append(toHash, logs.Event.Raw.TxHash.Bytes()...)
+							toHash = append(toHash, logs.Event.Raw.Address.Bytes()...)
+							toHash = append(toHash, logs.Event.Raw.Data...)
+							toHash = append(toHash, logs.Event.Raw.BlockHash.Bytes()...)
+
+							hashBytes := sha256.Sum256(toHash)
+
+							if _, loaded := duplicates[string(hashBytes[:])]; loaded {
 								f["duplicate"] = true
 							} else {
-								duplicates[logs.Event.Raw.TxHash.String()] = struct{}{}
+								duplicates[string(hashBytes[:])] = struct{}{}
 								f["duplicate"] = false
 							}
 							e.logger.Event("FetchMatureLog", f)
@@ -201,10 +214,22 @@ func (e *EthAdaptor) fetchMatureLogs(ctx context.Context, subscribeType int, ch 
 								"Removed": logs.Event.Raw.Removed,
 								"Tx":      logs.Event.Raw.TxHash.String(),
 								"BlockN":  logs.Event.Raw.BlockNumber}
-							if _, loaded := duplicates[logs.Event.Raw.TxHash.String()]; loaded {
+
+							var toHash []byte
+							for _, add := range logs.Event.PubKey {
+								toHash = append(toHash, add.Bytes()...)
+							}
+							toHash = append(toHash, logs.Event.Raw.TxHash.Bytes()...)
+							toHash = append(toHash, logs.Event.Raw.Address.Bytes()...)
+							toHash = append(toHash, logs.Event.Raw.Data...)
+							toHash = append(toHash, logs.Event.Raw.BlockHash.Bytes()...)
+
+							hashBytes := sha256.Sum256(toHash)
+
+							if _, loaded := duplicates[string(hashBytes[:])]; loaded {
 								f["duplicate"] = true
 							} else {
-								duplicates[logs.Event.Raw.TxHash.String()] = struct{}{}
+								duplicates[string(hashBytes[:])] = struct{}{}
 								f["duplicate"] = false
 							}
 							e.logger.Event("FetchMatureLog", f)
@@ -217,6 +242,7 @@ func (e *EthAdaptor) fetchMatureLogs(ctx context.Context, subscribeType int, ch 
 						}
 					}
 				}
+				timer.Reset(LogCheckingInterval * time.Second)
 			case <-ctx.Done():
 				return
 			}
@@ -266,6 +292,30 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 					BlockN:          i.Raw.BlockNumber,
 					Removed:         i.Raw.Removed,
 				}
+
+				ch <- &DOSProxyLogUrl{
+					QueryId:         i.QueryId,
+					Timeout:         i.Timeout,
+					DataSource:      i.DataSource,
+					Selector:        i.Selector,
+					Randomness:      i.Randomness,
+					DispatchedGroup: i.DispatchedGroup,
+					Tx:              i.Raw.TxHash.Hex(),
+					BlockN:          i.Raw.BlockNumber,
+					Removed:         true,
+				}
+
+				ch <- &DOSProxyLogUrl{
+					QueryId:         i.QueryId,
+					Timeout:         i.Timeout,
+					DataSource:      i.DataSource,
+					Selector:        i.Selector,
+					Randomness:      i.Randomness,
+					DispatchedGroup: i.DispatchedGroup,
+					Tx:              i.Raw.TxHash.Hex(),
+					BlockN:          i.Raw.BlockNumber,
+					Removed:         i.Raw.Removed,
+				}
 			}
 		}
 
@@ -296,6 +346,26 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 					BlockN:               i.Raw.BlockNumber,
 					Removed:              i.Raw.Removed,
 				}
+
+				ch <- &DOSProxyLogRequestUserRandom{
+					RequestId:            i.RequestId,
+					LastSystemRandomness: i.LastSystemRandomness,
+					UserSeed:             i.UserSeed,
+					DispatchedGroup:      i.DispatchedGroup,
+					Tx:                   i.Raw.TxHash.Hex(),
+					BlockN:               i.Raw.BlockNumber,
+					Removed:              true,
+				}
+
+				ch <- &DOSProxyLogRequestUserRandom{
+					RequestId:            i.RequestId,
+					LastSystemRandomness: i.LastSystemRandomness,
+					UserSeed:             i.UserSeed,
+					DispatchedGroup:      i.DispatchedGroup,
+					Tx:                   i.Raw.TxHash.Hex(),
+					BlockN:               i.Raw.BlockNumber,
+					Removed:              i.Raw.Removed,
+				}
 			}
 		}
 	case SubscribeDOSProxyLogUpdateRandom:
@@ -316,6 +386,22 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 			case err := <-sub.Err():
 				log.Fatal(err)
 			case i := <-transitChan:
+				ch <- &DOSProxyLogUpdateRandom{
+					LastRandomness:  i.LastRandomness,
+					DispatchedGroup: i.DispatchedGroup,
+					Tx:              i.Raw.TxHash.Hex(),
+					BlockN:          i.Raw.BlockNumber,
+					Removed:         i.Raw.Removed,
+				}
+
+				ch <- &DOSProxyLogUpdateRandom{
+					LastRandomness:  i.LastRandomness,
+					DispatchedGroup: i.DispatchedGroup,
+					Tx:              i.Raw.TxHash.Hex(),
+					BlockN:          i.Raw.BlockNumber,
+					Removed:         true,
+				}
+
 				ch <- &DOSProxyLogUpdateRandom{
 					LastRandomness:  i.LastRandomness,
 					DispatchedGroup: i.DispatchedGroup,
@@ -779,6 +865,7 @@ func (e *EthAdaptor) SetRandomNum(ctx context.Context, signatures <-chan *vss.Si
 			if !ok {
 				return
 			}
+			defer e.logger.TimeTrack(time.Now(), "SetRandomNum", map[string]interface{}{"RequestId": ctx.Value("RequestID")})
 			auth, err := e.GetAuth()
 			if err != nil {
 				fmt.Println("GetAuth() error")
@@ -789,12 +876,12 @@ func (e *EthAdaptor) SetRandomNum(ctx context.Context, signatures <-chan *vss.Si
 			x, y := DecodeSig(signature.Signature)
 			tx, err := e.proxy.UpdateRandomness(auth, [2]*big.Int{x, y}, 0)
 			if err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
-				ticker := time.NewTicker(1 * time.Second)
+				timer := time.NewTimer(1 * time.Second)
 				retryCount := 0
 			l:
 				for {
 					select {
-					case <-ticker.C:
+					case <-timer.C:
 						fmt.Println("transaction retry...")
 						retryCount++
 						auth, err = e.GetAuth()
@@ -802,16 +889,17 @@ func (e *EthAdaptor) SetRandomNum(ctx context.Context, signatures <-chan *vss.Si
 							fmt.Println("GetAuth() error")
 							e.logger.Error(err)
 							errc <- err
-							ticker.Stop()
+							timer.Stop()
 							return
 						}
 						tx, err = e.proxy.UpdateRandomness(auth, [2]*big.Int{x, y}, 0)
-						if err == nil || retryCount >= 10 || (err.Error() != core.ErrNonceTooLow.Error() && err.Error() != core.ErrReplaceUnderpriced.Error()) {
-							ticker.Stop()
+						if err == nil || (err.Error() != core.ErrNonceTooLow.Error() && err.Error() != core.ErrReplaceUnderpriced.Error()) {
+							timer.Stop()
 							break l
 						}
+						timer.Reset(1 * time.Second)
 					case <-ctx.Done():
-						ticker.Stop()
+						timer.Stop()
 						return
 					}
 				}
@@ -850,12 +938,12 @@ func (e *EthAdaptor) UploadPubKey(ctx context.Context, pubKeys chan [4]*big.Int)
 			}
 			tx, err := e.proxy.SetPublicKey(auth, pubKey)
 			if err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
-				ticker := time.NewTicker(1 * time.Second)
+				timer := time.NewTimer(1 * time.Second)
 				retryCount := 0
 			l:
 				for {
 					select {
-					case <-ticker.C:
+					case <-timer.C:
 						fmt.Println("transaction retry...")
 						retryCount++
 						auth, err = e.GetAuth()
@@ -863,16 +951,17 @@ func (e *EthAdaptor) UploadPubKey(ctx context.Context, pubKeys chan [4]*big.Int)
 							fmt.Println("GetAuth() error")
 							e.logger.Error(err)
 							errc <- err
-							ticker.Stop()
+							timer.Stop()
 							return
 						}
 						tx, err = e.proxy.SetPublicKey(auth, pubKey)
-						if err == nil || retryCount >= 10 || (err.Error() != core.ErrNonceTooLow.Error() && err.Error() != core.ErrReplaceUnderpriced.Error()) {
-							ticker.Stop()
+						if err == nil || (err.Error() != core.ErrNonceTooLow.Error() && err.Error() != core.ErrReplaceUnderpriced.Error()) {
+							timer.Stop()
 							break l
 						}
+						timer.Reset(1 * time.Second)
 					case <-ctx.Done():
-						ticker.Stop()
+						timer.Stop()
 						return
 					}
 				}
@@ -951,11 +1040,11 @@ func (e *EthAdaptor) DataReturn(ctx context.Context, signatures <-chan *vss.Sign
 			if !ok {
 				return
 			}
-			defer e.logger.TimeTrack(time.Now(), "TDataReturn")
+			defer e.logger.TimeTrack(time.Now(), "DataReturn", map[string]interface{}{"RequestId": ctx.Value("RequestID")})
 
-			e.logger.Event("DataReturn", map[string]interface{}{
-				"DOSEVENT": "DataReturn",
-				"Time":     time.Now()})
+			x, y := DecodeSig(signature.Signature)
+			requestId, _ := new(big.Int).SetString(signature.QueryId, 10)
+
 			auth, err := e.GetAuth()
 			if err != nil {
 				fmt.Println("GetAuth() error")
@@ -963,17 +1052,15 @@ func (e *EthAdaptor) DataReturn(ctx context.Context, signatures <-chan *vss.Sign
 				errc <- err
 				return
 			}
-			x, y := DecodeSig(signature.Signature)
-			requestId, _ := new(big.Int).SetString(signature.QueryId, 10)
 
 			tx, err := e.proxy.TriggerCallback(auth, requestId, uint8(signature.Index), signature.Content, [2]*big.Int{x, y}, 0)
 			if err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
-				ticker := time.NewTicker(1 * time.Second)
+				timer := time.NewTimer(1 * time.Second)
 				retryCount := 0
 			l:
 				for {
 					select {
-					case <-ticker.C:
+					case <-timer.C:
 						fmt.Println("transaction retry...")
 						retryCount++
 						auth, err = e.GetAuth()
@@ -981,16 +1068,17 @@ func (e *EthAdaptor) DataReturn(ctx context.Context, signatures <-chan *vss.Sign
 							fmt.Println("GetAuth() error")
 							e.logger.Error(err)
 							errc <- err
-							ticker.Stop()
+							timer.Stop()
 							return
 						}
 						tx, err = e.proxy.TriggerCallback(auth, requestId, uint8(signature.Index), signature.Content, [2]*big.Int{x, y}, 0)
-						if err == nil || retryCount >= 10 || (err.Error() != core.ErrNonceTooLow.Error() && err.Error() != core.ErrReplaceUnderpriced.Error()) {
-							ticker.Stop()
+						if err == nil || (err.Error() != core.ErrNonceTooLow.Error() && err.Error() != core.ErrReplaceUnderpriced.Error()) {
+							timer.Stop()
 							break l
 						}
+						timer.Reset(1 * time.Second)
 					case <-ctx.Done():
-						ticker.Stop()
+						timer.Stop()
 						return
 					}
 				}
@@ -1048,9 +1136,10 @@ func (e *EthAdaptor) filterLog(raw types.Log) (duplicates bool) {
 }
 
 func (e *EthAdaptor) logMapTimeout() {
-	ticker := time.NewTicker(10 * time.Minute)
-	for range ticker.C {
+	timer := time.NewTimer(10 * time.Minute)
+	for range timer.C {
 		e.logFilter.Range(e.checkTime)
+		timer.Reset(10 * time.Minute)
 	}
 
 }

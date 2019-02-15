@@ -34,7 +34,6 @@ func (u UTCFormatter) Format(e *logrus.Entry) ([]byte, error) {
 }
 
 func Init(id []byte) {
-	fmt.Println("lgo Init")
 	appSession := os.Getenv("APPSESSION")
 	appName := os.Getenv("APPNAME")
 	nodId := byteTohex(id)
@@ -113,6 +112,6 @@ func Progress(progress string) {
 func Event(e string, f map[string]interface{}) {
 	root.Event(e, f)
 }
-func TimeTrack(start time.Time, name string) {
-	root.TimeTrack(start, name)
+func TimeTrack(start time.Time, e string, info map[string]interface{}) {
+	root.TimeTrack(start, e, info)
 }

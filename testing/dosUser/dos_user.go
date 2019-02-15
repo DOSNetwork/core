@@ -272,7 +272,7 @@ func main() {
 }
 
 func VerifyResult(requestId string, rType string) {
-	timer := time.NewTimer(150 * time.Second)
+	timer := time.NewTimer(15 * time.Second)
 	select {
 	case <-timer.C:
 		if rMap[requestId] != "" && rMap[requestId] != "0" {

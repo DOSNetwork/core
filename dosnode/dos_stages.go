@@ -31,7 +31,7 @@ const (
 	ADDRESSLENGTH    = 20
 )
 
-func mergeErrors(cs ...<-chan error) <-chan error {
+func mergeErrors(ctx context.Context, cs ...<-chan error) <-chan error {
 	var wg sync.WaitGroup
 	// We must ensure that the output channel has the capacity to
 	// hold as many errors
@@ -44,7 +44,11 @@ func mergeErrors(cs ...<-chan error) <-chan error {
 	// wg.Done.
 	output := func(c <-chan error) {
 		for n := range c {
-			out <- n
+			select {
+			case <-ctx.Done():
+				return
+			case out <- n:
+			}
 		}
 		wg.Done()
 	}
@@ -55,17 +59,15 @@ func mergeErrors(cs ...<-chan error) <-chan error {
 	// Start a goroutine to close out once all the output goroutines
 	// are done.  This must start after the wg.Add call.
 	go func() {
+		defer logger.TimeTrack(time.Now(), "MergeErrors", map[string]interface{}{"RequestId": ctx.Value("RequestID")})
+
 		wg.Wait()
 		close(out)
-		defer logger.Event("Close_mergeErrors", map[string]interface{}{
-			"DOSEVENT": "Close_mergeErrors",
-			"Time":     time.Now()})
 	}()
 	return out
 }
 
 func fanIn(ctx context.Context, channels ...<-chan *vss.Signature) <-chan *vss.Signature {
-	startTime := time.Now()
 	var wg sync.WaitGroup
 	multiplexedStream := make(chan *vss.Signature)
 
@@ -89,10 +91,8 @@ func fanIn(ctx context.Context, channels ...<-chan *vss.Signature) <-chan *vss.S
 
 	// Wait for all the reads to complete
 	go func() {
-		defer logger.Event("Close_fanIn", map[string]interface{}{
-			"DOSEVENT": "Close_fanIn",
-			"TFanIn":   (time.Since(startTime).Nanoseconds() / 1000),
-			"Time":     time.Now()})
+		defer logger.TimeTrack(time.Now(), "FanIn", map[string]interface{}{"RequestId": ctx.Value("RequestID")})
+
 		wg.Wait()
 		close(multiplexedStream)
 	}()
@@ -107,13 +107,10 @@ func choseSubmitter(ctx context.Context, chain onchain.ChainInterface, lastSysRa
 		outs = append(outs, make(chan []byte, 1))
 	}
 	go func() {
-		defer logger.TimeTrack(time.Now(), "TChoseSubmitter")
+		defer logger.TimeTrack(time.Now(), "ChoseSubmitter", map[string]interface{}{"RequestId": ctx.Value("RequestID")})
+
 		defer close(errc)
 
-		f := map[string]interface{}{
-			"DOSEVENT": "Start_1_ChoseSubmitter",
-			"Time":     time.Now()}
-		logger.Event("Start_1_ChoseSubmitter", f)
 		lastRand := int(lastSysRand.Uint64())
 		if lastRand < 0 {
 			lastRand = 0 - lastRand
@@ -166,9 +163,6 @@ func requestSign(
 	go func() {
 		defer close(out)
 		defer close(errc)
-		defer logger.Event("Close_2_RequestSign", map[string]interface{}{
-			"DOSEVENT": "Close_2_RequestSign",
-			"Time":     time.Now()})
 
 		select {
 		case submitter, ok := <-submitterc:
@@ -178,13 +172,7 @@ func requestSign(
 			if r := bytes.Compare(nodeId, submitter); r != 0 {
 				return
 			}
-			defer logger.TimeTrack(time.Now(), "TRequestSign")
-
-			f := map[string]interface{}{
-				"DOSEVENT":  "Start_2_RequestSign",
-				"RequestId": fmt.Sprintf("%x", requestId),
-				"Time":      time.Now()}
-			logger.Event("Start_2_RequestSign", f)
+			defer logger.TimeTrack(time.Now(), "RequestSign", map[string]interface{}{"RequestId": ctx.Value("RequestID")})
 
 			sign := &vss.Signature{
 				Index:   trafficType,
@@ -235,9 +223,6 @@ func genSign(
 	go func() {
 		var submitter []byte
 		var content []byte
-		defer logger.Event("Close_2_GenSign", map[string]interface{}{
-			"DOSEVENT": "Close_2_GenSign",
-			"Time":     time.Now()})
 		defer close(out)
 		defer close(errc)
 
@@ -246,15 +231,11 @@ func genSign(
 			if !ok {
 				return
 			}
-			defer logger.TimeTrack(time.Now(), "TGenSign")
+			defer logger.TimeTrack(time.Now(), "GenSign", map[string]interface{}{"RequestId": ctx.Value("RequestID")})
 
 			content = value
 			submitter = content[len(content)-20:]
-			f := map[string]interface{}{
-				"DOSEVENT":  "Start_2_GenSign",
-				"RequestId": fmt.Sprintf("%x", requestId),
-				"Time":      time.Now()}
-			logger.Event("Start_2_GenSign", f)
+
 			sig, err := tbls.Sign(suite, dkg.GetShareSecurity(pubkey), content)
 			if err != nil {
 				select {
@@ -298,9 +279,6 @@ func genUserRandom(
 ) <-chan []byte {
 	out := make(chan []byte)
 	go func() {
-		defer logger.Event("Close_2_GenUserRandom", map[string]interface{}{
-			"DOSEVENT": "Close_2_GenUserRandom",
-			"Time":     time.Now()})
 		defer close(out)
 
 		select {
@@ -308,13 +286,8 @@ func genUserRandom(
 			if !ok {
 				return
 			}
-			defer logger.TimeTrack(time.Now(), "TGenSign")
+			defer logger.TimeTrack(time.Now(), "GenUserRandom", map[string]interface{}{"RequestId": ctx.Value("RequestID")})
 
-			f := map[string]interface{}{
-				"DOSEVENT":  "Start_2_GenUserRandom",
-				"RequestId": fmt.Sprintf("%x", requestId),
-				"Time":      time.Now()}
-			logger.Event("Start_2_GenUserRandom", f)
 			// signed message: concat(requestId, lastSystemRandom, userSeed, submitter address)
 			random := append(requestId, lastSysRand...)
 			random = append(random, userSeed...)
@@ -339,9 +312,6 @@ func genSysRandom(
 ) <-chan []byte {
 	out := make(chan []byte)
 	go func() {
-		defer logger.Event("Close_2_GenSysRandom", map[string]interface{}{
-			"DOSEVENT": "Close_2_GenSysRandom",
-			"Time":     time.Now()})
 		defer close(out)
 
 		select {
@@ -349,12 +319,8 @@ func genSysRandom(
 			if !ok {
 				return
 			}
-			defer logger.TimeTrack(time.Now(), "TGenSysRandom")
+			defer logger.TimeTrack(time.Now(), "GenSysRandom", map[string]interface{}{"RequestId": ctx.Value("RequestID")})
 
-			f := map[string]interface{}{
-				"DOSEVENT": "Start_2_GenSysRandom",
-				"Time":     time.Now()}
-			logger.Event("Start_2_GenSysRandom", f)
 			// signed message: concat(lastSystemRandom, submitter address)
 			paddedLastSysRand := padOrTrim(lastSysRand, RANDOMNUMBERSIZE)
 			random := append(paddedLastSysRand, submitter...)
@@ -420,9 +386,7 @@ func genQueryResult(ctx context.Context, submitterc chan []byte, url string, pat
 	errc := make(chan error)
 	go func() {
 		startTime := time.Now()
-		defer logger.Event("Close_2_GenQueryResult", map[string]interface{}{
-			"DOSEVENT": "Close_2_GenQueryResult",
-			"Time":     time.Now()})
+
 		defer close(out)
 		defer close(errc)
 
@@ -436,18 +400,14 @@ func genQueryResult(ctx context.Context, submitterc chan []byte, url string, pat
 			errc <- err
 			return
 		}
-		logger.TimeTrack(startTime, "TFetch")
+		logger.TimeTrack(startTime, "TFetch", map[string]interface{}{"RequestId": ctx.Value("RequestID")})
 		select {
 		case submitter, ok := <-submitterc:
 			if !ok {
 				return
 			}
-			defer logger.TimeTrack(time.Now(), "TGenQueryResult")
+			defer logger.TimeTrack(time.Now(), "GenQueryResult", map[string]interface{}{"RequestId": ctx.Value("RequestID")})
 
-			f := map[string]interface{}{
-				"DOSEVENT": "Start_2_genQueryResult",
-				"Time":     time.Now()}
-			logger.Event("Start_2_genQueryResult", f)
 			// signed message = concat(msgReturn, submitter address)
 			msgReturn = append(msgReturn, submitter...)
 			select {
@@ -467,9 +427,6 @@ func recoverSign(ctx context.Context, signc <-chan *vss.Signature, suite suites.
 	errc := make(chan error)
 	go func() {
 		var signShares [][]byte
-		defer logger.Event("Close_4_RecoverSign", map[string]interface{}{
-			"DOSEVENT": "Close_4_RecoverSign",
-			"Time":     time.Now()})
 		defer close(out)
 		defer close(errc)
 
@@ -480,13 +437,9 @@ func recoverSign(ctx context.Context, signc <-chan *vss.Signature, suite suites.
 					return
 				}
 				if len(signShares) == 0 {
-					defer logger.TimeTrack(time.Now(), "TRecoverSign")
+					defer logger.TimeTrack(time.Now(), "RecoverSign", map[string]interface{}{"RequestId": ctx.Value("RequestID")})
 				}
-				f := map[string]interface{}{
-					"DOSEVENT":  "Start_4_RecoverSign",
-					"RequestId": fmt.Sprintf("%x", sign.QueryId),
-					"Time":      time.Now()}
-				logger.Event("Start_4_RecoverSign", f)
+
 				signShares = append(signShares, sign.Signature)
 
 				if len(signShares) >= nbThreshold {
@@ -498,6 +451,7 @@ func recoverSign(ctx context.Context, signc <-chan *vss.Signature, suite suites.
 						nbThreshold,
 						nbParticipants)
 					if err != nil {
+						errc <- err
 						continue
 					}
 
@@ -506,6 +460,7 @@ func recoverSign(ctx context.Context, signc <-chan *vss.Signature, suite suites.
 						pubPoly.Commit(),
 						sign.Content,
 						sig); err != nil {
+						errc <- err
 						continue
 					}
 					x, y := onchain.DecodeSig(sig)
@@ -514,7 +469,7 @@ func recoverSign(ctx context.Context, signc <-chan *vss.Signature, suite suites.
 					//Contract will append sender address to content to verify if it is a right submitter
 					t := len(sign.Content) - ADDRESSLENGTH
 					if t < 0 {
-						fmt.Println("Error : length of content less than 0", t)
+						errc <- errors.New("length of content less than 0")
 					}
 
 					queryResult := make([]byte, t)
