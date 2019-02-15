@@ -77,7 +77,7 @@ func GIdsToSessionID(groupIds [][]byte) string {
 		sessionIdBytes = append(sessionIdBytes, groupId...)
 	}
 	sessionIdhash := sha256.Sum256(sessionIdBytes)
-	sessionId := new(big.Int).SetBytes(sessionIdhash[:]).String()
+	sessionId := fmt.Sprintf("%x", new(big.Int).SetBytes(sessionIdhash[:]))
 	return sessionId
 }
 
@@ -267,6 +267,8 @@ func (d *P2PDkg) pipeExchangePubKey(newSession *DkgSession, outToEventloop chan<
 	errc := make(chan error)
 
 	go func() {
+		defer d.logger.TimeTrack(time.Now(), "pipeExchangePubKey", map[string]interface{}{"SessionID": newSession.ctx.Value("RequestID")})
+
 		defer close(errc)
 		defer close(out)
 		newSession.pubkeyIdMap = make(map[string]string)
@@ -358,6 +360,7 @@ func (d *P2PDkg) pipeNewDistKeyGenerator(dkgSession <-chan *DkgSession, outToEve
 		defer close(errc)
 		defer close(out)
 		for newSession := range dkgSession {
+			defer d.logger.TimeTrack(time.Now(), "pipeNewDistKeyGenerator", map[string]interface{}{"SessionID": newSession.ctx.Value("RequestID")})
 			var err error
 			sort.Sort(newSession.pubKeys)
 			newSession.partDkg, err = NewDistKeyGenerator(d.suite, newSession.partSec, newSession.pubKeys, len(newSession.GroupIds)/2+1)
@@ -450,6 +453,8 @@ func (d *P2PDkg) pipeProcessDealAndResponses(dkgSession <-chan *DkgSession, outT
 	go func() {
 		defer close(errc)
 		for newSession := range dkgSession {
+			defer d.logger.TimeTrack(time.Now(), "pipeProcessDealAndResponses", map[string]interface{}{"SessionID": newSession.ctx.Value("RequestID")})
+
 			var resps []*Response
 			for _, deal := range newSession.deals {
 				resp, err := (*newSession.partDkg).ProcessDeal(&deal)

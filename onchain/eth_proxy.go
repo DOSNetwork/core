@@ -929,6 +929,8 @@ func (e *EthAdaptor) UploadPubKey(ctx context.Context, pubKeys chan [4]*big.Int)
 		fmt.Println("Starting UploadPubKey...")
 		select {
 		case pubKey := <-pubKeys:
+			defer e.logger.TimeTrack(time.Now(), "UploadPubKey", map[string]interface{}{"SessionID": ctx.Value("SessionID")})
+
 			auth, err := e.GetAuth()
 			if err != nil {
 				fmt.Println("GetAuth() error")
@@ -1030,9 +1032,6 @@ func (e *EthAdaptor) RandomNumberTimeOut() (err error) {
 func (e *EthAdaptor) DataReturn(ctx context.Context, signatures <-chan *vss.Signature) <-chan error {
 	errc := make(chan error)
 	go func() {
-		defer e.logger.Event("Close_DataReturn", map[string]interface{}{
-			"DOSEVENT": "Close_DataReturn",
-			"Time":     time.Now()})
 		defer close(errc)
 		fmt.Println("Starting DataReturn...")
 		select {

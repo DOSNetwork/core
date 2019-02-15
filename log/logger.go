@@ -94,7 +94,7 @@ func (l *logger) Error(err error) {
 		return
 	}
 	s := stack.Trace().TrimRuntime()
-	l.entry.WithFields(logrus.Fields{"stack": s}).Error(err)
+	l.entry.WithFields(logrus.Fields{"Stack": s, "ErrMsg": err}).Error(err)
 }
 
 func (l *logger) Fatal(err error) {

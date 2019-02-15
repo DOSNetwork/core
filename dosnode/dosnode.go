@@ -106,6 +106,7 @@ func (d *DosNode) buildPipeline(valueCtx context.Context, pubkey [4]*big.Int, re
 		cContent = genUserRandom(valueCtx, cSubmitter[0], requestID.Bytes(), lastRand.Bytes(), useSeed.Bytes())
 	case onchain.TrafficUserQuery:
 		cContent, cErr = genQueryResult(valueCtx, cSubmitter[0], url, selector)
+		errcList = append(errcList, cErr)
 	}
 
 	cSign, cErr = genSign(valueCtx, cContent, d.cSignToPeer, d.dkg, d.suite, d.chain.GetId(), pubkey, requestID.String(), pType)
@@ -232,26 +233,24 @@ func (d *DosNode) listen() (err error) {
 				if isMember {
 					sessionId := dkg.GIdsToSessionID(groupIds)
 					f := map[string]interface{}{
-						"Removed": content.Removed,
-						"Tx":      content.Tx,
-						"CurBlkN": currentBlockNumber,
-						"BlockN":  content.BlockN,
-						"Time":    time.Now()}
+						"SessionID": fmt.Sprintf("%x", sessionId),
+						"Removed":   content.Removed,
+						"Tx":        content.Tx,
+						"CurBlkN":   currentBlockNumber,
+						"BlockN":    content.BlockN,
+						"Time":      time.Now()}
 					logger.Event("DOS_Grouping", f)
 					if !content.Removed {
 						ctx, cancelFunc := context.WithCancel(context.Background())
+						valueCtx := context.WithValue(ctx, "RequestId", sessionId)
 						pipeCancel[sessionId] = cancelFunc
 						var errcList []<-chan error
-						outFromDkg, errc := d.dkg.Start(ctx, groupIds, sessionId)
+						outFromDkg, errc := d.dkg.Start(valueCtx, groupIds, sessionId)
 						errcList = append(errcList, errc)
-						errc = d.chain.UploadPubKey(ctx, outFromDkg)
+						errc = d.chain.UploadPubKey(valueCtx, outFromDkg)
 						errcList = append(errcList, errc)
-						errc = mergeErrors(ctx, errcList...)
+						errc = mergeErrors(valueCtx, errcList...)
 						go d.waitForGrouping(errc)
-					} else { //if chain reorg then call
-						if pipeCancel[sessionId] != nil {
-							pipeCancel[sessionId]()
-						}
 					}
 				}
 			case msg := <-eventGroupDismiss:
@@ -262,7 +261,9 @@ func (d *DosNode) listen() (err error) {
 				}
 
 				if d.isMember(content.PubKey) && d.dkg.GroupDismiss(content.PubKey) {
+					sessionId := dkg.GIdsToSessionID(d.dkg.GetGroupIDs(content.PubKey))
 					f := map[string]interface{}{
+						"SessionID":         fmt.Sprintf("%x", sessionId),
 						"DispatchedGroup_1": fmt.Sprintf("%x", content.PubKey[0].Bytes()),
 						"DispatchedGroup_2": fmt.Sprintf("%x", content.PubKey[1].Bytes()),
 						"DispatchedGroup_3": fmt.Sprintf("%x", content.PubKey[2].Bytes()),
@@ -371,7 +372,7 @@ func (d *DosNode) listen() (err error) {
 						//	delete(pipeCancel, requestID)
 						//}
 						ctx, cancelFunc := context.WithCancel(context.Background())
-						valueCtx := context.WithValue(ctx, "RequestID", fmt.Sprintf("%x", content.QueryId.String()))
+						valueCtx := context.WithValue(ctx, "RequestID", fmt.Sprintf("%x", content.QueryId))
 						pipeCancel[requestID] = cancelFunc
 						d.buildPipeline(valueCtx, content.DispatchedGroup, content.QueryId, content.Randomness, nil, content.DataSource, content.Selector, uint32(onchain.TrafficUserQuery))
 					}

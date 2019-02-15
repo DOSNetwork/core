@@ -181,114 +181,40 @@ func main() {
 				case *eth.AskMeAnythingQueryResponseReady:
 					f := map[string]interface{}{
 						"RequestId": fmt.Sprintf("%x", i.QueryId),
+						"Result":    i.Result,
 						"Removed":   i.Removed}
-					if i.Removed {
-						if rMap[fmt.Sprintf("%x", i.QueryId)] == "0" {
-							logger.Event("AMAURLTwoChainReorg", f)
-							// removed is true true case
-							rMap[fmt.Sprintf("%x", i.QueryId)] = i.Result
-							go VerifyResult(fmt.Sprintf("%x", i.QueryId), "Query")
-						} else {
-							logger.Event("AMAURLChainReorg", f)
-							canceled <- struct{}{}
-							rMap[fmt.Sprintf("%x", i.QueryId)] = "0"
-						}
-					} else {
-						if rMap[fmt.Sprintf("%x", i.QueryId)] == "" {
-							logger.Event("AMAURLNoReqID", f)
-						} else if rMap[fmt.Sprintf("%x", i.QueryId)] == "0" {
-							rMap[fmt.Sprintf("%x", i.QueryId)] = i.Result
-							logger.Event("AMAURLFullfill", f)
-							go VerifyResult(fmt.Sprintf("%x", i.QueryId), "Query")
-						} else {
-							if rMap[fmt.Sprintf("%x", i.QueryId)] != i.Result {
-								f := map[string]interface{}{
-									"RequestId": fmt.Sprintf("%x", i.QueryId),
-									"old":       rMap[fmt.Sprintf("%x", i.QueryId)],
-									"new":       i.Result,
-									"Removed":   i.Removed}
-								logger.Event("AMAURLIDSollision", f)
-								rMap[fmt.Sprintf("%x", i.QueryId)] = i.Result
-							} else {
-								logger.Event("AMAURLRequestIDExist", f)
-							}
-						}
-					}
+					logger.Event("AMAResponseReady", f)
 				case *eth.AskMeAnythingRequestSent:
-					if i.Removed {
-						delete(rMap, fmt.Sprintf("%x", i.RequestId))
-					} else {
-
-						rMap[fmt.Sprintf("%x", i.RequestId)] = "0"
-					}
-				case *eth.AskMeAnythingRandomReady:
 					f := map[string]interface{}{
 						"RequestId": fmt.Sprintf("%x", i.RequestId),
 						"Removed":   i.Removed}
-					if i.Removed {
-						if rMap[fmt.Sprintf("%x", i.RequestId)] == "0" {
-							logger.Event("AMARandTwoChainReorg", f)
-							// removed is true true case
-							rMap[fmt.Sprintf("%x", i.RequestId)] = fmt.Sprintf("%x", i.GeneratedRandom)
-							go VerifyResult(fmt.Sprintf("%x", i.RequestId), "Rand")
-
-						} else {
-							logger.Event("AMARandChainReorg", f)
-							canceled <- struct{}{}
-							rMap[fmt.Sprintf("%x", i.RequestId)] = "0"
-						}
-					} else {
-						if rMap[fmt.Sprintf("%x", i.RequestId)] == "" {
-							logger.Event("AMARandNoReqID", f)
-						} else if rMap[fmt.Sprintf("%x", i.RequestId)] == "0" {
-							rMap[fmt.Sprintf("%x", i.RequestId)] = fmt.Sprintf("%x", i.GeneratedRandom)
-							logger.Event("AMARandFullfill", f)
-							go VerifyResult(fmt.Sprintf("%x", i.RequestId), "Rand")
-						} else {
-							canceled <- struct{}{}
-							if rMap[fmt.Sprintf("%x", i.RequestId)] != fmt.Sprintf("%x", i.GeneratedRandom) {
-								f := map[string]interface{}{
-									"RequestId": fmt.Sprintf("%x", i.RequestId),
-									"old":       rMap[i.RequestId.String()],
-									"new":       fmt.Sprintf("%x", i.GeneratedRandom),
-									"Removed":   i.Removed}
-								logger.Event("AMARandIDSollision", f)
-								rMap[fmt.Sprintf("%x", i.RequestId)] = fmt.Sprintf("%x", i.GeneratedRandom)
-							} else {
-								logger.Event("AMARequestIDExist", f)
-							}
-						}
-					}
+					logger.Event("AMARequestSent", f)
+				case *eth.AskMeAnythingRandomReady:
+					f := map[string]interface{}{
+						"RequestId":       fmt.Sprintf("%x", i.RequestId),
+						"GeneratedRandom": fmt.Sprintf("%x", i.GeneratedRandom),
+						"Removed":         i.Removed}
+					logger.Event("AMARandomReady", f)
 				}
 			}
 		}
 	}()
-	for i := 0; i < counter; i++ {
-		wg.Add(1)
-		query(i)
-		wg.Wait()
-	}
-	<-done
-}
-
-func VerifyResult(requestId string, rType string) {
-	timer := time.NewTimer(15 * time.Second)
-	select {
-	case <-timer.C:
-		if rMap[requestId] != "" && rMap[requestId] != "0" {
-			delete(rMap, requestId)
-			f := map[string]interface{}{
-				"RequestId":  requestId,
-				"totalQuery": totalQuery,
-				"rMapLen":    len(rMap),
-				"Removed":    false}
-			logger.Event("AMA"+rType+"Done", f)
-			wg.Done()
+	timer := time.NewTimer(60 * time.Second)
+	for {
+		select {
+		case <-timer.C:
+			query(counter)
+			counter--
+			timer.Reset(60 * time.Second)
+			if counter == 0 {
+				timeout := time.After(5 * time.Second)
+				<-timeout
+				fmt.Println("There's no more time to this. Exiting!")
+				return
+			}
+		default:
 		}
-	case <-canceled:
-		// timer aborted
 	}
-
 }
 
 func query(counter int) {

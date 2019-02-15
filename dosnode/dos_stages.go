@@ -59,8 +59,6 @@ func mergeErrors(ctx context.Context, cs ...<-chan error) <-chan error {
 	// Start a goroutine to close out once all the output goroutines
 	// are done.  This must start after the wg.Add call.
 	go func() {
-		defer logger.TimeTrack(time.Now(), "MergeErrors", map[string]interface{}{"RequestId": ctx.Value("RequestID")})
-
 		wg.Wait()
 		close(out)
 	}()
@@ -91,8 +89,6 @@ func fanIn(ctx context.Context, channels ...<-chan *vss.Signature) <-chan *vss.S
 
 	// Wait for all the reads to complete
 	go func() {
-		defer logger.TimeTrack(time.Now(), "FanIn", map[string]interface{}{"RequestId": ctx.Value("RequestID")})
-
 		wg.Wait()
 		close(multiplexedStream)
 	}()
@@ -195,9 +191,10 @@ func requestSign(
 				}
 				retryCount++
 			}
-
+			err := errors.New("Retry limit exceeded")
+			logger.Error(err)
 			select {
-			case errc <- errors.New("Retry limit exceeded"):
+			case errc <- err:
 			case <-ctx.Done():
 			}
 			return
@@ -238,6 +235,7 @@ func genSign(
 
 			sig, err := tbls.Sign(suite, dkg.GetShareSecurity(pubkey), content)
 			if err != nil {
+				logger.Error(err)
 				select {
 				case errc <- err:
 				case <-ctx.Done():
@@ -392,11 +390,13 @@ func genQueryResult(ctx context.Context, submitterc chan []byte, url string, pat
 
 		rawMsg, err := dataFetch(url)
 		if err != nil {
+			logger.Error(err)
 			errc <- err
 			return
 		}
 		msgReturn, err := dataParse(rawMsg, pathStr)
 		if err != nil {
+			logger.Error(err)
 			errc <- err
 			return
 		}
@@ -451,6 +451,7 @@ func recoverSign(ctx context.Context, signc <-chan *vss.Signature, suite suites.
 						nbThreshold,
 						nbParticipants)
 					if err != nil {
+						logger.Error(err)
 						errc <- err
 						continue
 					}
@@ -460,6 +461,7 @@ func recoverSign(ctx context.Context, signc <-chan *vss.Signature, suite suites.
 						pubPoly.Commit(),
 						sign.Content,
 						sig); err != nil {
+						logger.Error(err)
 						errc <- err
 						continue
 					}
