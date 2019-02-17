@@ -22,7 +22,7 @@ type ChainInterface interface {
 	InitialWhiteList() (err error)
 	GetWhitelist() (address common.Address, err error)
 	UploadID() (err error)
-	UploadPubKey(ctx context.Context, pubKey chan [4]*big.Int) <-chan error
+	UploadPubKey(ctx context.Context, pubKey chan [5]*big.Int) <-chan error
 	GetId() (id []byte)
 	GetBlockHashByNumber(blknum *big.Int) (hash common.Hash, err error)
 	GetLastRandomness() (*big.Int, error)

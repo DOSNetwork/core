@@ -27,11 +27,12 @@ const (
 
 type P2PDkgInterface interface {
 	GetGroupPublicPoly(pubKeyCoor [4]*big.Int) *share.PubPoly
+	GetSessionID(pubKeyCoor [4]*big.Int) (sessionId string)
 	GetGroupIDs(pubKeyCoor [4]*big.Int) [][]byte
 	GetAnyGroupIDs() [][]byte
 	GetShareSecurity(pubKeyCoor [4]*big.Int) *share.PriShare
 	GroupDismiss(pubKeyCoor [4]*big.Int) bool
-	Start(ctx context.Context, groupIds [][]byte, sessionID string) (chan [4]*big.Int, <-chan error)
+	Start(ctx context.Context, groupIds [][]byte, sessionID string) (chan [5]*big.Int, <-chan error)
 }
 
 type P2PDkg struct {
@@ -54,7 +55,7 @@ type DkgSession struct {
 	deals          []Deal
 	partDks        *DistKeyShare
 	groupPubPoly   *share.PubPoly
-	subscribeEvent chan [4]*big.Int
+	subscribeEvent chan [5]*big.Int
 	ctx            context.Context
 	errc           chan error
 	groupingStart  time.Time
@@ -71,24 +72,21 @@ func CreateP2PDkg(p p2p.P2PInterface, suite suites.Suite) (P2PDkgInterface, erro
 	return d, d.eventLoop()
 }
 
-func GIdsToSessionID(groupIds [][]byte) string {
-	var sessionIdBytes []byte
-	for _, groupId := range groupIds {
-		sessionIdBytes = append(sessionIdBytes, groupId...)
+func (d *P2PDkg) GetSessionID(pubKeyCoor [4]*big.Int) (sessionId string) {
+	if targetSession, loaded := d.finSessions.Load(hashPoint(pubKeyCoor)); loaded {
+		sessionId = targetSession.(*DkgSession).SessionId
 	}
-	sessionIdhash := sha256.Sum256(sessionIdBytes)
-	sessionId := fmt.Sprintf("%x", new(big.Int).SetBytes(sessionIdhash[:]))
-	return sessionId
+	return
 }
 
-func (d *P2PDkg) Start(ctx context.Context, groupIds [][]byte, sessionId string) (chan [4]*big.Int, <-chan error) {
+func (d *P2PDkg) Start(ctx context.Context, groupIds [][]byte, sessionId string) (chan [5]*big.Int, <-chan error) {
 	partSec := d.suite.Scalar().Pick(d.suite.RandomStream())
 	newSession := &DkgSession{
 		SessionId:      sessionId,
 		GroupIds:       groupIds,
 		partSec:        partSec,
 		partPub:        d.suite.Point().Mul(partSec, nil),
-		subscribeEvent: make(chan [4]*big.Int),
+		subscribeEvent: make(chan [5]*big.Int),
 		ctx:            ctx,
 		errc:           make(chan error),
 	}
@@ -146,6 +144,9 @@ func (d *P2PDkg) GroupDismiss(pubKeyCoor [4]*big.Int) bool {
 		length++
 		return true
 	})
+
+	d.logger.TimeTrack(time.Now(), "dkgDismiss", map[string]interface{}{"size": length})
+
 	return length == 0
 }
 
@@ -194,8 +195,19 @@ func (d *P2PDkg) eventLoop() (err error) {
 						}
 						timeCost := time.Since(content.groupingStart).Seconds()
 						fmt.Println("DistKeyShare SUCCESS ", timeCost)
+
+						length := 0
+						d.finSessions.Range(func(_, _ interface{}) bool {
+							length++
+							return true
+						})
+						d.logger.TimeTrack(time.Now(), "dkgSucc", map[string]interface{}{"size": length})
+
+						groupId, _ := new(big.Int).SetString(content.SessionId, 16)
+						dataReturn := [5]*big.Int{groupId}
+						copy(dataReturn[1:], pubKeyCoor[:])
 						if content.subscribeEvent != nil {
-							content.subscribeEvent <- pubKeyCoor
+							content.subscribeEvent <- dataReturn
 						}
 					case vss.PublicKey:
 						peerPackageMap[msg.sessionId] = packageToPeer{pubKey: &content}

@@ -144,8 +144,9 @@ func (d *DosNode) listen() (err error) {
 	eventGroupDismiss := make(chan interface{})
 	chUrl := make(chan interface{})
 	chRandom := make(chan interface{})
-	chUsrRandom := make(chan interface{}, 1)
+	chUsrRandom := make(chan interface{})
 	eventValidation := make(chan interface{})
+	keyUploaded := make(chan interface{})
 	if err = d.chain.SubscribeEvent(eventGrouping, onchain.SubscribeDOSProxyLogGrouping); err != nil {
 		return err
 	}
@@ -162,6 +163,9 @@ func (d *DosNode) listen() (err error) {
 		return err
 	}
 	if err = d.chain.SubscribeEvent(eventValidation, onchain.SubscribeDOSProxyLogValidationResult); err != nil {
+		return err
+	}
+	if err = d.chain.SubscribeEvent(keyUploaded, onchain.SubscribeDOSProxyLogPublicKeyUploaded); err != nil {
 		return err
 	}
 	peerEvent, err := d.p.SubscribeEvent(50, vss.Signature{})
@@ -231,9 +235,9 @@ func (d *DosNode) listen() (err error) {
 				}
 
 				if isMember {
-					sessionId := dkg.GIdsToSessionID(groupIds)
+					sessionId := fmt.Sprintf("%x", content.GroupId)
 					f := map[string]interface{}{
-						"SessionID": fmt.Sprintf("%x", sessionId),
+						"SessionID": sessionId,
 						"Removed":   content.Removed,
 						"Tx":        content.Tx,
 						"CurBlkN":   currentBlockNumber,
@@ -261,9 +265,8 @@ func (d *DosNode) listen() (err error) {
 				}
 
 				if d.isMember(content.PubKey) && d.dkg.GroupDismiss(content.PubKey) {
-					sessionId := dkg.GIdsToSessionID(d.dkg.GetGroupIDs(content.PubKey))
 					f := map[string]interface{}{
-						"SessionID":         fmt.Sprintf("%x", sessionId),
+						"SessionID":         d.dkg.GetSessionID(content.PubKey),
 						"DispatchedGroup_1": fmt.Sprintf("%x", content.PubKey[0].Bytes()),
 						"DispatchedGroup_2": fmt.Sprintf("%x", content.PubKey[1].Bytes()),
 						"DispatchedGroup_3": fmt.Sprintf("%x", content.PubKey[2].Bytes()),
@@ -382,7 +385,6 @@ func (d *DosNode) listen() (err error) {
 				if !ok {
 					log.Error(err)
 				}
-				_ = content
 				if d.isMember(content.PubKey) {
 					fmt.Println("EthLog : validationResult", content.Pass)
 					if content.TrafficType == onchain.TrafficUserQuery {
@@ -434,6 +436,18 @@ func (d *DosNode) listen() (err error) {
 						logger.Event("DOS_SysRandomResult", f)
 					}
 				}
+			case msg := <-keyUploaded:
+				content, ok := msg.(*onchain.DOSProxyLogPublicKeyUploaded)
+				if !ok {
+					log.Error(err)
+				}
+				logger.TimeTrack(time.Now(), "keyUploaded", map[string]interface{}{
+					"groupId": fmt.Sprintf("%x", content.GroupId),
+					"x0":      fmt.Sprintf("%x", content.PubKey[0]),
+					"x1":      fmt.Sprintf("%x", content.PubKey[1]),
+					"y0":      fmt.Sprintf("%x", content.PubKey[2]),
+					"y1":      fmt.Sprintf("%x", content.PubKey[3]),
+				})
 			case <-d.done:
 				return
 			default:

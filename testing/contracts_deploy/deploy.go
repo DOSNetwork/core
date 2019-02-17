@@ -158,7 +158,7 @@ func deployContract(ethComm *onchain.EthCommon, contractName int) string {
 }
 
 func main() {
-	credentialPathPtr := flag.String("credentialPath", "./testAccounts/bootCredential/", "credential path")
+	credentialPathPtr := flag.String("credentialPath", "./testAccounts/bootCredential", "credential path")
 	contractPathPtr := flag.String("contractPath", "./contracts", "Contract file path")
 	contractPtr := flag.String("contract", "DOSProxy", "DOSProxy or AMA or SimpleDice")
 	configPathPtr := flag.String("configPath", "", "config path")
@@ -188,7 +188,13 @@ func main() {
 		log.Fatal(err)
 	}
 
-	_ = conn.Init(chainConfig)
+	if err := conn.Init(chainConfig); err != nil {
+		log.Fatal(err)
+	}
+
+	if err := conn.BalanceMaintain(credentialPath + "/fundKey"); err != nil {
+		log.Fatal(err)
+	}
 
 	if contract == "DOSProxy" {
 		chainConfig.DOSProxyAddress = deployContract(conn, DOSProxy)

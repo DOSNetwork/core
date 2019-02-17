@@ -68,6 +68,7 @@ type DOSProxyLogValidationResult struct {
 type DOSProxyLogInsufficientGroupNumber struct{}
 
 type DOSProxyLogGrouping struct {
+	GroupId *big.Int
 	NodeId  []common.Address
 	Removed bool
 	BlockN  uint64
@@ -75,15 +76,23 @@ type DOSProxyLogGrouping struct {
 }
 
 type DOSProxyLogDuplicatePubKey struct {
-	PubKey [4]*big.Int
+	GroupId *big.Int
+	PubKey  [4]*big.Int
 }
 
 type DOSProxyLogAddressNotFound struct {
-	PubKey [4]*big.Int
+	GroupId *big.Int
+	PubKey  [4]*big.Int
 }
 
 type DOSProxyLogPublicKeyAccepted struct {
-	PubKey [4]*big.Int
+	GroupId *big.Int
+	PubKey  [4]*big.Int
+}
+
+type DOSProxyLogPublicKeyUploaded struct {
+	GroupId *big.Int
+	PubKey  [4]*big.Int
 }
 
 type DOSProxyLogGroupDismiss struct {

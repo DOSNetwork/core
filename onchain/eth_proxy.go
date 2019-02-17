@@ -34,6 +34,7 @@ const (
 	SubscribeDOSProxyLogDuplicatePubKey
 	SubscribeDOSProxyLogAddressNotFound
 	SubscribeDOSProxyLogPublicKeyAccepted
+	SubscribeDOSProxyLogPublicKeyUploaded
 	SubscribeDOSProxyLogGroupDismiss
 	SubscribeDOSProxyWhitelistAddressTransferred
 )
@@ -46,7 +47,7 @@ const (
 )
 
 const (
-	LogBlockDiff        = 1
+	LogBlockDiff        = 10
 	LogCheckingInterval = 15 //in second
 	SubscribeTimeout    = 60 //in second
 )
@@ -155,6 +156,7 @@ func (e *EthAdaptor) fetchMatureLogs(ctx context.Context, subscribeType int, ch 
 						}
 						for logs.Next() {
 							ch <- &DOSProxyLogGrouping{
+								GroupId: logs.Event.GroupId,
 								NodeId:  logs.Event.NodeId,
 								Tx:      logs.Event.Raw.TxHash.Hex(),
 								BlockN:  logs.Event.Raw.BlockNumber,
@@ -168,6 +170,7 @@ func (e *EthAdaptor) fetchMatureLogs(ctx context.Context, subscribeType int, ch 
 								"BlockN":  logs.Event.Raw.BlockNumber}
 
 							var toHash []byte
+							toHash = append(toHash, logs.Event.GroupId.Bytes()...)
 							for _, add := range logs.Event.NodeId {
 								toHash = append(toHash, add.Bytes()...)
 							}
@@ -216,8 +219,8 @@ func (e *EthAdaptor) fetchMatureLogs(ctx context.Context, subscribeType int, ch 
 								"BlockN":  logs.Event.Raw.BlockNumber}
 
 							var toHash []byte
-							for _, add := range logs.Event.PubKey {
-								toHash = append(toHash, add.Bytes()...)
+							for _, key := range logs.Event.PubKey {
+								toHash = append(toHash, key.Bytes()...)
 							}
 							toHash = append(toHash, logs.Event.Raw.TxHash.Bytes()...)
 							toHash = append(toHash, logs.Event.Raw.Address.Bytes()...)
@@ -293,29 +296,29 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 					Removed:         i.Raw.Removed,
 				}
 
-				ch <- &DOSProxyLogUrl{
-					QueryId:         i.QueryId,
-					Timeout:         i.Timeout,
-					DataSource:      i.DataSource,
-					Selector:        i.Selector,
-					Randomness:      i.Randomness,
-					DispatchedGroup: i.DispatchedGroup,
-					Tx:              i.Raw.TxHash.Hex(),
-					BlockN:          i.Raw.BlockNumber,
-					Removed:         true,
-				}
-
-				ch <- &DOSProxyLogUrl{
-					QueryId:         i.QueryId,
-					Timeout:         i.Timeout,
-					DataSource:      i.DataSource,
-					Selector:        i.Selector,
-					Randomness:      i.Randomness,
-					DispatchedGroup: i.DispatchedGroup,
-					Tx:              i.Raw.TxHash.Hex(),
-					BlockN:          i.Raw.BlockNumber,
-					Removed:         i.Raw.Removed,
-				}
+				//ch <- &DOSProxyLogUrl{
+				//	QueryId:         i.QueryId,
+				//	Timeout:         i.Timeout,
+				//	DataSource:      i.DataSource,
+				//	Selector:        i.Selector,
+				//	Randomness:      i.Randomness,
+				//	DispatchedGroup: i.DispatchedGroup,
+				//	Tx:              i.Raw.TxHash.Hex(),
+				//	BlockN:          i.Raw.BlockNumber,
+				//	Removed:         true,
+				//}
+				//
+				//ch <- &DOSProxyLogUrl{
+				//	QueryId:         i.QueryId,
+				//	Timeout:         i.Timeout,
+				//	DataSource:      i.DataSource,
+				//	Selector:        i.Selector,
+				//	Randomness:      i.Randomness,
+				//	DispatchedGroup: i.DispatchedGroup,
+				//	Tx:              i.Raw.TxHash.Hex(),
+				//	BlockN:          i.Raw.BlockNumber,
+				//	Removed:         i.Raw.Removed,
+				//}
 			}
 		}
 
@@ -347,25 +350,25 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 					Removed:              i.Raw.Removed,
 				}
 
-				ch <- &DOSProxyLogRequestUserRandom{
-					RequestId:            i.RequestId,
-					LastSystemRandomness: i.LastSystemRandomness,
-					UserSeed:             i.UserSeed,
-					DispatchedGroup:      i.DispatchedGroup,
-					Tx:                   i.Raw.TxHash.Hex(),
-					BlockN:               i.Raw.BlockNumber,
-					Removed:              true,
-				}
-
-				ch <- &DOSProxyLogRequestUserRandom{
-					RequestId:            i.RequestId,
-					LastSystemRandomness: i.LastSystemRandomness,
-					UserSeed:             i.UserSeed,
-					DispatchedGroup:      i.DispatchedGroup,
-					Tx:                   i.Raw.TxHash.Hex(),
-					BlockN:               i.Raw.BlockNumber,
-					Removed:              i.Raw.Removed,
-				}
+				//ch <- &DOSProxyLogRequestUserRandom{
+				//	RequestId:            i.RequestId,
+				//	LastSystemRandomness: i.LastSystemRandomness,
+				//	UserSeed:             i.UserSeed,
+				//	DispatchedGroup:      i.DispatchedGroup,
+				//	Tx:                   i.Raw.TxHash.Hex(),
+				//	BlockN:               i.Raw.BlockNumber,
+				//	Removed:              true,
+				//}
+				//
+				//ch <- &DOSProxyLogRequestUserRandom{
+				//	RequestId:            i.RequestId,
+				//	LastSystemRandomness: i.LastSystemRandomness,
+				//	UserSeed:             i.UserSeed,
+				//	DispatchedGroup:      i.DispatchedGroup,
+				//	Tx:                   i.Raw.TxHash.Hex(),
+				//	BlockN:               i.Raw.BlockNumber,
+				//	Removed:              i.Raw.Removed,
+				//}
 			}
 		}
 	case SubscribeDOSProxyLogUpdateRandom:
@@ -394,21 +397,21 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 					Removed:         i.Raw.Removed,
 				}
 
-				ch <- &DOSProxyLogUpdateRandom{
-					LastRandomness:  i.LastRandomness,
-					DispatchedGroup: i.DispatchedGroup,
-					Tx:              i.Raw.TxHash.Hex(),
-					BlockN:          i.Raw.BlockNumber,
-					Removed:         true,
-				}
-
-				ch <- &DOSProxyLogUpdateRandom{
-					LastRandomness:  i.LastRandomness,
-					DispatchedGroup: i.DispatchedGroup,
-					Tx:              i.Raw.TxHash.Hex(),
-					BlockN:          i.Raw.BlockNumber,
-					Removed:         i.Raw.Removed,
-				}
+				//ch <- &DOSProxyLogUpdateRandom{
+				//	LastRandomness:  i.LastRandomness,
+				//	DispatchedGroup: i.DispatchedGroup,
+				//	Tx:              i.Raw.TxHash.Hex(),
+				//	BlockN:          i.Raw.BlockNumber,
+				//	Removed:         true,
+				//}
+				//
+				//ch <- &DOSProxyLogUpdateRandom{
+				//	LastRandomness:  i.LastRandomness,
+				//	DispatchedGroup: i.DispatchedGroup,
+				//	Tx:              i.Raw.TxHash.Hex(),
+				//	BlockN:          i.Raw.BlockNumber,
+				//	Removed:         i.Raw.Removed,
+				//}
 			}
 		}
 	case SubscribeDOSProxyLogValidationResult:
@@ -586,7 +589,8 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 			case i := <-transitChan:
 				if !e.filterLog(i.Raw) {
 					ch <- &DOSProxyLogDuplicatePubKey{
-						PubKey: i.PubKey,
+						GroupId: i.GroupId,
+						PubKey:  i.PubKey,
 					}
 				}
 			}
@@ -611,7 +615,8 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 			case i := <-transitChan:
 				if !e.filterLog(i.Raw) {
 					ch <- &DOSProxyLogAddressNotFound{
-						PubKey: i.PubKey,
+						GroupId: i.GroupId,
+						PubKey:  i.PubKey,
 					}
 				}
 			}
@@ -636,7 +641,34 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 			case i := <-transitChan:
 				if !e.filterLog(i.Raw) {
 					ch <- &DOSProxyLogPublicKeyAccepted{
-						PubKey: i.PubKey,
+						GroupId: i.GroupId,
+						PubKey:  i.PubKey,
+					}
+				}
+			}
+		}
+	case SubscribeDOSProxyLogPublicKeyUploaded:
+		fmt.Println("subscribing DOSProxyLogPublicKeyUploaded event...")
+		transitChan := make(chan *dosproxy.DOSProxyLogPublicKeyUploaded)
+		sub, err := e.proxy.DOSProxyFilterer.WatchLogPublicKeyUploaded(opt, transitChan)
+		if err != nil {
+			done <- false
+			//log.WithField("function", "watchLogPublicKeyAccepted").Warn(err)
+			fmt.Println("Network fail, will retry shortly")
+			return
+		}
+
+		fmt.Println("DOSProxyLogPublicKeyUploaded event subscribed")
+		done <- true
+		for {
+			select {
+			case err := <-sub.Err():
+				log.Fatal(err)
+			case i := <-transitChan:
+				if !e.filterLog(i.Raw) {
+					ch <- &DOSProxyLogPublicKeyUploaded{
+						GroupId: i.GroupId,
+						PubKey:  i.PubKey,
 					}
 				}
 			}
@@ -922,13 +954,13 @@ func (e *EthAdaptor) SetRandomNum(ctx context.Context, signatures <-chan *vss.Si
 	return errc
 }
 
-func (e *EthAdaptor) UploadPubKey(ctx context.Context, pubKeys chan [4]*big.Int) <-chan error {
+func (e *EthAdaptor) UploadPubKey(ctx context.Context, IdWithPubKeys chan [5]*big.Int) <-chan error {
 	errc := make(chan error, 1)
 	go func() {
 		defer close(errc)
 		fmt.Println("Starting UploadPubKey...")
 		select {
-		case pubKey := <-pubKeys:
+		case IdWithPubKey := <-IdWithPubKeys:
 			defer e.logger.TimeTrack(time.Now(), "UploadPubKey", map[string]interface{}{"SessionID": ctx.Value("SessionID")})
 
 			auth, err := e.GetAuth()
@@ -938,7 +970,10 @@ func (e *EthAdaptor) UploadPubKey(ctx context.Context, pubKeys chan [4]*big.Int)
 				errc <- err
 				return
 			}
-			tx, err := e.proxy.SetPublicKey(auth, pubKey)
+			groupId := IdWithPubKey[0]
+			var pubKey [4]*big.Int
+			copy(pubKey[:], IdWithPubKey[1:])
+			tx, err := e.proxy.SetPublicKey(auth, groupId, pubKey)
 			if err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
 				timer := time.NewTimer(1 * time.Second)
 				retryCount := 0
@@ -956,7 +991,7 @@ func (e *EthAdaptor) UploadPubKey(ctx context.Context, pubKeys chan [4]*big.Int)
 							timer.Stop()
 							return
 						}
-						tx, err = e.proxy.SetPublicKey(auth, pubKey)
+						tx, err = e.proxy.SetPublicKey(auth, groupId, pubKey)
 						if err == nil || (err.Error() != core.ErrNonceTooLow.Error() && err.Error() != core.ErrReplaceUnderpriced.Error()) {
 							timer.Stop()
 							break l
