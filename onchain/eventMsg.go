@@ -91,8 +91,10 @@ type DOSProxyLogPublicKeyAccepted struct {
 }
 
 type DOSProxyLogPublicKeyUploaded struct {
-	GroupId *big.Int
-	PubKey  [4]*big.Int
+	GroupId   *big.Int
+	PubKey    [4]*big.Int
+	Count     *big.Int
+	GroupSize *big.Int
 }
 
 type DOSProxyLogGroupDismiss struct {

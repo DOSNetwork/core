@@ -442,11 +442,13 @@ func (d *DosNode) listen() (err error) {
 					log.Error(err)
 				}
 				logger.TimeTrack(time.Now(), "keyUploaded", map[string]interface{}{
-					"groupId": fmt.Sprintf("%x", content.GroupId),
-					"x0":      fmt.Sprintf("%x", content.PubKey[0]),
-					"x1":      fmt.Sprintf("%x", content.PubKey[1]),
-					"y0":      fmt.Sprintf("%x", content.PubKey[2]),
-					"y1":      fmt.Sprintf("%x", content.PubKey[3]),
+					"groupId":   fmt.Sprintf("%x", content.GroupId),
+					"x0":        fmt.Sprintf("%x", content.PubKey[0]),
+					"x1":        fmt.Sprintf("%x", content.PubKey[1]),
+					"y0":        fmt.Sprintf("%x", content.PubKey[2]),
+					"y1":        fmt.Sprintf("%x", content.PubKey[3]),
+					"count":     fmt.Sprintf("%x", content.Count),
+					"groupSize": fmt.Sprintf("%x", content.GroupSize),
 				})
 			case <-d.done:
 				return

@@ -667,8 +667,10 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 			case i := <-transitChan:
 				if !e.filterLog(i.Raw) {
 					ch <- &DOSProxyLogPublicKeyUploaded{
-						GroupId: i.GroupId,
-						PubKey:  i.PubKey,
+						GroupId:   i.GroupId,
+						PubKey:    i.PubKey,
+						Count:     i.Count,
+						GroupSize: i.GroupSize,
 					}
 				}
 			}
