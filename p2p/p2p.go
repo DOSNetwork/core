@@ -242,7 +242,7 @@ func (n *P2P) Request(id []byte, m proto.Message) (msg proto.Message, err error)
 	if peer, found = n.findPeer(id); found {
 		request := new(Request)
 		request.SetMessage(m)
-		request.SetTimeout(3 * time.Second)
+		request.SetTimeout(10 * time.Second)
 
 		if msg, err = peer.Request(request); err != nil {
 			n.logger.Error(err)

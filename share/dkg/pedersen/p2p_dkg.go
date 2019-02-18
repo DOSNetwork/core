@@ -21,8 +21,8 @@ import (
 )
 
 const (
-	CHANTIMEOUT    = 1  //IN SECOND
-	REQUESTTIMEOUT = 60 //IN SECOND
+	CHANTIMEOUT    = 1   //IN SECOND
+	REQUESTTIMEOUT = 600 //IN SECOND
 )
 
 type P2PDkgInterface interface {

@@ -175,7 +175,7 @@ func requestSign(
 				QueryId: requestId,
 			}
 			retryCount := 0
-			for retryCount < 10 {
+			for retryCount < 30 {
 				if msg, err := p.Request(id, sign); err == nil {
 					switch content := msg.(type) {
 					case *vss.Signature:

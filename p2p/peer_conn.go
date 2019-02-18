@@ -441,13 +441,14 @@ func (p *PeerConn) SendPackage(msg proto.Message) (err error) {
 	bytes = append(prefix, bytes...)
 	p.mux.Lock()
 	defer p.mux.Unlock()
-
 	if _, err := p.rw.Write(bytes); err != nil {
 		p.logger.Error(err)
+		p.End()
 		return err
 	}
 	if err := p.rw.Flush(); err != nil {
 		p.logger.Error(err)
+		p.End()
 		return err
 	}
 
@@ -513,6 +514,7 @@ func (p *PeerConn) Request(req *Request) (proto.Message, error) {
 	})
 
 	// Stop tracking the request.
+	defer p.logger.TimeTrack(time.Now(), "requestTime", map[string]interface{}{})
 	defer close(closeSignal)
 	defer p.Requests.Delete(prepared.GetRequestNonce())
 
