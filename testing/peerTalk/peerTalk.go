@@ -181,7 +181,7 @@ func main() {
 					if bytes.Compare(p.GetID(), id) == 0 {
 						start := uint32(idx) / groupSize * groupSize
 						group = ids[start : start+groupSize]
-						dkgEvent, errc := p2pdkg.Start(context.Background(), group, dkg.GIdsToSessionID(group))
+						dkgEvent, errc := p2pdkg.Start(context.Background(), group, fmt.Sprintf("%x", group))
 						go func() {
 							for err := range errc {
 								logger.WithFields(logrus.Fields{

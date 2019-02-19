@@ -166,7 +166,7 @@ func (r test3) StartTest(d *PeerNode) {
 		if bytes.Compare(d.p.GetID(), id) == 0 {
 			start := idx / groupSize * groupSize
 			group := d.nodeIDs[start : start+groupSize]
-			dkgEvent, errChan := p2pDkg.Start(context.Background(), group, dkg.GIdsToSessionID(group))
+			dkgEvent, errChan := p2pDkg.Start(context.Background(), group, fmt.Sprintf("%x", group))
 			go func() {
 				for err := range errChan {
 					fmt.Println("errorChan", err)
@@ -199,22 +199,25 @@ func (r test4) StartTest(d *PeerNode) {
 	}
 
 	var pubKey [4]*big.Int
+
 	var succ bool
 
 	for idx, id := range d.nodeIDs {
 		if bytes.Compare(d.p.GetID(), id) == 0 {
 			start := idx / groupSize * groupSize
 			group := d.nodeIDs[start : start+groupSize]
-			dkgEvent, errChan := p2pDkg.Start(context.Background(), group, dkg.GIdsToSessionID(group))
+			dkgEvent, errChan := p2pDkg.Start(context.Background(), group, fmt.Sprintf("%x", group))
 			go func() {
 				for err := range errChan {
 					fmt.Println("errorChan", err)
 				}
 			}()
-			if pubKey, succ = <-dkgEvent; !succ {
+			var IdWithPubKey [5]*big.Int
+			if IdWithPubKey, succ = <-dkgEvent; !succ {
 				fmt.Println(errors.New("err: dkg fail"))
 				return
 			}
+			copy(pubKey[:], IdWithPubKey[1:])
 			break
 		}
 	}
@@ -298,14 +301,14 @@ func (r test5) StartTest(d *PeerNode) {
 	for {
 		var (
 			group    [][]byte
-			dkgEvent chan [4]*big.Int
+			dkgEvent chan [5]*big.Int
 			errChan  <-chan error
 		)
 		for idx, id := range d.nodeIDs {
 			if bytes.Compare(d.p.GetID(), id) == 0 {
 				start := idx / groupSize * groupSize
 				group = d.nodeIDs[start : start+groupSize]
-				dkgEvent, errChan = p2pDkg.Start(context.Background(), group, dkg.GIdsToSessionID(group))
+				dkgEvent, errChan = p2pDkg.Start(context.Background(), group, fmt.Sprintf("%x", group))
 				go func() {
 					for err := range errChan {
 						fmt.Println("errorChan", err)
