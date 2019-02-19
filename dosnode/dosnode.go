@@ -64,7 +64,9 @@ func (d *DosNode) End() {
 	close(d.done)
 }
 
-func (d *DosNode) waitForGrouping(errc <-chan error) {
+func (d *DosNode) waitForGrouping(ctx context.Context, errc <-chan error) {
+	defer logger.TimeTrack(time.Now(), "waitForGrouping", map[string]interface{}{"SessionID": ctx.Value("SessionID")})
+
 	for err := range errc {
 		if err != nil {
 			logger.Error(err)
@@ -147,6 +149,7 @@ func (d *DosNode) listen() (err error) {
 	chUsrRandom := make(chan interface{})
 	eventValidation := make(chan interface{})
 	keyUploaded := make(chan interface{})
+	keyAccepted := make(chan interface{})
 	if err = d.chain.SubscribeEvent(eventGrouping, onchain.SubscribeDOSProxyLogGrouping); err != nil {
 		return err
 	}
@@ -166,6 +169,9 @@ func (d *DosNode) listen() (err error) {
 		return err
 	}
 	if err = d.chain.SubscribeEvent(keyUploaded, onchain.SubscribeDOSProxyLogPublicKeyUploaded); err != nil {
+		return err
+	}
+	if err = d.chain.SubscribeEvent(keyAccepted, onchain.SubscribeDOSProxyLogPublicKeyAccepted); err != nil {
 		return err
 	}
 	peerEvent, err := d.p.SubscribeEvent(50, vss.Signature{})
@@ -246,7 +252,7 @@ func (d *DosNode) listen() (err error) {
 					logger.Event("DOS_Grouping", f)
 					if !content.Removed {
 						ctx, cancelFunc := context.WithCancel(context.Background())
-						valueCtx := context.WithValue(ctx, "RequestId", sessionId)
+						valueCtx := context.WithValue(ctx, "SessionID", sessionId)
 						pipeCancel[sessionId] = cancelFunc
 						var errcList []<-chan error
 						outFromDkg, errc := d.dkg.Start(valueCtx, groupIds, sessionId)
@@ -254,7 +260,7 @@ func (d *DosNode) listen() (err error) {
 						errc = d.chain.UploadPubKey(valueCtx, outFromDkg)
 						errcList = append(errcList, errc)
 						errc = mergeErrors(valueCtx, errcList...)
-						go d.waitForGrouping(errc)
+						go d.waitForGrouping(valueCtx, errc)
 					}
 				}
 			case msg := <-eventGroupDismiss:
@@ -441,13 +447,33 @@ func (d *DosNode) listen() (err error) {
 				if !ok {
 					log.Error(err)
 				}
-				logger.TimeTrack(time.Now(), "keyUploaded", map[string]interface{}{
-					"groupId": fmt.Sprintf("%x", content.GroupId),
-					"x0":      fmt.Sprintf("%x", content.PubKey[0]),
-					"x1":      fmt.Sprintf("%x", content.PubKey[1]),
-					"y0":      fmt.Sprintf("%x", content.PubKey[2]),
-					"y1":      fmt.Sprintf("%x", content.PubKey[3]),
-				})
+				if d.isMember(content.PubKey) {
+					logger.TimeTrack(time.Now(), "keyUploaded", map[string]interface{}{
+						"SessionID": d.dkg.GetSessionID(content.PubKey),
+						"groupId":   fmt.Sprintf("%x", content.GroupId),
+						"x0":        fmt.Sprintf("%x", content.PubKey[0]),
+						"x1":        fmt.Sprintf("%x", content.PubKey[1]),
+						"y0":        fmt.Sprintf("%x", content.PubKey[2]),
+						"y1":        fmt.Sprintf("%x", content.PubKey[3]),
+						"Count":     fmt.Sprintf("%d", content.Count),
+						"GroupSize": fmt.Sprintf("%d", content.GroupSize),
+					})
+				}
+			case msg := <-keyAccepted:
+				content, ok := msg.(*onchain.DOSProxyLogPublicKeyAccepted)
+				if !ok {
+					log.Error(err)
+				}
+				if d.isMember(content.PubKey) {
+					logger.TimeTrack(time.Now(), "keyAccepted", map[string]interface{}{
+						"SessionID": d.dkg.GetSessionID(content.PubKey),
+						"groupId":   fmt.Sprintf("%x", content.GroupId),
+						"x0":        fmt.Sprintf("%x", content.PubKey[0]),
+						"x1":        fmt.Sprintf("%x", content.PubKey[1]),
+						"y0":        fmt.Sprintf("%x", content.PubKey[2]),
+						"y1":        fmt.Sprintf("%x", content.PubKey[3]),
+					})
+				}
 			case <-d.done:
 				return
 			default:

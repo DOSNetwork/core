@@ -207,7 +207,7 @@ func main() {
 			counter--
 			timer.Reset(60 * time.Second)
 			if counter == 0 {
-				timeout := time.After(5 * time.Second)
+				timeout := time.After(60 * time.Second)
 				<-timeout
 				fmt.Println("There's no more time to this. Exiting!")
 				return

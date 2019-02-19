@@ -172,9 +172,7 @@ func (n *P2P) Leave() {
 
 func (n *P2P) findPeer(id []byte) (peer *PeerConn, found bool) {
 	var err error
-
-	startTime := time.Now()
-	defer n.logger.Metrics(time.Since(startTime).Seconds() * 1000)
+	defer n.logger.TimeTrack(time.Now(), "FindPeer", nil)
 
 	// Find Peer from existing peerConn
 	if peer = n.peers.GetPeerByID(string(id)); peer != nil {
@@ -236,8 +234,8 @@ func (n *P2P) SendMessage(id []byte, m proto.Message) (err error) {
 func (n *P2P) Request(id []byte, m proto.Message) (msg proto.Message, err error) {
 	var peer *PeerConn
 	var found bool
-	startTime := time.Now()
-	defer n.logger.Metrics(time.Since(startTime).Seconds() * 1000)
+	//defer n.logger.Metrics(time.Since(startTime).Seconds() * 1000)
+	defer n.logger.TimeTrack(time.Now(), "Request", nil)
 
 	if peer, found = n.findPeer(id); found {
 		request := new(Request)
@@ -326,8 +324,8 @@ type lookupBucket struct {
 //
 // Queries at most #ALPHA nodes at a time per lookup, and returns all peer IDs closest to a target peer ID.
 func (n *P2P) findNode(targetID internal.ID, alpha int, disjointPaths int) (results []internal.ID) {
-	startTime := time.Now()
-	defer n.logger.Metrics(time.Since(startTime).Seconds() * 1000)
+	defer n.logger.TimeTrack(time.Now(), "FindNode", nil)
+
 	visited := new(sync.Map)
 
 	var lookups []*lookupBucket
