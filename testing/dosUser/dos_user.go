@@ -144,9 +144,16 @@ func main() {
 	}
 
 	log.Init(userTestAdaptor.GetId()[:])
-	source := rand.NewSource(time.Now().UnixNano())
-	random := rand.New(source)
-	if err = userTestAdaptor.Init(config.AskMeAnythingAddressPool[random.Intn(len(config.AskMeAnythingAddressPool))], chainConfig); err != nil {
+	//source := rand.NewSource(time.Now().UnixNano())
+	//random := rand.New(source)
+
+	envSize := os.Getenv("AMA")
+	index, err := strconv.Atoi(envSize)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	if err = userTestAdaptor.Init(config.AskMeAnythingAddressPool[index], chainConfig); err != nil {
 		log.Fatal(err)
 	}
 
@@ -171,6 +178,8 @@ func main() {
 		log.Fatal(err)
 	}
 
+	requestIdMap := make(map[string]bool)
+
 	go func() {
 		for {
 			select {
@@ -179,42 +188,48 @@ func main() {
 				case *eth.AskMeAnythingSetTimeout:
 
 				case *eth.AskMeAnythingQueryResponseReady:
+					requestId := fmt.Sprintf("%x", i.QueryId)
 					f := map[string]interface{}{
-						"RequestId": fmt.Sprintf("%x", i.QueryId),
+						"RequestId": requestId,
 						"Result":    i.Result,
 						"Removed":   i.Removed}
 					logger.Event("AMAResponseReady", f)
+					if requestIdMap[requestId] {
+						query(counter)
+						counter--
+					} else {
+						logger.Event("RequestIdNotFound", map[string]interface{}{"RequestId": requestId})
+					}
 				case *eth.AskMeAnythingRequestSent:
+					requestId := fmt.Sprintf("%x", i.RequestId)
 					f := map[string]interface{}{
-						"RequestId": fmt.Sprintf("%x", i.RequestId),
+						"RequestId": requestId,
 						"Removed":   i.Removed}
 					logger.Event("AMARequestSent", f)
+					requestIdMap[requestId] = true
 				case *eth.AskMeAnythingRandomReady:
+					requestId := fmt.Sprintf("%x", i.RequestId)
 					f := map[string]interface{}{
-						"RequestId":       fmt.Sprintf("%x", i.RequestId),
+						"RequestId":       fmt.Sprintf("%x", requestId),
 						"GeneratedRandom": fmt.Sprintf("%x", i.GeneratedRandom),
 						"Removed":         i.Removed}
 					logger.Event("AMARandomReady", f)
+					if requestIdMap[requestId] {
+						query(counter)
+						counter--
+					} else {
+						logger.Event("RequestIdNotFound", map[string]interface{}{"RequestId": requestId})
+					}
 				}
 			}
 		}
 	}()
-	timer := time.NewTimer(60 * time.Second)
-	for {
-		select {
-		case <-timer.C:
-			query(counter)
-			counter--
-			timer.Reset(60 * time.Second)
-			if counter == 0 {
-				timeout := time.After(60 * time.Second)
-				<-timeout
-				fmt.Println("There's no more time to this. Exiting!")
-				return
-			}
-		default:
-		}
-	}
+
+	query(counter)
+	counter--
+
+	finish := make(chan bool)
+	<-finish
 }
 
 func query(counter int) {

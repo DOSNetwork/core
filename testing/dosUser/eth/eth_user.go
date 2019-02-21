@@ -1,6 +1,7 @@
 package eth
 
 import (
+	"context"
 	"fmt"
 	"math/big"
 	"sync"
@@ -39,22 +40,23 @@ type EthUserAdaptor struct {
 }
 
 func (e *EthUserAdaptor) Init(address string, config configuration.ChainConfig) (err error) {
-	e.EthCommon.Init(config)
+	if err = e.EthCommon.Init(config); err != nil {
+		return
+	}
 	e.logFilter = new(sync.Map)
 	go e.logMapTimeout()
 
 	e.address = address
 	fmt.Println("onChainConn initialization finished.")
 	e.lock = new(sync.Mutex)
-	e.dialToEth()
+	e.dialToProxy()
 	e.logger = log.New("module", "EthUser")
 	return
 }
 
-func (e *EthUserAdaptor) dialToEth() (err error) {
+func (e *EthUserAdaptor) dialToProxy() (err error) {
 	e.lock.Lock()
-	fmt.Println("dialing...")
-	e.EthCommon.DialToEth()
+	fmt.Println("dialing To Proxy...")
 	addr := common.HexToAddress(e.address)
 	e.proxy, err = dosUser.NewAskMeAnything(addr, e.Client)
 	for err != nil {
@@ -66,29 +68,186 @@ func (e *EthUserAdaptor) dialToEth() (err error) {
 	return
 }
 
+func (e *EthUserAdaptor) resetOnChainConn() (err error) {
+	e.lock.Lock()
+	defer e.lock.Unlock()
+	if err = e.EthCommon.DialToEth(); err != nil {
+		e.logger.Error(err)
+		return
+	}
+	err = e.dialToProxy()
+	return
+}
+
 func (e *EthUserAdaptor) GetId() (id []byte) {
 	return e.GetAddress().Bytes()
 }
 
 func (e *EthUserAdaptor) SubscribeEvent(ch chan interface{}, subscribeType int) (err error) {
 	opt := &bind.WatchOpts{}
+	var cancel context.CancelFunc
+	opt.Context, cancel = context.WithCancel(context.Background())
 	done := make(chan bool)
+	timer := time.NewTimer(onchain.SubscribeTimeout * time.Second)
 
 	go e.subscribeEventAttempt(ch, opt, subscribeType, done)
 
 	for {
 		select {
-		case <-done:
-			fmt.Println("subscribing done.")
+		case succ := <-done:
+			if succ {
+				fmt.Println("subscribe done")
+				return
+			} else {
+				fmt.Println("retry...")
+				if err = e.resetOnChainConn(); err != nil {
+					return
+				} else {
+					go e.subscribeEventAttempt(ch, opt, subscribeType, done)
+				}
+			}
+		case <-timer.C:
+			cancel()
+			fmt.Println("subscribe timeout")
 			return
-			//Todo:This will cause multiple event from eth
-		case <-time.After(60 * time.Second):
-			fmt.Println("retry...")
-			e.dialToEth()
-			go e.subscribeEventAttempt(ch, opt, subscribeType, done)
-
 		}
 	}
+}
+
+func (e *EthUserAdaptor) fetchMatureLogs(ctx context.Context, subscribeType int, ch chan interface{}) (err error) {
+	targetBlockN, err := e.GetCurrentBlock()
+	if err != nil {
+		return
+	}
+
+	timer := time.NewTimer(onchain.LogCheckingInterval * time.Second)
+	go func() {
+		for {
+			select {
+			case <-timer.C:
+				currentBlockN, err := e.GetCurrentBlock()
+				if err != nil {
+					e.logger.Error(err)
+				}
+				for ; currentBlockN-onchain.LogBlockDiff >= targetBlockN; targetBlockN++ {
+					fmt.Println("checking Block", currentBlockN)
+					switch subscribeType {
+					case SubscribeAskMeAnythingQueryResponseReady:
+						logs, err := e.proxy.AskMeAnythingFilterer.FilterQueryResponseReady(&bind.FilterOpts{
+							Start:   targetBlockN,
+							End:     &targetBlockN,
+							Context: ctx,
+						})
+						if err != nil {
+							e.logger.Error(err)
+						}
+						for logs.Next() {
+							ch <- &AskMeAnythingQueryResponseReady{
+								QueryId: logs.Event.QueryId,
+								Result:  logs.Event.Result,
+								Tx:      logs.Event.Raw.TxHash.Hex(),
+								BlockN:  logs.Event.Raw.BlockNumber,
+								Removed: logs.Event.Raw.Removed,
+							}
+							f := map[string]interface{}{
+								"RequestId": fmt.Sprintf("%x", logs.Event.QueryId),
+								"Message":   logs.Event.Result,
+								"Removed":   logs.Event.Raw.Removed,
+								"Tx":        logs.Event.Raw.TxHash.Hex(),
+								"BlockN":    logs.Event.Raw.BlockNumber,
+								"Time":      time.Now()}
+							e.logger.Event("EthUserQueryReady", f)
+						}
+						if logs.Error() != nil {
+							e.logger.Error(logs.Error())
+						}
+						if logs.Close() != nil {
+							e.logger.Error(logs.Error())
+						}
+					case SubscribeAskMeAnythingRequestSent:
+						logs, err := e.proxy.AskMeAnythingFilterer.FilterRequestSent(&bind.FilterOpts{
+							Start:   targetBlockN,
+							End:     &targetBlockN,
+							Context: ctx,
+						}, []common.Address{e.GetAddress()})
+						if err != nil {
+							e.logger.Error(err)
+						}
+						for logs.Next() {
+							f := map[string]interface{}{
+								"Event":     "EthUserRequestSent",
+								"RequestId": fmt.Sprintf("%x", logs.Event.RequestId),
+								"Succ":      logs.Event.Succ,
+								"Removed":   logs.Event.Raw.Removed,
+								"Tx":        logs.Event.Raw.TxHash.Hex(),
+								"BlockN":    logs.Event.Raw.BlockNumber,
+								"Time":      time.Now()}
+							e.logger.Event("EthUserRequestSent", f)
+							ch <- &AskMeAnythingRequestSent{
+								InternalSerial: logs.Event.InternalSerial,
+								Succ:           logs.Event.Succ,
+								RequestId:      logs.Event.RequestId,
+								Tx:             logs.Event.Raw.TxHash.Hex(),
+								BlockN:         logs.Event.Raw.BlockNumber,
+								Removed:        logs.Event.Raw.Removed,
+							}
+						}
+						if logs.Error() != nil {
+							e.logger.Error(logs.Error())
+						}
+						if logs.Close() != nil {
+							e.logger.Error(logs.Error())
+						}
+					case SubscribeAskMeAnythingRandomReady:
+						logs, err := e.proxy.AskMeAnythingFilterer.FilterRandomReady(&bind.FilterOpts{
+							Start:   targetBlockN,
+							End:     &targetBlockN,
+							Context: ctx,
+						})
+						if err != nil {
+							e.logger.Error(err)
+						}
+						for logs.Next() {
+							ch <- &AskMeAnythingRandomReady{
+								GeneratedRandom: logs.Event.GeneratedRandom,
+								RequestId:       logs.Event.RequestId,
+								Tx:              logs.Event.Raw.TxHash.Hex(),
+								BlockN:          logs.Event.Raw.BlockNumber,
+								Removed:         logs.Event.Raw.Removed,
+							}
+							f := map[string]interface{}{
+								"RequestId":       fmt.Sprintf("%x", logs.Event.RequestId),
+								"GeneratedRandom": fmt.Sprintf("%x", logs.Event.GeneratedRandom),
+								"Removed":         logs.Event.Raw.Removed,
+								"Tx":              logs.Event.Raw.TxHash.Hex(),
+								"BlockN":          logs.Event.Raw.BlockNumber,
+								"Time":            time.Now()}
+							e.logger.Event("EthUserRandomReady", f)
+						}
+						if logs.Error() != nil {
+							e.logger.Error(logs.Error())
+						}
+						if logs.Close() != nil {
+							e.logger.Error(logs.Error())
+						}
+					}
+				}
+				timer.Reset(onchain.LogCheckingInterval * time.Second)
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	return
+}
+
+func (e *EthUserAdaptor) GetCurrentBlock() (blknum uint64, err error) {
+	var header *types.Header
+	header, err = e.Client.HeaderByNumber(context.Background(), nil)
+	if err == nil {
+		blknum = header.Number.Uint64()
+	}
+	return
 }
 
 func (e *EthUserAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchOpts, subscribeType int, done chan bool) {
@@ -99,6 +258,7 @@ func (e *EthUserAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.Wa
 		transitChan := make(chan *dosUser.AskMeAnythingSetTimeout)
 		sub, err := e.proxy.AskMeAnythingFilterer.WatchSetTimeout(opt, transitChan)
 		if err != nil {
+			done <- false
 			fmt.Println(err)
 			fmt.Println("Network fail, will retry shortly")
 			return
@@ -120,108 +280,32 @@ func (e *EthUserAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.Wa
 			}
 		}
 	case SubscribeAskMeAnythingQueryResponseReady:
-		fmt.Println("subscribing AskMeAnythingQueryResponseReady event...")
-		transitChan := make(chan *dosUser.AskMeAnythingQueryResponseReady)
-		sub, err := e.proxy.AskMeAnythingFilterer.WatchQueryResponseReady(opt, transitChan)
-		if err != nil {
-			fmt.Println(err)
+		if err := e.fetchMatureLogs(opt.Context, SubscribeAskMeAnythingQueryResponseReady, ch); err != nil {
+			done <- false
+			e.logger.Error(err)
 			fmt.Println("Network fail, will retry shortly")
 			return
-		}
-		fmt.Println("AskMeAnythingQueryResponseReady event subscribed")
-
-		done <- true
-		for {
-			select {
-			case err := <-sub.Err():
-				log.Fatal(err)
-			case i := <-transitChan:
-				f := map[string]interface{}{
-					"RequestId": fmt.Sprintf("%x", i.QueryId),
-					"Message":   i.Result,
-					"Removed":   i.Raw.Removed,
-					"Tx":        i.Raw.TxHash.Hex(),
-					"BlockN":    i.Raw.BlockNumber,
-					"Time":      time.Now()}
-				e.logger.Event("EthUserQueryReady", f)
-				ch <- &AskMeAnythingQueryResponseReady{
-					QueryId: i.QueryId,
-					Result:  i.Result,
-					Tx:      i.Raw.TxHash.Hex(),
-					BlockN:  i.Raw.BlockNumber,
-					Removed: i.Raw.Removed,
-				}
-			}
+		} else {
+			done <- true
 		}
 	case SubscribeAskMeAnythingRequestSent:
-		fmt.Println("subscribing AskMeAnythingRequestSent event...")
-		transitChan := make(chan *dosUser.AskMeAnythingRequestSent)
-		sub, err := e.proxy.AskMeAnythingFilterer.WatchRequestSent(opt, transitChan, []common.Address{e.GetAddress()})
-		if err != nil {
-			fmt.Println(err)
+		if err := e.fetchMatureLogs(opt.Context, SubscribeAskMeAnythingRequestSent, ch); err != nil {
+			done <- false
+			e.logger.Error(err)
 			fmt.Println("Network fail, will retry shortly")
 			return
+		} else {
+			done <- true
 		}
-		fmt.Println("AskMeAnythingRequestSent event subscribed")
 
-		done <- true
-		for {
-			select {
-			case err := <-sub.Err():
-				log.Fatal(err)
-			case i := <-transitChan:
-				f := map[string]interface{}{
-					"Event":     "EthUserRequestSent",
-					"RequestId": fmt.Sprintf("%x", i.RequestId),
-					"Succ":      i.Succ,
-					"Removed":   i.Raw.Removed,
-					"Tx":        i.Raw.TxHash.Hex(),
-					"BlockN":    i.Raw.BlockNumber,
-					"Time":      time.Now()}
-				e.logger.Event("EthUserRequestSent", f)
-				ch <- &AskMeAnythingRequestSent{
-					InternalSerial: i.InternalSerial,
-					Succ:           i.Succ,
-					RequestId:      i.RequestId,
-					Tx:             i.Raw.TxHash.Hex(),
-					BlockN:         i.Raw.BlockNumber,
-					Removed:        i.Raw.Removed,
-				}
-			}
-		}
 	case SubscribeAskMeAnythingRandomReady:
-		fmt.Println("subscribing AskMeAnythingRandomReady event...")
-		transitChan := make(chan *dosUser.AskMeAnythingRandomReady)
-		sub, err := e.proxy.AskMeAnythingFilterer.WatchRandomReady(opt, transitChan)
-		if err != nil {
-			fmt.Println(err)
+		if err := e.fetchMatureLogs(opt.Context, SubscribeAskMeAnythingRandomReady, ch); err != nil {
+			done <- false
+			e.logger.Error(err)
 			fmt.Println("Network fail, will retry shortly")
 			return
-		}
-		fmt.Println("AskMeAnythingRandomReady event subscribed")
-
-		done <- true
-		for {
-			select {
-			case err := <-sub.Err():
-				log.Fatal(err)
-			case i := <-transitChan:
-				f := map[string]interface{}{
-					"RequestId":       fmt.Sprintf("%x", i.RequestId),
-					"GeneratedRandom": fmt.Sprintf("%x", i.GeneratedRandom),
-					"Removed":         i.Raw.Removed,
-					"Tx":              i.Raw.TxHash.Hex(),
-					"BlockN":          i.Raw.BlockNumber,
-					"Time":            time.Now()}
-				e.logger.Event("EthUserRandomReady", f)
-				ch <- &AskMeAnythingRandomReady{
-					GeneratedRandom: i.GeneratedRandom,
-					RequestId:       i.RequestId,
-					Tx:              i.Raw.TxHash.Hex(),
-					BlockN:          i.Raw.BlockNumber,
-					Removed:         i.Raw.Removed,
-				}
-			}
+		} else {
+			done <- true
 		}
 	}
 }

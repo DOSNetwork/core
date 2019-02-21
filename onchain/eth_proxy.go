@@ -613,12 +613,15 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 			case err := <-sub.Err():
 				log.Fatal(err)
 			case i := <-transitChan:
-				if !e.filterLog(i.Raw) {
-					ch <- &DOSProxyLogAddressNotFound{
-						GroupId: i.GroupId,
-						PubKey:  i.PubKey,
-					}
+				//if !e.filterLog(i.Raw) {
+				ch <- &DOSProxyLogAddressNotFound{
+					GroupId: i.GroupId,
+					PubKey:  i.PubKey,
+					Removed: i.Raw.Removed,
+					Tx:      i.Raw.TxHash.String(),
+					BlockN:  i.Raw.BlockNumber,
 				}
+				//}
 			}
 		}
 	case SubscribeDOSProxyLogPublicKeyAccepted:
@@ -639,12 +642,16 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 			case err := <-sub.Err():
 				log.Fatal(err)
 			case i := <-transitChan:
-				if !e.filterLog(i.Raw) {
-					ch <- &DOSProxyLogPublicKeyAccepted{
-						GroupId: i.GroupId,
-						PubKey:  i.PubKey,
-					}
+				//if !e.filterLog(i.Raw) {
+				ch <- &DOSProxyLogPublicKeyAccepted{
+					GroupId:          i.GroupId,
+					PubKey:           i.PubKey,
+					WorkingGroupSize: i.WorkingGroupSize,
+					Removed:          i.Raw.Removed,
+					Tx:               i.Raw.TxHash.String(),
+					BlockN:           i.Raw.BlockNumber,
 				}
+				//}
 			}
 		}
 	case SubscribeDOSProxyLogPublicKeyUploaded:
@@ -665,14 +672,17 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 			case err := <-sub.Err():
 				log.Fatal(err)
 			case i := <-transitChan:
-				if !e.filterLog(i.Raw) {
-					ch <- &DOSProxyLogPublicKeyUploaded{
-						GroupId:   i.GroupId,
-						PubKey:    i.PubKey,
-						Count:     i.Count,
-						GroupSize: i.GroupSize,
-					}
+				//if !e.filterLog(i.Raw) {
+				ch <- &DOSProxyLogPublicKeyUploaded{
+					GroupId:   i.GroupId,
+					PubKey:    i.PubKey,
+					Count:     i.Count,
+					GroupSize: i.GroupSize,
+					Removed:   i.Raw.Removed,
+					Tx:        i.Raw.TxHash.String(),
+					BlockN:    i.Raw.BlockNumber,
 				}
+				//}
 			}
 		}
 	case SubscribeDOSProxyLogGroupDismiss:

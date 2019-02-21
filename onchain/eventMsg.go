@@ -83,11 +83,18 @@ type DOSProxyLogDuplicatePubKey struct {
 type DOSProxyLogAddressNotFound struct {
 	GroupId *big.Int
 	PubKey  [4]*big.Int
+	Removed bool
+	BlockN  uint64
+	Tx      string
 }
 
 type DOSProxyLogPublicKeyAccepted struct {
-	GroupId *big.Int
-	PubKey  [4]*big.Int
+	GroupId          *big.Int
+	PubKey           [4]*big.Int
+	WorkingGroupSize *big.Int
+	Removed          bool
+	BlockN           uint64
+	Tx               string
 }
 
 type DOSProxyLogPublicKeyUploaded struct {
@@ -95,6 +102,9 @@ type DOSProxyLogPublicKeyUploaded struct {
 	PubKey    [4]*big.Int
 	Count     *big.Int
 	GroupSize *big.Int
+	Removed   bool
+	BlockN    uint64
+	Tx        string
 }
 
 type DOSProxyLogGroupDismiss struct {

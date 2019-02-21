@@ -457,6 +457,9 @@ func (d *DosNode) listen() (err error) {
 						"y1":        fmt.Sprintf("%x", content.PubKey[3]),
 						"Count":     fmt.Sprintf("%d", content.Count),
 						"GroupSize": fmt.Sprintf("%d", content.GroupSize),
+						"Removed":   content.Removed,
+						"Tx":        content.Tx,
+						"BlockN":    content.BlockN,
 					})
 				}
 			case msg := <-keyAccepted:
@@ -466,12 +469,16 @@ func (d *DosNode) listen() (err error) {
 				}
 				if d.isMember(content.PubKey) {
 					logger.TimeTrack(time.Now(), "keyAccepted", map[string]interface{}{
-						"SessionID": d.dkg.GetSessionID(content.PubKey),
-						"groupId":   fmt.Sprintf("%x", content.GroupId),
-						"x0":        fmt.Sprintf("%x", content.PubKey[0]),
-						"x1":        fmt.Sprintf("%x", content.PubKey[1]),
-						"y0":        fmt.Sprintf("%x", content.PubKey[2]),
-						"y1":        fmt.Sprintf("%x", content.PubKey[3]),
+						"SessionID":        d.dkg.GetSessionID(content.PubKey),
+						"groupId":          fmt.Sprintf("%x", content.GroupId),
+						"x0":               fmt.Sprintf("%x", content.PubKey[0]),
+						"x1":               fmt.Sprintf("%x", content.PubKey[1]),
+						"y0":               fmt.Sprintf("%x", content.PubKey[2]),
+						"y1":               fmt.Sprintf("%x", content.PubKey[3]),
+						"workingGroupSize": content.WorkingGroupSize,
+						"Removed":          content.Removed,
+						"Tx":               content.Tx,
+						"BlockN":           content.BlockN,
 					})
 				}
 			case <-d.done:
