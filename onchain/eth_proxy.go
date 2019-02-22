@@ -47,7 +47,8 @@ const (
 )
 
 const (
-	LogBlockDiff        = 10
+	LogLargeBlockDiff   = 10
+	LogSmallBlockDiff   = 6
 	LogCheckingInterval = 15 //in second
 	SubscribeTimeout    = 60 //in second
 )
@@ -126,7 +127,7 @@ func (e *EthAdaptor) resetOnChainConn() (err error) {
 	return
 }
 
-func (e *EthAdaptor) fetchMatureLogs(ctx context.Context, subscribeType int, ch chan interface{}) (err error) {
+func (e *EthAdaptor) fetchMatureLogs(ctx context.Context, subscribeType int, ch chan interface{}, blockDiff uint64) (err error) {
 	targetBlockN, err := e.GetCurrentBlock()
 	if err != nil {
 		return
@@ -143,7 +144,7 @@ func (e *EthAdaptor) fetchMatureLogs(ctx context.Context, subscribeType int, ch 
 				if err != nil {
 					e.logger.Error(err)
 				}
-				for ; currentBlockN-LogBlockDiff >= targetBlockN; targetBlockN++ {
+				for ; currentBlockN-blockDiff >= targetBlockN; targetBlockN++ {
 					switch subscribeType {
 					case SubscribeDOSProxyLogGrouping:
 						logs, err := e.proxy.DOSProxyFilterer.FilterLogGrouping(&bind.FilterOpts{
@@ -258,7 +259,7 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 	fmt.Println("attempt to subscribe event...")
 	switch subscribeType {
 	case SubscribeDOSProxyLogGrouping:
-		if err := e.fetchMatureLogs(opt.Context, SubscribeDOSProxyLogGrouping, ch); err != nil {
+		if err := e.fetchMatureLogs(opt.Context, SubscribeDOSProxyLogGrouping, ch, LogLargeBlockDiff); err != nil {
 			done <- false
 			e.logger.Error(err)
 			fmt.Println("Network fail, will retry shortly")
@@ -283,6 +284,7 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 			select {
 			case err := <-sub.Err():
 				e.logger.Error(err)
+
 			case i := <-transitChan:
 				ch <- &DOSProxyLogUrl{
 					QueryId:         i.QueryId,
@@ -295,30 +297,6 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 					BlockN:          i.Raw.BlockNumber,
 					Removed:         i.Raw.Removed,
 				}
-
-				//ch <- &DOSProxyLogUrl{
-				//	QueryId:         i.QueryId,
-				//	Timeout:         i.Timeout,
-				//	DataSource:      i.DataSource,
-				//	Selector:        i.Selector,
-				//	Randomness:      i.Randomness,
-				//	DispatchedGroup: i.DispatchedGroup,
-				//	Tx:              i.Raw.TxHash.Hex(),
-				//	BlockN:          i.Raw.BlockNumber,
-				//	Removed:         true,
-				//}
-				//
-				//ch <- &DOSProxyLogUrl{
-				//	QueryId:         i.QueryId,
-				//	Timeout:         i.Timeout,
-				//	DataSource:      i.DataSource,
-				//	Selector:        i.Selector,
-				//	Randomness:      i.Randomness,
-				//	DispatchedGroup: i.DispatchedGroup,
-				//	Tx:              i.Raw.TxHash.Hex(),
-				//	BlockN:          i.Raw.BlockNumber,
-				//	Removed:         i.Raw.Removed,
-				//}
 			}
 		}
 
@@ -338,7 +316,7 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 		for {
 			select {
 			case err := <-sub.Err():
-				log.Fatal(err)
+				e.logger.Fatal(err)
 			case i := <-transitChan:
 				ch <- &DOSProxyLogRequestUserRandom{
 					RequestId:            i.RequestId,
@@ -349,26 +327,6 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 					BlockN:               i.Raw.BlockNumber,
 					Removed:              i.Raw.Removed,
 				}
-
-				//ch <- &DOSProxyLogRequestUserRandom{
-				//	RequestId:            i.RequestId,
-				//	LastSystemRandomness: i.LastSystemRandomness,
-				//	UserSeed:             i.UserSeed,
-				//	DispatchedGroup:      i.DispatchedGroup,
-				//	Tx:                   i.Raw.TxHash.Hex(),
-				//	BlockN:               i.Raw.BlockNumber,
-				//	Removed:              true,
-				//}
-				//
-				//ch <- &DOSProxyLogRequestUserRandom{
-				//	RequestId:            i.RequestId,
-				//	LastSystemRandomness: i.LastSystemRandomness,
-				//	UserSeed:             i.UserSeed,
-				//	DispatchedGroup:      i.DispatchedGroup,
-				//	Tx:                   i.Raw.TxHash.Hex(),
-				//	BlockN:               i.Raw.BlockNumber,
-				//	Removed:              i.Raw.Removed,
-				//}
 			}
 		}
 	case SubscribeDOSProxyLogUpdateRandom:
@@ -387,7 +345,7 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 		for {
 			select {
 			case err := <-sub.Err():
-				log.Fatal(err)
+				e.logger.Fatal(err)
 			case i := <-transitChan:
 				ch <- &DOSProxyLogUpdateRandom{
 					LastRandomness:  i.LastRandomness,
@@ -396,22 +354,6 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 					BlockN:          i.Raw.BlockNumber,
 					Removed:         i.Raw.Removed,
 				}
-
-				//ch <- &DOSProxyLogUpdateRandom{
-				//	LastRandomness:  i.LastRandomness,
-				//	DispatchedGroup: i.DispatchedGroup,
-				//	Tx:              i.Raw.TxHash.Hex(),
-				//	BlockN:          i.Raw.BlockNumber,
-				//	Removed:         true,
-				//}
-				//
-				//ch <- &DOSProxyLogUpdateRandom{
-				//	LastRandomness:  i.LastRandomness,
-				//	DispatchedGroup: i.DispatchedGroup,
-				//	Tx:              i.Raw.TxHash.Hex(),
-				//	BlockN:          i.Raw.BlockNumber,
-				//	Removed:         i.Raw.Removed,
-				//}
 			}
 		}
 	case SubscribeDOSProxyLogValidationResult:
@@ -430,7 +372,7 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 		for {
 			select {
 			case err := <-sub.Err():
-				log.Fatal(err)
+				e.logger.Fatal(err)
 			case i := <-transitChan:
 				//if i.Raw.Removed == false {
 				ch <- &DOSProxyLogValidationResult{
@@ -464,7 +406,7 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 		for {
 			select {
 			case err := <-sub.Err():
-				log.Fatal(err)
+				e.logger.Fatal(err)
 			case i := <-transitChan:
 				if !e.filterLog(i.Raw) {
 					ch <- &DOSProxyLogNonSupportedType{
@@ -489,7 +431,7 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 		for {
 			select {
 			case err := <-sub.Err():
-				log.Fatal(err)
+				e.logger.Fatal(err)
 			case i := <-transitChan:
 				if !e.filterLog(i.Raw) {
 					ch <- &DOSProxyLogNonContractCall{
@@ -514,7 +456,7 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 		for {
 			select {
 			case err := <-sub.Err():
-				log.Fatal(err)
+				e.logger.Fatal(err)
 			case i := <-transitChan:
 				if !e.filterLog(i.Raw) {
 					ch <- &DOSProxyLogCallbackTriggeredFor{
@@ -539,7 +481,7 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 		for {
 			select {
 			case err := <-sub.Err():
-				log.Fatal(err)
+				e.logger.Fatal(err)
 			case i := <-transitChan:
 				if !e.filterLog(i.Raw) {
 					ch <- &DOSProxyLogRequestFromNonExistentUC{}
@@ -562,7 +504,7 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 		for {
 			select {
 			case err := <-sub.Err():
-				log.Fatal(err)
+				e.logger.Fatal(err)
 			case i := <-transitChan:
 				if !e.filterLog(i.Raw) {
 					ch <- &DOSProxyLogInsufficientGroupNumber{}
@@ -585,7 +527,7 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 		for {
 			select {
 			case err := <-sub.Err():
-				log.Fatal(err)
+				e.logger.Fatal(err)
 			case i := <-transitChan:
 				if !e.filterLog(i.Raw) {
 					ch <- &DOSProxyLogDuplicatePubKey{
@@ -611,7 +553,7 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 		for {
 			select {
 			case err := <-sub.Err():
-				log.Fatal(err)
+				e.logger.Fatal(err)
 			case i := <-transitChan:
 				//if !e.filterLog(i.Raw) {
 				ch <- &DOSProxyLogAddressNotFound{
@@ -640,7 +582,7 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 		for {
 			select {
 			case err := <-sub.Err():
-				log.Fatal(err)
+				e.logger.Fatal(err)
 			case i := <-transitChan:
 				//if !e.filterLog(i.Raw) {
 				ch <- &DOSProxyLogPublicKeyAccepted{
@@ -670,7 +612,7 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 		for {
 			select {
 			case err := <-sub.Err():
-				log.Fatal(err)
+				e.logger.Fatal(err)
 			case i := <-transitChan:
 				//if !e.filterLog(i.Raw) {
 				ch <- &DOSProxyLogPublicKeyUploaded{
@@ -686,7 +628,7 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 			}
 		}
 	case SubscribeDOSProxyLogGroupDismiss:
-		if err := e.fetchMatureLogs(opt.Context, SubscribeDOSProxyLogGroupDismiss, ch); err != nil {
+		if err := e.fetchMatureLogs(opt.Context, SubscribeDOSProxyLogGroupDismiss, ch, LogLargeBlockDiff); err != nil {
 			done <- false
 			e.logger.Error(err)
 			fmt.Println("Network fail, will retry shortly")
@@ -710,7 +652,7 @@ func (e *EthAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchO
 		for {
 			select {
 			case err := <-sub.Err():
-				log.Fatal(err)
+				e.logger.Fatal(err)
 			case i := <-transitChan:
 				if !e.filterLog(i.Raw) {
 					ch <- &DOSProxyWhitelistAddressTransferred{

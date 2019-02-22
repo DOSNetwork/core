@@ -114,7 +114,7 @@ func (e *EthUserAdaptor) SubscribeEvent(ch chan interface{}, subscribeType int) 
 	}
 }
 
-func (e *EthUserAdaptor) fetchMatureLogs(ctx context.Context, subscribeType int, ch chan interface{}) (err error) {
+func (e *EthUserAdaptor) fetchMatureLogs(ctx context.Context, subscribeType int, ch chan interface{}, blockDiff uint64) (err error) {
 	targetBlockN, err := e.GetCurrentBlock()
 	if err != nil {
 		return
@@ -129,7 +129,7 @@ func (e *EthUserAdaptor) fetchMatureLogs(ctx context.Context, subscribeType int,
 				if err != nil {
 					e.logger.Error(err)
 				}
-				for ; currentBlockN-onchain.LogBlockDiff >= targetBlockN; targetBlockN++ {
+				for ; currentBlockN-blockDiff >= targetBlockN; targetBlockN++ {
 					fmt.Println("checking Block", currentBlockN)
 					switch subscribeType {
 					case SubscribeAskMeAnythingQueryResponseReady:
@@ -269,7 +269,7 @@ func (e *EthUserAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.Wa
 		for {
 			select {
 			case err := <-sub.Err():
-				log.Fatal(err)
+				e.logger.Fatal(err)
 			case i := <-transitChan:
 				if !e.filterLog(i.Raw) {
 					ch <- &AskMeAnythingSetTimeout{
@@ -280,7 +280,7 @@ func (e *EthUserAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.Wa
 			}
 		}
 	case SubscribeAskMeAnythingQueryResponseReady:
-		if err := e.fetchMatureLogs(opt.Context, SubscribeAskMeAnythingQueryResponseReady, ch); err != nil {
+		if err := e.fetchMatureLogs(opt.Context, SubscribeAskMeAnythingQueryResponseReady, ch, onchain.LogLargeBlockDiff); err != nil {
 			done <- false
 			e.logger.Error(err)
 			fmt.Println("Network fail, will retry shortly")
@@ -289,7 +289,7 @@ func (e *EthUserAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.Wa
 			done <- true
 		}
 	case SubscribeAskMeAnythingRequestSent:
-		if err := e.fetchMatureLogs(opt.Context, SubscribeAskMeAnythingRequestSent, ch); err != nil {
+		if err := e.fetchMatureLogs(opt.Context, SubscribeAskMeAnythingRequestSent, ch, onchain.LogSmallBlockDiff); err != nil {
 			done <- false
 			e.logger.Error(err)
 			fmt.Println("Network fail, will retry shortly")
@@ -299,7 +299,7 @@ func (e *EthUserAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.Wa
 		}
 
 	case SubscribeAskMeAnythingRandomReady:
-		if err := e.fetchMatureLogs(opt.Context, SubscribeAskMeAnythingRandomReady, ch); err != nil {
+		if err := e.fetchMatureLogs(opt.Context, SubscribeAskMeAnythingRandomReady, ch, onchain.LogLargeBlockDiff); err != nil {
 			done <- false
 			e.logger.Error(err)
 			fmt.Println("Network fail, will retry shortly")
