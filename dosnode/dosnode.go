@@ -3,16 +3,21 @@ package dosnode
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
+	"io/ioutil"
 	"math/big"
+	"net/http"
+	"os"
+	"strings"
 	"time"
 
+	"github.com/DOSNetwork/core/configuration"
 	"github.com/DOSNetwork/core/log"
 	"github.com/DOSNetwork/core/onchain"
 	"github.com/DOSNetwork/core/p2p"
 	"github.com/DOSNetwork/core/share/dkg/pedersen"
 	"github.com/DOSNetwork/core/share/vss/pedersen"
-
 	"github.com/DOSNetwork/core/suites"
 )
 
@@ -34,19 +39,120 @@ type DosNode struct {
 	cPipCancel  chan string
 }
 
-func NewDosNode(suite suites.Suite, p p2p.P2PInterface, chain onchain.ChainInterface, dkg dkg.P2PDkgInterface) (dosNode *DosNode) {
+func NewDosNode(credentialPath, passphrase string) (dosNode *DosNode, err error) {
+	if passphrase == "" {
+		passphrase = os.Getenv("PASSPHRASE")
+		if passphrase == "" {
+			err = errors.New("No passphrase")
+			return
+		}
+	}
+
+	//Read Configuration
+	config := configuration.Config{}
+	err = config.LoadConfig()
+	if err != nil {
+		return
+	}
+
+	role := config.NodeRole
+	port := config.Port
+	bootstrapIp := config.BootStrapIp
+	chainConfig := config.GetChainConfig()
+
+	//Set up an onchain adapter
+	chainConn, err := onchain.AdaptTo(config.GetCurrentType())
+	if err != nil {
+		return
+	}
+
+	workingDir, err := os.Getwd()
+	if err != nil {
+		return
+	}
+	if workingDir == "/" {
+		workingDir = "."
+	}
+
+	if config.NodeRole == "testNode" {
+		var credential []byte
+		var resp *http.Response
+		s := strings.Split(config.BootStrapIp, ":")
+		ip, _ := s[0], s[1]
+		tServer := "http://" + ip + ":8080/getCredential"
+		resp, err = http.Get(tServer)
+		for err != nil {
+			time.Sleep(1 * time.Second)
+			resp, err = http.Get(tServer)
+		}
+
+		credential, err = ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return
+		}
+
+		if err = resp.Body.Close(); err != nil {
+			return
+		}
+
+		credentialPath = workingDir + "/testAccounts/" + string(credential) + "/credential"
+	} else if credentialPath == "" {
+		credentialPath = workingDir + "/credential"
+	}
+
+	err = chainConn.SetAccount(credentialPath, passphrase)
+	if err != nil {
+		return
+	}
+
+	//Init log module with nodeID that is an onchain account address
+	log.Init(chainConn.GetId()[:])
+	err = chainConn.Init(chainConfig)
+	if err != nil {
+		return
+	}
+
+	//Build a p2p network
+	p, err := p2p.CreateP2PNetwork(chainConn.GetId(), port)
+	if err != nil {
+		return
+	}
+
+	err = p.Listen()
+	if err != nil {
+		return
+	}
+
+	//Bootstrapping p2p network
+	if role != "BootstrapNode" {
+		err = p.Join(bootstrapIp)
+		if err != nil {
+			return
+		}
+	}
+
+	//Build a p2pDKG
+	suite := suites.MustFind("bn256")
+	p2pDkg, err := dkg.CreateP2PDkg(p, suite)
+	if err != nil {
+		return
+	}
+
 	if logger == nil {
 		logger = log.New("module", "dosclient")
 	}
-	return &DosNode{
+
+	dosNode = &DosNode{
 		suite:       suite,
 		p:           p,
-		chain:       chain,
-		dkg:         dkg,
+		chain:       chainConn,
+		dkg:         p2pDkg,
 		done:        make(chan interface{}),
 		cSignToPeer: make(chan *vss.Signature, 50),
 		cPipCancel:  make(chan string),
 	}
+	err = dosNode.Start()
+	return
 }
 
 func (d *DosNode) Start() (err error) {

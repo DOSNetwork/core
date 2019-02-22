@@ -5,10 +5,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"math/rand"
-	"net/http"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -81,20 +79,17 @@ func UpdateConfig(path string, c interface{}) (err error) {
 }
 
 func (c *Config) LoadConfig() (err error) {
-	var workingDir string
 	path := os.Getenv(ENVCONFIGPATH)
-	if path != "" {
-		workingDir = path
-	} else {
-		workingDir, err = os.Getwd()
+	if path == "" {
+		path, err = os.Getwd()
 		if err != nil {
 			return
 		}
-		if workingDir == "/" {
-			workingDir = "."
+		if path == "/" {
+			path = "."
 		}
 	}
-	c.path = workingDir + "/config.json"
+	c.path = path + "/config.json"
 	err = LoadConfig(c.path, c)
 	if err != nil {
 		fmt.Println("LoadConfig  err", err)
@@ -103,32 +98,6 @@ func (c *Config) LoadConfig() (err error) {
 
 	err = c.overWrite()
 
-	if c.NodeRole == "testNode" {
-		var credential []byte
-		var resp *http.Response
-		fmt.Println("This is a test node : ", c.BootStrapIp)
-		s := strings.Split(c.BootStrapIp, ":")
-		ip, _ := s[0], s[1]
-		tServer := "http://" + ip + ":8080/getCredential"
-		resp, err = http.Get(tServer)
-		for err != nil {
-			time.Sleep(1 * time.Second)
-			resp, err = http.Get(tServer)
-		}
-
-		credential, err = ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return
-		}
-
-		if err = resp.Body.Close(); err != nil {
-			return
-		}
-
-		c.credentialPath = workingDir + "/testAccounts/" + string(credential) + "/credential"
-		fmt.Println("credential : ", c.credentialPath)
-
-	}
 	return
 }
 

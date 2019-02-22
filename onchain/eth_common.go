@@ -61,20 +61,11 @@ func (e *EthCommon) Init(config configuration.ChainConfig) (err error) {
 	return
 }
 
-func (e *EthCommon) SetAccount(credentialPath string) (err error) {
+func (e *EthCommon) SetAccount(credentialPath, passphrase string) (err error) {
 	fmt.Println("credentialPath: ", credentialPath)
-
-	passPhraseBytes, err := ioutil.ReadFile(credentialPath + "/passPhrase")
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	passPhrase := string(passPhraseBytes)
-
 	newKeyStore := keystore.NewKeyStore(credentialPath, keystore.StandardScryptN, keystore.StandardScryptP)
 	if len(newKeyStore.Accounts()) < 1 {
-		_, err = newKeyStore.NewAccount(passPhrase)
+		_, err = newKeyStore.NewAccount(passphrase)
 		if err != nil {
 			fmt.Println(err)
 			return
@@ -83,7 +74,7 @@ func (e *EthCommon) SetAccount(credentialPath string) (err error) {
 
 	usrKeyPath := newKeyStore.Accounts()[0].URL.Path
 
-	usrKey, err := e.getKey(usrKeyPath, passPhrase)
+	usrKey, err := e.getKey(usrKeyPath, passphrase)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -170,6 +161,16 @@ func (e *EthCommon) balanceMaintain(usrKey, rootKey *keystore.Key) (err error) {
 	}
 
 	return
+}
+
+func (e *EthCommon) GetBalance() (balance *big.Float) {
+	balance, err := e.getBalance(&keystore.Key{Address: e.GetAddress()})
+	if err != nil {
+		log.Error(err)
+		return
+	}
+
+	return balance
 }
 
 func (e *EthCommon) EnoughBalance(address common.Address) (isEnough bool) {

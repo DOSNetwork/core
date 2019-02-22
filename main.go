@@ -1,90 +1,237 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
-	"time"
+	"io/ioutil"
+	"net/http"
+	"os"
+	"os/exec"
+	"os/signal"
+	"strconv"
+	"strings"
+	"syscall"
 
-	"github.com/DOSNetwork/core/configuration"
 	"github.com/DOSNetwork/core/dosnode"
-	"github.com/DOSNetwork/core/log"
-	"github.com/DOSNetwork/core/onchain"
-	"github.com/DOSNetwork/core/p2p"
-	"github.com/DOSNetwork/core/share/dkg/pedersen"
-	"github.com/DOSNetwork/core/suites"
+
+	"github.com/urfave/cli"
+	"golang.org/x/crypto/ssh/terminal"
 )
+
+var PIDFile = "./dosclient.pid"
+
+func savePID(pid int) {
+
+	file, err := os.Create(PIDFile)
+	if err != nil {
+		fmt.Printf("Unable to create pid file : %v\n", err)
+		os.Exit(1)
+	}
+
+	defer file.Close()
+
+	_, err = file.WriteString(strconv.Itoa(pid))
+
+	if err != nil {
+		fmt.Printf("Unable to create pid file : %v\n", err)
+		os.Exit(1)
+	}
+
+	file.Sync() // flush to disk
+
+}
+
+func runDos(credentialPath, passphrase string) {
+
+	// Make arrangement to remove PID file upon receiving the SIGTERM from kill command
+	ch := make(chan os.Signal, 1)
+	signal.Notify(ch, os.Interrupt, os.Kill, syscall.SIGTERM)
+
+	go func() {
+		signalType := <-ch
+		signal.Stop(ch)
+
+		fmt.Println("Received signal type : ", signalType)
+
+		// remove PID file
+		os.Remove(PIDFile)
+
+		os.Exit(0)
+
+	}()
+	mux := http.NewServeMux()
+	dosclient, err := dosnode.NewDosNode(credentialPath, passphrase)
+	if err != nil {
+		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			content := "Error:" + err.Error() + "\n"
+			w.Write([]byte(content))
+		})
+	} else {
+		mux.HandleFunc("/", dosclient.Status)
+		mux.HandleFunc("/balance", dosclient.Balance)
+		mux.HandleFunc("/groups", dosclient.Groups)
+	}
+	http.ListenAndServe("localhost:8080", mux)
+}
+
+func makeRequest(f string, args []byte) ([]byte, error) {
+
+	tServer := "http://localhost:8080/" + f
+
+	req, err := http.NewRequest("POST", tServer, bytes.NewBuffer(args))
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	r, err := ioutil.ReadAll(resp.Body)
+	return r, err
+}
 
 // main
 func main() {
-	//Read Configuration
-	config := configuration.Config{}
-	if err := config.LoadConfig(); err != nil {
-		log.Fatal(err)
-	}
-
-	role := config.NodeRole
-	port := config.Port
-	bootstrapIp := config.BootStrapIp
-	chainConfig := config.GetChainConfig()
-
-	//Set up an onchain adapter
-	chainConn, err := onchain.AdaptTo(config.GetCurrentType())
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	if err = chainConn.SetAccount(config.GetCredentialPath()); err != nil {
-		log.Fatal(err)
-	}
-	//Init log module with nodeID that is an onchain account address
-	log.Init(chainConn.GetId()[:])
-	if err = chainConn.Init(chainConfig); err != nil {
-		log.Fatal(err)
-	}
-
-	rootCredentialPath := "testAccounts/bootCredential/fundKey"
-	if err := chainConn.BalanceMaintain(rootCredentialPath); err != nil {
-		log.Fatal(err)
-	}
-
-	go func() {
-		fmt.Println("regular balanceMaintain started")
-		ticker := time.NewTicker(time.Hour * 8)
-		for range ticker.C {
-			if err := chainConn.BalanceMaintain(rootCredentialPath); err != nil {
-				log.Fatal(err)
-			}
+	if len(os.Args) > 1 && strings.ToLower(os.Args[1]) == "run" {
+		path := ""
+		pass := ""
+		if len(os.Args) > 3 {
+			path = strings.ToLower(os.Args[2])
+			pass = strings.ToLower(os.Args[3])
 		}
-	}()
-
-	//Build a p2p network
-	p, err := p2p.CreateP2PNetwork(chainConn.GetId(), port)
-	if err != nil {
-		log.Fatal(err)
+		runDos(path, pass)
 	}
 
-	if err := p.Listen(); err != nil {
-		log.Fatal(err)
+	app := cli.NewApp()
+	app.Name = "client"
+	app.Usage = "the dos-client command line interface"
+
+	app.Commands = []cli.Command{
+		{
+			Name:  "start",
+			Usage: "Start a dos-client daemon",
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name:   "credential.path,c",
+					Usage:  "credential.path",
+					EnvVar: "CREDENTIALPATH",
+				},
+				cli.StringFlag{
+					Name:   "credential.passphrase,p",
+					Usage:  "credential.passPhrase",
+					EnvVar: "PASSPHRASE",
+				},
+			},
+			Action: func(c *cli.Context) error {
+				password := ""
+				fmt.Print("credentialPath: ", c.String("credential.path"))
+				if c.String("credential.passphrase") != "" {
+					fmt.Print("passPhrase: ", strings.TrimSpace(c.String("credential.passphrase")))
+				} else {
+					fmt.Print("Enter Password: ")
+					bytePassword, err := terminal.ReadPassword(0)
+					if err == nil {
+						fmt.Println("\nPassword typed: ***\n")
+					}
+					password = strings.TrimSpace(string(bytePassword))
+				}
+				// check if daemon already running.
+				if _, err := os.Stat(PIDFile); err == nil {
+					fmt.Println("Already running or /tmp/dosclient.pid file exist.")
+					os.Exit(1)
+				}
+				fmt.Println("!!!" + c.String("credential.path"))
+				path := ""
+				if c.String("credential.passphrase") != "" {
+					path = strings.TrimSpace(c.String("credential.path"))
+				}
+				cmd := exec.Command(os.Args[0], "run", path, password)
+				cmd.Start()
+				//runDos(c.String("credential.path"), password)
+				savePID(cmd.Process.Pid)
+				return nil
+			},
+		},
+		{
+			Name:  "stop",
+			Usage: "Stop a daemon",
+			Action: func(c *cli.Context) error {
+				if _, err := os.Stat(PIDFile); err == nil {
+					data, err := ioutil.ReadFile(PIDFile)
+					if err != nil {
+						fmt.Println("Not running")
+						return nil
+					}
+					ProcessID, err := strconv.Atoi(string(data))
+
+					if err != nil {
+						fmt.Println("Unable to read and parse process id found in ", PIDFile)
+						return nil
+					}
+
+					process, err := os.FindProcess(ProcessID)
+
+					if err != nil {
+						fmt.Printf("Unable to find process ID [%v] with error %v \n", ProcessID, err)
+						return nil
+					}
+					// remove PID file
+					os.Remove(PIDFile)
+
+					fmt.Printf("Killing process ID [%v] now.\n", ProcessID)
+					// kill process and exit immediately
+					err = process.Kill()
+
+					if err != nil {
+						fmt.Printf("Unable to kill process ID [%v] with error %v \n", ProcessID, err)
+						return nil
+					} else {
+						fmt.Printf("Killed process ID [%v]\n", ProcessID)
+						return nil
+					}
+
+				} else {
+
+					fmt.Println("Not running.")
+					return nil
+				}
+				return nil
+			},
+		},
+		{
+			Name:  "show",
+			Usage: "Show dos-client status",
+			Subcommands: []cli.Command{
+				{
+					Name:  "status",
+					Usage: "show status",
+					Action: func(c *cli.Context) error {
+						r, _ := makeRequest("/", []byte{})
+						fmt.Println(string(r))
+						return nil
+					},
+				},
+				{
+					Name:  "balance",
+					Usage: "show balance",
+					Action: func(c *cli.Context) error {
+						r, _ := makeRequest("balance", []byte{})
+						fmt.Println("show balance: ", string(r))
+						return nil
+					},
+				},
+				{
+					Name:  "groups",
+					Usage: "show group number",
+					Action: func(c *cli.Context) error {
+						r, _ := makeRequest("groups", []byte{})
+						fmt.Println("show group number: ", string(r))
+						return nil
+					},
+				},
+			},
+		},
 	}
 
-	//Bootstrapping p2p network
-	if role != "BootstrapNode" {
-		if err = p.Join(bootstrapIp); err != nil {
-			log.Fatal(err)
-		}
-	}
-
-	//Build a p2pDKG
-	suite := suites.MustFind("bn256")
-	p2pDkg, err := dkg.CreateP2PDkg(p, suite)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	dosclient := dosnode.NewDosNode(suite, p, chainConn, p2pDkg)
-	if err = dosclient.Start(); err != nil {
-		log.Fatal(err)
-	}
-
-	done := make(chan interface{})
-	<-done
+	app.Run(os.Args)
 }

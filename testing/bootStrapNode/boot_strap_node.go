@@ -4,6 +4,7 @@ import (
 	// Import the gorilla/mux library we just installed
 	"fmt"
 	"net/http"
+	"os"
 	"strconv"
 	"sync"
 
@@ -35,8 +36,9 @@ func main() {
 
 	chainConfig := config.GetChainConfig()
 
+	passphrase := os.Getenv("PASSPHRASE")
 	adaptor = &onchain.EthAdaptor{}
-	if err = adaptor.SetAccount("testAccounts/bootCredential/fundKey"); err != nil {
+	if err = adaptor.SetAccount("testAccounts/bootCredential/fundKey", passphrase); err != nil {
 		log.Fatal(err)
 	}
 

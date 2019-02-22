@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/crypto/ssh/terminal"
+
 	"github.com/DOSNetwork/core/configuration"
 	"github.com/DOSNetwork/core/onchain"
 	"github.com/DOSNetwork/core/onchain/dosproxy"
@@ -182,9 +184,15 @@ func main() {
 	fmt.Println("Use : ", chainConfig)
 	fmt.Println(" address ", chainConfig.RemoteNodeAddress)
 
+	fmt.Print("Enter Password: ")
+	bytePassword, err := terminal.ReadPassword(0)
+	if err == nil {
+		fmt.Println("\nPassword typed: ***\n")
+	}
+	password := strings.TrimSpace(string(bytePassword))
 	//Dial to blockchain
 	conn := &onchain.EthCommon{}
-	if err := conn.SetAccount(credentialPath); err != nil {
+	if err := conn.SetAccount(credentialPath, password); err != nil {
 		log.Fatal(err)
 	}
 

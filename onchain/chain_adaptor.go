@@ -16,7 +16,7 @@ const (
 )
 
 type ChainInterface interface {
-	SetAccount(credentialPath string) (err error)
+	SetAccount(credentialPath, passphrase string) (err error)
 	Init(chainConfig configuration.ChainConfig) (err error)
 	SubscribeEvent(ch chan interface{}, subscribeType int) (err error)
 	InitialWhiteList() (err error)
@@ -36,6 +36,7 @@ type ChainInterface interface {
 	ResetNodeIDs() (err error)
 	RandomNumberTimeOut() (err error)
 	EnoughBalance(address common.Address) (isEnough bool)
+	GetBalance() (balance *big.Float)
 	WhitelistInitialized() (initialized bool, err error)
 }
 

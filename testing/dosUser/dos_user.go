@@ -139,7 +139,8 @@ func main() {
 			break
 		}
 	}
-	if err = userTestAdaptor.SetAccount(onChainConfig.GetCredentialPath()); err != nil {
+	passphrase := os.Getenv("PASSPHRASE")
+	if err = userTestAdaptor.SetAccount(onChainConfig.GetCredentialPath(), passphrase); err != nil {
 		log.Fatal(err)
 	}
 
