@@ -6,8 +6,7 @@ import (
 	"sync"
 	"testing"
 	"time"
-
-	"github.com/DOSNetwork/core/share/vss/pedersen"
+	//"github.com/DOSNetwork/core/share/vss/pedersen"
 )
 
 const (
@@ -51,21 +50,21 @@ func mergeErrors(ctx context.Context, cs ...<-chan error) <-chan error {
 }
 
 func testProxy(setting int) (err error) {
+	/*
+		proxyAddr := "0x25d1b6aD154C84a998a836663c867853A916d4bD"
+		urls := []string{"ws://51.15.0.157:8546", "ws://51.159.4.51:8546", "wss://rinkeby.infura.io/ws/8e609c76fce442f8a1735fbea9999747"}
+		if setting == TWOFULLNODES_1 {
+			//urls = []string{"wss://rinkeby.infura.io/ws/8e609c76fce442f8a1735fbea9999747"}
+			urls = []string{"ws://51.15.0.157:8546"}
+		} else if setting == TWOFULLNODES_2 {
+			urls = []string{"ws://51.159.4.51:8546"}
+		}
+	*/
+	proxyAddr := "0x4562daE9d912638413a5B290D657e28724E28e06"
+	urls := []string{"ws://163.172.36.173:8546"}
 
-	proxyAddr := "0x25d1b6aD154C84a998a836663c867853A916d4bD"
-	urls := []string{"ws://51.15.0.157:8546", "ws://51.159.4.51:8546", "wss://rinkeby.infura.io/ws/8e609c76fce442f8a1735fbea9999747"}
-	if setting == TWOFULLNODES_1 {
-		//urls = []string{"wss://rinkeby.infura.io/ws/8e609c76fce442f8a1735fbea9999747"}
-		urls = []string{"ws://51.15.0.157:8546"}
-	} else if setting == TWOFULLNODES_2 {
-		urls = []string{"ws://51.159.4.51:8546"}
-	}
-
-	//proxyAddr := "0x4562daE9d912638413a5B290D657e28724E28e06"
-	//urls := []string{"ws://163.172.36.173:8546"}
-
-	credentialPath := "/Users/chenhaonien/go/src/github.com/DOSNetwork/core/credential"
-	passphrase := "123"
+	credentialPath := ""
+	passphrase := ""
 	adaptor, err := NewETHProxySession(credentialPath, passphrase, proxyAddr, urls)
 	if err != nil {
 		fmt.Println(err.Error())
@@ -87,9 +86,10 @@ func testProxy(setting int) (err error) {
 		_ = adaptor.SubscribeEvent(SubscribeDOSProxyLogValidationResult, sink)
 		//_ = adaptor.PollLogs(SubscribeDOSProxyLogInsufficientGroupNumber, sink)
 	}
+
 	ctx, _ := context.WithCancel(context.Background())
 	var errcList []<-chan error
-	sigC := make(chan *vss.Signature)
+	//sigC := make(chan *vss.Signature)
 	for i := 1; i <= 3; i++ {
 
 		if setting == TWOFULLNODES_1 {
@@ -101,27 +101,28 @@ func testProxy(setting int) (err error) {
 			err := adaptor.Grouping(ctx, i)
 			errcList = append(errcList, err)
 		} else {
-			//err := adaptor.Grouping(ctx, i)
-			//errcList = append(errcList, err)
-
-			err := adaptor.SetRandomNum(ctx, sigC)
+			err := adaptor.Grouping(ctx, i)
 			errcList = append(errcList, err)
-			b := []byte{'g', 'o', 'l', 'a', 'n', 'g', 'g', 'o', 'l', 'a',
-				'g', 'o', 'l', 'a', 'n', 'g', 'g', 'o', 'l', 'a',
-				'g', 'o', 'l', 'a', 'n', 'g', 'g', 'o', 'l', 'a',
-				'g', 'o', 'l', 'a', 'n', 'g', 'g', 'o', 'l', 'a',
-				'g', 'o', 'l', 'a', 'n', 'g', 'g', 'o', 'l', 'a',
-				'g', 'o', 'l', 'a', 'n', 'g', 'g', 'o', 'l', 'a',
-				'g', 'o', 'l', 'a'}
-			sig := &vss.Signature{Index: 1, QueryId: "test", Content: b, Signature: b}
-			sigC <- sig
+			/*
+				err := adaptor.SetRandomNum(ctx, sigC)
+				errcList = append(errcList, err)
+				b := []byte{'g', 'o', 'l', 'a', 'n', 'g', 'g', 'o', 'l', 'a',
+					'g', 'o', 'l', 'a', 'n', 'g', 'g', 'o', 'l', 'a',
+					'g', 'o', 'l', 'a', 'n', 'g', 'g', 'o', 'l', 'a',
+					'g', 'o', 'l', 'a', 'n', 'g', 'g', 'o', 'l', 'a',
+					'g', 'o', 'l', 'a', 'n', 'g', 'g', 'o', 'l', 'a',
+					'g', 'o', 'l', 'a', 'n', 'g', 'g', 'o', 'l', 'a',
+					'g', 'o', 'l', 'a'}
+				sig := &vss.Signature{Index: 1, QueryId: "test", Content: b, Signature: b}
+				sigC <- sig
+			*/
 		}
 
 	}
 	errc := mergeErrors(ctx, errcList...)
 
 	//count := 0
-	//L:
+L:
 	for {
 		select {
 		case event := <-sink:
@@ -145,9 +146,9 @@ func testProxy(setting int) (err error) {
 			}
 		case _, ok := <-errc:
 			if !ok {
-				//fmt.Println("errc done")
-				//adaptor.End()
-				//break L
+				fmt.Println("errc done")
+				adaptor.End()
+				break L
 			}
 		}
 	}
@@ -164,7 +165,6 @@ func TestConcurrentSend(t *testing.T) {
 	}
 }
 
-/*
 func TestNonceConflict(t *testing.T) {
 
 	for i := 1; i < 2; i++ {
@@ -182,4 +182,3 @@ func TestNonceConflict(t *testing.T) {
 		wg.Wait()
 	}
 }
-*/

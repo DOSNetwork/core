@@ -88,7 +88,6 @@ func NewDosNode(credentialPath, passphrase string) (dosNode *DosNode, err error)
 		if err = resp.Body.Close(); err != nil {
 			return
 		}
-
 		credentialPath = workingDir + "/testAccounts/" + string(credential) + "/credential"
 	} else if credentialPath == "" {
 		credentialPath = workingDir + "/credential"
@@ -156,7 +155,6 @@ func (d *DosNode) Start() (err error) {
 		logger.Error(err)
 		return
 	}
-
 	return
 }
 
@@ -250,14 +248,26 @@ func (d *DosNode) listen() (err error) {
 	eventValidation := make(chan interface{})
 	keyUploaded := make(chan interface{})
 	keyAccepted := make(chan interface{})
-	d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogGrouping, eventGrouping)
-	d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogGroupDismiss, eventGroupDismiss)
-	d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogUrl, chUrl)
-	d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogUpdateRandom, chRandom)
-	d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogRequestUserRandom, chUsrRandom)
-	d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogValidationResult, eventValidation)
-	d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogPublicKeyUploaded, keyUploaded)
-	d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogPublicKeyAccepted, keyAccepted)
+
+	var errcList []<-chan error
+	errc := d.chain.PollLogs(onchain.SubscribeDOSProxyLogGrouping, eventGrouping)
+	errcList = append(errcList, errc)
+	errc = d.chain.PollLogs(onchain.SubscribeDOSProxyLogGroupDismiss, eventGroupDismiss)
+	errcList = append(errcList, errc)
+	errc = d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogUrl, chUrl)
+	errcList = append(errcList, errc)
+	errc = d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogUpdateRandom, chRandom)
+	errcList = append(errcList, errc)
+	errc = d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogRequestUserRandom, chUsrRandom)
+	errcList = append(errcList, errc)
+	errc = d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogValidationResult, eventValidation)
+	errcList = append(errcList, errc)
+	errc = d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogPublicKeyUploaded, keyUploaded)
+	errcList = append(errcList, errc)
+	errc = d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogPublicKeyAccepted, keyAccepted)
+	errcList = append(errcList, errc)
+	errc = mergeErrors(context.Background(), errcList...)
+
 	peerEvent, err := d.p.SubscribeEvent(50, vss.Signature{})
 
 	go func() {
@@ -278,6 +288,9 @@ func (d *DosNode) listen() (err error) {
 				logger.Error(err)
 			}
 			select {
+			case err := <-errc:
+				fmt.Println("!!!dosnode err ", err)
+				logger.Error(err)
 			case <-watchdog.C:
 				ids := d.dkg.GetAnyGroupIDs()
 				if len(ids) != 0 {
@@ -307,7 +320,6 @@ func (d *DosNode) listen() (err error) {
 				switch content := msg.Msg.Message.(type) {
 				case *vss.Signature:
 					d.p.Reply(msg.Sender, msg.RequestNonce, peerSignMap[content.QueryId])
-					fmt.Println("Reply 1!!!!!!!!!!")
 				}
 			case msg := <-eventGrouping:
 				content, ok := msg.(*onchain.DOSProxyLogGrouping)

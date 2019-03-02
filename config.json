@@ -24,7 +24,8 @@
                 "DOSProxyAddress": "0xEaf6917171fA093a5879ffEAAFc3a7D52C931D13",
                 "DOSAddressBridgeAddress": "0xa52039D37520D5dd00aCC6B0D7C34DA01563F9CD",
                 "RemoteNodeAddressPool": [
-                    "ws://51.15.0.157:8546"
+                    "ws://51.15.0.157:8546",
+                    "ws://51.159.4.51:8546"
                 ],
                 "RemoteNodeAddress": "ws://51.15.0.157:8546"
             }

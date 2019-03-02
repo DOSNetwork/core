@@ -5,5 +5,6 @@ COPY . .
 RUN env CGO_ENABLED=0 GOOS=linux GOARCH=amd64 && go build -ldflags "-linkmode external -extldflags -static" -a -o peerTalk ./testing/peerTalk/peerTalk.go
 
 FROM scratch
+COPY --from=dosnetwork/dosenv:latest  /etc/ssl/certs/ /etc/ssl/certs/
 COPY --from=builder /go/src/github.com/DOSNetwork/core/peerTalk /
 CMD ["/peerTalk"]

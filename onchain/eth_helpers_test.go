@@ -1,15 +1,16 @@
 package onchain
 
-//"context"
-//"fmt"
-//"testing"
-//"time"
+import (
+	"context"
+	"fmt"
+	"testing"
+	"time"
+)
 
 const (
 	ID = 4
 )
 
-/*
 func TestSetEthKey(t *testing.T) {
 	credentialPath := "/Users/chenhaonien/go/src/github.com/DOSNetwork/core/credential"
 	passphrase := "123"
@@ -76,4 +77,4 @@ func TestDialToEthErrHandling(t *testing.T) {
 	if count > 1 {
 		t.Errorf("Dial success count, got: %d, want: %d.", count, 1)
 	}
-}*/
+}

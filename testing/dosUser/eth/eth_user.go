@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/big"
 	"time"
 
 	"github.com/DOSNetwork/core/log"
@@ -47,6 +46,7 @@ func NewAMAUserSession(credentialPath, passphrase, addr string, gethUrls []strin
 		fmt.Println("NewETHProxySession ", err)
 		return
 	}
+	log.Init(key.Address.Bytes()[:])
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	defer cancelFunc()
@@ -75,9 +75,9 @@ func NewAMAUserSession(credentialPath, passphrase, addr string, gethUrls []strin
 	auth := bind.NewKeyedTransactor(key.PrivateKey)
 	auth.GasLimit = uint64(5000000)
 	auth.Context = ctxD
-	nonce, _ := c.PendingNonceAt(ctxD, key.Address)
-	auth.Nonce = big.NewInt(0)
-	auth.Nonce = auth.Nonce.SetUint64(nonce)
+	//nonce, _ := c.PendingNonceAt(ctxD, key.Address)
+	//auth.Nonce = big.NewInt(0)
+	//auth.Nonce = auth.Nonce.SetUint64(nonce)
 	adaptor.s = &dosUser.AskMeAnythingSession{Contract: a, CallOpts: bind.CallOpts{Context: ctxD}, TransactOpts: *auth}
 	adaptor.c = c
 	adaptor.key = key

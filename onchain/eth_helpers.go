@@ -104,7 +104,7 @@ func CheckTransaction(client *ethclient.Client, tx *types.Transaction) (err erro
 	for err == ethereum.NotFound {
 
 		if time.Since(start).Seconds() > 90 {
-			err = errors.New("transaction failed")
+			err = errors.New("transaction not found")
 			fmt.Println("transaction failed. tx ", fmt.Sprintf("%x", tx.Hash()))
 			return
 		}
@@ -121,7 +121,7 @@ func CheckTransaction(client *ethclient.Client, tx *types.Transaction) (err erro
 		fmt.Println("transaction confirmed. tx ", fmt.Sprintf("%x", tx.Hash()))
 	} else {
 		err = errors.New("transaction failed")
-		fmt.Println("transaction failed.  tx ", fmt.Sprintf("%x", tx.Hash()))
+		fmt.Println("transaction Status != 0 .  tx ", fmt.Sprintf("%x", tx.Hash()))
 	}
 
 	return

@@ -19,10 +19,10 @@ import (
 )
 
 var (
-	adaptor         onchain.EthAdaptor
 	lock            sync.Mutex
 	credentialIndex = 0
 )
+var adaptor onchain.ProxyAdapter
 
 // main
 func main() {
@@ -47,7 +47,7 @@ func main() {
 	credentialPath := workingDir + "/testAccounts/bootCredential/fundKey"
 	//Set up an onchain adapter
 	chainConfig := config.GetChainConfig()
-	adaptor, err := onchain.NewProxyAdapter(config.GetCurrentType(), credentialPath, passphrase, chainConfig.DOSProxyAddress, chainConfig.RemoteNodeAddressPool)
+	adaptor, err = onchain.NewProxyAdapter(config.GetCurrentType(), credentialPath, passphrase, chainConfig.DOSProxyAddress, chainConfig.RemoteNodeAddressPool)
 	if err != nil {
 		return
 	}
@@ -55,8 +55,8 @@ func main() {
 	//Init log module with nodeID that is an onchain account address
 	log.Init(id[:])
 	ctx, _ := context.WithCancel(context.Background())
-	adaptor.ResetNodeIDs(ctx)
-
+	errc := adaptor.ResetNodeIDs(ctx)
+	<-errc
 	adaptor.Grouping(ctx, config.GetRandomGroupSize())
 
 	//2)Build a p2p network
@@ -97,6 +97,9 @@ func getCredential(w http.ResponseWriter, r *http.Request) {
 }
 
 func hasGroupPubkey(w http.ResponseWriter, r *http.Request) {
+	if adaptor == nil {
+		fmt.Println("adaptor is nil")
+	}
 	key, err := adaptor.GroupPubKey(0)
 	if err != nil {
 		//TODO: Need to check why it has err : abi: improperly formatted output

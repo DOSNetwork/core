@@ -112,7 +112,40 @@ func main() {
 	if err = onChainConfig.LoadConfig(); err != nil {
 		log.Fatal(err)
 	}
+	credentialPath := ""
+	workingDir, err := os.Getwd()
+	if err != nil {
+		return
+	}
+	if workingDir == "/" {
+		workingDir = "."
+	}
 
+	if onChainConfig.NodeRole == "testNode" {
+		var credential []byte
+		var resp *http.Response
+		s := strings.Split(onChainConfig.BootStrapIp, ":")
+		ip, _ := s[0], s[1]
+		tServer := "http://" + ip + ":8080/getCredential"
+		resp, err = http.Get(tServer)
+		for err != nil {
+			time.Sleep(1 * time.Second)
+			resp, err = http.Get(tServer)
+		}
+
+		credential, err = ioutil.ReadAll(resp.Body)
+		if err != nil {
+			return
+		}
+
+		if err = resp.Body.Close(); err != nil {
+			return
+		}
+
+		credentialPath = workingDir + "/testAccounts/" + string(credential) + "/credential"
+	} else if credentialPath == "" {
+		credentialPath = workingDir + "/credential"
+	}
 	chainConfig := onChainConfig.GetChainConfig()
 
 	//Wait until contract has group public key
@@ -140,45 +173,16 @@ func main() {
 		}
 	}
 	passphrase := os.Getenv("PASSPHRASE")
-	if err = userTestAdaptor.SetAccount(onChainConfig.GetCredentialPath(), passphrase); err != nil {
-		log.Fatal(err)
-	}
 
-	log.Init(userTestAdaptor.GetId()[:])
-	//source := rand.NewSource(time.Now().UnixNano())
-	//random := rand.New(source)
+	userTestAdaptor, err = eth.NewAMAUserSession(credentialPath, passphrase, config.AskMeAnythingAddressPool[0], chainConfig.RemoteNodeAddressPool)
 
-	envSize := os.Getenv("AMA")
-	index, err := strconv.Atoi(envSize)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	if err = userTestAdaptor.Init(config.AskMeAnythingAddressPool[index], chainConfig); err != nil {
-		log.Fatal(err)
-	}
-
-	rootCredentialPath := "testAccounts/bootCredential/fundKey"
-	if err := userTestAdaptor.BalanceMaintain(rootCredentialPath); err != nil {
-		log.Fatal(err)
-	}
-
-	go func() {
-		fmt.Println("regular balanceMaintain started")
-		ticker := time.NewTicker(time.Hour * 8)
-		for range ticker.C {
-			if err := userTestAdaptor.BalanceMaintain(rootCredentialPath); err != nil {
-				log.Fatal(err)
-			}
-		}
-	}()
+	log.Init(userTestAdaptor.Address().Bytes()[:])
 
 	logger = log.New("module", "AMAUser")
 	events := make(chan interface{}, 5)
-	if err = userTestAdaptor.SubscribeToAll(events); err != nil {
-		log.Fatal(err)
-	}
-
+	userTestAdaptor.PollLogs(eth.SubscribeAskMeAnythingQueryResponseReady, events)
+	userTestAdaptor.PollLogs(eth.SubscribeAskMeAnythingRequestSent, events)
+	userTestAdaptor.PollLogs(eth.SubscribeAskMeAnythingRandomReady, events)
 	requestIdMap := make(map[string]bool)
 
 	go func() {
