@@ -2,6 +2,8 @@ package main
 
 import (
 	// Import the gorilla/mux library we just installed
+	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -17,7 +19,7 @@ import (
 )
 
 var (
-	adaptor         *onchain.EthAdaptor
+	adaptor         onchain.EthAdaptor
 	lock            sync.Mutex
 	credentialIndex = 0
 )
@@ -25,45 +27,40 @@ var (
 // main
 func main() {
 	//1) Connect to Ethereum to reset contract
-	var (
-		config configuration.Config
-		err    error
-	)
-
-	if err = config.LoadConfig(); err != nil {
-		log.Fatal(err)
-	}
-
-	chainConfig := config.GetChainConfig()
-
 	passphrase := os.Getenv("PASSPHRASE")
-	adaptor = &onchain.EthAdaptor{}
-	if err = adaptor.SetAccount("testAccounts/bootCredential/fundKey", passphrase); err != nil {
+	if passphrase == "" {
+		log.Fatal(errors.New("No passphrase"))
+	}
+	//Read Configuration
+	config := configuration.Config{}
+	if err := config.LoadConfig(); err != nil {
 		log.Fatal(err)
 	}
 
-	log.Init(adaptor.GetId()[:])
-	if err = adaptor.Init(chainConfig); err != nil {
-		log.Fatal(err)
-	}
-
-	if wlInitialized, err := (*adaptor).WhitelistInitialized(); (err == nil) && !wlInitialized {
-		err = (*adaptor).InitialWhiteList()
-	}
+	workingDir, err := os.Getwd()
 	if err != nil {
-		log.Fatal(err)
+		return
 	}
+	if workingDir == "/" {
+		workingDir = "."
+	}
+	credentialPath := workingDir + "/testAccounts/bootCredential/fundKey"
+	//Set up an onchain adapter
+	chainConfig := config.GetChainConfig()
+	adaptor, err := onchain.NewProxyAdapter(config.GetCurrentType(), credentialPath, passphrase, chainConfig.DOSProxyAddress, chainConfig.RemoteNodeAddressPool)
+	if err != nil {
+		return
+	}
+	id := adaptor.Address()
+	//Init log module with nodeID that is an onchain account address
+	log.Init(id[:])
+	ctx, _ := context.WithCancel(context.Background())
+	adaptor.ResetNodeIDs(ctx)
 
-	if err = (*adaptor).ResetNodeIDs(); err != nil {
-		log.Fatal(err)
-	}
-
-	if err = (*adaptor).Grouping(config.GetRandomGroupSize()); err != nil {
-		log.Fatal(err)
-	}
+	adaptor.Grouping(ctx, config.GetRandomGroupSize())
 
 	//2)Build a p2p network
-	id := []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20}
+	id = []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20}
 	p, err := p2p.CreateP2PNetwork(id[:], config.Port)
 	if err != nil {
 		log.Fatal(err)
@@ -100,7 +97,7 @@ func getCredential(w http.ResponseWriter, r *http.Request) {
 }
 
 func hasGroupPubkey(w http.ResponseWriter, r *http.Request) {
-	key, err := (*adaptor).GetGroupPubKey(0)
+	key, err := adaptor.GroupPubKey(0)
 	if err != nil {
 		//TODO: Need to check why it has err : abi: improperly formatted output
 	}

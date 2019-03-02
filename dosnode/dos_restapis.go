@@ -12,7 +12,7 @@ func (d *DosNode) Status(w http.ResponseWriter, r *http.Request) {
 
 func (d *DosNode) Balance(w http.ResponseWriter, r *http.Request) {
 	html := "Balance "
-	result := d.chain.GetBalance()
+	result := d.chain.Balance()
 	html = html + result.String()
 	w.Write([]byte(html))
 }

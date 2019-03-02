@@ -30,13 +30,14 @@ var logger log.Logger
 
 type DosNode struct {
 	suite       suites.Suite
-	chain       onchain.ChainInterface
+	chain       onchain.ProxyAdapter
 	dkg         dkg.P2PDkgInterface
 	p           p2p.P2PInterface
 	logger      log.Logger
 	done        chan interface{}
 	cSignToPeer chan *vss.Signature
 	cPipCancel  chan string
+	id          []byte
 }
 
 func NewDosNode(credentialPath, passphrase string) (dosNode *DosNode, err error) {
@@ -58,13 +59,6 @@ func NewDosNode(credentialPath, passphrase string) (dosNode *DosNode, err error)
 	role := config.NodeRole
 	port := config.Port
 	bootstrapIp := config.BootStrapIp
-	chainConfig := config.GetChainConfig()
-
-	//Set up an onchain adapter
-	chainConn, err := onchain.AdaptTo(config.GetCurrentType())
-	if err != nil {
-		return
-	}
 
 	workingDir, err := os.Getwd()
 	if err != nil {
@@ -100,20 +94,18 @@ func NewDosNode(credentialPath, passphrase string) (dosNode *DosNode, err error)
 		credentialPath = workingDir + "/credential"
 	}
 
-	err = chainConn.SetAccount(credentialPath, passphrase)
+	//Set up an onchain adapter
+	chainConfig := config.GetChainConfig()
+	chainConn, err := onchain.NewProxyAdapter(config.GetCurrentType(), credentialPath, passphrase, chainConfig.DOSProxyAddress, chainConfig.RemoteNodeAddressPool)
 	if err != nil {
 		return
 	}
-
+	id := chainConn.Address()
 	//Init log module with nodeID that is an onchain account address
-	log.Init(chainConn.GetId()[:])
-	err = chainConn.Init(chainConfig)
-	if err != nil {
-		return
-	}
+	log.Init(id[:])
 
 	//Build a p2p network
-	p, err := p2p.CreateP2PNetwork(chainConn.GetId(), port)
+	p, err := p2p.CreateP2PNetwork(id, port)
 	if err != nil {
 		return
 	}
@@ -150,8 +142,12 @@ func NewDosNode(credentialPath, passphrase string) (dosNode *DosNode, err error)
 		done:        make(chan interface{}),
 		cSignToPeer: make(chan *vss.Signature, 50),
 		cPipCancel:  make(chan string),
+		id:          id,
 	}
 	err = dosNode.Start()
+	ctx, _ := context.WithCancel(context.Background())
+	errc := dosNode.chain.UploadID(ctx)
+	<-errc
 	return
 }
 
@@ -160,9 +156,7 @@ func (d *DosNode) Start() (err error) {
 		logger.Error(err)
 		return
 	}
-	if err = d.chain.UploadID(); err != nil {
-		logger.Error(err)
-	}
+
 	return
 }
 
@@ -217,14 +211,14 @@ func (d *DosNode) buildPipeline(valueCtx context.Context, pubkey [4]*big.Int, re
 		errcList = append(errcList, cErr)
 	}
 
-	cSign, cErr = genSign(valueCtx, cContent, d.cSignToPeer, d.dkg, d.suite, d.chain.GetId(), pubkey, requestID.String(), pType)
+	cSign, cErr = genSign(valueCtx, cContent, d.cSignToPeer, d.dkg, d.suite, d.id, pubkey, requestID.String(), pType)
 	errcList = append(errcList, cErr)
 
 	signShares = append(signShares, cSign)
 	idx := 1
 	for _, id := range ids {
-		if r := bytes.Compare(d.chain.GetId(), id); r != 0 {
-			cSign, cErr = requestSign(valueCtx, cSubmitter[idx], d.p, d.chain.GetId(), requestID.String(), pType, id)
+		if r := bytes.Compare(d.id, id); r != 0 {
+			cSign, cErr = requestSign(valueCtx, cSubmitter[idx], d.p, d.id, requestID.String(), pType, id)
 			signShares = append(signShares, cSign)
 			errcList = append(errcList, cErr)
 			idx++
@@ -256,30 +250,14 @@ func (d *DosNode) listen() (err error) {
 	eventValidation := make(chan interface{})
 	keyUploaded := make(chan interface{})
 	keyAccepted := make(chan interface{})
-	if err = d.chain.SubscribeEvent(eventGrouping, onchain.SubscribeDOSProxyLogGrouping); err != nil {
-		return err
-	}
-	if err = d.chain.SubscribeEvent(eventGroupDismiss, onchain.SubscribeDOSProxyLogGroupDismiss); err != nil {
-		return err
-	}
-	if err = d.chain.SubscribeEvent(chUrl, onchain.SubscribeDOSProxyLogUrl); err != nil {
-		return err
-	}
-	if err = d.chain.SubscribeEvent(chRandom, onchain.SubscribeDOSProxyLogUpdateRandom); err != nil {
-		return err
-	}
-	if err = d.chain.SubscribeEvent(chUsrRandom, onchain.SubscribeDOSProxyLogRequestUserRandom); err != nil {
-		return err
-	}
-	if err = d.chain.SubscribeEvent(eventValidation, onchain.SubscribeDOSProxyLogValidationResult); err != nil {
-		return err
-	}
-	if err = d.chain.SubscribeEvent(keyUploaded, onchain.SubscribeDOSProxyLogPublicKeyUploaded); err != nil {
-		return err
-	}
-	if err = d.chain.SubscribeEvent(keyAccepted, onchain.SubscribeDOSProxyLogPublicKeyAccepted); err != nil {
-		return err
-	}
+	d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogGrouping, eventGrouping)
+	d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogGroupDismiss, eventGroupDismiss)
+	d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogUrl, chUrl)
+	d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogUpdateRandom, chRandom)
+	d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogRequestUserRandom, chUsrRandom)
+	d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogValidationResult, eventValidation)
+	d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogPublicKeyUploaded, keyUploaded)
+	d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogPublicKeyAccepted, keyAccepted)
 	peerEvent, err := d.p.SubscribeEvent(50, vss.Signature{})
 
 	go func() {
@@ -295,7 +273,7 @@ func (d *DosNode) listen() (err error) {
 		defer watchdog.Stop()
 		defer d.p.UnSubscribeEvent(vss.Signature{})
 		for {
-			currentBlockNumber, err := d.chain.GetCurrentBlock()
+			currentBlockNumber, err := d.chain.CurrentBlock()
 			if err != nil {
 				logger.Error(err)
 			}
@@ -303,14 +281,15 @@ func (d *DosNode) listen() (err error) {
 			case <-watchdog.C:
 				ids := d.dkg.GetAnyGroupIDs()
 				if len(ids) != 0 {
-					lastUpdatedBlock, err := d.chain.GetLastUpdatedBlock()
+					lastUpdatedBlock, err := d.chain.LastUpdatedBlock()
 					if err != nil {
 						logger.Error(err)
 						continue
 					}
 					diff := currentBlockNumber - lastUpdatedBlock
 					if diff > SYSRANDOMNTERVAL {
-						go d.chain.RandomNumberTimeOut()
+						ctx, _ := context.WithCancel(context.Background())
+						d.chain.RandomNumberTimeOut(ctx)
 					}
 				}
 			case requestID := <-d.cPipCancel:
@@ -340,7 +319,7 @@ func (d *DosNode) listen() (err error) {
 				var groupIds [][]byte
 				for _, node := range content.NodeId {
 					id := node.Bytes()
-					if r := bytes.Compare(d.chain.GetId(), id); r == 0 {
+					if r := bytes.Compare(d.id, id); r == 0 {
 						isMember = true
 					}
 					groupIds = append(groupIds, id)
@@ -372,7 +351,10 @@ func (d *DosNode) listen() (err error) {
 			case msg := <-eventGroupDismiss:
 				content, ok := msg.(*onchain.DOSProxyLogGroupDismiss)
 				if !ok {
-					log.Error(err)
+					e, ok := msg.(error)
+					if ok {
+						logger.Error(e)
+					}
 					continue
 				}
 
@@ -389,9 +371,9 @@ func (d *DosNode) listen() (err error) {
 						"BlockN":            content.BlockN,
 						"Time":              time.Now()}
 					logger.Event("DOS_GroupDismiss", f)
-					if err = d.chain.UploadID(); err != nil {
-						logger.Error(err)
-					}
+					ctx, _ := context.WithCancel(context.Background())
+					d.chain.UploadID(ctx)
+
 				}
 			case msg := <-chRandom:
 				content, ok := msg.(*onchain.DOSProxyLogUpdateRandom)
@@ -461,6 +443,7 @@ func (d *DosNode) listen() (err error) {
 				content, ok := msg.(*onchain.DOSProxyLogUrl)
 				if !ok {
 					log.Error(err)
+					continue
 				}
 				if d.isMember(content.DispatchedGroup) {
 					startTime := time.Now()
@@ -496,6 +479,7 @@ func (d *DosNode) listen() (err error) {
 				content, ok := msg.(*onchain.DOSProxyLogValidationResult)
 				if !ok {
 					log.Error(err)
+					continue
 				}
 				if d.isMember(content.PubKey) {
 					fmt.Println("EthLog : validationResult", content.Pass)
@@ -551,7 +535,11 @@ func (d *DosNode) listen() (err error) {
 			case msg := <-keyUploaded:
 				content, ok := msg.(*onchain.DOSProxyLogPublicKeyUploaded)
 				if !ok {
-					log.Error(err)
+					e, ok := msg.(error)
+					if ok {
+						logger.Error(e)
+					}
+					continue
 				}
 				if d.isMember(content.PubKey) {
 					logger.TimeTrack(time.Now(), "keyUploaded", map[string]interface{}{
@@ -571,7 +559,12 @@ func (d *DosNode) listen() (err error) {
 			case msg := <-keyAccepted:
 				content, ok := msg.(*onchain.DOSProxyLogPublicKeyAccepted)
 				if !ok {
-					log.Error(err)
+					e, ok := msg.(error)
+					if ok {
+						logger.Error(e)
+						d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogPublicKeyAccepted, keyAccepted)
+					}
+					continue
 				}
 				if d.isMember(content.PubKey) {
 					logger.TimeTrack(time.Now(), "keyAccepted", map[string]interface{}{

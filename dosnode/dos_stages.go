@@ -22,7 +22,6 @@ import (
 	"github.com/DOSNetwork/core/sign/tbls"
 	"github.com/DOSNetwork/core/suites"
 	"github.com/antchfx/xmlquery"
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/oliveagle/jsonpath"
 )
 
@@ -96,7 +95,7 @@ func fanIn(ctx context.Context, channels ...<-chan *vss.Signature) <-chan *vss.S
 	return multiplexedStream
 }
 
-func choseSubmitter(ctx context.Context, chain onchain.ChainInterface, lastSysRand *big.Int, ids [][]byte, outCount int) ([]chan []byte, <-chan error) {
+func choseSubmitter(ctx context.Context, chain onchain.ProxyAdapter, lastSysRand *big.Int, ids [][]byte, outCount int) ([]chan []byte, <-chan error) {
 	errc := make(chan error)
 	var outs []chan []byte
 	for i := 0; i < outCount; i++ {
@@ -116,10 +115,12 @@ func choseSubmitter(ctx context.Context, chain onchain.ChainInterface, lastSysRa
 		//Check Balance
 		for i := 0; i < len(ids); i++ {
 			idx := (lastRand + i) % len(ids)
-			if chain.EnoughBalance(common.BytesToAddress(ids[idx])) {
-				submitter = idx
-				break
-			}
+			//if chain.EnoughBalance(common.BytesToAddress(ids[idx])) {
+			//	submitter = idx
+			//	break
+			//}
+			submitter = idx
+			break
 			select {
 			case <-ctx.Done():
 				return

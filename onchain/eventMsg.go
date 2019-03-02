@@ -65,7 +65,11 @@ type DOSProxyLogValidationResult struct {
 	Removed     bool
 }
 
-type DOSProxyLogInsufficientGroupNumber struct{}
+type DOSProxyLogInsufficientGroupNumber struct {
+	Tx      string
+	BlockN  uint64
+	Removed bool
+}
 
 type DOSProxyLogGrouping struct {
 	GroupId *big.Int

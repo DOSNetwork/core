@@ -5,47 +5,41 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/DOSNetwork/core/configuration"
+	//	"github.com/DOSNetwork/core/configuration"
 	"github.com/DOSNetwork/core/share/vss/pedersen"
-
-	"github.com/ethereum/go-ethereum/common"
 )
 
 const (
 	ETH = "ETH"
 )
 
-type ChainInterface interface {
-	SetAccount(credentialPath, passphrase string) (err error)
-	Init(chainConfig configuration.ChainConfig) (err error)
-	SubscribeEvent(ch chan interface{}, subscribeType int) (err error)
-	InitialWhiteList() (err error)
-	GetWhitelist() (address common.Address, err error)
-	UploadID() (err error)
-	UploadPubKey(ctx context.Context, pubKey chan [5]*big.Int) <-chan error
-	GetId() (id []byte)
-	GetBlockHashByNumber(blknum *big.Int) (hash common.Hash, err error)
-	GetLastRandomness() (*big.Int, error)
-	GetLastUpdatedBlock() (uint64, error)
-	GetCurrentBlock() (uint64, error)
-	SetRandomNum(ctx context.Context, signatures <-chan *vss.Signature) <-chan error
-	DataReturn(ctx context.Context, signatures <-chan *vss.Signature) <-chan error
-	SubscribeToAll(msgChan chan interface{}) (err error)
-	BalanceMaintain(rootCredentialPath string) (err error)
-	//For test
-	ResetNodeIDs() (err error)
-	RandomNumberTimeOut() (err error)
-	EnoughBalance(address common.Address) (isEnough bool)
-	GetBalance() (balance *big.Float)
-	WhitelistInitialized() (initialized bool, err error)
+type ProxyAdapter interface {
+	UploadID(ctx context.Context) (errc <-chan error)
+	ResetNodeIDs(ctx context.Context) (errc <-chan error)
+	RandomNumberTimeOut(ctx context.Context) (errc <-chan error)
+	UploadPubKey(ctx context.Context, IdWithPubKeys chan [5]*big.Int) (errc chan error)
+	SetRandomNum(ctx context.Context, signatures <-chan *vss.Signature) (errc chan error)
+	DataReturn(ctx context.Context, signatures <-chan *vss.Signature) (errc chan error)
+	Grouping(ctx context.Context, size int) <-chan error
+
+	SubscribeEvent(subscribeType int, sink chan interface{}) chan error
+	PollLogs(subscribeType int, sink chan interface{}) <-chan error
+
+	LastUpdatedBlock() (blknum uint64, err error)
+	GroupPubKey(idx int) (groupPubKeys [4]*big.Int, err error)
+
+	Balance() (balance *big.Float)
+	Address() (addr []byte)
+	CurrentBlock() (blknum uint64, err error)
 }
 
-func AdaptTo(ChainType string) (conn ChainInterface, err error) {
+func NewProxyAdapter(ChainType, credentialPath, passphrase, proxyAddr string, urls []string) (ProxyAdapter, error) {
 	switch ChainType {
 	case ETH:
-		conn = &EthAdaptor{}
+		adaptor, err := NewETHProxySession(credentialPath, passphrase, proxyAddr, urls)
+		return adaptor, err
 	default:
-		err = fmt.Errorf("Chain %s not supported error\n", ChainType)
+		err := fmt.Errorf("Chain %s not supported error\n", ChainType)
+		return nil, err
 	}
-	return conn, err
 }

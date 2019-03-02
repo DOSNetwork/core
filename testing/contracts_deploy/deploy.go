@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -16,13 +18,14 @@ import (
 	"github.com/DOSNetwork/core/onchain"
 	"github.com/DOSNetwork/core/onchain/dosproxy"
 
+	"github.com/DOSNetwork/core/testing/dosUser/contract"
+	"github.com/DOSNetwork/core/testing/dosUser/eth"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/types"
-
-	"github.com/DOSNetwork/core/testing/dosUser/contract"
-	"github.com/DOSNetwork/core/testing/dosUser/eth"
+	"github.com/ethereum/go-ethereum/ethclient"
 )
 
 const (
@@ -78,14 +81,13 @@ func updateSDK(path string, updated string) error {
 	return nil
 }
 
-func updateBridge(ethComm *onchain.EthCommon, bridgeAddress, proxyAddress common.Address) (err error) {
+func updateBridge(client *ethclient.Client, key *keystore.Key, bridgeAddress, proxyAddress common.Address) (err error) {
 	var auth *bind.TransactOpts
 	fmt.Println("start to update proxy address to bridge...")
-	auth, err = ethComm.GetAuth()
-	if err != nil {
-		return
-	}
-	bridge, err := dosproxy.NewDOSAddressBridge(bridgeAddress, ethComm.Client)
+	auth = bind.NewKeyedTransactor(key.PrivateKey)
+	auth.GasLimit = uint64(5000000)
+
+	bridge, err := dosproxy.NewDOSAddressBridge(bridgeAddress, client)
 	if err != nil {
 		return
 	}
@@ -104,43 +106,47 @@ func updateBridge(ethComm *onchain.EthCommon, bridgeAddress, proxyAddress common
 	fmt.Println("tx sent: ", tx.Hash().Hex())
 	fmt.Println("proxy address updated in bridge")
 
-	err = ethComm.CheckTransaction(tx)
+	err = onchain.CheckTransaction(client, tx)
+	if err != nil {
+		fmt.Println(err)
+	}
 
 	return
 }
 
-func deployContract(ethComm *onchain.EthCommon, contractName int) string {
+func deployContract(client *ethclient.Client, key *keystore.Key, contractName int) string {
 	var tx *types.Transaction
 	var address common.Address
-	auth, err := ethComm.GetAuth()
-
+	auth := bind.NewKeyedTransactor(key.PrivateKey)
+	auth.GasLimit = uint64(5000000)
+	var err error
 	switch contractName {
 	case DOSAddressBridge:
 		fmt.Println("Starting deploy DOSAddressBridge.sol...")
-		address, tx, _, err = dosproxy.DeployDOSAddressBridge(auth, ethComm.Client)
+		address, tx, _, err = dosproxy.DeployDOSAddressBridge(auth, client)
 		for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
 			fmt.Println(err)
 			time.Sleep(time.Second)
 			fmt.Println("transaction retry...")
-			address, tx, _, err = dosproxy.DeployDOSAddressBridge(auth, ethComm.Client)
+			address, tx, _, err = dosproxy.DeployDOSAddressBridge(auth, client)
 		}
 	case DOSProxy:
 		fmt.Println("Starting deploy DOSProxy.sol...")
-		address, tx, _, err = dosproxy.DeployDOSProxy(auth, ethComm.Client)
+		address, tx, _, err = dosproxy.DeployDOSProxy(auth, client)
 		for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
 			fmt.Println(err)
 			time.Sleep(time.Second)
 			fmt.Println("transaction retry...")
-			address, tx, _, err = dosproxy.DeployDOSProxy(auth, ethComm.Client)
+			address, tx, _, err = dosproxy.DeployDOSProxy(auth, client)
 		}
 	case AMA:
 		fmt.Println("Starting deploy AskMeAnyThing.sol...")
-		address, tx, _, err = dosUser.DeployAskMeAnything(auth, ethComm.Client)
+		address, tx, _, err = dosUser.DeployAskMeAnything(auth, client)
 		for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
 			fmt.Println(err)
 			time.Sleep(time.Second)
 			fmt.Println("transaction retry...")
-			address, tx, _, err = dosUser.DeployAskMeAnything(auth, ethComm.Client)
+			address, tx, _, err = dosUser.DeployAskMeAnything(auth, client)
 		}
 	}
 	if err != nil {
@@ -152,7 +158,7 @@ func deployContract(ethComm *onchain.EthCommon, contractName int) string {
 	fmt.Println("tx sent: ", tx.Hash().Hex())
 	fmt.Println("contract deployed, waiting for confirmation...")
 
-	err = ethComm.CheckTransaction(tx)
+	err = onchain.CheckTransaction(client, tx)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -190,23 +196,31 @@ func main() {
 		fmt.Println("\nPassword typed: ***\n")
 	}
 	password := strings.TrimSpace(string(bytePassword))
+
 	//Dial to blockchain
-	conn := &onchain.EthCommon{}
-	if err := conn.SetAccount(credentialPath, password); err != nil {
-		log.Fatal(err)
+	key, err := onchain.SetEthKey(credentialPath, password)
+	if err != nil {
+		fmt.Println("NewETHProxySession ", err)
+		return
 	}
 
-	if err := conn.Init(chainConfig); err != nil {
-		log.Fatal(err)
-	}
+	clients, errs := onchain.DialToEth(context.Background(), chainConfig.RemoteNodeAddressPool)
+	go func() {
+		for e := range errs {
+			fmt.Println("NewETHProxySession ", e)
+		}
+	}()
 
-	if err := conn.BalanceMaintain(credentialPath + "/fundKey"); err != nil {
-		log.Fatal(err)
+	//Use first client
+	c, ok := <-clients
+	if !ok {
+		err = errors.New("No any working eth client")
+		return
 	}
 
 	if contract == "DOSProxy" {
-		chainConfig.DOSProxyAddress = deployContract(conn, DOSProxy)
-		chainConfig.DOSAddressBridgeAddress = deployContract(conn, DOSAddressBridge)
+		chainConfig.DOSProxyAddress = deployContract(c, key, DOSProxy)
+		chainConfig.DOSAddressBridgeAddress = deployContract(c, key, DOSAddressBridge)
 		if err := config.UpdateConfig(chainConfig); err != nil {
 			log.Fatal(err)
 		}
@@ -217,7 +231,7 @@ func main() {
 
 		bridgeAddress := common.HexToAddress(chainConfig.DOSAddressBridgeAddress)
 		proxyAddress := common.HexToAddress(chainConfig.DOSProxyAddress)
-		err := updateBridge(conn, bridgeAddress, proxyAddress)
+		err := updateBridge(c, key, bridgeAddress, proxyAddress)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -236,7 +250,7 @@ func main() {
 
 		var amaAdd []string
 		for i := 0; i < count; i++ {
-			amaAdd = append(amaAdd, deployContract(conn, AMA))
+			amaAdd = append(amaAdd, deployContract(c, key, AMA))
 		}
 		amaConfig.AskMeAnythingAddressPool = amaAdd
 		if err := configuration.UpdateConfig(configPath, amaConfig); err != nil {

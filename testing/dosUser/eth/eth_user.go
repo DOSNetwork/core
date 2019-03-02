@@ -2,20 +2,20 @@ package eth
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/big"
-	"sync"
 	"time"
 
-	"github.com/DOSNetwork/core/configuration"
 	"github.com/DOSNetwork/core/log"
 	"github.com/DOSNetwork/core/onchain"
 	"github.com/DOSNetwork/core/testing/dosUser/contract"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core"
-	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/ethclient"
 )
 
 // TODO: Instead of hardcode, read from DOSAddressBridge.go
@@ -30,119 +30,103 @@ type AMAConfig struct {
 	AskMeAnythingAddressPool []string
 }
 
+var logger log.Logger
+
 type EthUserAdaptor struct {
-	onchain.EthCommon
-	proxy     *dosUser.AskMeAnything
-	lock      *sync.Mutex
-	logFilter *sync.Map
-	address   string
-	logger    log.Logger
+	s        *dosUser.AskMeAnythingSession
+	c        *ethclient.Client
+	key      *keystore.Key
+	ctx      context.Context
+	cancel   context.CancelFunc
+	reqQueue chan interface{}
 }
 
-func (e *EthUserAdaptor) Init(address string, config configuration.ChainConfig) (err error) {
-	if err = e.EthCommon.Init(config); err != nil {
+func NewAMAUserSession(credentialPath, passphrase, addr string, gethUrls []string) (adaptor *EthUserAdaptor, err error) {
+	key, err := onchain.SetEthKey(credentialPath, passphrase)
+	if err != nil {
+		fmt.Println("NewETHProxySession ", err)
 		return
 	}
-	e.logFilter = new(sync.Map)
-	go e.logMapTimeout()
 
-	e.address = address
-	fmt.Println("onChainConn initialization finished.")
-	e.lock = new(sync.Mutex)
-	e.dialToProxy()
-	e.logger = log.New("module", "EthUser")
-	return
-}
+	ctx, cancelFunc := context.WithCancel(context.Background())
+	defer cancelFunc()
+	clients, errs := onchain.DialToEth(ctx, gethUrls)
+	go func() {
+		for e := range errs {
+			fmt.Println("NewETHProxySession ", e)
+			cancelFunc()
+		}
+	}()
 
-func (e *EthUserAdaptor) dialToProxy() (err error) {
-	e.lock.Lock()
-	fmt.Println("dialing To Proxy...")
-	addr := common.HexToAddress(e.address)
-	e.proxy, err = dosUser.NewAskMeAnything(addr, e.Client)
-	for err != nil {
-		fmt.Println(err)
-		fmt.Println("Connot Create new proxy, retrying...")
-		e.proxy, err = dosUser.NewAskMeAnything(addr, e.Client)
-	}
-	e.lock.Unlock()
-	return
-}
-
-func (e *EthUserAdaptor) resetOnChainConn() (err error) {
-	e.lock.Lock()
-	defer e.lock.Unlock()
-	if err = e.EthCommon.DialToEth(); err != nil {
-		e.logger.Error(err)
+	//Use first client
+	c, ok := <-clients
+	if !ok {
+		err = errors.New("No any working eth client")
 		return
 	}
-	err = e.dialToProxy()
+
+	a, err := dosUser.NewAskMeAnything(common.HexToAddress(addr), c)
+	if err != nil {
+		fmt.Println("NewAskMeAnything ", err)
+		return
+	}
+	adaptor = &EthUserAdaptor{}
+	ctxD, cancelSession := context.WithCancel(context.Background())
+	auth := bind.NewKeyedTransactor(key.PrivateKey)
+	auth.GasLimit = uint64(5000000)
+	auth.Context = ctxD
+	nonce, _ := c.PendingNonceAt(ctxD, key.Address)
+	auth.Nonce = big.NewInt(0)
+	auth.Nonce = auth.Nonce.SetUint64(nonce)
+	adaptor.s = &dosUser.AskMeAnythingSession{Contract: a, CallOpts: bind.CallOpts{Context: ctxD}, TransactOpts: *auth}
+	adaptor.c = c
+	adaptor.key = key
+	adaptor.ctx = ctxD
+	adaptor.cancel = cancelSession
+	adaptor.reqQueue = make(chan interface{})
+	logger = log.New("module", "EthUser")
 	return
 }
 
-func (e *EthUserAdaptor) GetId() (id []byte) {
-	return e.GetAddress().Bytes()
+func (e *EthUserAdaptor) Address() (addr common.Address) {
+	return e.key.Address
 }
 
-func (e *EthUserAdaptor) SubscribeEvent(ch chan interface{}, subscribeType int) (err error) {
-	opt := &bind.WatchOpts{}
-	var cancel context.CancelFunc
-	opt.Context, cancel = context.WithCancel(context.Background())
-	done := make(chan bool)
-	timer := time.NewTimer(onchain.SubscribeTimeout * time.Second)
-
-	go e.subscribeEventAttempt(ch, opt, subscribeType, done)
-
-	for {
-		select {
-		case succ := <-done:
-			if succ {
-				fmt.Println("subscribe done")
-				return
-			} else {
-				fmt.Println("retry...")
-				if err = e.resetOnChainConn(); err != nil {
-					return
-				} else {
-					go e.subscribeEventAttempt(ch, opt, subscribeType, done)
-				}
-			}
-		case <-timer.C:
-			cancel()
-			fmt.Println("subscribe timeout")
+func (e *EthUserAdaptor) PollLogs(subscribeType int, sink chan interface{}) <-chan error {
+	errc := make(chan error)
+	go func() {
+		defer close(errc)
+		targetBlockN, err := onchain.CurrentBlock(e.c)
+		if err != nil {
+			errc <- err
 			return
 		}
-	}
-}
+		timer := time.NewTimer(onchain.LogCheckingInterval * time.Second)
 
-func (e *EthUserAdaptor) fetchMatureLogs(ctx context.Context, subscribeType int, ch chan interface{}) (err error) {
-	targetBlockN, err := e.GetCurrentBlock()
-	if err != nil {
-		return
-	}
-
-	timer := time.NewTimer(onchain.LogCheckingInterval * time.Second)
-	go func() {
 		for {
 			select {
 			case <-timer.C:
-				currentBlockN, err := e.GetCurrentBlock()
+				currentBlockN, err := onchain.CurrentBlock(e.c)
 				if err != nil {
-					e.logger.Error(err)
+					fmt.Println("PollLogs ", err)
+					errc <- err
+					return
 				}
 				for ; currentBlockN-onchain.LogBlockDiff >= targetBlockN; targetBlockN++ {
-					fmt.Println("checking Block", currentBlockN)
 					switch subscribeType {
 					case SubscribeAskMeAnythingQueryResponseReady:
-						logs, err := e.proxy.AskMeAnythingFilterer.FilterQueryResponseReady(&bind.FilterOpts{
+						logs, err := e.s.Contract.AskMeAnythingFilterer.FilterQueryResponseReady(&bind.FilterOpts{
 							Start:   targetBlockN,
 							End:     &targetBlockN,
-							Context: ctx,
+							Context: e.ctx,
 						})
 						if err != nil {
-							e.logger.Error(err)
+							fmt.Println("PollLogs ", err)
+							errc <- err
+							return
 						}
 						for logs.Next() {
-							ch <- &AskMeAnythingQueryResponseReady{
+							sink <- &AskMeAnythingQueryResponseReady{
 								QueryId: logs.Event.QueryId,
 								Result:  logs.Event.Result,
 								Tx:      logs.Event.Raw.TxHash.Hex(),
@@ -156,22 +140,17 @@ func (e *EthUserAdaptor) fetchMatureLogs(ctx context.Context, subscribeType int,
 								"Tx":        logs.Event.Raw.TxHash.Hex(),
 								"BlockN":    logs.Event.Raw.BlockNumber,
 								"Time":      time.Now()}
-							e.logger.Event("EthUserQueryReady", f)
-						}
-						if logs.Error() != nil {
-							e.logger.Error(logs.Error())
-						}
-						if logs.Close() != nil {
-							e.logger.Error(logs.Error())
+							logger.Event("EthUserQueryReady", f)
 						}
 					case SubscribeAskMeAnythingRequestSent:
-						logs, err := e.proxy.AskMeAnythingFilterer.FilterRequestSent(&bind.FilterOpts{
+						logs, err := e.s.Contract.AskMeAnythingFilterer.FilterRequestSent(&bind.FilterOpts{
 							Start:   targetBlockN,
 							End:     &targetBlockN,
-							Context: ctx,
-						}, []common.Address{e.GetAddress()})
+							Context: e.ctx,
+						}, []common.Address{e.Address()})
 						if err != nil {
-							e.logger.Error(err)
+							errc <- err
+							return
 						}
 						for logs.Next() {
 							f := map[string]interface{}{
@@ -182,8 +161,8 @@ func (e *EthUserAdaptor) fetchMatureLogs(ctx context.Context, subscribeType int,
 								"Tx":        logs.Event.Raw.TxHash.Hex(),
 								"BlockN":    logs.Event.Raw.BlockNumber,
 								"Time":      time.Now()}
-							e.logger.Event("EthUserRequestSent", f)
-							ch <- &AskMeAnythingRequestSent{
+							logger.Event("EthUserRequestSent", f)
+							sink <- &AskMeAnythingRequestSent{
 								InternalSerial: logs.Event.InternalSerial,
 								Succ:           logs.Event.Succ,
 								RequestId:      logs.Event.RequestId,
@@ -192,23 +171,19 @@ func (e *EthUserAdaptor) fetchMatureLogs(ctx context.Context, subscribeType int,
 								Removed:        logs.Event.Raw.Removed,
 							}
 						}
-						if logs.Error() != nil {
-							e.logger.Error(logs.Error())
-						}
-						if logs.Close() != nil {
-							e.logger.Error(logs.Error())
-						}
 					case SubscribeAskMeAnythingRandomReady:
-						logs, err := e.proxy.AskMeAnythingFilterer.FilterRandomReady(&bind.FilterOpts{
+						logs, err := e.s.Contract.AskMeAnythingFilterer.FilterRandomReady(&bind.FilterOpts{
 							Start:   targetBlockN,
 							End:     &targetBlockN,
-							Context: ctx,
+							Context: e.ctx,
 						})
 						if err != nil {
-							e.logger.Error(err)
+							fmt.Println("PollLogs ", err)
+							errc <- err
+							return
 						}
 						for logs.Next() {
-							ch <- &AskMeAnythingRandomReady{
+							sink <- &AskMeAnythingRandomReady{
 								GeneratedRandom: logs.Event.GeneratedRandom,
 								RequestId:       logs.Event.RequestId,
 								Tx:              logs.Event.Raw.TxHash.Hex(),
@@ -222,133 +197,43 @@ func (e *EthUserAdaptor) fetchMatureLogs(ctx context.Context, subscribeType int,
 								"Tx":              logs.Event.Raw.TxHash.Hex(),
 								"BlockN":          logs.Event.Raw.BlockNumber,
 								"Time":            time.Now()}
-							e.logger.Event("EthUserRandomReady", f)
-						}
-						if logs.Error() != nil {
-							e.logger.Error(logs.Error())
-						}
-						if logs.Close() != nil {
-							e.logger.Error(logs.Error())
+							logger.Event("EthUserRandomReady", f)
 						}
 					}
 				}
 				timer.Reset(onchain.LogCheckingInterval * time.Second)
-			case <-ctx.Done():
+			case <-e.ctx.Done():
 				return
 			}
 		}
 	}()
-	return
-}
-
-func (e *EthUserAdaptor) GetCurrentBlock() (blknum uint64, err error) {
-	var header *types.Header
-	header, err = e.Client.HeaderByNumber(context.Background(), nil)
-	if err == nil {
-		blknum = header.Number.Uint64()
-	}
-	return
-}
-
-func (e *EthUserAdaptor) subscribeEventAttempt(ch chan interface{}, opt *bind.WatchOpts, subscribeType int, done chan bool) {
-	fmt.Println("attempt to subscribe event...")
-	switch subscribeType {
-	case SubscribeAskMeAnythingSetTimeout:
-		fmt.Println("subscribing AskMeAnythingSetTimeout event...")
-		transitChan := make(chan *dosUser.AskMeAnythingSetTimeout)
-		sub, err := e.proxy.AskMeAnythingFilterer.WatchSetTimeout(opt, transitChan)
-		if err != nil {
-			done <- false
-			fmt.Println(err)
-			fmt.Println("Network fail, will retry shortly")
-			return
-		}
-		fmt.Println("AskMeAnythingSetTimeout event subscribed")
-
-		done <- true
-		for {
-			select {
-			case err := <-sub.Err():
-				log.Fatal(err)
-			case i := <-transitChan:
-				if !e.filterLog(i.Raw) {
-					ch <- &AskMeAnythingSetTimeout{
-						PreviousTimeout: i.PreviousTimeout,
-						NewTimeout:      i.NewTimeout,
-					}
-				}
-			}
-		}
-	case SubscribeAskMeAnythingQueryResponseReady:
-		if err := e.fetchMatureLogs(opt.Context, SubscribeAskMeAnythingQueryResponseReady, ch); err != nil {
-			done <- false
-			e.logger.Error(err)
-			fmt.Println("Network fail, will retry shortly")
-			return
-		} else {
-			done <- true
-		}
-	case SubscribeAskMeAnythingRequestSent:
-		if err := e.fetchMatureLogs(opt.Context, SubscribeAskMeAnythingRequestSent, ch); err != nil {
-			done <- false
-			e.logger.Error(err)
-			fmt.Println("Network fail, will retry shortly")
-			return
-		} else {
-			done <- true
-		}
-
-	case SubscribeAskMeAnythingRandomReady:
-		if err := e.fetchMatureLogs(opt.Context, SubscribeAskMeAnythingRandomReady, ch); err != nil {
-			done <- false
-			e.logger.Error(err)
-			fmt.Println("Network fail, will retry shortly")
-			return
-		} else {
-			done <- true
-		}
-	}
+	return errc
 }
 
 func (e *EthUserAdaptor) Query(internalSerial uint8, url, selector string) (err error) {
-	auth, err := e.GetAuth()
-	if err != nil {
-		fmt.Println(" Query GetAuth err ", err)
-		return
-	}
-
-	tx, err := e.proxy.AMA(auth, internalSerial, url, selector)
+	tx, err := e.s.AMA(internalSerial, url, selector)
 	for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
 		fmt.Println(err)
 		time.Sleep(time.Second)
 		fmt.Println("transaction retry...")
-		tx, err = e.proxy.AMA(auth, internalSerial, url, selector)
+		tx, err = e.s.AMA(internalSerial, url, selector)
 	}
 	if err != nil {
 		fmt.Println(" Query AMAerr ", err)
 		return
 	}
-
 	fmt.Println("tx sent: ", tx.Hash().Hex())
-	fmt.Println("Querying ", url, "selector", selector, "waiting for confirmation...")
-
-	//err = e.CheckTransaction(tx)
 
 	return
 }
 
 func (e *EthUserAdaptor) GetSafeRandom(internalSerial uint8) (err error) {
-	auth, err := e.GetAuth()
-	if err != nil {
-		return
-	}
-
-	tx, err := e.proxy.RequestSafeRandom(auth, internalSerial)
+	tx, err := e.s.RequestSafeRandom(internalSerial)
 	for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
 		fmt.Println(err)
 		time.Sleep(time.Second)
 		fmt.Println("transaction retry...")
-		tx, err = e.proxy.RequestSafeRandom(auth, internalSerial)
+		tx, err = e.s.RequestSafeRandom(internalSerial)
 	}
 	if err != nil {
 		return
@@ -356,24 +241,16 @@ func (e *EthUserAdaptor) GetSafeRandom(internalSerial uint8) (err error) {
 
 	fmt.Println("tx sent: ", tx.Hash().Hex())
 	fmt.Println("RequestSafeRandom ", " waiting for confirmation...")
-
-	//err = e.CheckTransaction(tx)
-
 	return
 }
 
 func (e *EthUserAdaptor) GetFastRandom() (err error) {
-	auth, err := e.GetAuth()
-	if err != nil {
-		return
-	}
-
-	tx, err := e.proxy.RequestFastRandom(auth)
+	tx, err := e.s.RequestFastRandom()
 	for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
 		fmt.Println(err)
 		time.Sleep(time.Second)
 		fmt.Println("transaction retry...")
-		tx, err = e.proxy.RequestFastRandom(auth)
+		tx, err = e.s.RequestFastRandom()
 	}
 	if err != nil {
 		return
@@ -383,51 +260,5 @@ func (e *EthUserAdaptor) GetFastRandom() (err error) {
 	fmt.Println("RequestSafeRandom ", " waiting for confirmation...")
 
 	//err = e.CheckTransaction(tx)
-
 	return
-}
-
-func (e *EthUserAdaptor) SubscribeToAll(msgChan chan interface{}) (err error) {
-	for i := SubscribeAskMeAnythingSetTimeout; i <= SubscribeAskMeAnythingRandomReady; i++ {
-		err = e.SubscribeEvent(msgChan, i)
-	}
-	return
-}
-
-type logRecord struct {
-	content       types.Log
-	currTimeStamp time.Time
-}
-
-func (e *EthUserAdaptor) filterLog(raw types.Log) (duplicates bool) {
-	fmt.Println("check duplicates")
-	identityBytes := append(raw.Address.Bytes(), raw.Topics[0].Bytes()...)
-	identityBytes = append(identityBytes, raw.Data...)
-	identity := new(big.Int).SetBytes(identityBytes).String()
-
-	var record interface{}
-	if record, duplicates = e.logFilter.Load(identity); duplicates {
-		fmt.Println("got duplicate event", record, "\n", raw)
-	}
-	e.logFilter.Store(identity, logRecord{raw, time.Now()})
-
-	return
-}
-
-func (e *EthUserAdaptor) logMapTimeout() {
-	ticker := time.NewTicker(10 * time.Minute)
-	for range ticker.C {
-		e.logFilter.Range(e.checkTime)
-	}
-
-}
-
-func (e *EthUserAdaptor) checkTime(log, deliverTime interface{}) (okToDelete bool) {
-	switch t := deliverTime.(type) {
-	case logRecord:
-		if time.Now().Sub(t.currTimeStamp).Seconds() > 60*10 {
-			e.logFilter.Delete(log)
-		}
-	}
-	return true
 }
