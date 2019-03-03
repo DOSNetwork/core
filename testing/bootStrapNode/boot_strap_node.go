@@ -57,7 +57,8 @@ func main() {
 	ctx, _ := context.WithCancel(context.Background())
 	errc := adaptor.ResetNodeIDs(ctx)
 	<-errc
-	adaptor.Grouping(ctx, config.GetRandomGroupSize())
+	errc = adaptor.Grouping(ctx, config.GetRandomGroupSize())
+	<-errc
 
 	//2)Build a p2p network
 	id = []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20}
