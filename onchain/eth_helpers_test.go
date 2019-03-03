@@ -11,12 +11,12 @@ const (
 	ID = 4
 )
 
-func TestSetEthKey(t *testing.T) {
+func TestReadEthKey(t *testing.T) {
 	credentialPath := "/Users/chenhaonien/go/src/github.com/DOSNetwork/core/credential"
 	passphrase := "123"
-	_, err := SetEthKey(credentialPath, passphrase)
+	_, err := ReadEthKey(credentialPath, passphrase)
 	if err != nil {
-		t.Errorf("SetEthKey Error: %s.", err.Error())
+		t.Errorf("ReadEthKey Error: %s.", err.Error())
 	}
 }
 func TestDialToEth(t *testing.T) {

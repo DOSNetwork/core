@@ -26,7 +26,7 @@ const (
 	RETRTCOUNT          = 2
 )
 
-func SetEthKey(credentialPath, passphrase string) (key *keystore.Key, err error) {
+func ReadEthKey(credentialPath, passphrase string) (key *keystore.Key, err error) {
 	fmt.Println("credentialPath: ", credentialPath)
 	newKeyStore := keystore.NewKeyStore(credentialPath, keystore.StandardScryptN, keystore.StandardScryptP)
 	if len(newKeyStore.Accounts()) < 1 {
@@ -89,7 +89,7 @@ func DialToEth(ctx context.Context, urlPool []string) (out chan *ethclient.Clien
 	return
 }
 
-func CurrentBlock(client *ethclient.Client) (blknum uint64, err error) {
+func GetCurrentBlock(client *ethclient.Client) (blknum uint64, err error) {
 	var header *types.Header
 	header, err = client.HeaderByNumber(context.Background(), nil)
 	if err == nil {
@@ -127,7 +127,7 @@ func CheckTransaction(client *ethclient.Client, tx *types.Transaction) (err erro
 	return
 }
 
-func Balance(client *ethclient.Client, key *keystore.Key) (balance *big.Float) {
+func GetBalance(client *ethclient.Client, key *keystore.Key) (balance *big.Float) {
 	wei, err := client.BalanceAt(context.Background(), key.Address, nil)
 	if err != nil {
 		return

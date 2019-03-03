@@ -198,7 +198,7 @@ func main() {
 	password := strings.TrimSpace(string(bytePassword))
 
 	//Dial to blockchain
-	key, err := onchain.SetEthKey(credentialPath, password)
+	key, err := onchain.ReadEthKey(credentialPath, password)
 	if err != nil {
 		fmt.Println("NewETHProxySession ", err)
 		return

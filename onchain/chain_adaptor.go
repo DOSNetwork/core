@@ -28,7 +28,7 @@ type ProxyAdapter interface {
 	LastUpdatedBlock() (blknum uint64, err error)
 	GroupPubKey(idx int) (groupPubKeys [4]*big.Int, err error)
 
-	Balance() (balance *big.Float)
+	GetBalance() (balance *big.Float)
 	Address() (addr []byte)
 	CurrentBlock() (blknum uint64, err error)
 }

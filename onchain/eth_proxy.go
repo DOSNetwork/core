@@ -111,7 +111,7 @@ func NewETHProxySession(credentialPath, passphrase, proxyAddr string, gethUrls [
 		logger = log.New("module", "EthProxy")
 	}
 
-	key, err := SetEthKey(credentialPath, passphrase)
+	key, err := ReadEthKey(credentialPath, passphrase)
 	if err != nil {
 		logger.Error(err)
 		return
@@ -396,7 +396,7 @@ func (e *EthAdaptor) PollLogs(subscribeType int, sink chan interface{}) <-chan e
 	errc := make(chan error)
 	go func() {
 		defer close(errc)
-		targetBlockN, err := CurrentBlock(e.c)
+		targetBlockN, err := GetCurrentBlock(e.c)
 		if err != nil {
 			errc <- err
 			return
@@ -405,7 +405,7 @@ func (e *EthAdaptor) PollLogs(subscribeType int, sink chan interface{}) <-chan e
 		for {
 			select {
 			case <-timer.C:
-				currentBlockN, err := CurrentBlock(e.c)
+				currentBlockN, err := GetCurrentBlock(e.c)
 				if err != nil {
 					errc <- err
 					return
@@ -657,8 +657,8 @@ func (e *EthAdaptor) CurrentBlock() (blknum uint64, err error) {
 	return
 }
 
-func (e *EthAdaptor) Balance() (balance *big.Float) {
-	return Balance(e.c, e.key)
+func (e *EthAdaptor) GetBalance() (balance *big.Float) {
+	return GetBalance(e.c, e.key)
 }
 
 func (e *EthAdaptor) Address() (addr []byte) {

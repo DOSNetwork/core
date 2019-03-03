@@ -41,7 +41,7 @@ type EthUserAdaptor struct {
 }
 
 func NewAMAUserSession(credentialPath, passphrase, addr string, gethUrls []string) (adaptor *EthUserAdaptor, err error) {
-	key, err := onchain.SetEthKey(credentialPath, passphrase)
+	key, err := onchain.ReadEthKey(credentialPath, passphrase)
 	if err != nil {
 		fmt.Println("NewETHProxySession ", err)
 		return
@@ -96,7 +96,7 @@ func (e *EthUserAdaptor) PollLogs(subscribeType int, sink chan interface{}) <-ch
 	errc := make(chan error)
 	go func() {
 		defer close(errc)
-		targetBlockN, err := onchain.CurrentBlock(e.c)
+		targetBlockN, err := onchain.GetCurrentBlock(e.c)
 		if err != nil {
 			errc <- err
 			return
@@ -106,7 +106,7 @@ func (e *EthUserAdaptor) PollLogs(subscribeType int, sink chan interface{}) <-ch
 		for {
 			select {
 			case <-timer.C:
-				currentBlockN, err := onchain.CurrentBlock(e.c)
+				currentBlockN, err := onchain.GetCurrentBlock(e.c)
 				if err != nil {
 					fmt.Println("PollLogs ", err)
 					errc <- err
