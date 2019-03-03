@@ -8,7 +8,7 @@ services:
      - APPSESSION=Beta
      - APPNAME=BootNode
      - LOGIP=163.172.36.173:9500
-     - CHAINNODE=rinkebyInfura
+     - CHAINNODE=rinkebyPrivateNode
      - GROUPSIZE=3
      - PASSPHRASE=
  dosnode:
@@ -22,7 +22,7 @@ services:
      - APPNAME=DosNode
      - LOGIP=163.172.36.173:9500
      - NODEROLE=testNode
-     - CHAINNODE=rinkebyInfura
+     - CHAINNODE=rinkebyPrivateNode
      - BOOTSTRAPIP=bootstrap:44460
      - RANDOMCONNECT=true
      - PASSPHRASE=
@@ -35,7 +35,7 @@ services:
      - APPNAME=RandomNode
      - LOGIP=163.172.36.173:9500
      - NODEROLE=testNode
-     - CHAINNODE=rinkebyInfura
+     - CHAINNODE=rinkebyPrivateNode
      - BOOTSTRAPIP=bootstrap:44460
      - QUERYTIMES=1
      - QUERYTYPE=random
@@ -51,7 +51,7 @@ services:
      - APPNAME=UrlNode
      - LOGIP=163.172.36.173:9500
      - NODEROLE=testNode
-     - CHAINNODE=rinkebyInfura
+     - CHAINNODE=rinkebyPrivateNode
      - BOOTSTRAPIP=bootstrap:44460
      - QUERYTIMES=1
      - QUERYTYPE=url

@@ -12,11 +12,6 @@ AMA_CONFIGPATH := dosUser/ama.json
 
 gen:
 	cd .. && make gen
-
-clean:
-	cd .. && make clean
-
-deploy: gen
 	mkdir -p $(USER_CONTRACTS)
 	cp $(ETH_CONTRACTS)/DOSOnChainSDK.sol $(USER_CONTRACTS)/
 	cp $(ETH_CONTRACTS)/Ownable.sol $(USER_CONTRACTS)/
@@ -24,8 +19,19 @@ deploy: gen
 	cp $(ETH_CONTRACTS)/lib/utils.sol $(USER_CONTRACTS)/lib/
 	cp $(REMOTE_USER_CONTRACT)/AskMeAnything.sol $(USER_CONTRACTS)/
 	abigen -sol $(USER_CONTRACTS)/AskMeAnything.sol --pkg dosUser --out $(USER_CONTRACTS)/AskMeAnything.go
+	rm $(USER_CONTRACTS)/*.sol
+	rm -r $(USER_CONTRACTS)/lib
+
+clean:
+	cd .. && make clean
+
+deploy: gen
 	go run contracts_deploy/deploy.go -credentialPath $(BOOT_CREDENTIAL) -contractPath $(ETH_CONTRACTS) -contract DOSProxy
 	cp $(ETH_CONTRACTS)/DOSOnChainSDK.sol $(USER_CONTRACTS)/
+	cp $(ETH_CONTRACTS)/Ownable.sol $(USER_CONTRACTS)/
+	mkdir -p $(USER_CONTRACTS)/lib/
+	cp $(ETH_CONTRACTS)/lib/utils.sol $(USER_CONTRACTS)/lib/
+	cp $(REMOTE_USER_CONTRACT)/AskMeAnything.sol $(USER_CONTRACTS)/
 	abigen -sol $(USER_CONTRACTS)/AskMeAnything.sol --pkg dosUser --out $(USER_CONTRACTS)/AskMeAnything.go
 	go run contracts_deploy/deploy.go -credentialPath $(BOOT_CREDENTIAL) -contractPath $(ETH_CONTRACTS) -contract AMA -configPath $(AMA_CONFIGPATH)
 	rm $(USER_CONTRACTS)/*.sol
@@ -54,7 +60,7 @@ docker-peerTalk:
 	cd .. && docker build -t peertalk -f Dockerfile.peertalk .
 	rm ../Dockerfile.peertalk
 
-docker-all: gen docker-bootnode docker-dosnode docker-usernode docker-peernode docker-peerTalk
+docker-all: docker-bootnode docker-dosnode docker-usernode docker-peernode docker-peerTalk
 	docker image prune -f
 
 update-dosenv:
