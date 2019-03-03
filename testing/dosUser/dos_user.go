@@ -174,7 +174,13 @@ func main() {
 	}
 	passphrase := os.Getenv("PASSPHRASE")
 
-	userTestAdaptor, err = eth.NewAMAUserSession(credentialPath, passphrase, config.AskMeAnythingAddressPool[0], chainConfig.RemoteNodeAddressPool)
+	envSize := os.Getenv("AMA")
+	index, err := strconv.Atoi(envSize)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	userTestAdaptor, err = eth.NewAMAUserSession(credentialPath, passphrase, config.AskMeAnythingAddressPool[index], chainConfig.RemoteNodeAddressPool)
 
 	log.Init(userTestAdaptor.Address().Bytes()[:])
 
