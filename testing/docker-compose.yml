@@ -11,6 +11,19 @@ services:
      - CHAINNODE=rinkebyPrivateNode
      - GROUPSIZE=3
      - PASSPHRASE=
+ banker:
+   image: banker
+   deploy:
+     replicas: 1
+   environment:
+     - APPSESSION=Beta
+     - APPNAME=Banker
+     - LOGIP=163.172.36.173:9500
+     - CHAINNODE=rinkebyPrivateNode
+     - KEYFOLDERPATH=/testAccounts
+     - SCANRANGE=3
+     - SCANINTERVAL=8 #in hour
+     - PASSPHRASE=
  dosnode:
    image: dosnode
    depends_on:

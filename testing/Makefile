@@ -60,7 +60,12 @@ docker-peerTalk:
 	cd .. && docker build -t peertalk -f Dockerfile.peertalk .
 	rm ../Dockerfile.peertalk
 
-docker-all: docker-bootnode docker-dosnode docker-usernode docker-peernode docker-peerTalk
+docker-banker:
+	cp banker/Dockerfile ../Dockerfile.banker
+	cd .. && docker build -t banker -f Dockerfile.banker .
+	rm ../Dockerfile.banker
+
+docker-all: docker-bootnode docker-dosnode docker-usernode docker-peernode docker-peerTalk docker-banker
 	docker image prune -f
 
 update-dosenv:

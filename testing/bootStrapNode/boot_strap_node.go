@@ -27,7 +27,7 @@ var adaptor onchain.ProxyAdapter
 // main
 func main() {
 	//1) Connect to Ethereum to reset contract
-	passphrase := os.Getenv("PASSPHRASE")
+	passphrase := os.Getenv(configuration.ENVPASSPHRASE)
 	if passphrase == "" {
 		log.Fatal(errors.New("No passphrase"))
 	}

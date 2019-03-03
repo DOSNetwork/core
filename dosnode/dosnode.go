@@ -42,7 +42,7 @@ type DosNode struct {
 
 func NewDosNode(credentialPath, passphrase string) (dosNode *DosNode, err error) {
 	if passphrase == "" {
-		passphrase = os.Getenv("PASSPHRASE")
+		passphrase = os.Getenv(configuration.ENVPASSPHRASE)
 		if passphrase == "" {
 			err = errors.New("No passphrase")
 			return

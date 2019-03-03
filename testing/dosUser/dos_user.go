@@ -172,7 +172,7 @@ func main() {
 			break
 		}
 	}
-	passphrase := os.Getenv("PASSPHRASE")
+	passphrase := os.Getenv(configuration.ENVPASSPHRASE)
 
 	envSize := os.Getenv("AMA")
 	index, err := strconv.Atoi(envSize)
