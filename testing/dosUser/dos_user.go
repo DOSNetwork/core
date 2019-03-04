@@ -26,6 +26,8 @@ const (
 	INVALIDQUERYINDEX = 17
 	CHECKINTERVAL     = 3
 	FINALREPORTDUE    = 10
+	SMALLLOGBLOCKDIFF = 1
+	LARGELOGBLOCKDIFF = 3
 )
 
 type record struct {
@@ -186,9 +188,9 @@ func main() {
 
 	logger = log.New("module", "AMAUser")
 	events := make(chan interface{}, 5)
-	userTestAdaptor.PollLogs(eth.SubscribeAskMeAnythingQueryResponseReady, events)
-	userTestAdaptor.PollLogs(eth.SubscribeAskMeAnythingRequestSent, events)
-	userTestAdaptor.PollLogs(eth.SubscribeAskMeAnythingRandomReady, events)
+	userTestAdaptor.PollLogs(eth.SubscribeAskMeAnythingQueryResponseReady, events, LARGELOGBLOCKDIFF)
+	userTestAdaptor.PollLogs(eth.SubscribeAskMeAnythingRequestSent, events, SMALLLOGBLOCKDIFF)
+	userTestAdaptor.PollLogs(eth.SubscribeAskMeAnythingRandomReady, events, LARGELOGBLOCKDIFF)
 	requestIdMap := make(map[string]bool)
 
 	go func() {

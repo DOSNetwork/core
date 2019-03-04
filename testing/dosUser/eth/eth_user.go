@@ -92,7 +92,7 @@ func (e *EthUserAdaptor) Address() (addr common.Address) {
 	return e.key.Address
 }
 
-func (e *EthUserAdaptor) PollLogs(subscribeType int, sink chan interface{}) <-chan error {
+func (e *EthUserAdaptor) PollLogs(subscribeType int, sink chan interface{}, logBlockDiff uint64) <-chan error {
 	errc := make(chan error)
 	go func() {
 		defer close(errc)
@@ -112,7 +112,7 @@ func (e *EthUserAdaptor) PollLogs(subscribeType int, sink chan interface{}) <-ch
 					errc <- err
 					return
 				}
-				for ; currentBlockN-onchain.LogBlockDiff >= targetBlockN; targetBlockN++ {
+				for ; currentBlockN-logBlockDiff >= targetBlockN; targetBlockN++ {
 					switch subscribeType {
 					case SubscribeAskMeAnythingQueryResponseReady:
 						logs, err := e.s.Contract.AskMeAnythingFilterer.FilterQueryResponseReady(&bind.FilterOpts{
