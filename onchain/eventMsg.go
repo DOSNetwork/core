@@ -9,21 +9,23 @@ import (
 //TODO: MAKE IT A UNIVERSAL INTERFACE FOR ALL KIND OF CHAINS IN FUTURE
 //TODO: NEED TO MOVE IT DIRECTLY INSIDE BLOCKCHAIN FOLDER
 type DOSProxyLogUrl struct {
-	QueryId         *big.Int
-	Timeout         *big.Int
-	DataSource      string
-	Selector        string
-	Randomness      *big.Int
-	DispatchedGroup [4]*big.Int
-	Tx              string
-	BlockN          uint64
-	Removed         bool
+	QueryId           *big.Int
+	Timeout           *big.Int
+	DataSource        string
+	Selector          string
+	Randomness        *big.Int
+	DispatchedGroupId *big.Int
+	DispatchedGroup   [4]*big.Int
+	Tx                string
+	BlockN            uint64
+	Removed           bool
 }
 
 type DOSProxyLogRequestUserRandom struct {
 	RequestId            *big.Int
 	LastSystemRandomness *big.Int
 	UserSeed             *big.Int
+	DispatchedGroupId    *big.Int
 	DispatchedGroup      [4]*big.Int
 	Tx                   string
 	BlockN               uint64
@@ -45,11 +47,12 @@ type DOSProxyLogCallbackTriggeredFor struct {
 type DOSProxyLogRequestFromNonExistentUC struct{}
 
 type DOSProxyLogUpdateRandom struct {
-	LastRandomness  *big.Int
-	DispatchedGroup [4]*big.Int
-	Tx              string
-	BlockN          uint64
-	Removed         bool
+	LastRandomness    *big.Int
+	DispatchedGroupId *big.Int
+	DispatchedGroup   [4]*big.Int
+	Tx                string
+	BlockN            uint64
+	Removed           bool
 }
 
 type DOSProxyLogValidationResult struct {
@@ -58,6 +61,7 @@ type DOSProxyLogValidationResult struct {
 	Message     []byte
 	Signature   [2]*big.Int
 	PubKey      [4]*big.Int
+	GroupId     *big.Int
 	Pass        bool
 	Version     uint8
 	Tx          string
@@ -65,10 +69,18 @@ type DOSProxyLogValidationResult struct {
 	Removed     bool
 }
 
-type DOSProxyLogInsufficientGroupNumber struct {
-	Tx      string
-	BlockN  uint64
-	Removed bool
+type DOSProxyLogInsufficientWorkingGroup struct {
+	NumWorkingGroups *big.Int
+	Tx               string
+	BlockN           uint64
+	Removed          bool
+}
+
+type DOSProxyLogInsufficientPendingNode struct {
+	NumPendingNodes *big.Int
+	Tx              string
+	BlockN          uint64
+	Removed         bool
 }
 
 type DOSProxyLogGrouping struct {
@@ -112,13 +124,9 @@ type DOSProxyLogPublicKeyUploaded struct {
 }
 
 type DOSProxyLogGroupDismiss struct {
+	GroupId *big.Int
 	PubKey  [4]*big.Int
 	Removed bool
 	BlockN  uint64
 	Tx      string
-}
-
-type DOSProxyWhitelistAddressTransferred struct {
-	Previous common.Address
-	Curr     common.Address
 }

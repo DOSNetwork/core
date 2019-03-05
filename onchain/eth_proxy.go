@@ -28,9 +28,10 @@ const (
 	SubscribeDOSProxyLogValidationResult
 	SubscribeDOSProxyLogGrouping
 	SubscribeDOSProxyLogPublicKeyAccepted
-	SubscribeDOSProxyLogPublicKeyUploaded
+	SubscribeDOSProxyLogPublicKeySuggested
 	SubscribeDOSProxyLogGroupDismiss
-	SubscribeDOSProxyLogInsufficientGroupNumber
+	SubscribeDOSProxyLogInsufficientPendingNode
+	SubscribeDOSProxyLogInsufficientWorkingGroup
 )
 
 var logger log.Logger
@@ -289,31 +290,26 @@ func (e *EthAdaptor) sendRequest(ctx context.Context, request interface{}, resul
 	return errc
 }
 
-func (e *EthAdaptor) FireRandom(ctx context.Context) <-chan error {
+func (e *EthAdaptor) RegisterNewNode(ctx context.Context) (errc <-chan error) {
 	result := make(chan Reply)
-	request := &Request{ctx, e.s.FireRandom, result}
+	request := &Request{ctx, e.s.RegisterNewNode, result}
 	return e.sendRequest(ctx, request, result)
 }
 
-func (e *EthAdaptor) UploadID(ctx context.Context) (errc <-chan error) {
-	result := make(chan Reply)
-	request := &Request{ctx, e.s.UploadNodeId, result}
-	return e.sendRequest(ctx, request, result)
-}
-
+/*
 func (e *EthAdaptor) ResetNodeIDs(ctx context.Context) (errc <-chan error) {
 	result := make(chan Reply)
 	request := &Request{ctx, e.s.ResetContract, result}
 	return e.sendRequest(ctx, request, result)
 }
-
+*/
 func (e *EthAdaptor) RandomNumberTimeOut(ctx context.Context) (errc <-chan error) {
 	result := make(chan Reply)
 	request := &Request{ctx, e.s.HandleTimeout, result}
 	return e.sendRequest(ctx, request, result)
 }
 
-func (e *EthAdaptor) UploadPubKey(ctx context.Context, IdWithPubKeys chan [5]*big.Int) (errc chan error) {
+func (e *EthAdaptor) RegisterGroupPubKey(ctx context.Context, IdWithPubKeys chan [5]*big.Int) (errc chan error) {
 	errc = make(chan error)
 	go func() {
 		defer close(errc)
@@ -326,7 +322,7 @@ func (e *EthAdaptor) UploadPubKey(ctx context.Context, IdWithPubKeys chan [5]*bi
 			groupId := IdWithPubKey[0]
 			var pubKey [4]*big.Int
 			copy(pubKey[:], IdWithPubKey[1:])
-			request := &ReqSetPublicKey{ctx, groupId, pubKey, e.s.SetPublicKey, result}
+			request := &ReqSetPublicKey{ctx, groupId, pubKey, e.s.RegisterGroupPubKey, result}
 			errChan := e.sendRequest(ctx, request, result)
 			err := <-errChan
 			errc <- err
@@ -386,12 +382,13 @@ func (e *EthAdaptor) DataReturn(ctx context.Context, signatures <-chan *vss.Sign
 	return errc
 }
 
+/*
 func (e *EthAdaptor) Grouping(ctx context.Context, size int) <-chan error {
 	result := make(chan Reply)
 	request := &ReqGrouping{ctx, nil, big.NewInt(int64(size)), e.s.Grouping, result}
 	return e.sendRequest(ctx, request, result)
 }
-
+*/
 func (e *EthAdaptor) PollLogs(subscribeType int, sink chan interface{}) <-chan error {
 	errc := make(chan error)
 	go func() {
@@ -444,23 +441,7 @@ func (e *EthAdaptor) PollLogs(subscribeType int, sink chan interface{}) <-chan e
 						for logs.Next() {
 							sink <- &DOSProxyLogGroupDismiss{
 								PubKey:  logs.Event.PubKey,
-								Tx:      logs.Event.Raw.TxHash.Hex(),
-								BlockN:  logs.Event.Raw.BlockNumber,
-								Removed: logs.Event.Raw.Removed,
-							}
-						}
-					case SubscribeDOSProxyLogInsufficientGroupNumber:
-						logs, err := e.s.Contract.DOSProxyFilterer.FilterLogInsufficientGroupNumber(&bind.FilterOpts{
-							Start:   targetBlockN,
-							End:     &targetBlockN,
-							Context: e.ctx,
-						})
-						if err != nil {
-							errc <- err
-							return
-						}
-						for logs.Next() {
-							sink <- &DOSProxyLogInsufficientGroupNumber{
+								GroupId: logs.Event.GroupId,
 								Tx:      logs.Event.Raw.TxHash.Hex(),
 								BlockN:  logs.Event.Raw.BlockNumber,
 								Removed: logs.Event.Raw.Removed,
@@ -480,32 +461,6 @@ func (e *EthAdaptor) PollLogs(subscribeType int, sink chan interface{}) <-chan e
 func (e *EthAdaptor) SubscribeEvent(subscribeType int, sink chan interface{}) chan error {
 	errc := make(chan error)
 	switch subscribeType {
-	case SubscribeDOSProxyLogInsufficientGroupNumber:
-		go func() {
-			transitChan := make(chan *dosproxy.DOSProxyLogInsufficientGroupNumber)
-			defer close(transitChan)
-			defer close(errc)
-			sub, err := e.s.Contract.DOSProxyFilterer.WatchLogInsufficientGroupNumber(e.wOpts, transitChan)
-			if err != nil {
-				return
-			}
-			for {
-				select {
-				case <-e.ctx.Done():
-					sub.Unsubscribe()
-					return
-				case err := <-sub.Err():
-					errc <- err
-					return
-				case i := <-transitChan:
-					sink <- &DOSProxyLogInsufficientGroupNumber{
-						Tx:      i.Raw.TxHash.Hex(),
-						BlockN:  i.Raw.BlockNumber,
-						Removed: i.Raw.Removed,
-					}
-				}
-			}
-		}()
 	case SubscribeDOSProxyLogUpdateRandom:
 		go func() {
 			transitChan := make(chan *dosproxy.DOSProxyLogUpdateRandom)
@@ -525,11 +480,12 @@ func (e *EthAdaptor) SubscribeEvent(subscribeType int, sink chan interface{}) ch
 					return
 				case i := <-transitChan:
 					sink <- &DOSProxyLogUpdateRandom{
-						LastRandomness:  i.LastRandomness,
-						DispatchedGroup: i.DispatchedGroup,
-						Tx:              i.Raw.TxHash.Hex(),
-						BlockN:          i.Raw.BlockNumber,
-						Removed:         i.Raw.Removed,
+						LastRandomness:    i.LastRandomness,
+						DispatchedGroupId: i.DispatchedGroupId,
+						DispatchedGroup:   i.DispatchedGroup,
+						Tx:                i.Raw.TxHash.Hex(),
+						BlockN:            i.Raw.BlockNumber,
+						Removed:           i.Raw.Removed,
 					}
 				}
 			}
@@ -553,15 +509,16 @@ func (e *EthAdaptor) SubscribeEvent(subscribeType int, sink chan interface{}) ch
 					return
 				case i := <-transitChan:
 					sink <- &DOSProxyLogUrl{
-						QueryId:         i.QueryId,
-						Timeout:         i.Timeout,
-						DataSource:      i.DataSource,
-						Selector:        i.Selector,
-						Randomness:      i.Randomness,
-						DispatchedGroup: i.DispatchedGroup,
-						Tx:              i.Raw.TxHash.Hex(),
-						BlockN:          i.Raw.BlockNumber,
-						Removed:         i.Raw.Removed,
+						QueryId:           i.QueryId,
+						Timeout:           i.Timeout,
+						DataSource:        i.DataSource,
+						Selector:          i.Selector,
+						Randomness:        i.Randomness,
+						DispatchedGroupId: i.DispatchedGroupId,
+						DispatchedGroup:   i.DispatchedGroup,
+						Tx:                i.Raw.TxHash.Hex(),
+						BlockN:            i.Raw.BlockNumber,
+						Removed:           i.Raw.Removed,
 					}
 				}
 			}
@@ -588,6 +545,7 @@ func (e *EthAdaptor) SubscribeEvent(subscribeType int, sink chan interface{}) ch
 						RequestId:            i.RequestId,
 						LastSystemRandomness: i.LastSystemRandomness,
 						UserSeed:             i.UserSeed,
+						DispatchedGroupId:    i.DispatchedGroupId,
 						DispatchedGroup:      i.DispatchedGroup,
 						Tx:                   i.Raw.TxHash.Hex(),
 						BlockN:               i.Raw.BlockNumber,
@@ -620,6 +578,7 @@ func (e *EthAdaptor) SubscribeEvent(subscribeType int, sink chan interface{}) ch
 						Message:     i.Message,
 						Signature:   i.Signature,
 						PubKey:      i.PubKey,
+						GroupId:     i.GroupId,
 						Pass:        i.Pass,
 						Version:     i.Version,
 						Tx:          i.Raw.TxHash.Hex(),
@@ -629,6 +588,34 @@ func (e *EthAdaptor) SubscribeEvent(subscribeType int, sink chan interface{}) ch
 				}
 			}
 		}()
+	case SubscribeDOSProxyLogInsufficientPendingNode:
+		go func() {
+			transitChan := make(chan *dosproxy.DOSProxyLogInsufficientPendingNode)
+			defer close(transitChan)
+			defer close(errc)
+			sub, err := e.s.Contract.DOSProxyFilterer.WatchLogInsufficientPendingNode(e.wOpts, transitChan)
+			if err != nil {
+				return
+			}
+			for {
+				select {
+				case <-e.ctx.Done():
+					sub.Unsubscribe()
+					return
+				case err := <-sub.Err():
+					errc <- err
+					return
+				case i := <-transitChan:
+					sink <- &DOSProxyLogInsufficientPendingNode{
+						NumPendingNodes: i.NumPendingNodes,
+						Tx:              i.Raw.TxHash.Hex(),
+						BlockN:          i.Raw.BlockNumber,
+						Removed:         i.Raw.Removed,
+					}
+				}
+			}
+		}()
+	case SubscribeDOSProxyLogInsufficientWorkingGroup:
 	}
 	return errc
 }

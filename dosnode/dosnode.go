@@ -145,7 +145,7 @@ func NewDosNode(credentialPath, passphrase string) (dosNode *DosNode, err error)
 	}
 	err = dosNode.Start()
 	ctx, _ := context.WithCancel(context.Background())
-	errc := dosNode.chain.UploadID(ctx)
+	errc := dosNode.chain.RegisterNewNode(ctx)
 	<-errc
 	return
 }
@@ -216,7 +216,7 @@ func (d *DosNode) buildPipeline(valueCtx context.Context, pubkey [4]*big.Int, re
 	idx := 1
 	for _, id := range ids {
 		if r := bytes.Compare(d.id, id); r != 0 {
-			cSign, cErr = requestSign(valueCtx, cSubmitter[idx], d.p, d.id, requestID.String(), pType, id)
+			cSign, cErr = requestSign(valueCtx, cSubmitter[idx], cContent, d.p, d.id, requestID.String(), pType)
 			signShares = append(signShares, cSign)
 			errcList = append(errcList, cErr)
 			idx++
@@ -262,8 +262,6 @@ func (d *DosNode) listen() (err error) {
 	errcList = append(errcList, errc)
 	errc = d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogValidationResult, eventValidation)
 	errcList = append(errcList, errc)
-	errc = d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogPublicKeyUploaded, keyUploaded)
-	errcList = append(errcList, errc)
 	errc = d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogPublicKeyAccepted, keyAccepted)
 	errcList = append(errcList, errc)
 	errc = mergeErrors(context.Background(), errcList...)
@@ -289,7 +287,9 @@ func (d *DosNode) listen() (err error) {
 			}
 			select {
 			case err := <-errc:
-				fmt.Println("!!!dosnode err ", err)
+				if err.Error() == "EOF" {
+					fmt.Println("!!!dosnode err ", err)
+				}
 				logger.Error(err)
 			case <-watchdog.C:
 				ids := d.dkg.GetAnyGroupIDs()
@@ -315,7 +315,8 @@ func (d *DosNode) listen() (err error) {
 					delete(pipeCancel, requestID)
 				}
 			case msg := <-d.cSignToPeer:
-				peerSignMap[msg.QueryId] = msg
+				peerSignMap[hashSignId(msg.QueryId, msg.Content)] = msg
+
 			case msg := <-peerEvent:
 				switch content := msg.Msg.Message.(type) {
 				case *vss.Signature:
@@ -354,7 +355,7 @@ func (d *DosNode) listen() (err error) {
 						var errcList []<-chan error
 						outFromDkg, errc := d.dkg.Start(valueCtx, groupIds, sessionId)
 						errcList = append(errcList, errc)
-						errc = d.chain.UploadPubKey(valueCtx, outFromDkg)
+						errc = d.chain.RegisterGroupPubKey(valueCtx, outFromDkg)
 						errcList = append(errcList, errc)
 						errc = mergeErrors(valueCtx, errcList...)
 						go d.waitForGrouping(valueCtx, errc)
@@ -372,7 +373,7 @@ func (d *DosNode) listen() (err error) {
 
 				if d.isMember(content.PubKey) && d.dkg.GroupDismiss(content.PubKey) {
 					f := map[string]interface{}{
-						"SessionID":         d.dkg.GetSessionID(content.PubKey),
+						"SessionID":         fmt.Sprintf("%x", content.GroupId),
 						"DispatchedGroup_1": fmt.Sprintf("%x", content.PubKey[0].Bytes()),
 						"DispatchedGroup_2": fmt.Sprintf("%x", content.PubKey[1].Bytes()),
 						"DispatchedGroup_3": fmt.Sprintf("%x", content.PubKey[2].Bytes()),
@@ -384,7 +385,7 @@ func (d *DosNode) listen() (err error) {
 						"Time":              time.Now()}
 					logger.Event("DOS_GroupDismiss", f)
 					ctx, _ := context.WithCancel(context.Background())
-					d.chain.UploadID(ctx)
+					d.chain.RegisterNewNode(ctx)
 
 				}
 			case msg := <-chRandom:
@@ -395,6 +396,7 @@ func (d *DosNode) listen() (err error) {
 				if d.isMember(content.DispatchedGroup) {
 					f := map[string]interface{}{
 						"LastSystemRandomness": fmt.Sprintf("%x", content.LastRandomness),
+						"DispatchedGroupId":    fmt.Sprintf("%x", content.DispatchedGroupId),
 						"DispatchedGroup_1":    fmt.Sprintf("%x", content.DispatchedGroup[0].Bytes()),
 						"DispatchedGroup_2":    fmt.Sprintf("%x", content.DispatchedGroup[1].Bytes()),
 						"DispatchedGroup_3":    fmt.Sprintf("%x", content.DispatchedGroup[2].Bytes()),
@@ -428,6 +430,7 @@ func (d *DosNode) listen() (err error) {
 					f := map[string]interface{}{
 						"RequestId":            fmt.Sprintf("%x", content.RequestId),
 						"LastSystemRandomness": fmt.Sprintf("%x", content.LastSystemRandomness),
+						"DispatchedGroupId":    fmt.Sprintf("%x", content.DispatchedGroupId),
 						"DispatchedGroup_1":    fmt.Sprintf("%x", content.DispatchedGroup[0].Bytes()),
 						"DispatchedGroup_2":    fmt.Sprintf("%x", content.DispatchedGroup[1].Bytes()),
 						"DispatchedGroup_3":    fmt.Sprintf("%x", content.DispatchedGroup[2].Bytes()),
@@ -464,6 +467,7 @@ func (d *DosNode) listen() (err error) {
 						"RequestId":         fmt.Sprintf("%x", content.QueryId),
 						"Randomness":        fmt.Sprintf("%x", content.Randomness),
 						"DataSource":        fmt.Sprintf("%x", content.DataSource),
+						"DispatchedGroupId": fmt.Sprintf("%x", content.DispatchedGroupId),
 						"DispatchedGroup_1": fmt.Sprintf("%x", content.DispatchedGroup[0].Bytes()),
 						"DispatchedGroup_2": fmt.Sprintf("%x", content.DispatchedGroup[1].Bytes()),
 						"DispatchedGroup_3": fmt.Sprintf("%x", content.DispatchedGroup[2].Bytes()),
@@ -502,6 +506,7 @@ func (d *DosNode) listen() (err error) {
 							"RequestId":         fmt.Sprintf("%x", content.TrafficId),
 							"QueryResult":       string(content.Message),
 							"ValidationPass":    content.Pass,
+							"GroupId":           fmt.Sprintf("%x", content.GroupId),
 							"DispatchedGroup_1": fmt.Sprintf("%x", content.PubKey[0].Bytes()),
 							"DispatchedGroup_2": fmt.Sprintf("%x", content.PubKey[1].Bytes()),
 							"DispatchedGroup_3": fmt.Sprintf("%x", content.PubKey[2].Bytes()),
@@ -519,6 +524,7 @@ func (d *DosNode) listen() (err error) {
 							"RequestId":         fmt.Sprintf("%x", content.TrafficId),
 							"GeneratedRandom":   fmt.Sprintf("%x", z),
 							"ValidationPass":    content.Pass,
+							"GroupId":           fmt.Sprintf("%x", content.GroupId),
 							"DispatchedGroup_1": fmt.Sprintf("%x", content.PubKey[0].Bytes()),
 							"DispatchedGroup_2": fmt.Sprintf("%x", content.PubKey[1].Bytes()),
 							"DispatchedGroup_3": fmt.Sprintf("%x", content.PubKey[2].Bytes()),
@@ -534,7 +540,8 @@ func (d *DosNode) listen() (err error) {
 						z.SetBytes(content.Message)
 						f := map[string]interface{}{
 							"RequestId":       fmt.Sprintf("%x", content.TrafficId),
-							"GeneratedRandom": fmt.Sprintf("%x", z),
+							"GeneratedRandom": fmt.Sprintf("0x%x", z),
+							"GroupId":         fmt.Sprintf("%x", content.GroupId),
 							"ValidationPass":  content.Pass,
 							"Removed":         content.Removed,
 							"Tx":              content.Tx,
@@ -556,7 +563,6 @@ func (d *DosNode) listen() (err error) {
 				if d.isMember(content.PubKey) {
 					logger.TimeTrack(time.Now(), "keyUploaded", map[string]interface{}{
 						"SessionID": d.dkg.GetSessionID(content.PubKey),
-						"groupId":   fmt.Sprintf("%x", content.GroupId),
 						"x0":        fmt.Sprintf("%x", content.PubKey[0]),
 						"x1":        fmt.Sprintf("%x", content.PubKey[1]),
 						"y0":        fmt.Sprintf("%x", content.PubKey[2]),
@@ -580,7 +586,6 @@ func (d *DosNode) listen() (err error) {
 				}
 				if d.isMember(content.PubKey) {
 					logger.TimeTrack(time.Now(), "keyAccepted", map[string]interface{}{
-						"SessionID":        d.dkg.GetSessionID(content.PubKey),
 						"groupId":          fmt.Sprintf("%x", content.GroupId),
 						"x0":               fmt.Sprintf("%x", content.PubKey[0]),
 						"x1":               fmt.Sprintf("%x", content.PubKey[1]),

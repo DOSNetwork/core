@@ -14,13 +14,11 @@ const (
 )
 
 type ProxyAdapter interface {
-	UploadID(ctx context.Context) (errc <-chan error)
-	ResetNodeIDs(ctx context.Context) (errc <-chan error)
+	RegisterNewNode(ctx context.Context) (errc <-chan error)
 	RandomNumberTimeOut(ctx context.Context) (errc <-chan error)
-	UploadPubKey(ctx context.Context, IdWithPubKeys chan [5]*big.Int) (errc chan error)
+	RegisterGroupPubKey(ctx context.Context, IdWithPubKeys chan [5]*big.Int) (errc chan error)
 	SetRandomNum(ctx context.Context, signatures <-chan *vss.Signature) (errc chan error)
 	DataReturn(ctx context.Context, signatures <-chan *vss.Signature) (errc chan error)
-	Grouping(ctx context.Context, size int) <-chan error
 
 	SubscribeEvent(subscribeType int, sink chan interface{}) chan error
 	PollLogs(subscribeType int, sink chan interface{}) <-chan error

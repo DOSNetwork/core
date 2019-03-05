@@ -6,7 +6,8 @@ import (
 	"sync"
 	"testing"
 	"time"
-	//"github.com/DOSNetwork/core/share/vss/pedersen"
+
+	"github.com/DOSNetwork/core/share/vss/pedersen"
 )
 
 const (
@@ -50,21 +51,21 @@ func mergeErrors(ctx context.Context, cs ...<-chan error) <-chan error {
 }
 
 func testProxy(setting int) (err error) {
-	/*
-		proxyAddr := "0x25d1b6aD154C84a998a836663c867853A916d4bD"
-		urls := []string{"ws://51.15.0.157:8546", "ws://51.159.4.51:8546", "wss://rinkeby.infura.io/ws/8e609c76fce442f8a1735fbea9999747"}
-		if setting == TWOFULLNODES_1 {
-			//urls = []string{"wss://rinkeby.infura.io/ws/8e609c76fce442f8a1735fbea9999747"}
-			urls = []string{"ws://51.15.0.157:8546"}
-		} else if setting == TWOFULLNODES_2 {
-			urls = []string{"ws://51.159.4.51:8546"}
-		}
-	*/
-	proxyAddr := "0x4562daE9d912638413a5B290D657e28724E28e06"
-	urls := []string{"ws://163.172.36.173:8546"}
 
-	credentialPath := ""
-	passphrase := ""
+	proxyAddr := "0x25d1b6aD154C84a998a836663c867853A916d4bD"
+	urls := []string{"ws://51.15.0.157:8546", "ws://51.159.4.51:8546", "wss://rinkeby.infura.io/ws/8e609c76fce442f8a1735fbea9999747"}
+	if setting == TWOFULLNODES_1 {
+		//urls = []string{"wss://rinkeby.infura.io/ws/8e609c76fce442f8a1735fbea9999747"}
+		urls = []string{"ws://51.15.0.157:8546"}
+	} else if setting == TWOFULLNODES_2 {
+		urls = []string{"ws://51.159.4.51:8546"}
+	}
+
+	//proxyAddr := "0x4562daE9d912638413a5B290D657e28724E28e06"
+	//urls := []string{"ws://163.172.36.173:8546"}
+
+	credentialPath := "/Users/chenhaonien/go/src/github.com/DOSNetwork/core/credential"
+	passphrase := "123"
 	adaptor, err := NewETHProxySession(credentialPath, passphrase, proxyAddr, urls)
 	if err != nil {
 		fmt.Println(err.Error())
@@ -79,43 +80,39 @@ func testProxy(setting int) (err error) {
 	if setting == TWOFULLNODES_1 {
 		_ = adaptor.SubscribeEvent(SubscribeDOSProxyLogUpdateRandom, sink)
 	} else if setting == TWOFULLNODES_2 {
-		_ = adaptor.SubscribeEvent(SubscribeDOSProxyLogInsufficientGroupNumber, sink)
+		_ = adaptor.SubscribeEvent(SubscribeDOSProxyLogInsufficientWorkingGroup, sink)
 	} else {
 		_ = adaptor.SubscribeEvent(SubscribeDOSProxyLogUpdateRandom, sink)
-		_ = adaptor.SubscribeEvent(SubscribeDOSProxyLogInsufficientGroupNumber, sink)
+		_ = adaptor.SubscribeEvent(SubscribeDOSProxyLogInsufficientWorkingGroup, sink)
+		_ = adaptor.SubscribeEvent(SubscribeDOSProxyLogInsufficientPendingNode, sink)
 		_ = adaptor.SubscribeEvent(SubscribeDOSProxyLogValidationResult, sink)
-		//_ = adaptor.PollLogs(SubscribeDOSProxyLogInsufficientGroupNumber, sink)
 	}
 
 	ctx, _ := context.WithCancel(context.Background())
 	var errcList []<-chan error
-	//sigC := make(chan *vss.Signature)
+	sigC := make(chan *vss.Signature)
 	for i := 1; i <= 3; i++ {
 
 		if setting == TWOFULLNODES_1 {
-			//err := adaptor.FireRandom(ctx)
-			err := adaptor.Grouping(ctx, i+3)
+			err := adaptor.RegisterNewNode(ctx)
 			errcList = append(errcList, err)
 		} else if setting == TWOFULLNODES_2 {
-			//err := adaptor.FireRandom(ctx)
-			err := adaptor.Grouping(ctx, i)
+			err := adaptor.RandomNumberTimeOut(ctx)
 			errcList = append(errcList, err)
 		} else {
-			err := adaptor.Grouping(ctx, i)
+
+			err := adaptor.SetRandomNum(ctx, sigC)
 			errcList = append(errcList, err)
-			/*
-				err := adaptor.SetRandomNum(ctx, sigC)
-				errcList = append(errcList, err)
-				b := []byte{'g', 'o', 'l', 'a', 'n', 'g', 'g', 'o', 'l', 'a',
-					'g', 'o', 'l', 'a', 'n', 'g', 'g', 'o', 'l', 'a',
-					'g', 'o', 'l', 'a', 'n', 'g', 'g', 'o', 'l', 'a',
-					'g', 'o', 'l', 'a', 'n', 'g', 'g', 'o', 'l', 'a',
-					'g', 'o', 'l', 'a', 'n', 'g', 'g', 'o', 'l', 'a',
-					'g', 'o', 'l', 'a', 'n', 'g', 'g', 'o', 'l', 'a',
-					'g', 'o', 'l', 'a'}
-				sig := &vss.Signature{Index: 1, QueryId: "test", Content: b, Signature: b}
-				sigC <- sig
-			*/
+			b := []byte{'g', 'o', 'l', 'a', 'n', 'g', 'g', 'o', 'l', 'a',
+				'g', 'o', 'l', 'a', 'n', 'g', 'g', 'o', 'l', 'a',
+				'g', 'o', 'l', 'a', 'n', 'g', 'g', 'o', 'l', 'a',
+				'g', 'o', 'l', 'a', 'n', 'g', 'g', 'o', 'l', 'a',
+				'g', 'o', 'l', 'a', 'n', 'g', 'g', 'o', 'l', 'a',
+				'g', 'o', 'l', 'a', 'n', 'g', 'g', 'o', 'l', 'a',
+				'g', 'o', 'l', 'a'}
+			sig := &vss.Signature{Index: 1, QueryId: "test", Content: b, Signature: b}
+			sigC <- sig
+
 		}
 
 	}
@@ -127,10 +124,12 @@ L:
 		select {
 		case event := <-sink:
 			switch content := event.(type) {
-			case *DOSProxyLogInsufficientGroupNumber:
+			case *DOSProxyLogInsufficientWorkingGroup:
 				fmt.Println(setting, " Event DOSProxyLogInsufficientGroupNumber")
 				//count++
-
+			case *DOSProxyLogInsufficientPendingNode:
+				fmt.Println(setting, " Event DOSProxyLogInsufficientPendingNode")
+				//count++
 			case *DOSProxyLogUpdateRandom:
 				if !content.Removed {
 					fmt.Println(setting, " Event DOSProxyLogUpdateRandom last: ", fmt.Sprintf("%x", content.LastRandomness))

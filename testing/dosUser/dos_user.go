@@ -186,7 +186,9 @@ func main() {
 
 	log.Init(userTestAdaptor.Address().Bytes()[:])
 
-	logger = log.New("module", "AMAUser")
+	if logger == nil {
+		logger = log.New("module", "AMAUser")
+	}
 	events := make(chan interface{}, 5)
 	userTestAdaptor.PollLogs(eth.SubscribeAskMeAnythingQueryResponseReady, events, LARGELOGBLOCKDIFF)
 	userTestAdaptor.PollLogs(eth.SubscribeAskMeAnythingRequestSent, events, SMALLLOGBLOCKDIFF)

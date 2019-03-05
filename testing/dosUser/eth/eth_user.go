@@ -84,7 +84,9 @@ func NewAMAUserSession(credentialPath, passphrase, addr string, gethUrls []strin
 	adaptor.ctx = ctxD
 	adaptor.cancel = cancelSession
 	adaptor.reqQueue = make(chan interface{})
-	logger = log.New("module", "EthUser")
+	if logger == nil {
+		logger = log.New("module", "EthUser")
+	}
 	return
 }
 

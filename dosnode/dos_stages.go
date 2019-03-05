@@ -3,6 +3,7 @@ package dosnode
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -150,11 +151,11 @@ func choseSubmitter(ctx context.Context, chain onchain.ProxyAdapter, lastSysRand
 func requestSign(
 	ctx context.Context,
 	submitterc <-chan []byte,
+	contentc <-chan []byte,
 	p p2p.P2PInterface,
 	nodeId []byte,
 	requestId string,
-	trafficType uint32,
-	id []byte) (<-chan *vss.Signature, <-chan error) {
+	trafficType uint32) (<-chan *vss.Signature, <-chan error) {
 	out := make(chan *vss.Signature)
 	errc := make(chan error)
 	go func() {
@@ -169,12 +170,18 @@ func requestSign(
 			if r := bytes.Compare(nodeId, submitter); r != 0 {
 				return
 			}
+		case content, ok := <-contentc:
+			if !ok {
+				return
+			}
 			defer logger.TimeTrack(time.Now(), "RequestSign", map[string]interface{}{"RequestId": ctx.Value("RequestID")})
 
 			sign := &vss.Signature{
 				Index:   trafficType,
 				QueryId: requestId,
 			}
+
+			id := []byte(hashSignId(requestId, content))
 			retryCount := 0
 			for retryCount < 30 {
 				if msg, err := p.Request(id, sign); err == nil {
@@ -508,4 +515,9 @@ func padOrTrim(bb []byte, size int) []byte {
 	tmp := make([]byte, size)
 	copy(tmp[size-l:], bb)
 	return tmp
+}
+
+func hashSignId(queryId string, content []byte) string {
+	h := sha256.Sum256(append([]byte(queryId), content...))
+	return string(h[:])
 }

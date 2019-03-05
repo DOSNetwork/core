@@ -16,6 +16,7 @@ import (
 
 	"github.com/DOSNetwork/core/configuration"
 	"github.com/DOSNetwork/core/onchain"
+	"github.com/DOSNetwork/core/onchain/dosbridge"
 	"github.com/DOSNetwork/core/onchain/dosproxy"
 
 	"github.com/DOSNetwork/core/testing/dosUser/contract"
@@ -87,7 +88,7 @@ func updateBridge(client *ethclient.Client, key *keystore.Key, bridgeAddress, pr
 	auth = bind.NewKeyedTransactor(key.PrivateKey)
 	auth.GasLimit = uint64(5000000)
 
-	bridge, err := dosproxy.NewDOSAddressBridge(bridgeAddress, client)
+	bridge, err := dosbridge.NewDOSAddressBridge(bridgeAddress, client)
 	if err != nil {
 		return
 	}
@@ -123,12 +124,12 @@ func deployContract(client *ethclient.Client, key *keystore.Key, contractName in
 	switch contractName {
 	case DOSAddressBridge:
 		fmt.Println("Starting deploy DOSAddressBridge.sol...")
-		address, tx, _, err = dosproxy.DeployDOSAddressBridge(auth, client)
+		address, tx, _, err = dosbridge.DeployDOSAddressBridge(auth, client)
 		for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
 			fmt.Println(err)
 			time.Sleep(time.Second)
 			fmt.Println("transaction retry...")
-			address, tx, _, err = dosproxy.DeployDOSAddressBridge(auth, client)
+			address, tx, _, err = dosbridge.DeployDOSAddressBridge(auth, client)
 		}
 	case DOSProxy:
 		fmt.Println("Starting deploy DOSProxy.sol...")

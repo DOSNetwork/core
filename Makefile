@@ -6,9 +6,10 @@
 
 .DEFAULT_GOAL := build
 DOSPROXY_PATH := onchain/eth/contracts/DOSProxy.sol
-CONTRACTS_GOPATH := onchain/dosproxy
+DOSPROXY_GOPATH := onchain/dosproxy
+DOSBRIDGE_GOPATH := onchain/dosbridge
 TEST_CONTRACTS_GOPATH := testing/dosUser/contract
-GENERATED_FILES := $(shell find $(CONTRACTS_GOPATH) $(TEST_CONTRACTS_GOPATH) -name '*.go')
+GENERATED_FILES := $(shell find $(DOSPROXY_GOPATH) $(DOSBRIDGE_GOPATH) $(TEST_CONTRACTS_GOPATH) -name '*.go')
 ETH_CONTRACTS := onchain/eth/contracts
 BOOT_CREDENTIAL := testAccounts/bootCredential
 
@@ -31,8 +32,8 @@ updateSubmodule:
 	git submodule update --remote
 
 gen: updateSubmodule
-	abigen -sol $(ETH_CONTRACTS)/DOSAddressBridge.sol --pkg dosproxy --out $(CONTRACTS_GOPATH)/DOSAddressBridge.go
-	abigen -sol $(ETH_CONTRACTS)/DOSProxy.sol --pkg dosproxy --out $(CONTRACTS_GOPATH)/DOSProxy.go
+	abigen -sol $(ETH_CONTRACTS)/DOSAddressBridge.sol --pkg dosbridge --out $(DOSBRIDGE_GOPATH)/DOSAddressBridge.go
+	abigen -sol $(ETH_CONTRACTS)/DOSProxy.sol --pkg dosproxy --out $(DOSPROXY_GOPATH)/DOSProxy.go
 
 clean:
 	rm -f client
