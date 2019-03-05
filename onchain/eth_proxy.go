@@ -480,12 +480,11 @@ func (e *EthAdaptor) SubscribeEvent(subscribeType int, sink chan interface{}) ch
 					return
 				case i := <-transitChan:
 					sink <- &DOSProxyLogUpdateRandom{
-						LastRandomness:    i.LastRandomness,
-						DispatchedGroupId: i.DispatchedGroupId,
-						DispatchedGroup:   i.DispatchedGroup,
-						Tx:                i.Raw.TxHash.Hex(),
-						BlockN:            i.Raw.BlockNumber,
-						Removed:           i.Raw.Removed,
+						LastRandomness:  i.LastRandomness,
+						DispatchedGroup: i.DispatchedGroup,
+						Tx:              i.Raw.TxHash.Hex(),
+						BlockN:          i.Raw.BlockNumber,
+						Removed:         i.Raw.Removed,
 					}
 				}
 			}

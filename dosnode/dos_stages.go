@@ -155,7 +155,8 @@ func requestSign(
 	p p2p.P2PInterface,
 	nodeId []byte,
 	requestId string,
-	trafficType uint32) (<-chan *vss.Signature, <-chan error) {
+	trafficType uint32,
+	id []byte) (<-chan *vss.Signature, <-chan error) {
 	out := make(chan *vss.Signature)
 	errc := make(chan error)
 	go func() {
@@ -179,9 +180,9 @@ func requestSign(
 			sign := &vss.Signature{
 				Index:   trafficType,
 				QueryId: requestId,
+				Content: content,
 			}
 
-			id := []byte(hashSignId(requestId, content))
 			retryCount := 0
 			for retryCount < 30 {
 				if msg, err := p.Request(id, sign); err == nil {
@@ -196,6 +197,8 @@ func requestSign(
 						return
 					default:
 					}
+				} else {
+					fmt.Println(err)
 				}
 				retryCount++
 			}
@@ -282,6 +285,8 @@ func genUserRandom(
 	requestId []byte,
 	lastSysRand []byte,
 	userSeed []byte,
+	nodeId []byte,
+	peerSize int,
 ) <-chan []byte {
 	out := make(chan []byte)
 	go func() {
@@ -300,6 +305,11 @@ func genUserRandom(
 			random = append(random, submitter...)
 			select {
 			case out <- random:
+				if bytes.Compare(nodeId, submitter) == 0 {
+					for i := 0; i < peerSize; i++ {
+						out <- random
+					}
+				}
 			case <-ctx.Done():
 			}
 			return
@@ -315,6 +325,8 @@ func genSysRandom(
 	ctx context.Context,
 	submitterc <-chan []byte,
 	lastSysRand []byte,
+	nodeId []byte,
+	peerSize int,
 ) <-chan []byte {
 	out := make(chan []byte)
 	go func() {
@@ -332,6 +344,11 @@ func genSysRandom(
 			random := append(paddedLastSysRand, submitter...)
 			select {
 			case out <- random:
+				if bytes.Compare(nodeId, submitter) == 0 {
+					for i := 0; i < peerSize; i++ {
+						out <- random
+					}
+				}
 			case <-ctx.Done():
 			}
 			return
@@ -387,7 +404,7 @@ func dataParse(rawMsg []byte, pathStr string) (msg []byte, err error) {
 	return
 }
 
-func genQueryResult(ctx context.Context, submitterc chan []byte, url string, pathStr string) (<-chan []byte, chan error) {
+func genQueryResult(ctx context.Context, submitterc chan []byte, url string, pathStr string, nodeId []byte, peerSize int) (<-chan []byte, chan error) {
 	out := make(chan []byte)
 	errc := make(chan error)
 	go func() {
@@ -420,6 +437,11 @@ func genQueryResult(ctx context.Context, submitterc chan []byte, url string, pat
 			msgReturn = append(msgReturn, submitter...)
 			select {
 			case out <- msgReturn:
+				if bytes.Compare(nodeId, submitter) == 0 {
+					for i := 0; i < peerSize; i++ {
+						out <- msgReturn
+					}
+				}
 			case <-ctx.Done():
 			}
 			return

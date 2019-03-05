@@ -47,12 +47,11 @@ type DOSProxyLogCallbackTriggeredFor struct {
 type DOSProxyLogRequestFromNonExistentUC struct{}
 
 type DOSProxyLogUpdateRandom struct {
-	LastRandomness    *big.Int
-	DispatchedGroupId *big.Int
-	DispatchedGroup   [4]*big.Int
-	Tx                string
-	BlockN            uint64
-	Removed           bool
+	LastRandomness  *big.Int
+	DispatchedGroup [4]*big.Int
+	Tx              string
+	BlockN          uint64
+	Removed         bool
 }
 
 type DOSProxyLogValidationResult struct {

@@ -201,11 +201,11 @@ func (d *DosNode) buildPipeline(valueCtx context.Context, pubkey [4]*big.Int, re
 
 	switch pType {
 	case onchain.TrafficSystemRandom:
-		cContent = genSysRandom(valueCtx, cSubmitter[0], lastRand.Bytes())
+		cContent = genSysRandom(valueCtx, cSubmitter[0], lastRand.Bytes(), d.id, len(ids)-1)
 	case onchain.TrafficUserRandom:
-		cContent = genUserRandom(valueCtx, cSubmitter[0], requestID.Bytes(), lastRand.Bytes(), useSeed.Bytes())
+		cContent = genUserRandom(valueCtx, cSubmitter[0], requestID.Bytes(), lastRand.Bytes(), useSeed.Bytes(), d.id, len(ids)-1)
 	case onchain.TrafficUserQuery:
-		cContent, cErr = genQueryResult(valueCtx, cSubmitter[0], url, selector)
+		cContent, cErr = genQueryResult(valueCtx, cSubmitter[0], url, selector, d.id, len(ids)-1)
 		errcList = append(errcList, cErr)
 	}
 
@@ -216,7 +216,7 @@ func (d *DosNode) buildPipeline(valueCtx context.Context, pubkey [4]*big.Int, re
 	idx := 1
 	for _, id := range ids {
 		if r := bytes.Compare(d.id, id); r != 0 {
-			cSign, cErr = requestSign(valueCtx, cSubmitter[idx], cContent, d.p, d.id, requestID.String(), pType)
+			cSign, cErr = requestSign(valueCtx, cSubmitter[idx], cContent, d.p, d.id, requestID.String(), pType, id)
 			signShares = append(signShares, cSign)
 			errcList = append(errcList, cErr)
 			idx++
@@ -320,7 +320,7 @@ func (d *DosNode) listen() (err error) {
 			case msg := <-peerEvent:
 				switch content := msg.Msg.Message.(type) {
 				case *vss.Signature:
-					d.p.Reply(msg.Sender, msg.RequestNonce, peerSignMap[content.QueryId])
+					d.p.Reply(msg.Sender, msg.RequestNonce, peerSignMap[hashSignId(content.QueryId, content.Content)])
 				}
 			case msg := <-eventGrouping:
 				content, ok := msg.(*onchain.DOSProxyLogGrouping)
@@ -396,7 +396,6 @@ func (d *DosNode) listen() (err error) {
 				if d.isMember(content.DispatchedGroup) {
 					f := map[string]interface{}{
 						"LastSystemRandomness": fmt.Sprintf("%x", content.LastRandomness),
-						"DispatchedGroupId":    fmt.Sprintf("%x", content.DispatchedGroupId),
 						"DispatchedGroup_1":    fmt.Sprintf("%x", content.DispatchedGroup[0].Bytes()),
 						"DispatchedGroup_2":    fmt.Sprintf("%x", content.DispatchedGroup[1].Bytes()),
 						"DispatchedGroup_3":    fmt.Sprintf("%x", content.DispatchedGroup[2].Bytes()),
