@@ -248,6 +248,9 @@ func main() {
 }
 
 func query(counter int) {
+	if counter == 0 {
+		os.Exit(0)
+	}
 	fmt.Println("query counter ", counter)
 	f := map[string]interface{}{
 		"Removed": false}
