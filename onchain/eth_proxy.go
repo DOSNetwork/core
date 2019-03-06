@@ -367,7 +367,7 @@ func (e *EthAdaptor) DataReturn(ctx context.Context, signatures <-chan *vss.Sign
 				return
 			}
 			x, y := DecodeSig(signature.Signature)
-			requestId, _ := new(big.Int).SetString(signature.QueryId, 10)
+			requestId := new(big.Int).SetBytes(signature.RequestId)
 
 			result := make(chan Reply)
 			request := &ReqTriggerCallback{ctx, requestId, uint8(signature.Index), signature.Content, [2]*big.Int{x, y}, 0, e.s.TriggerCallback, result}
@@ -480,11 +480,12 @@ func (e *EthAdaptor) SubscribeEvent(subscribeType int, sink chan interface{}) ch
 					return
 				case i := <-transitChan:
 					sink <- &DOSProxyLogUpdateRandom{
-						LastRandomness:  i.LastRandomness,
-						DispatchedGroup: i.DispatchedGroup,
-						Tx:              i.Raw.TxHash.Hex(),
-						BlockN:          i.Raw.BlockNumber,
-						Removed:         i.Raw.Removed,
+						LastRandomness:    i.LastRandomness,
+						DispatchedGroupId: i.DispatchedGroupId,
+						DispatchedGroup:   i.DispatchedGroup,
+						Tx:                i.Raw.TxHash.Hex(),
+						BlockN:            i.Raw.BlockNumber,
+						Removed:           i.Raw.Removed,
 					}
 				}
 			}

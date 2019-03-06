@@ -3,7 +3,6 @@ package dosnode
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -154,9 +153,10 @@ func requestSign(
 	contentc <-chan []byte,
 	p p2p.P2PInterface,
 	nodeId []byte,
-	requestId string,
+	requestId []byte,
 	trafficType uint32,
-	id []byte) (<-chan *vss.Signature, <-chan error) {
+	id []byte,
+	nonce []byte) (<-chan *vss.Signature, <-chan error) {
 	out := make(chan *vss.Signature)
 	errc := make(chan error)
 	go func() {
@@ -171,16 +171,12 @@ func requestSign(
 			if r := bytes.Compare(nodeId, submitter); r != 0 {
 				return
 			}
-		case content, ok := <-contentc:
-			if !ok {
-				return
-			}
 			defer logger.TimeTrack(time.Now(), "RequestSign", map[string]interface{}{"RequestId": ctx.Value("RequestID")})
-
+			fmt.Println("requestSign nonce ", nonce)
 			sign := &vss.Signature{
-				Index:   trafficType,
-				QueryId: requestId,
-				Content: content,
+				Index:     trafficType,
+				RequestId: requestId,
+				Nonce:     nonce,
 			}
 
 			retryCount := 0
@@ -197,8 +193,6 @@ func requestSign(
 						return
 					default:
 					}
-				} else {
-					fmt.Println(err)
 				}
 				retryCount++
 			}
@@ -224,8 +218,9 @@ func genSign(
 	suite suites.Suite,
 	nodeID []byte,
 	pubkey [4]*big.Int,
-	requestId string,
-	index uint32) (<-chan *vss.Signature, <-chan error) {
+	requestId []byte,
+	index uint32,
+	nonce []byte) (<-chan *vss.Signature, <-chan error) {
 	out := make(chan *vss.Signature)
 	errc := make(chan error)
 	go func() {
@@ -256,7 +251,8 @@ func genSign(
 
 			sign := &vss.Signature{
 				Index:     index,
-				QueryId:   requestId,
+				RequestId: requestId,
+				Nonce:     nonce,
 				Content:   content,
 				Signature: sig,
 			}
@@ -285,8 +281,6 @@ func genUserRandom(
 	requestId []byte,
 	lastSysRand []byte,
 	userSeed []byte,
-	nodeId []byte,
-	peerSize int,
 ) <-chan []byte {
 	out := make(chan []byte)
 	go func() {
@@ -305,11 +299,6 @@ func genUserRandom(
 			random = append(random, submitter...)
 			select {
 			case out <- random:
-				if bytes.Compare(nodeId, submitter) == 0 {
-					for i := 0; i < peerSize; i++ {
-						out <- random
-					}
-				}
 			case <-ctx.Done():
 			}
 			return
@@ -325,8 +314,6 @@ func genSysRandom(
 	ctx context.Context,
 	submitterc <-chan []byte,
 	lastSysRand []byte,
-	nodeId []byte,
-	peerSize int,
 ) <-chan []byte {
 	out := make(chan []byte)
 	go func() {
@@ -344,11 +331,6 @@ func genSysRandom(
 			random := append(paddedLastSysRand, submitter...)
 			select {
 			case out <- random:
-				if bytes.Compare(nodeId, submitter) == 0 {
-					for i := 0; i < peerSize; i++ {
-						out <- random
-					}
-				}
 			case <-ctx.Done():
 			}
 			return
@@ -404,7 +386,7 @@ func dataParse(rawMsg []byte, pathStr string) (msg []byte, err error) {
 	return
 }
 
-func genQueryResult(ctx context.Context, submitterc chan []byte, url string, pathStr string, nodeId []byte, peerSize int) (<-chan []byte, chan error) {
+func genQueryResult(ctx context.Context, submitterc chan []byte, url string, pathStr string) (<-chan []byte, chan error) {
 	out := make(chan []byte)
 	errc := make(chan error)
 	go func() {
@@ -437,11 +419,6 @@ func genQueryResult(ctx context.Context, submitterc chan []byte, url string, pat
 			msgReturn = append(msgReturn, submitter...)
 			select {
 			case out <- msgReturn:
-				if bytes.Compare(nodeId, submitter) == 0 {
-					for i := 0; i < peerSize; i++ {
-						out <- msgReturn
-					}
-				}
 			case <-ctx.Done():
 			}
 			return
@@ -509,7 +486,7 @@ func recoverSign(ctx context.Context, signc <-chan *vss.Signature, suite suites.
 					select {
 					case out <- &vss.Signature{
 						Index:     sign.Index,
-						QueryId:   sign.QueryId,
+						RequestId: sign.RequestId,
 						Content:   queryResult,
 						Signature: sig,
 					}:
@@ -537,9 +514,4 @@ func padOrTrim(bb []byte, size int) []byte {
 	tmp := make([]byte, size)
 	copy(tmp[size-l:], bb)
 	return tmp
-}
-
-func hashSignId(queryId string, content []byte) string {
-	h := sha256.Sum256(append([]byte(queryId), content...))
-	return string(h[:])
 }

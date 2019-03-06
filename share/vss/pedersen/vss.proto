@@ -35,7 +35,8 @@ message PublicKeys {
 
 message Signature {
     uint32 index = 1;
-    string queryId = 2;
-    bytes content = 3;
-    bytes signature = 4;
+    bytes requestId = 2;
+	bytes nonce = 3;
+    bytes content = 4;
+    bytes signature = 5;
 }

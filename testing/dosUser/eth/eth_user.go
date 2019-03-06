@@ -46,7 +46,6 @@ func NewAMAUserSession(credentialPath, passphrase, addr string, gethUrls []strin
 		fmt.Println("NewETHProxySession ", err)
 		return
 	}
-	log.Init(key.Address.Bytes()[:])
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	defer cancelFunc()
@@ -84,9 +83,7 @@ func NewAMAUserSession(credentialPath, passphrase, addr string, gethUrls []strin
 	adaptor.ctx = ctxD
 	adaptor.cancel = cancelSession
 	adaptor.reqQueue = make(chan interface{})
-	if logger == nil {
-		logger = log.New("module", "EthUser")
-	}
+
 	return
 }
 
@@ -135,14 +132,6 @@ func (e *EthUserAdaptor) PollLogs(subscribeType int, sink chan interface{}, logB
 								BlockN:  logs.Event.Raw.BlockNumber,
 								Removed: logs.Event.Raw.Removed,
 							}
-							f := map[string]interface{}{
-								"RequestId": fmt.Sprintf("%x", logs.Event.QueryId),
-								"Message":   logs.Event.Result,
-								"Removed":   logs.Event.Raw.Removed,
-								"Tx":        logs.Event.Raw.TxHash.Hex(),
-								"BlockN":    logs.Event.Raw.BlockNumber,
-								"Time":      time.Now()}
-							logger.Event("EthUserQueryReady", f)
 						}
 					case SubscribeAskMeAnythingRequestSent:
 						logs, err := e.s.Contract.AskMeAnythingFilterer.FilterRequestSent(&bind.FilterOpts{
@@ -155,15 +144,6 @@ func (e *EthUserAdaptor) PollLogs(subscribeType int, sink chan interface{}, logB
 							return
 						}
 						for logs.Next() {
-							f := map[string]interface{}{
-								"Event":     "EthUserRequestSent",
-								"RequestId": fmt.Sprintf("%x", logs.Event.RequestId),
-								"Succ":      logs.Event.Succ,
-								"Removed":   logs.Event.Raw.Removed,
-								"Tx":        logs.Event.Raw.TxHash.Hex(),
-								"BlockN":    logs.Event.Raw.BlockNumber,
-								"Time":      time.Now()}
-							logger.Event("EthUserRequestSent", f)
 							sink <- &AskMeAnythingRequestSent{
 								InternalSerial: logs.Event.InternalSerial,
 								Succ:           logs.Event.Succ,
@@ -192,14 +172,6 @@ func (e *EthUserAdaptor) PollLogs(subscribeType int, sink chan interface{}, logB
 								BlockN:          logs.Event.Raw.BlockNumber,
 								Removed:         logs.Event.Raw.Removed,
 							}
-							f := map[string]interface{}{
-								"RequestId":       fmt.Sprintf("%x", logs.Event.RequestId),
-								"GeneratedRandom": fmt.Sprintf("%x", logs.Event.GeneratedRandom),
-								"Removed":         logs.Event.Raw.Removed,
-								"Tx":              logs.Event.Raw.TxHash.Hex(),
-								"BlockN":          logs.Event.Raw.BlockNumber,
-								"Time":            time.Now()}
-							logger.Event("EthUserRandomReady", f)
 						}
 					}
 				}

@@ -3,6 +3,7 @@ package dosnode
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -36,7 +37,7 @@ type DosNode struct {
 	logger      log.Logger
 	done        chan interface{}
 	cSignToPeer chan *vss.Signature
-	cPipCancel  chan string
+	cPipCancel  chan []byte
 	id          []byte
 }
 
@@ -140,7 +141,7 @@ func NewDosNode(credentialPath, passphrase string) (dosNode *DosNode, err error)
 		dkg:         p2pDkg,
 		done:        make(chan interface{}),
 		cSignToPeer: make(chan *vss.Signature, 50),
-		cPipCancel:  make(chan string),
+		cPipCancel:  make(chan []byte),
 		id:          id,
 	}
 	err = dosNode.Start()
@@ -172,7 +173,7 @@ func (d *DosNode) waitForGrouping(ctx context.Context, errc <-chan error) {
 	}
 }
 
-func (d *DosNode) waitForRequestDone(ctx context.Context, requestID string, errc <-chan error) {
+func (d *DosNode) waitForRequestDone(ctx context.Context, requestID []byte, errc <-chan error) {
 	defer logger.TimeTrack(time.Now(), "WaitForRequestDone", map[string]interface{}{"RequestId": ctx.Value("RequestID")})
 	for err := range errc {
 		if err != nil {
@@ -183,7 +184,7 @@ func (d *DosNode) waitForRequestDone(ctx context.Context, requestID string, errc
 
 }
 
-func (d *DosNode) buildPipeline(valueCtx context.Context, pubkey [4]*big.Int, requestID, lastRand, useSeed *big.Int, url, selector string, pType uint32) {
+func (d *DosNode) buildPipeline(valueCtx context.Context, pubkey [4]*big.Int, groupID, requestID, lastRand, useSeed *big.Int, url, selector string, pType uint32) {
 	defer logger.TimeTrack(time.Now(), "BuildPipeline", map[string]interface{}{"RequestId": valueCtx.Value("RequestID")})
 	var signShares []<-chan *vss.Signature
 	var errcList []<-chan error
@@ -191,9 +192,37 @@ func (d *DosNode) buildPipeline(valueCtx context.Context, pubkey [4]*big.Int, re
 	var cErr <-chan error
 	var cSign <-chan *vss.Signature
 	var cContent <-chan []byte
-
+	var nonce []byte
 	ids := d.dkg.GetGroupIDs(pubkey)
 	pubPoly := d.dkg.GetGroupPublicPoly(pubkey)
+
+	//Generate an unique id
+	switch pType {
+	case onchain.TrafficSystemRandom:
+		var bytes []byte
+		bytes = append(bytes, groupID.Bytes()...)
+		bytes = append(bytes, requestID.Bytes()...)
+		bytes = append(bytes, lastRand.Bytes()...)
+		nHash := sha256.Sum256(bytes)
+		nonce = nHash[:]
+	case onchain.TrafficUserRandom:
+		var bytes []byte
+		bytes = append(bytes, groupID.Bytes()...)
+		bytes = append(bytes, requestID.Bytes()...)
+		bytes = append(bytes, lastRand.Bytes()...)
+		bytes = append(bytes, useSeed.Bytes()...)
+		nHash := sha256.Sum256(bytes)
+		nonce = nHash[:]
+	case onchain.TrafficUserQuery:
+		var bytes []byte
+		bytes = append(bytes, groupID.Bytes()...)
+		bytes = append(bytes, requestID.Bytes()...)
+		bytes = append(bytes, lastRand.Bytes()...)
+		bytes = append(bytes, []byte(url)...)
+		bytes = append(bytes, []byte(selector)...)
+		nHash := sha256.Sum256(bytes)
+		nonce = nHash[:]
+	}
 
 	//Build a pipeline
 	cSubmitter, cErr = choseSubmitter(valueCtx, d.chain, lastRand, ids, len(ids))
@@ -201,22 +230,22 @@ func (d *DosNode) buildPipeline(valueCtx context.Context, pubkey [4]*big.Int, re
 
 	switch pType {
 	case onchain.TrafficSystemRandom:
-		cContent = genSysRandom(valueCtx, cSubmitter[0], lastRand.Bytes(), d.id, len(ids)-1)
+		cContent = genSysRandom(valueCtx, cSubmitter[0], lastRand.Bytes())
 	case onchain.TrafficUserRandom:
-		cContent = genUserRandom(valueCtx, cSubmitter[0], requestID.Bytes(), lastRand.Bytes(), useSeed.Bytes(), d.id, len(ids)-1)
+		cContent = genUserRandom(valueCtx, cSubmitter[0], requestID.Bytes(), lastRand.Bytes(), useSeed.Bytes())
 	case onchain.TrafficUserQuery:
-		cContent, cErr = genQueryResult(valueCtx, cSubmitter[0], url, selector, d.id, len(ids)-1)
+		cContent, cErr = genQueryResult(valueCtx, cSubmitter[0], url, selector)
 		errcList = append(errcList, cErr)
 	}
 
-	cSign, cErr = genSign(valueCtx, cContent, d.cSignToPeer, d.dkg, d.suite, d.id, pubkey, requestID.String(), pType)
+	cSign, cErr = genSign(valueCtx, cContent, d.cSignToPeer, d.dkg, d.suite, d.id, pubkey, requestID.Bytes(), pType, nonce)
 	errcList = append(errcList, cErr)
 
 	signShares = append(signShares, cSign)
 	idx := 1
 	for _, id := range ids {
 		if r := bytes.Compare(d.id, id); r != 0 {
-			cSign, cErr = requestSign(valueCtx, cSubmitter[idx], cContent, d.p, d.id, requestID.String(), pType, id)
+			cSign, cErr = requestSign(valueCtx, cSubmitter[idx], cContent, d.p, d.id, requestID.Bytes(), pType, id, nonce)
 			signShares = append(signShares, cSign)
 			errcList = append(errcList, cErr)
 			idx++
@@ -235,7 +264,7 @@ func (d *DosNode) buildPipeline(valueCtx context.Context, pubkey [4]*big.Int, re
 	errcList = append(errcList, cErr)
 	errc := mergeErrors(valueCtx, errcList...)
 
-	go d.waitForRequestDone(valueCtx, requestID.String(), errc)
+	go d.waitForRequestDone(valueCtx, requestID.Bytes(), errc)
 
 }
 
@@ -306,6 +335,8 @@ func (d *DosNode) listen() (err error) {
 					}
 				}
 			case requestID := <-d.cPipCancel:
+				_ = requestID
+			/*
 				if pipeCancel[requestID] != nil {
 					a, _ := new(big.Int).SetString(requestID, 10)
 					f := map[string]interface{}{"RequestId": fmt.Sprintf("%x", a)}
@@ -313,14 +344,18 @@ func (d *DosNode) listen() (err error) {
 
 					pipeCancel[requestID]()
 					delete(pipeCancel, requestID)
-				}
+				}*/
 			case msg := <-d.cSignToPeer:
-				peerSignMap[hashSignId(msg.QueryId, msg.Content)] = msg
-
+				peerSignMap[string(msg.Nonce)] = msg
+				fmt.Println("Save nonce ", msg.Nonce)
 			case msg := <-peerEvent:
 				switch content := msg.Msg.Message.(type) {
 				case *vss.Signature:
-					d.p.Reply(msg.Sender, msg.RequestNonce, peerSignMap[hashSignId(content.QueryId, content.Content)])
+					fmt.Println("Ask for nonce ", content.Nonce)
+					if peerSignMap[string(content.Nonce)] != nil {
+						fmt.Println("Got Sign ", peerSignMap[string(content.Nonce)].RequestId)
+					}
+					d.p.Reply(msg.Sender, msg.RequestNonce, peerSignMap[string(content.Nonce)])
 				}
 			case msg := <-eventGrouping:
 				content, ok := msg.(*onchain.DOSProxyLogGrouping)
@@ -396,6 +431,7 @@ func (d *DosNode) listen() (err error) {
 				if d.isMember(content.DispatchedGroup) {
 					f := map[string]interface{}{
 						"LastSystemRandomness": fmt.Sprintf("%x", content.LastRandomness),
+						"DispatchedGroupId":    fmt.Sprintf("%x", content.DispatchedGroupId.Bytes()),
 						"DispatchedGroup_1":    fmt.Sprintf("%x", content.DispatchedGroup[0].Bytes()),
 						"DispatchedGroup_2":    fmt.Sprintf("%x", content.DispatchedGroup[1].Bytes()),
 						"DispatchedGroup_3":    fmt.Sprintf("%x", content.DispatchedGroup[2].Bytes()),
@@ -416,7 +452,7 @@ func (d *DosNode) listen() (err error) {
 						ctx, cancelFunc := context.WithCancel(context.Background())
 						valueCtx := context.WithValue(ctx, "RequestID", fmt.Sprintf("%x", content.LastRandomness))
 						pipeCancel[requestID] = cancelFunc
-						d.buildPipeline(valueCtx, content.DispatchedGroup, content.LastRandomness, content.LastRandomness, nil, "", "", uint32(onchain.TrafficSystemRandom))
+						d.buildPipeline(valueCtx, content.DispatchedGroup, content.DispatchedGroupId, content.LastRandomness, content.LastRandomness, nil, "", "", uint32(onchain.TrafficSystemRandom))
 					}
 				}
 			case msg := <-chUsrRandom:
@@ -450,7 +486,7 @@ func (d *DosNode) listen() (err error) {
 						ctx, cancelFunc := context.WithCancel(context.Background())
 						valueCtx := context.WithValue(ctx, "RequestID", fmt.Sprintf("%x", content.RequestId))
 						pipeCancel[requestID] = cancelFunc
-						d.buildPipeline(valueCtx, content.DispatchedGroup, content.RequestId, content.LastSystemRandomness, content.UserSeed, "", "", uint32(onchain.TrafficUserRandom))
+						d.buildPipeline(valueCtx, content.DispatchedGroup, content.DispatchedGroupId, content.RequestId, content.LastSystemRandomness, content.UserSeed, "", "", uint32(onchain.TrafficUserRandom))
 					}
 				}
 			case msg := <-chUrl:
@@ -487,7 +523,7 @@ func (d *DosNode) listen() (err error) {
 						ctx, cancelFunc := context.WithCancel(context.Background())
 						valueCtx := context.WithValue(ctx, "RequestID", fmt.Sprintf("%x", content.QueryId))
 						pipeCancel[requestID] = cancelFunc
-						d.buildPipeline(valueCtx, content.DispatchedGroup, content.QueryId, content.Randomness, nil, content.DataSource, content.Selector, uint32(onchain.TrafficUserQuery))
+						d.buildPipeline(valueCtx, content.DispatchedGroup, content.DispatchedGroupId, content.QueryId, content.Randomness, nil, content.DataSource, content.Selector, uint32(onchain.TrafficUserQuery))
 					}
 				}
 			case msg := <-eventValidation:
