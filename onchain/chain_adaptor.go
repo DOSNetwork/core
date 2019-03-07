@@ -23,6 +23,7 @@ type ProxyAdapter interface {
 	SubscribeEvent(subscribeType int, sink chan interface{}) chan error
 	PollLogs(subscribeType int, sink chan interface{}) <-chan error
 
+	GetWorkingGroupSize() (size uint64)
 	LastUpdatedBlock() (blknum uint64, err error)
 	GroupPubKey(idx int) (groupPubKeys [4]*big.Int, err error)
 

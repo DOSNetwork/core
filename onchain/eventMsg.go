@@ -4,6 +4,7 @@ import (
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 )
 
 //TODO: MAKE IT A UNIVERSAL INTERFACE FOR ALL KIND OF CHAINS IN FUTURE
@@ -30,6 +31,7 @@ type DOSProxyLogRequestUserRandom struct {
 	Tx                   string
 	BlockN               uint64
 	Removed              bool
+	Raw                  types.Log
 }
 
 type DOSProxyLogNonSupportedType struct {
@@ -67,6 +69,7 @@ type DOSProxyLogValidationResult struct {
 	Tx          string
 	BlockN      uint64
 	Removed     bool
+	Raw         types.Log
 }
 
 type DOSProxyLogInsufficientWorkingGroup struct {
@@ -126,6 +129,12 @@ type DOSProxyLogPublicKeyUploaded struct {
 type DOSProxyLogGroupDismiss struct {
 	GroupId *big.Int
 	PubKey  [4]*big.Int
+	Removed bool
+	BlockN  uint64
+	Tx      string
+}
+
+type DOSProxyLogNoWorkingGroup struct {
 	Removed bool
 	BlockN  uint64
 	Tx      string

@@ -32,6 +32,7 @@ const (
 	SubscribeDOSProxyLogGroupDismiss
 	SubscribeDOSProxyLogInsufficientPendingNode
 	SubscribeDOSProxyLogInsufficientWorkingGroup
+	SubscribeDOSProxyLogNoWorkingGroup
 )
 
 var logger log.Logger
@@ -44,7 +45,7 @@ const (
 )
 
 const (
-	LogBlockDiff        = 2
+	LogBlockDiff        = 5
 	LogCheckingInterval = 15 //in second
 	SubscribeTimeout    = 60 //in second
 )
@@ -108,14 +109,18 @@ type Reply struct {
 
 func NewETHProxySession(credentialPath, passphrase, proxyAddr string, gethUrls []string) (adaptor *EthAdaptor, err error) {
 
-	if logger == nil {
-		logger = log.New("module", "EthProxy")
-	}
-
 	key, err := ReadEthKey(credentialPath, passphrase)
 	if err != nil {
 		logger.Error(err)
 		return
+	}
+	log.Init(key.Address.Bytes()[:])
+
+	//log.Init(key.Address.Bytes()[:])
+	//Init log module with nodeID that is an onchain account address
+	log.Init(key.Address.Bytes()[:])
+	if logger == nil {
+		logger = log.New("module", "EthProxy")
 	}
 
 	clients, errs := DialToEth(context.Background(), gethUrls)
@@ -266,11 +271,19 @@ func (e *EthAdaptor) sendRequest(ctx context.Context, request interface{}, resul
 						strings.Contains(err.Error(), "use of closed network connection") {
 						errc <- err
 						return
+					} else {
+						logger.Error(err)
+						f := map[string]interface{}{
+							"ErrMsg": err.Error(),
+							"Time":   time.Now()}
+						logger.Event("SendRequestFail", f)
 					}
 					continue
 				}
+				defer logger.TimeTrack(time.Now(), "SendRequest", map[string]interface{}{"RequestId": ctx.Value("RequestID"), "Tx": fmt.Sprintf("%x", tx.Hash())})
 				err = CheckTransaction(e.c, tx)
 				if err != nil {
+					logger.Error(err)
 					if err.Error() == "client is closed" ||
 						err.Error() == "EOF" ||
 						strings.Contains(err.Error(), "connection refused") ||
@@ -278,6 +291,13 @@ func (e *EthAdaptor) sendRequest(ctx context.Context, request interface{}, resul
 						strings.Contains(err.Error(), "transaction failed") {
 						errc <- err
 						return
+					} else {
+						logger.Error(err)
+						f := map[string]interface{}{
+							"Tx":     tx,
+							"ErrMsg": err.Error(),
+							"Time":   time.Now()}
+						logger.Event("TransactionFail", f)
 					}
 					continue
 				}
@@ -291,6 +311,8 @@ func (e *EthAdaptor) sendRequest(ctx context.Context, request interface{}, resul
 }
 
 func (e *EthAdaptor) RegisterNewNode(ctx context.Context) (errc <-chan error) {
+	defer logger.TimeTrack(time.Now(), "RegisterNewNode", nil)
+	fmt.Println("RegisterNewNode")
 	result := make(chan Reply)
 	request := &Request{ctx, e.s.RegisterNewNode, result}
 	return e.sendRequest(ctx, request, result)
@@ -366,6 +388,8 @@ func (e *EthAdaptor) DataReturn(ctx context.Context, signatures <-chan *vss.Sign
 			if !ok {
 				return
 			}
+			defer logger.TimeTrack(time.Now(), "DataReturn", map[string]interface{}{"RequestId": ctx.Value("RequestID")})
+
 			x, y := DecodeSig(signature.Signature)
 			requestId := new(big.Int).SetBytes(signature.RequestId)
 
@@ -445,6 +469,55 @@ func (e *EthAdaptor) PollLogs(subscribeType int, sink chan interface{}) <-chan e
 								Tx:      logs.Event.Raw.TxHash.Hex(),
 								BlockN:  logs.Event.Raw.BlockNumber,
 								Removed: logs.Event.Raw.Removed,
+							}
+						}
+					case SubscribeDOSProxyLogRequestUserRandom:
+						logs, err := e.s.Contract.DOSProxyFilterer.FilterLogRequestUserRandom(&bind.FilterOpts{
+							Start:   targetBlockN,
+							End:     &targetBlockN,
+							Context: e.ctx,
+						})
+						if err != nil {
+							errc <- err
+							return
+						}
+						for logs.Next() {
+							sink <- &DOSProxyLogRequestUserRandom{
+								RequestId:            logs.Event.RequestId,
+								LastSystemRandomness: logs.Event.LastSystemRandomness,
+								UserSeed:             logs.Event.UserSeed,
+								DispatchedGroupId:    logs.Event.DispatchedGroupId,
+								DispatchedGroup:      logs.Event.DispatchedGroup,
+								Tx:                   logs.Event.Raw.TxHash.Hex(),
+								BlockN:               logs.Event.Raw.BlockNumber,
+								Removed:              logs.Event.Raw.Removed,
+								Raw:                  logs.Event.Raw,
+							}
+						}
+					case SubscribeDOSProxyLogValidationResult:
+						logs, err := e.s.Contract.DOSProxyFilterer.FilterLogValidationResult(&bind.FilterOpts{
+							Start:   targetBlockN,
+							End:     &targetBlockN,
+							Context: e.ctx,
+						})
+						if err != nil {
+							errc <- err
+							return
+						}
+						for logs.Next() {
+							sink <- &DOSProxyLogValidationResult{
+								TrafficType: logs.Event.TrafficType,
+								TrafficId:   logs.Event.TrafficId,
+								Message:     logs.Event.Message,
+								Signature:   logs.Event.Signature,
+								PubKey:      logs.Event.PubKey,
+								GroupId:     logs.Event.GroupId,
+								Pass:        logs.Event.Pass,
+								Version:     logs.Event.Version,
+								Tx:          logs.Event.Raw.TxHash.Hex(),
+								BlockN:      logs.Event.Raw.BlockNumber,
+								Removed:     logs.Event.Raw.Removed,
+								Raw:         logs.Event.Raw,
 							}
 						}
 					}
@@ -550,6 +623,7 @@ func (e *EthAdaptor) SubscribeEvent(subscribeType int, sink chan interface{}) ch
 						Tx:                   i.Raw.TxHash.Hex(),
 						BlockN:               i.Raw.BlockNumber,
 						Removed:              i.Raw.Removed,
+						Raw:                  i.Raw,
 					}
 				}
 			}
@@ -584,6 +658,7 @@ func (e *EthAdaptor) SubscribeEvent(subscribeType int, sink chan interface{}) ch
 						Tx:          i.Raw.TxHash.Hex(),
 						BlockN:      i.Raw.BlockNumber,
 						Removed:     i.Raw.Removed,
+						Raw:         i.Raw,
 					}
 				}
 			}
@@ -615,13 +690,47 @@ func (e *EthAdaptor) SubscribeEvent(subscribeType int, sink chan interface{}) ch
 				}
 			}
 		}()
-	case SubscribeDOSProxyLogInsufficientWorkingGroup:
+	case SubscribeDOSProxyLogNoWorkingGroup:
+		go func() {
+			transitChan := make(chan *dosproxy.DOSProxyLogNoWorkingGroup)
+			defer close(transitChan)
+			defer close(errc)
+			sub, err := e.s.Contract.DOSProxyFilterer.WatchLogNoWorkingGroup(e.wOpts, transitChan)
+			if err != nil {
+				return
+			}
+			for {
+				select {
+				case <-e.ctx.Done():
+					sub.Unsubscribe()
+					return
+				case err := <-sub.Err():
+					errc <- err
+					return
+				case i := <-transitChan:
+					sink <- &DOSProxyLogNoWorkingGroup{
+						Tx:      i.Raw.TxHash.Hex(),
+						BlockN:  i.Raw.BlockNumber,
+						Removed: i.Raw.Removed,
+					}
+				}
+			}
+		}()
 	}
 	return errc
 }
 
 func (e *EthAdaptor) LastRandomness() (rand *big.Int, err error) {
 	rand, err = e.s.LastRandomness()
+	return
+}
+
+func (e *EthAdaptor) GetWorkingGroupSize() (size uint64) {
+	sizeBig, err := e.s.GetWorkingGroupSize()
+	if err != nil {
+		size = 999
+	}
+	size = sizeBig.Uint64()
 	return
 }
 
