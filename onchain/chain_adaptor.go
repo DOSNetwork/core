@@ -30,6 +30,9 @@ type ProxyAdapter interface {
 	GetBalance() (balance *big.Float)
 	Address() (addr []byte)
 	CurrentBlock() (blknum uint64, err error)
+
+	BootStrap() error
+	ResetContract() error
 }
 
 func NewProxyAdapter(ChainType, credentialPath, passphrase, proxyAddr string, urls []string) (ProxyAdapter, error) {

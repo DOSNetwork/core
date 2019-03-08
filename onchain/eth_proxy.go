@@ -176,7 +176,7 @@ func NewEthAdaptor(credentialPath, passphrase, proxyAddr string, gethUrls []stri
 	if len(adaptor.rProxies) == 0 {
 		adaptor.wClient.Close()
 		err = errors.New("No any working eth client for event tracking")
-		return
+		//return
 	}
 
 	adaptor.reqLoop()
@@ -765,7 +765,7 @@ func (e *EthAdaptor) PollLogs(subscribeType int, LogBlockDiff, preBlockBuf uint6
 				currentBlockN, err := GetCurrentBlock(e.wClient)
 				if err != nil {
 					errc <- err
-					return
+					continue
 				}
 				for ; currentBlockN-LogBlockDiff >= targetBlockN; targetBlockN++ {
 					switch subscribeType {
@@ -777,7 +777,7 @@ func (e *EthAdaptor) PollLogs(subscribeType int, LogBlockDiff, preBlockBuf uint6
 						})
 						if err != nil {
 							errc <- err
-							return
+							continue
 						}
 						for logs.Next() {
 							sink <- &DOSProxyLogGrouping{
@@ -797,7 +797,7 @@ func (e *EthAdaptor) PollLogs(subscribeType int, LogBlockDiff, preBlockBuf uint6
 						})
 						if err != nil {
 							errc <- err
-							return
+							continue
 						}
 						for logs.Next() {
 							sink <- &DOSProxyLogGroupDismiss{
@@ -817,7 +817,7 @@ func (e *EthAdaptor) PollLogs(subscribeType int, LogBlockDiff, preBlockBuf uint6
 						})
 						if err != nil {
 							errc <- err
-							return
+							continue
 						}
 						for logs.Next() {
 							sink <- &DOSProxyLogUpdateRandom{
@@ -838,7 +838,7 @@ func (e *EthAdaptor) PollLogs(subscribeType int, LogBlockDiff, preBlockBuf uint6
 						})
 						if err != nil {
 							errc <- err
-							return
+							continue
 						}
 						for logs.Next() {
 							sink <- &DOSProxyLogRequestUserRandom{
@@ -861,7 +861,7 @@ func (e *EthAdaptor) PollLogs(subscribeType int, LogBlockDiff, preBlockBuf uint6
 						})
 						if err != nil {
 							errc <- err
-							return
+							continue
 						}
 						for logs.Next() {
 							sink <- &DOSProxyLogUrl{
@@ -886,7 +886,7 @@ func (e *EthAdaptor) PollLogs(subscribeType int, LogBlockDiff, preBlockBuf uint6
 						})
 						if err != nil {
 							errc <- err
-							return
+							continue
 						}
 						for logs.Next() {
 							sink <- &DOSProxyLogValidationResult{
@@ -904,29 +904,6 @@ func (e *EthAdaptor) PollLogs(subscribeType int, LogBlockDiff, preBlockBuf uint6
 								Raw:         logs.Event.Raw,
 							}
 						}
-						/*
-							 case SubscribeDOSProxyLogNoWorkingGroup:
-								 transitChan := make(chan *dosproxy.DOSProxyLogNoWorkingGroup)
-								 defer close(transitChan)
-								 defer close(errc)
-								 defer close(sink)
-								 logs, err := e.wProxy.Contract.DOSProxyFilterer.FilterLogNoWorkingGroup(&bind.FilterOpts{
-									 Start:   targetBlockN,
-									 End:     &targetBlockN,
-									 Context: e.wCtx,
-								 })
-								 if err != nil {
-									 return
-								 }
-								 for logs.Next() {
-									 sink <- &DOSProxyLogNoWorkingGroup{
-										 Raw:     logs.Event.Raw,
-										 Tx:      logs.Event.Raw.TxHash.Hex(),
-										 BlockN:  logs.Event.Raw.BlockNumber,
-										 Removed: logs.Event.Raw.Removed,
-									 }
-								 }
-						*/
 					}
 				}
 				timer.Reset(LogCheckingInterval * time.Second)
@@ -969,6 +946,20 @@ func (e *EthAdaptor) LastUpdatedBlock() (blknum uint64, err error) {
 
 func (e *EthAdaptor) GroupPubKey(idx int) (groupPubKeys [4]*big.Int, err error) {
 	return e.wProxy.GetGroupPubKey(big.NewInt(int64(idx)))
+}
+
+func (e *EthAdaptor) BootStrap() error {
+	result := make(chan Reply)
+	request := &Request{e.wCtx, e.wProxy.BootStrap, result}
+	errc := e.sendRequest(e.wCtx, request, result)
+	return <-errc
+}
+
+func (e *EthAdaptor) ResetContract() error {
+	result := make(chan Reply)
+	request := &Request{e.wCtx, e.wProxy.ResetContract, result}
+	errc := e.sendRequest(e.wCtx, request, result)
+	return <-errc
 }
 
 func (e *EthAdaptor) CurrentBlock() (blknum uint64, err error) {

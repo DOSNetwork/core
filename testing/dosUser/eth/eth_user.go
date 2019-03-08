@@ -109,7 +109,7 @@ func (e *EthUserAdaptor) PollLogs(subscribeType int, sink chan interface{}, logB
 				if err != nil {
 					fmt.Println("PollLogs ", err)
 					errc <- err
-					return
+					continue
 				}
 				for ; currentBlockN-logBlockDiff >= targetBlockN; targetBlockN++ {
 					switch subscribeType {
@@ -122,7 +122,7 @@ func (e *EthUserAdaptor) PollLogs(subscribeType int, sink chan interface{}, logB
 						if err != nil {
 							fmt.Println("PollLogs ", err)
 							errc <- err
-							return
+							continue
 						}
 						for logs.Next() {
 							sink <- &AskMeAnythingQueryResponseReady{
@@ -141,7 +141,7 @@ func (e *EthUserAdaptor) PollLogs(subscribeType int, sink chan interface{}, logB
 						}, []common.Address{e.Address()})
 						if err != nil {
 							errc <- err
-							return
+							continue
 						}
 						for logs.Next() {
 							sink <- &AskMeAnythingRequestSent{
@@ -162,7 +162,7 @@ func (e *EthUserAdaptor) PollLogs(subscribeType int, sink chan interface{}, logB
 						if err != nil {
 							fmt.Println("PollLogs ", err)
 							errc <- err
-							return
+							continue
 						}
 						for logs.Next() {
 							sink <- &AskMeAnythingRandomReady{

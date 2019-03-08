@@ -154,6 +154,19 @@ func (c *Config) overWrite() (err error) {
 		} else {
 			config.RemoteNodeAddress = config.RemoteNodeAddressPool[0]
 		}
+		gethIP := os.Getenv("GETHIP")
+		if gethIP != "" {
+			config.RemoteNodeAddressPool = append(config.RemoteNodeAddressPool, "ws://"+gethIP+":8546")
+		}
+		gethIP2 := os.Getenv("GETHIP2")
+		if gethIP != "" {
+			config.RemoteNodeAddressPool = append(config.RemoteNodeAddressPool, "ws://"+gethIP2+":8546")
+		}
+		gethIP3 := os.Getenv("GETHIP3")
+		if gethIP3 != "" {
+			config.RemoteNodeAddressPool = append(config.RemoteNodeAddressPool, "ws://"+gethIP3+":8546")
+		}
+		fmt.Println("config.RemoteNodeAddressPool ", config.RemoteNodeAddressPool)
 		c.ChainConfigs[c.currentType][c.currentNode] = config
 	}
 

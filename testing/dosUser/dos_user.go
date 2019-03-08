@@ -225,7 +225,7 @@ func main() {
 				case *eth.AskMeAnythingRandomReady:
 					requestId := fmt.Sprintf("%x", i.RequestId)
 					f := map[string]interface{}{
-						"RequestId":       fmt.Sprintf("%x", requestId),
+						"RequestId":       requestId,
 						"GeneratedRandom": fmt.Sprintf("%x", i.GeneratedRandom),
 						"Removed":         i.Removed}
 					logger.Event("AMARandomReady", f)

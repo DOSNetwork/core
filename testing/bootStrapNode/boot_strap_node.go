@@ -9,6 +9,7 @@ import (
 	"os"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/gorilla/mux"
 
@@ -20,7 +21,7 @@ import (
 
 var (
 	lock            sync.Mutex
-	credentialIndex = 0
+	credentialIndex = 50
 )
 var adaptor onchain.ProxyAdapter
 
@@ -44,18 +45,22 @@ func main() {
 	if workingDir == "/" {
 		workingDir = "."
 	}
-	credentialPath := workingDir + "/testAccounts/bootCredential/fundKey"
+	credentialPath := workingDir + "/testAccounts/bootCredential"
 	//Set up an onchain adapter
 	chainConfig := config.GetChainConfig()
+	fmt.Println("chainConfig.RemoteNodeAddressPool", chainConfig.RemoteNodeAddressPool)
 	adaptor, err = onchain.NewProxyAdapter(config.GetCurrentType(), credentialPath, passphrase, chainConfig.DOSProxyAddress, chainConfig.RemoteNodeAddressPool)
 	if err != nil {
-		return
+		fmt.Println(err)
+		//return
 	}
 	id := adaptor.Address()
 	//Init log module with nodeID that is an onchain account address
 	log.Init(id[:])
 	//ctx, _ := context.WithCancel(context.Background())
-	//errc := adaptor.ResetNodeIDs(ctx)
+	err = adaptor.ResetContract()
+	fmt.Println("ResetContract ", err)
+
 	//<-errc
 	//errc = adaptor.Grouping(ctx, config.GetRandomGroupSize())
 	//<-errc
@@ -94,7 +99,17 @@ func getCredential(w http.ResponseWriter, r *http.Request) {
 	if _, err := fmt.Fprintf(w, strconv.Itoa(credentialIndex)); err != nil {
 		fmt.Println(err)
 	}
+	go func() {
+		if credentialIndex == 68 {
+			fmt.Println("!!!!!!!!!!!!!!start BootStrap ")
+			time.Sleep(300 * time.Second)
+
+			err := adaptor.BootStrap()
+			fmt.Println("BootStrap ", err)
+		}
+	}()
 	lock.Unlock()
+
 }
 
 func hasGroupPubkey(w http.ResponseWriter, r *http.Request) {

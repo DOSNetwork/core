@@ -1,7 +1,72 @@
 version: '3'
 services:
+ geth1:
+   image: ethereum/client-go
+   ports:
+      - "8545:8545"
+   command:
+     --rpc
+     --rpcaddr 0.0.0.0
+     --ws
+     --wsaddr 0.0.0.0
+     --wsorigins '*'
+     --rinkeby
+ geth2:
+   image: ethereum/client-go
+   command:
+     --rpc
+     --rpcaddr 0.0.0.0
+     --ws
+     --wsaddr 0.0.0.0
+     --wsorigins '*'
+     --rinkeby
+ geth3:
+   image: ethereum/client-go
+   command:
+     --rpc
+     --rpcaddr 0.0.0.0
+     --ws
+     --wsaddr 0.0.0.0
+     --wsorigins '*'
+     --rinkeby
+ geth4:
+   image: ethereum/client-go
+   ports:
+      - "8545:8545"
+   command:
+     --rpc
+     --rpcaddr 0.0.0.0
+     --ws
+     --wsaddr 0.0.0.0
+     --wsorigins '*'
+     --rinkeby
+ geth5:
+   image: ethereum/client-go
+   command:
+     --rpc
+     --rpcaddr 0.0.0.0
+     --ws
+     --wsaddr 0.0.0.0
+     --wsorigins '*'
+     --rinkeby
+ geth6:
+   image: ethereum/client-go
+   command:
+     --rpc
+     --rpcaddr 0.0.0.0
+     --ws
+     --wsaddr 0.0.0.0
+     --wsorigins '*'
+     --rinkeby
  bootstrap:
    image: bootstrap
+   depends_on:
+     - geth1
+     - geth2
+     - geth3
+     - geth4
+     - geth5
+     - geth6
    deploy:
      replicas: 1
    environment:
@@ -39,6 +104,27 @@ services:
      - BOOTSTRAPIP=bootstrap:44460
      - RANDOMCONNECT=true
      - PASSPHRASE=
+     - GETHIP=geth1
+     - GETHIP2=geth2
+     - GETHIP3=geth3
+ dosnode2:
+   image: dosnode
+   depends_on:
+     - bootstrap
+   deploy:
+     replicas: 3
+   environment:
+     - APPSESSION=Beta
+     - APPNAME=DosNode
+     - LOGIP=163.172.36.173:9500
+     - NODEROLE=testNode
+     - CHAINNODE=rinkebyPrivateNode
+     - BOOTSTRAPIP=bootstrap:44460
+     - RANDOMCONNECT=true
+     - PASSPHRASE=
+     - GETHIP=geth4
+     - GETHIP2=geth5
+     - GETHIP3=geth6
  randomnode:
    image: usernode
    deploy:
