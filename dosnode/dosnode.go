@@ -144,6 +144,8 @@ func NewDosNode(credentialPath, passphrase string) (dosNode *DosNode, err error)
 		id:          id,
 	}
 	err = dosNode.Start()
+	delay := 15 * rand.Intn(10)
+	time.Sleep(time.Duration(delay) * time.Second)
 	ctx, _ := context.WithCancel(context.Background())
 	errc := dosNode.chain.RegisterNewNode(ctx)
 	<-errc
@@ -268,8 +270,7 @@ func (d *DosNode) buildPipeline(valueCtx context.Context, pubkey [4]*big.Int, gr
 }
 
 func (d *DosNode) listen() (err error) {
-	eventGrouping := make(chan interface{})
-	eventGroupDismiss := make(chan interface{})
+
 	chUrl := make(chan interface{})
 	chRandom := make(chan interface{})
 	chUsrRandom := make(chan interface{})
@@ -279,23 +280,18 @@ func (d *DosNode) listen() (err error) {
 	noworkinggroup := make(chan interface{})
 
 	var errcList []<-chan error
-	errc := d.chain.PollLogs(onchain.SubscribeDOSProxyLogGrouping, eventGrouping)
+	eventGrouping, errc := d.chain.PollLogs(onchain.SubscribeDOSProxyLogGrouping, 10, 0)
 	errcList = append(errcList, errc)
-	errc = d.chain.PollLogs(onchain.SubscribeDOSProxyLogGroupDismiss, eventGroupDismiss)
+	eventGroupDismiss, errc := d.chain.PollLogs(onchain.SubscribeDOSProxyLogGroupDismiss, 10, 0)
 	errcList = append(errcList, errc)
-	errc = d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogUrl, chUrl)
-	errcList = append(errcList, errc)
-	errc = d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogUpdateRandom, chRandom)
-	errcList = append(errcList, errc)
-	errc = d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogRequestUserRandom, chUsrRandom)
-	errcList = append(errcList, errc)
-	errc = d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogValidationResult, eventValidation)
-	errcList = append(errcList, errc)
-	errc = d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogPublicKeyAccepted, keyAccepted)
-	errcList = append(errcList, errc)
-	errc = d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogNoWorkingGroup, noworkinggroup)
-	errcList = append(errcList, errc)
-	errc = mergeErrors(context.Background(), errcList...)
+	//errc = mergeErrors(context.Background(), errcList...)
+
+	d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogUrl, chUrl)
+	d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogUpdateRandom, chRandom)
+	d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogRequestUserRandom, chUsrRandom)
+	d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogValidationResult, eventValidation)
+	d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogPublicKeyAccepted, keyAccepted)
+	d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogNoWorkingGroup, noworkinggroup)
 
 	peerEvent, err := d.p.SubscribeEvent(50, vss.Signature{})
 
@@ -426,7 +422,7 @@ func (d *DosNode) listen() (err error) {
 					ctx, _ := context.WithCancel(context.Background())
 					go func() {
 						delay := 15 * rand.Intn(10)
-						time.Sleep(time.Duration(delay) * time.Microsecond)
+						time.Sleep(time.Duration(delay) * time.Second)
 						errc := d.chain.RegisterNewNode(ctx)
 						err := <-errc
 						if err != nil {

@@ -20,6 +20,7 @@ type DOSProxyLogUrl struct {
 	Tx                string
 	BlockN            uint64
 	Removed           bool
+	Raw               types.Log
 }
 
 type DOSProxyLogRequestUserRandom struct {
@@ -55,6 +56,7 @@ type DOSProxyLogUpdateRandom struct {
 	Tx                string
 	BlockN            uint64
 	Removed           bool
+	Raw               types.Log
 }
 
 type DOSProxyLogValidationResult struct {
@@ -92,6 +94,7 @@ type DOSProxyLogGrouping struct {
 	Removed bool
 	BlockN  uint64
 	Tx      string
+	Raw     types.Log
 }
 
 type DOSProxyLogDuplicatePubKey struct {
@@ -132,9 +135,11 @@ type DOSProxyLogGroupDismiss struct {
 	Removed bool
 	BlockN  uint64
 	Tx      string
+	Raw     types.Log
 }
 
 type DOSProxyLogNoWorkingGroup struct {
+	Raw     types.Log
 	Removed bool
 	BlockN  uint64
 	Tx      string

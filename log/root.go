@@ -18,7 +18,7 @@ var (
 
 func New(key string, value interface{}) Logger {
 	if root == nil {
-		fmt.Println("root nit")
+		fmt.Println("no root")
 	}
 	return root.New(key, value)
 }
@@ -42,12 +42,14 @@ func Init(id []byte) {
 	logrus.SetOutput(ioutil.Discard)
 	logrus.SetFormatter(UTCFormatter{&logrus.JSONFormatter{}})
 	//IP,Subject and appName should read from environment variables
-	hook, err := logrustash.NewHook("tcp", logIp, appSession)
-	if err != nil {
-		fmt.Println(err)
-		logrus.Error(err)
+	if logIp != "" {
+		hook, err := logrustash.NewHook("tcp", logIp, appSession)
+		if err != nil {
+			fmt.Println(err)
+			logrus.Error(err)
+		}
+		logrus.AddHook(hook)
 	}
-	logrus.AddHook(hook)
 	root.entry = logrus.WithFields(logrus.Fields{
 		"appSession": appSession,
 		"appName":    appName,
@@ -93,7 +95,9 @@ func Warn(msg string) {
 }
 
 func Error(err error) {
-	root.Error(err)
+	if root != nil {
+		root.Error(err)
+	}
 }
 
 func Fatal(err error) {

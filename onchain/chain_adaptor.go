@@ -20,8 +20,8 @@ type ProxyAdapter interface {
 	SetRandomNum(ctx context.Context, signatures <-chan *vss.Signature) (errc chan error)
 	DataReturn(ctx context.Context, signatures <-chan *vss.Signature) (errc chan error)
 
-	SubscribeEvent(subscribeType int, sink chan interface{}) chan error
-	PollLogs(subscribeType int, sink chan interface{}) <-chan error
+	SubscribeEvent(subscribeType int, sink chan interface{})
+	PollLogs(subscribeType int, LogBlockDiff, duration uint64) (chan interface{}, chan error)
 
 	GetWorkingGroupSize() (size uint64)
 	LastUpdatedBlock() (blknum uint64, err error)
@@ -35,7 +35,7 @@ type ProxyAdapter interface {
 func NewProxyAdapter(ChainType, credentialPath, passphrase, proxyAddr string, urls []string) (ProxyAdapter, error) {
 	switch ChainType {
 	case ETH:
-		adaptor, err := NewETHProxySession(credentialPath, passphrase, proxyAddr, urls)
+		adaptor, err := NewEthAdaptor(credentialPath, passphrase, proxyAddr, urls)
 		return adaptor, err
 	default:
 		err := fmt.Errorf("Chain %s not supported error\n", ChainType)
