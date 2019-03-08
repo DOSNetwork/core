@@ -21,7 +21,7 @@ type ProxyAdapter interface {
 	DataReturn(ctx context.Context, signatures <-chan *vss.Signature) (errc chan error)
 
 	SubscribeEvent(subscribeType int, sink chan interface{})
-	PollLogs(subscribeType int, LogBlockDiff, duration uint64) (chan interface{}, chan error)
+	PollLogs(subscribeType int, LogBlockDiff, preBlockBuf uint64) (chan interface{}, <-chan error)
 
 	GetWorkingGroupSize() (size uint64)
 	LastUpdatedBlock() (blknum uint64, err error)

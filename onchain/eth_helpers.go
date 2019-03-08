@@ -75,9 +75,13 @@ func DialToEth(ctx context.Context, urlPool []string) (out chan *ethclient.Clien
 	// Select from all the channels
 	wg.Add(len(urlPool))
 
-	for _, url := range urlPool {
-		go multiplex(url)
-	}
+	go func() {
+		//ensure the first is always http client
+		multiplex(urlPool[0])
+		for i := 1; i < len(urlPool); i++ {
+			go multiplex(urlPool[i])
+		}
+	}()
 
 	// Wait for all the reads to complete
 	go func() {

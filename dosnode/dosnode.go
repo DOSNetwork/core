@@ -284,7 +284,7 @@ func (d *DosNode) listen() (err error) {
 	errcList = append(errcList, errc)
 	eventGroupDismiss, errc := d.chain.PollLogs(onchain.SubscribeDOSProxyLogGroupDismiss, 10, 0)
 	errcList = append(errcList, errc)
-	//errc = mergeErrors(context.Background(), errcList...)
+	errc = mergeErrors(context.Background(), errcList...)
 
 	d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogUrl, chUrl)
 	d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogUpdateRandom, chRandom)
@@ -313,11 +313,15 @@ func (d *DosNode) listen() (err error) {
 				logger.Error(err)
 			}
 			select {
-			case err := <-errc:
-				if err.Error() == "EOF" {
+			case err, ok := <-errc:
+				if ok && err.Error() == "EOF" {
 					fmt.Println("!!!dosnode err ", err)
 				}
 				logger.Error(err)
+				/*
+					TODO: subscribe again and push err to errc,
+					TODO: otherwise possibly closed errc will keep consuming "select",
+				*/
 			case <-watchdog.C:
 				ids := d.dkg.GetAnyGroupIDs()
 				if len(ids) != 0 {

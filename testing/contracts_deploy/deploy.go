@@ -205,7 +205,7 @@ func main() {
 		return
 	}
 
-	clients, errs := onchain.DialToEth(context.Background(), chainConfig.RemoteNodeAddressPool)
+	clients, errs := onchain.DialToEth(context.Background(), chainConfig.RemoteNodeAddressPool[:1])
 	go func() {
 		for e := range errs {
 			fmt.Println("NewETHProxySession ", e)

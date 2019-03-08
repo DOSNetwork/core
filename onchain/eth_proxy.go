@@ -156,8 +156,7 @@ func NewEthAdaptor(credentialPath, passphrase, proxyAddr string, gethUrls []stri
 	auth.Context = adaptor.wCtx
 	nonce, err := adaptor.wClient.PendingNonceAt(adaptor.wCtx, key.Address)
 	if err == nil {
-		auth.Nonce = big.NewInt(0)
-		auth.Nonce = auth.Nonce.SetUint64(nonce)
+		auth.Nonce = new(big.Int).SetUint64(nonce)
 	}
 	adaptor.wProxy = &dosproxy.DOSProxySession{Contract: proxy, CallOpts: bind.CallOpts{Context: adaptor.wCtx}, TransactOpts: *auth}
 	adaptor.wReqQueue = make(chan interface{})
@@ -209,8 +208,7 @@ func (e *EthAdaptor) reqLoop() {
 				nonce, err := e.wClient.PendingNonceAt(e.wCtx, e.key.Address)
 				if err == nil {
 					reply.err = err
-					nonceBig := big.NewInt(0)
-					nonceBig = nonceBig.SetUint64(nonce)
+					nonceBig := new(big.Int).SetUint64(nonce)
 					if e.wProxy.TransactOpts.Nonce.Cmp(nonceBig) == -1 {
 						e.wProxy.TransactOpts.Nonce = nonceBig
 					}
@@ -498,6 +496,7 @@ func (e *EthAdaptor) first(ctx context.Context, sink, source chan interface{}) {
 			if err != nil {
 				continue
 			}
+
 			if visited[identity] == 0 {
 				visited[identity] = blkNum
 				select {
@@ -506,10 +505,8 @@ func (e *EthAdaptor) first(ctx context.Context, sink, source chan interface{}) {
 				}
 			} else {
 				for k, blkN := range visited {
-					if curBlk > blkN {
-						if curBlk-blkN >= 100 {
-							delete(visited, k)
-						}
+					if curBlk >= blkN+100 {
+						delete(visited, k)
 					}
 				}
 			}
@@ -533,7 +530,7 @@ func (e *EthAdaptor) SubscribeEvent(subscribeType int, sink chan interface{}) {
 		out, _ := subscribeEvent(ctx, proxy, subscribeType)
 		eventList = append(eventList, out)
 	}
-	out, _ := e.PollLogs(subscribeType, 30, 30)
+	out, _ := e.PollLogs(subscribeType, 0, 0)
 	eventList = append(eventList, out)
 	e.first(e.wCtx, sink, mergeEvents(e.wCtx, eventList...))
 }
@@ -749,7 +746,7 @@ func subscribeEvent(ctx context.Context, proxy *dosproxy.DOSProxy, subscribeType
 	return
 }
 
-func (e *EthAdaptor) PollLogs(subscribeType int, LogBlockDiff uint64, duration uint64) (chan interface{}, chan error) {
+func (e *EthAdaptor) PollLogs(subscribeType int, LogBlockDiff, preBlockBuf uint64) (chan interface{}, <-chan error) {
 	errc := make(chan error)
 	sink := make(chan interface{})
 	go func() {
@@ -760,6 +757,7 @@ func (e *EthAdaptor) PollLogs(subscribeType int, LogBlockDiff uint64, duration u
 			errc <- err
 			return
 		}
+		targetBlockN -= preBlockBuf
 		timer := time.NewTimer(LogCheckingInterval * time.Second)
 		for {
 			select {
@@ -770,7 +768,6 @@ func (e *EthAdaptor) PollLogs(subscribeType int, LogBlockDiff uint64, duration u
 					return
 				}
 				for ; currentBlockN-LogBlockDiff >= targetBlockN; targetBlockN++ {
-					endBlock := targetBlockN + duration
 					switch subscribeType {
 					case SubscribeDOSProxyLogGrouping:
 						logs, err := e.wProxy.Contract.DOSProxyFilterer.FilterLogGrouping(&bind.FilterOpts{
@@ -815,7 +812,7 @@ func (e *EthAdaptor) PollLogs(subscribeType int, LogBlockDiff uint64, duration u
 					case SubscribeDOSProxyLogUpdateRandom:
 						logs, err := e.wProxy.Contract.DOSProxyFilterer.FilterLogUpdateRandom(&bind.FilterOpts{
 							Start:   targetBlockN,
-							End:     &endBlock,
+							End:     &targetBlockN,
 							Context: e.wCtx,
 						})
 						if err != nil {
@@ -836,7 +833,7 @@ func (e *EthAdaptor) PollLogs(subscribeType int, LogBlockDiff uint64, duration u
 					case SubscribeDOSProxyLogRequestUserRandom:
 						logs, err := e.wProxy.Contract.DOSProxyFilterer.FilterLogRequestUserRandom(&bind.FilterOpts{
 							Start:   targetBlockN,
-							End:     &endBlock,
+							End:     &targetBlockN,
 							Context: e.wCtx,
 						})
 						if err != nil {
@@ -859,7 +856,7 @@ func (e *EthAdaptor) PollLogs(subscribeType int, LogBlockDiff uint64, duration u
 					case SubscribeDOSProxyLogUrl:
 						logs, err := e.wProxy.Contract.DOSProxyFilterer.FilterLogUrl(&bind.FilterOpts{
 							Start:   targetBlockN,
-							End:     &endBlock,
+							End:     &targetBlockN,
 							Context: e.wCtx,
 						})
 						if err != nil {
@@ -884,7 +881,7 @@ func (e *EthAdaptor) PollLogs(subscribeType int, LogBlockDiff uint64, duration u
 					case SubscribeDOSProxyLogValidationResult:
 						logs, err := e.wProxy.Contract.DOSProxyFilterer.FilterLogValidationResult(&bind.FilterOpts{
 							Start:   targetBlockN,
-							End:     &endBlock,
+							End:     &targetBlockN,
 							Context: e.wCtx,
 						})
 						if err != nil {
@@ -908,27 +905,27 @@ func (e *EthAdaptor) PollLogs(subscribeType int, LogBlockDiff uint64, duration u
 							}
 						}
 						/*
-							case SubscribeDOSProxyLogNoWorkingGroup:
-								transitChan := make(chan *dosproxy.DOSProxyLogNoWorkingGroup)
-								defer close(transitChan)
-								defer close(errc)
-								defer close(sink)
-								logs, err := e.wProxy.Contract.DOSProxyFilterer.FilterLogNoWorkingGroup(&bind.FilterOpts{
-									Start:   targetBlockN,
-									End:     &endBlock,
-									Context: e.wCtx,
-								})
-								if err != nil {
-									return
-								}
-								for logs.Next() {
-									sink <- &DOSProxyLogNoWorkingGroup{
-										Raw:     logs.Event.Raw,
-										Tx:      logs.Event.Raw.TxHash.Hex(),
-										BlockN:  logs.Event.Raw.BlockNumber,
-										Removed: logs.Event.Raw.Removed,
-									}
-								}
+							 case SubscribeDOSProxyLogNoWorkingGroup:
+								 transitChan := make(chan *dosproxy.DOSProxyLogNoWorkingGroup)
+								 defer close(transitChan)
+								 defer close(errc)
+								 defer close(sink)
+								 logs, err := e.wProxy.Contract.DOSProxyFilterer.FilterLogNoWorkingGroup(&bind.FilterOpts{
+									 Start:   targetBlockN,
+									 End:     &targetBlockN,
+									 Context: e.wCtx,
+								 })
+								 if err != nil {
+									 return
+								 }
+								 for logs.Next() {
+									 sink <- &DOSProxyLogNoWorkingGroup{
+										 Raw:     logs.Event.Raw,
+										 Tx:      logs.Event.Raw.TxHash.Hex(),
+										 BlockN:  logs.Event.Raw.BlockNumber,
+										 Removed: logs.Event.Raw.Removed,
+									 }
+								 }
 						*/
 					}
 				}
