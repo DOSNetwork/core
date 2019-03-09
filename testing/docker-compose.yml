@@ -2,8 +2,6 @@ version: '3'
 services:
  geth1:
    image: ethereum/client-go
-   ports:
-      - "8545:8545"
    command:
      --rpc
      --rpcaddr 0.0.0.0
@@ -11,6 +9,8 @@ services:
      --wsaddr 0.0.0.0
      --wsorigins '*'
      --rinkeby
+     --syncmode "light"
+     --lightkdf
  geth2:
    image: ethereum/client-go
    command:
@@ -20,6 +20,8 @@ services:
      --wsaddr 0.0.0.0
      --wsorigins '*'
      --rinkeby
+     --syncmode "light"
+     --lightkdf
  geth3:
    image: ethereum/client-go
    command:
@@ -29,10 +31,10 @@ services:
      --wsaddr 0.0.0.0
      --wsorigins '*'
      --rinkeby
+     --syncmode "light"
+     --lightkdf
  geth4:
    image: ethereum/client-go
-   ports:
-      - "8545:8545"
    command:
      --rpc
      --rpcaddr 0.0.0.0
@@ -40,6 +42,8 @@ services:
      --wsaddr 0.0.0.0
      --wsorigins '*'
      --rinkeby
+     --syncmode "light"
+     --lightkdf
  geth5:
    image: ethereum/client-go
    command:
@@ -49,6 +53,8 @@ services:
      --wsaddr 0.0.0.0
      --wsorigins '*'
      --rinkeby
+     --syncmode "light"
+     --lightkdf
  geth6:
    image: ethereum/client-go
    command:
@@ -58,6 +64,8 @@ services:
      --wsaddr 0.0.0.0
      --wsorigins '*'
      --rinkeby
+     --syncmode "light"
+     --lightkdf
  bootstrap:
    image: bootstrap
    depends_on:
@@ -102,9 +110,8 @@ services:
      - NODEROLE=testNode
      - CHAINNODE=rinkebyPrivateNode
      - BOOTSTRAPIP=bootstrap:44460
-     - RANDOMCONNECT=true
      - PASSPHRASE=
-     - GETHIP=geth1
+     - GETHIP1=geth1
      - GETHIP2=geth2
      - GETHIP3=geth3
  dosnode2:
@@ -120,9 +127,8 @@ services:
      - NODEROLE=testNode
      - CHAINNODE=rinkebyPrivateNode
      - BOOTSTRAPIP=bootstrap:44460
-     - RANDOMCONNECT=true
      - PASSPHRASE=
-     - GETHIP=geth4
+     - GETHIP1=geth4
      - GETHIP2=geth5
      - GETHIP3=geth6
  randomnode:
@@ -138,9 +144,11 @@ services:
      - BOOTSTRAPIP=bootstrap:44460
      - QUERYTIMES=1
      - QUERYTYPE=random
-     - RANDOMCONNECT=true
      - AMA=0
      - PASSPHRASE=
+     - GETHIP1=geth1
+     - GETHIP2=geth5
+     - GETHIP3=geth6
  urlnode:
    image: usernode
    deploy:
@@ -154,6 +162,8 @@ services:
      - BOOTSTRAPIP=bootstrap:44460
      - QUERYTIMES=1
      - QUERYTYPE=url
-     - RANDOMCONNECT=true
      - AMA=0
      - PASSPHRASE=
+     - GETHIP1=geth4
+     - GETHIP2=geth5
+     - GETHIP3=geth6

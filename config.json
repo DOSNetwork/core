@@ -9,26 +9,23 @@
                 "DOSAddressBridgeAddress": "0x6E9A8cb8Fb1b24569F4FbF16672c4835eF5C96D9",
                 "RemoteNodeAddressPool": [
                     "ws://163.172.36.173:8546"
-                ],
-                "RemoteNodeAddress": "ws://163.172.36.173:8546"
+                ]
             },
             "rinkebyInfura": {
                 "DOSProxyAddress": "0x57054466fAD09bFA5fB723c9057f7a16d359656D",
                 "DOSAddressBridgeAddress": "0x09dB4cd7ec4de9A5f4d45C270C01be33E8dC9567",
                 "RemoteNodeAddressPool": [
                     "https://rinkeby.infura.io/8e609c76fce442f8a1735fbea9999747"
-                ],
-                "RemoteNodeAddress": "https://rinkeby.infura.io/8e609c76fce442f8a1735fbea9999747"
+                ]
             },
             "rinkebyPrivateNode": {
-                "DOSProxyAddress": "0x961946CcE4111a38975bDe4442eFd19DCE0BC87d",
-                "DOSAddressBridgeAddress": "0x0fe818Ad20f83c5fb005c70A86f7D139F791Ef07",
+                "DOSProxyAddress": "0xe7a337019e9abf8504F58d07A9FfcD1136023835",
+                "DOSAddressBridgeAddress": "0x4B3b32710A32C6FA4dF3A92BDfAadA61854A6E71",
                 "RemoteNodeAddressPool": [
                     "https://rinkeby.infura.io/8e609c76fce442f8a1735fbea9999747",
                     "ws://51.159.4.51:8546",
                     "ws://51.15.0.157:8546"
-                ],
-                "RemoteNodeAddress": "https://rinkeby.infura.io/8e609c76fce442f8a1735fbea9999747"
+                ]
             }
         }
     }

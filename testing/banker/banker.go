@@ -140,7 +140,7 @@ func main() {
 	}
 
 	fmt.Println("connecting to eth...")
-	client, err := ethclient.Dial(chainConfig.RemoteNodeAddress)
+	client, err := ethclient.Dial(chainConfig.RemoteNodeAddressPool[0])
 	if err != nil {
 		log.Fatal(err)
 	}

@@ -21,7 +21,7 @@ import (
 
 var (
 	lock            sync.Mutex
-	credentialIndex = 50
+	credentialIndex = 0
 )
 var adaptor onchain.ProxyAdapter
 
@@ -100,7 +100,7 @@ func getCredential(w http.ResponseWriter, r *http.Request) {
 		fmt.Println(err)
 	}
 	go func() {
-		if credentialIndex == 68 {
+		if credentialIndex == 12 {
 			fmt.Println("!!!!!!!!!!!!!!start BootStrap ")
 			time.Sleep(300 * time.Second)
 

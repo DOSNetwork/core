@@ -189,7 +189,7 @@ func main() {
 
 	chainConfig := config.GetChainConfig()
 	fmt.Println("Use : ", chainConfig)
-	fmt.Println(" address ", chainConfig.RemoteNodeAddress)
+	fmt.Println(" address ", chainConfig.RemoteNodeAddressPool[0])
 
 	fmt.Print("Enter Password: ")
 	bytePassword, err := terminal.ReadPassword(0)

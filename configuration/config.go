@@ -4,10 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"math/rand"
 	"os"
 	"strconv"
-	"time"
 )
 
 const (
@@ -39,7 +37,6 @@ type ChainConfig struct {
 	DOSProxyAddress         string
 	DOSAddressBridgeAddress string
 	RemoteNodeAddressPool   []string
-	RemoteNodeAddress       string
 }
 
 func LoadConfig(path string, c interface{}) (err error) {
@@ -147,24 +144,9 @@ func (c *Config) overWrite() (err error) {
 	c.currentNode = chainNode
 
 	if config, loaded := c.ChainConfigs[c.currentType][c.currentNode]; loaded {
-		source := rand.NewSource(time.Now().UnixNano())
-		random := rand.New(source)
-		if os.Getenv(ENVRANDOMCONNECT) == "true" {
-			config.RemoteNodeAddress = config.RemoteNodeAddressPool[random.Intn(len(config.RemoteNodeAddressPool))]
-		} else {
-			config.RemoteNodeAddress = config.RemoteNodeAddressPool[0]
-		}
-		gethIP := os.Getenv("GETHIP")
-		if gethIP != "" {
+		x := 1
+		for gethIP := os.Getenv("GETHIP" + strconv.Itoa(x)); gethIP != ""; x++ {
 			config.RemoteNodeAddressPool = append(config.RemoteNodeAddressPool, "ws://"+gethIP+":8546")
-		}
-		gethIP2 := os.Getenv("GETHIP2")
-		if gethIP != "" {
-			config.RemoteNodeAddressPool = append(config.RemoteNodeAddressPool, "ws://"+gethIP2+":8546")
-		}
-		gethIP3 := os.Getenv("GETHIP3")
-		if gethIP3 != "" {
-			config.RemoteNodeAddressPool = append(config.RemoteNodeAddressPool, "ws://"+gethIP3+":8546")
 		}
 		fmt.Println("config.RemoteNodeAddressPool ", config.RemoteNodeAddressPool)
 		c.ChainConfigs[c.currentType][c.currentNode] = config
