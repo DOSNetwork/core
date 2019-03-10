@@ -9,7 +9,6 @@ import (
 	"os"
 	"strconv"
 	"sync"
-	"time"
 
 	"github.com/gorilla/mux"
 
@@ -58,8 +57,8 @@ func main() {
 	//Init log module with nodeID that is an onchain account address
 	log.Init(id[:])
 	//ctx, _ := context.WithCancel(context.Background())
-	err = adaptor.ResetContract()
-	fmt.Println("ResetContract ", err)
+	//err = adaptor.ResetContract()
+	//fmt.Println("ResetContract ", err)
 
 	//<-errc
 	//errc = adaptor.Grouping(ctx, config.GetRandomGroupSize())
@@ -99,15 +98,17 @@ func getCredential(w http.ResponseWriter, r *http.Request) {
 	if _, err := fmt.Fprintf(w, strconv.Itoa(credentialIndex)); err != nil {
 		fmt.Println(err)
 	}
-	go func() {
-		if credentialIndex == 12 {
-			fmt.Println("!!!!!!!!!!!!!!start BootStrap ")
-			time.Sleep(300 * time.Second)
+	/*
+		go func() {
+			if credentialIndex == 12 {
+				fmt.Println("!!!!!!!!!!!!!!start BootStrap ")
+				time.Sleep(300 * time.Second)
 
-			err := adaptor.BootStrap()
-			fmt.Println("BootStrap ", err)
-		}
-	}()
+				err := adaptor.BootStrap()
+				fmt.Println("BootStrap ", err)
+			}
+		}()
+	*/
 	lock.Unlock()
 
 }

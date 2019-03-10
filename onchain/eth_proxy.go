@@ -948,13 +948,14 @@ func (e *EthAdaptor) GroupPubKey(idx int) (groupPubKeys [4]*big.Int, err error) 
 	return e.wProxy.GetGroupPubKey(big.NewInt(int64(idx)))
 }
 
+/*
 func (e *EthAdaptor) BootStrap() error {
 	result := make(chan Reply)
 	request := &Request{e.wCtx, e.wProxy.BootStrap, result}
 	errc := e.sendRequest(e.wCtx, request, result)
 	return <-errc
 }
-
+*/
 func (e *EthAdaptor) ResetContract() error {
 	result := make(chan Reply)
 	request := &Request{e.wCtx, e.wProxy.ResetContract, result}

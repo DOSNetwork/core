@@ -145,8 +145,9 @@ func (c *Config) overWrite() (err error) {
 
 	if config, loaded := c.ChainConfigs[c.currentType][c.currentNode]; loaded {
 		x := 1
-		for gethIP := os.Getenv("GETHIP" + strconv.Itoa(x)); gethIP != ""; x++ {
+		for gethIP := os.Getenv("GETHIP" + strconv.Itoa(x)); gethIP != ""; gethIP = os.Getenv("GETHIP" + strconv.Itoa(x)) {
 			config.RemoteNodeAddressPool = append(config.RemoteNodeAddressPool, "ws://"+gethIP+":8546")
+			x++
 		}
 		fmt.Println("config.RemoteNodeAddressPool ", config.RemoteNodeAddressPool)
 		c.ChainConfigs[c.currentType][c.currentNode] = config

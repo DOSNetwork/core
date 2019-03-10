@@ -144,7 +144,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println("connected, ")
+	fmt.Println("connected")
 
 	var keyArray []*keystore.Key
 	for i := 1; i <= scanRangeInt; i++ {

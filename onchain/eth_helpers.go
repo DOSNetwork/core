@@ -2,20 +2,19 @@ package onchain
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"math"
 	"math/big"
 	"sync"
-
-	"github.com/ethereum/go-ethereum/accounts/keystore"
-	"github.com/ethereum/go-ethereum/ethclient"
-
-	"errors"
 	"time"
 
 	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/core/types"
+	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/light"
 )
 
 const (
@@ -24,6 +23,9 @@ const (
 	REPLENISHAMOUNT     = 800000000000000000 //0.8 Eth
 	STOPSUBMITTHRESHOLD = 0.1
 	RETRTCOUNT          = 2
+	CHECKSYNCINTERVAL   = 1
+	WCLIENTINDEX        = 0
+	SYNCBLOCKDRIFT      = 3
 )
 
 func ReadEthKey(credentialPath, passphrase string) (key *keystore.Key, err error) {
@@ -52,10 +54,11 @@ func DialToEth(ctx context.Context, urlPool []string) (out chan *ethclient.Clien
 	out = make(chan *ethclient.Client)
 	err = make(chan error)
 	var wg sync.WaitGroup
+	var wClient *ethclient.Client
 
-	multiplex := func(url string) {
+	multiplex := func(index int) {
 		defer wg.Done()
-		client, e := ethclient.Dial(url)
+		client, e := ethclient.Dial(urlPool[index])
 		if e != nil {
 			select {
 			case <-ctx.Done():
@@ -64,11 +67,59 @@ func DialToEth(ctx context.Context, urlPool []string) (out chan *ethclient.Clien
 				return
 			}
 		}
+
+		if index == WCLIENTINDEX {
+			wClient = client
+		} else {
+			fmt.Println("wait client to sync...")
+			ticker := time.NewTicker(time.Second * time.Duration(CHECKSYNCINTERVAL))
+		L:
+			for {
+				select {
+				case <-ticker.C:
+					highestBlk, e := wClient.BlockByNumber(ctx, nil)
+					if e != nil && e != light.ErrNoPeers {
+						fmt.Println(e)
+						select {
+						case <-ctx.Done():
+							ticker.Stop()
+							return
+						case err <- e:
+							ticker.Stop()
+							return
+						}
+					}
+					highestBlkN := highestBlk.NumberU64()
+					currBlk, e := client.BlockByNumber(ctx, nil)
+					if e != nil && e != light.ErrNoPeers {
+						fmt.Println(e)
+						select {
+						case <-ctx.Done():
+							ticker.Stop()
+							return
+						case err <- e:
+							ticker.Stop()
+							return
+						}
+					}
+					currBlkN := currBlk.NumberU64()
+					blockDiff := math.Abs(float64(highestBlkN) - float64(currBlkN))
+					fmt.Println("block to Sync ", blockDiff)
+					if blockDiff <= SYNCBLOCKDRIFT {
+						ticker.Stop()
+						break L
+					}
+				}
+			}
+			fmt.Println("sync success")
+		}
+
 		select {
 		case <-ctx.Done():
 			client.Close()
 			return
 		case out <- client:
+			fmt.Println("Client ", index, " initialized")
 		}
 	}
 
@@ -77,9 +128,9 @@ func DialToEth(ctx context.Context, urlPool []string) (out chan *ethclient.Clien
 
 	go func() {
 		//ensure the first is always http client
-		multiplex(urlPool[0])
-		for i := 1; i < len(urlPool); i++ {
-			go multiplex(urlPool[i])
+		multiplex(WCLIENTINDEX)
+		for i := WCLIENTINDEX + 1; i < len(urlPool); i++ {
+			go multiplex(i)
 		}
 	}()
 

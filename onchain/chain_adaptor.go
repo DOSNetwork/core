@@ -31,7 +31,7 @@ type ProxyAdapter interface {
 	Address() (addr []byte)
 	CurrentBlock() (blknum uint64, err error)
 
-	BootStrap() error
+	//BootStrap() error
 	ResetContract() error
 }
 
