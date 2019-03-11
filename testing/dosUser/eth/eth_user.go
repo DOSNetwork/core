@@ -2,8 +2,11 @@ package eth
 
 import (
 	"context"
+	"crypto/sha256"
 	"errors"
 	"fmt"
+	"math/big"
+	"sync"
 	"time"
 
 	"github.com/DOSNetwork/core/log"
@@ -38,6 +41,12 @@ type EthUserAdaptor struct {
 	ctx      context.Context
 	cancel   context.CancelFunc
 	reqQueue chan interface{}
+
+	//read only DOSProxy
+	rProxies     []*dosUser.AskMeAnything
+	rClients     []*ethclient.Client
+	rCtxs        []context.Context
+	rCancelFuncs []context.CancelFunc
 }
 
 func NewAMAUserSession(credentialPath, passphrase, addr string, gethUrls []string) (adaptor *EthUserAdaptor, err error) {
@@ -84,6 +93,19 @@ func NewAMAUserSession(credentialPath, passphrase, addr string, gethUrls []strin
 	adaptor.cancel = cancelSession
 	adaptor.reqQueue = make(chan interface{})
 
+	for client := range clients {
+		p, err := dosUser.NewAskMeAnything(common.HexToAddress(addr), client)
+		if err != nil {
+			logger.Error(err)
+			continue
+		}
+		ctx, cancelFunc := context.WithCancel(context.Background())
+		adaptor.rClients = append(adaptor.rClients, client)
+		adaptor.rProxies = append(adaptor.rProxies, p)
+		adaptor.rCtxs = append(adaptor.rCtxs, ctx)
+		adaptor.rCancelFuncs = append(adaptor.rCancelFuncs, cancelFunc)
+	}
+
 	return
 }
 
@@ -91,36 +113,43 @@ func (e *EthUserAdaptor) Address() (addr common.Address) {
 	return e.key.Address
 }
 
-func (e *EthUserAdaptor) PollLogs(subscribeType int, sink chan interface{}, logBlockDiff uint64) <-chan error {
-	errc := make(chan error)
-	go func() {
+func (e *EthUserAdaptor) PollLogs(subscribeType int, logBlockDiff, preBlockBuf uint64) (<-chan interface{}, <-chan error) {
+	var errcs []<-chan error
+	var sinks []<-chan interface{}
+	var wg sync.WaitGroup
+
+	multiplex := func(client *ethclient.Client, askMeAnythingFilterer *dosUser.AskMeAnythingFilterer, ctx context.Context) {
+		errc := make(chan error)
+		errcs = append(errcs, errc)
+		sink := make(chan interface{})
+		sinks = append(sinks, sink)
+		wg.Done()
 		defer close(errc)
-		targetBlockN, err := onchain.GetCurrentBlock(e.c)
+		defer close(sink)
+		targetBlockN, err := onchain.GetCurrentBlock(client)
 		if err != nil {
 			errc <- err
 			return
 		}
+		targetBlockN -= preBlockBuf
 		timer := time.NewTimer(onchain.LogCheckingInterval * time.Second)
-
 		for {
 			select {
 			case <-timer.C:
-				currentBlockN, err := onchain.GetCurrentBlock(e.c)
+				currentBlockN, err := onchain.GetCurrentBlock(client)
 				if err != nil {
-					fmt.Println("PollLogs ", err)
 					errc <- err
 					continue
 				}
 				for ; currentBlockN-logBlockDiff >= targetBlockN; targetBlockN++ {
 					switch subscribeType {
 					case SubscribeAskMeAnythingQueryResponseReady:
-						logs, err := e.s.Contract.AskMeAnythingFilterer.FilterQueryResponseReady(&bind.FilterOpts{
+						logs, err := askMeAnythingFilterer.FilterQueryResponseReady(&bind.FilterOpts{
 							Start:   targetBlockN,
 							End:     &targetBlockN,
-							Context: e.ctx,
+							Context: ctx,
 						})
 						if err != nil {
-							fmt.Println("PollLogs ", err)
 							errc <- err
 							continue
 						}
@@ -131,13 +160,14 @@ func (e *EthUserAdaptor) PollLogs(subscribeType int, sink chan interface{}, logB
 								Tx:      logs.Event.Raw.TxHash.Hex(),
 								BlockN:  logs.Event.Raw.BlockNumber,
 								Removed: logs.Event.Raw.Removed,
+								Raw:     logs.Event.Raw,
 							}
 						}
 					case SubscribeAskMeAnythingRequestSent:
-						logs, err := e.s.Contract.AskMeAnythingFilterer.FilterRequestSent(&bind.FilterOpts{
+						logs, err := askMeAnythingFilterer.FilterRequestSent(&bind.FilterOpts{
 							Start:   targetBlockN,
 							End:     &targetBlockN,
-							Context: e.ctx,
+							Context: ctx,
 						}, []common.Address{e.Address()})
 						if err != nil {
 							errc <- err
@@ -151,16 +181,16 @@ func (e *EthUserAdaptor) PollLogs(subscribeType int, sink chan interface{}, logB
 								Tx:             logs.Event.Raw.TxHash.Hex(),
 								BlockN:         logs.Event.Raw.BlockNumber,
 								Removed:        logs.Event.Raw.Removed,
+								Raw:            logs.Event.Raw,
 							}
 						}
 					case SubscribeAskMeAnythingRandomReady:
-						logs, err := e.s.Contract.AskMeAnythingFilterer.FilterRandomReady(&bind.FilterOpts{
+						logs, err := askMeAnythingFilterer.FilterRandomReady(&bind.FilterOpts{
 							Start:   targetBlockN,
 							End:     &targetBlockN,
-							Context: e.ctx,
+							Context: ctx,
 						})
 						if err != nil {
-							fmt.Println("PollLogs ", err)
 							errc <- err
 							continue
 						}
@@ -171,17 +201,154 @@ func (e *EthUserAdaptor) PollLogs(subscribeType int, sink chan interface{}, logB
 								Tx:              logs.Event.Raw.TxHash.Hex(),
 								BlockN:          logs.Event.Raw.BlockNumber,
 								Removed:         logs.Event.Raw.Removed,
+								Raw:             logs.Event.Raw,
 							}
 						}
 					}
 				}
 				timer.Reset(onchain.LogCheckingInterval * time.Second)
-			case <-e.ctx.Done():
+			case <-ctx.Done():
 				return
 			}
 		}
+
+	}
+
+	wg.Add(len(e.rClients) + 1)
+	go multiplex(e.c, &e.s.Contract.AskMeAnythingFilterer, e.ctx)
+	for i := 0; i < len(e.rClients); i++ {
+		go multiplex(e.rClients[i], &e.rProxies[i].AskMeAnythingFilterer, e.rCtxs[i])
+	}
+
+	wg.Wait()
+
+	return e.first(e.ctx, MergeEvents(e.ctx, sinks...)), MergeErrors(e.ctx, errcs...)
+}
+
+func (e *EthUserAdaptor) first(ctx context.Context, source chan interface{}) <-chan interface{} {
+	sink := make(chan interface{})
+
+	go func() {
+		defer close(sink)
+		visited := make(map[string]uint64)
+		for {
+			var bytes []byte
+			var blkNum uint64
+			var event interface{}
+			var ok bool
+			select {
+			case event, ok = <-source:
+				if ok {
+					switch content := event.(type) {
+					case *AskMeAnythingQueryResponseReady:
+						bytes = append(bytes, content.Raw.Data...)
+						blkNum = content.BlockN
+						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
+					case *AskMeAnythingRequestSent:
+						bytes = append(bytes, content.Raw.Data...)
+						blkNum = content.BlockN
+						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
+					case *AskMeAnythingRandomReady:
+						bytes = append(bytes, content.Raw.Data...)
+						blkNum = content.BlockN
+						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
+					}
+				} else {
+					return
+				}
+			}
+			nHash := sha256.Sum256(bytes)
+			identity := string(nHash[:])
+			curBlk, err := onchain.GetCurrentBlock(e.c)
+			if err != nil {
+				continue
+			}
+
+			if visited[identity] == 0 {
+				visited[identity] = blkNum
+				select {
+				case sink <- event:
+				case <-ctx.Done():
+				}
+			} else {
+				for k, blkN := range visited {
+					if curBlk >= blkN+100 {
+						delete(visited, k)
+					}
+				}
+			}
+		}
 	}()
-	return errc
+
+	return sink
+}
+
+func MergeEvents(ctx context.Context, cs ...<-chan interface{}) chan interface{} {
+	var wg sync.WaitGroup
+	// We must ensure that the output channel has the capacity to
+	// hold as many errors
+	// as there are error channels.
+	// This will ensure that it never blocks, even
+	// if WaitForPipeline returns early.
+	out := make(chan interface{}, len(cs))
+	// Start an output goroutine for each input channel in cs.  output
+	// copies values from c to out until c is closed, then calls
+	// wg.Done.
+	output := func(c <-chan interface{}) {
+		for n := range c {
+			select {
+			case <-ctx.Done():
+				return
+			case out <- n:
+			}
+		}
+		wg.Done()
+	}
+	wg.Add(len(cs))
+	for _, c := range cs {
+		go output(c)
+	}
+	// Start a goroutine to close out once all the output goroutines
+	// are done.  This must start after the wg.Add call.
+	go func() {
+		wg.Wait()
+		close(out)
+	}()
+	return out
+}
+
+func MergeErrors(ctx context.Context, cs ...<-chan error) <-chan error {
+	var wg sync.WaitGroup
+	// We must ensure that the output channel has the capacity to
+	// hold as many errors
+	// as there are error channels.
+	// This will ensure that it never blocks, even
+	// if WaitForPipeline returns early.
+	out := make(chan error, len(cs))
+	// Start an output goroutine for each input channel in cs.  output
+	// copies values from c to out until c is closed, then calls
+	// wg.Done.
+	output := func(c <-chan error) {
+		for n := range c {
+			select {
+			case <-ctx.Done():
+				return
+			case out <- n:
+			}
+		}
+		wg.Done()
+	}
+	wg.Add(len(cs))
+	for _, c := range cs {
+		go output(c)
+	}
+	// Start a goroutine to close out once all the output goroutines
+	// are done.  This must start after the wg.Add call.
+	go func() {
+		wg.Wait()
+		close(out)
+	}()
+	return out
 }
 
 func (e *EthUserAdaptor) Query(internalSerial uint8, url, selector string) (err error) {

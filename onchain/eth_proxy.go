@@ -424,7 +424,7 @@ func (e *EthAdaptor) DataReturn(ctx context.Context, signatures <-chan *vss.Sign
 	return errc
 }
 
-func mergeEvents(ctx context.Context, cs ...chan interface{}) chan interface{} {
+func mergeEvents(ctx context.Context, cs ...<-chan interface{}) chan interface{} {
 	var wg sync.WaitGroup
 	// We must ensure that the output channel has the capacity to
 	// hold as many errors
@@ -458,36 +458,86 @@ func mergeEvents(ctx context.Context, cs ...chan interface{}) chan interface{} {
 	return out
 }
 
-func (e *EthAdaptor) first(ctx context.Context, sink, source chan interface{}) {
+func mergeErrors(ctx context.Context, cs ...<-chan error) <-chan error {
+	var wg sync.WaitGroup
+	// We must ensure that the output channel has the capacity to
+	// hold as many errors
+	// as there are error channels.
+	// This will ensure that it never blocks, even
+	// if WaitForPipeline returns early.
+	out := make(chan error, len(cs))
+	// Start an output goroutine for each input channel in cs.  output
+	// copies values from c to out until c is closed, then calls
+	// wg.Done.
+	output := func(c <-chan error) {
+		for n := range c {
+			select {
+			case <-ctx.Done():
+				return
+			case out <- n:
+			}
+		}
+		wg.Done()
+	}
+	wg.Add(len(cs))
+	for _, c := range cs {
+		go output(c)
+	}
+	// Start a goroutine to close out once all the output goroutines
+	// are done.  This must start after the wg.Add call.
 	go func() {
+		wg.Wait()
+		close(out)
+	}()
+	return out
+}
+
+func (e *EthAdaptor) first(ctx context.Context, source chan interface{}) <-chan interface{} {
+	sink := make(chan interface{})
+
+	go func() {
+		defer close(sink)
 		visited := make(map[string]uint64)
 		for {
 			var bytes []byte
-			var event interface{}
 			var blkNum uint64
+			var event interface{}
+			var ok bool
 			select {
-			case event = <-source:
-				switch content := event.(type) {
-				case *DOSProxyLogUpdateRandom:
-					bytes = append(bytes, content.Raw.Data...)
-					blkNum = content.BlockN
-					bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
-				case *DOSProxyLogRequestUserRandom:
-					bytes = append(bytes, content.Raw.Data...)
-					blkNum = content.BlockN
-					bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
-				case *DOSProxyLogUrl:
-					bytes = append(bytes, content.Raw.Data...)
-					blkNum = content.BlockN
-					bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
-				case *DOSProxyLogValidationResult:
-					bytes = append(bytes, content.Raw.Data...)
-					blkNum = content.BlockN
-					bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
-				case *DOSProxyLogNoWorkingGroup:
-					bytes = append(bytes, content.Raw.Data...)
-					blkNum = content.BlockN
-					bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
+			case event, ok = <-source:
+				if ok {
+					switch content := event.(type) {
+					case *DOSProxyLogUpdateRandom:
+						bytes = append(bytes, content.Raw.Data...)
+						blkNum = content.BlockN
+						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
+					case *DOSProxyLogRequestUserRandom:
+						bytes = append(bytes, content.Raw.Data...)
+						blkNum = content.BlockN
+						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
+					case *DOSProxyLogUrl:
+						bytes = append(bytes, content.Raw.Data...)
+						blkNum = content.BlockN
+						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
+					case *DOSProxyLogValidationResult:
+						bytes = append(bytes, content.Raw.Data...)
+						blkNum = content.BlockN
+						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
+					case *DOSProxyLogNoWorkingGroup:
+						bytes = append(bytes, content.Raw.Data...)
+						blkNum = content.BlockN
+						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
+					case *DOSProxyLogGrouping:
+						bytes = append(bytes, content.Raw.Data...)
+						blkNum = content.BlockN
+						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
+					case *DOSProxyLogGroupDismiss:
+						bytes = append(bytes, content.Raw.Data...)
+						blkNum = content.BlockN
+						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
+					}
+				} else {
+					return
 				}
 			}
 			nHash := sha256.Sum256(bytes)
@@ -512,11 +562,13 @@ func (e *EthAdaptor) first(ctx context.Context, sink, source chan interface{}) {
 			}
 		}
 	}()
+
+	return sink
 }
 
-func (e *EthAdaptor) SubscribeEvent(subscribeType int, sink chan interface{}) {
-
-	var eventList []chan interface{}
+func (e *EthAdaptor) SubscribeEvent(subscribeType int) (<-chan interface{}, <-chan error) {
+	var eventList []<-chan interface{}
+	var errcs []<-chan error
 	for i := 0; i < len(e.rProxies); i++ {
 		fmt.Println("SubscribeEvent ", i)
 		proxy := e.rProxies[i]
@@ -527,17 +579,19 @@ func (e *EthAdaptor) SubscribeEvent(subscribeType int, sink chan interface{}) {
 		if ctx == nil {
 			continue
 		}
-		out, _ := subscribeEvent(ctx, proxy, subscribeType)
+		out, errc := subscribeEvent(ctx, proxy, subscribeType)
 		eventList = append(eventList, out)
+		errcs = append(errcs, errc)
 	}
-	out, _ := e.PollLogs(subscribeType, 0, 0)
+	out, errc := e.PollLogs(subscribeType, 0, 0)
 	eventList = append(eventList, out)
-	e.first(e.wCtx, sink, mergeEvents(e.wCtx, eventList...))
+	errcs = append(errcs, errc)
+	return e.first(e.wCtx, mergeEvents(e.wCtx, eventList...)), mergeErrors(e.wCtx, errcs...)
 }
 
-func subscribeEvent(ctx context.Context, proxy *dosproxy.DOSProxy, subscribeType int) (out chan interface{}, errc chan error) {
-	out = make(chan interface{})
-	errc = make(chan error)
+func subscribeEvent(ctx context.Context, proxy *dosproxy.DOSProxy, subscribeType int) (<-chan interface{}, <-chan error) {
+	out := make(chan interface{})
+	errc := make(chan error)
 	opt := &bind.WatchOpts{}
 
 	switch subscribeType {
@@ -743,16 +797,23 @@ func subscribeEvent(ctx context.Context, proxy *dosproxy.DOSProxy, subscribeType
 				}()
 		*/
 	}
-	return
+	return out, errc
 }
 
-func (e *EthAdaptor) PollLogs(subscribeType int, LogBlockDiff, preBlockBuf uint64) (chan interface{}, <-chan error) {
-	errc := make(chan error)
-	sink := make(chan interface{})
-	go func() {
+func (e *EthAdaptor) PollLogs(subscribeType int, logBlockDiff, preBlockBuf uint64) (<-chan interface{}, <-chan error) {
+	var errcs []<-chan error
+	var sinks []<-chan interface{}
+	var wg sync.WaitGroup
+
+	multiplex := func(client *ethclient.Client, proxyFilter *dosproxy.DOSProxyFilterer, ctx context.Context) {
+		errc := make(chan error)
+		errcs = append(errcs, errc)
+		sink := make(chan interface{})
+		sinks = append(sinks, sink)
+		wg.Done()
 		defer close(errc)
 		defer close(sink)
-		targetBlockN, err := GetCurrentBlock(e.wClient)
+		targetBlockN, err := GetCurrentBlock(client)
 		if err != nil {
 			errc <- err
 			return
@@ -762,18 +823,18 @@ func (e *EthAdaptor) PollLogs(subscribeType int, LogBlockDiff, preBlockBuf uint6
 		for {
 			select {
 			case <-timer.C:
-				currentBlockN, err := GetCurrentBlock(e.wClient)
+				currentBlockN, err := GetCurrentBlock(client)
 				if err != nil {
 					errc <- err
 					continue
 				}
-				for ; currentBlockN-LogBlockDiff >= targetBlockN; targetBlockN++ {
+				for ; currentBlockN-logBlockDiff >= targetBlockN; targetBlockN++ {
 					switch subscribeType {
 					case SubscribeDOSProxyLogGrouping:
-						logs, err := e.wProxy.Contract.DOSProxyFilterer.FilterLogGrouping(&bind.FilterOpts{
+						logs, err := proxyFilter.FilterLogGrouping(&bind.FilterOpts{
 							Start:   targetBlockN,
 							End:     &targetBlockN,
-							Context: e.wCtx,
+							Context: ctx,
 						})
 						if err != nil {
 							errc <- err
@@ -790,10 +851,10 @@ func (e *EthAdaptor) PollLogs(subscribeType int, LogBlockDiff, preBlockBuf uint6
 							}
 						}
 					case SubscribeDOSProxyLogGroupDismiss:
-						logs, err := e.wProxy.Contract.DOSProxyFilterer.FilterLogGroupDismiss(&bind.FilterOpts{
+						logs, err := proxyFilter.FilterLogGroupDismiss(&bind.FilterOpts{
 							Start:   targetBlockN,
 							End:     &targetBlockN,
-							Context: e.wCtx,
+							Context: ctx,
 						})
 						if err != nil {
 							errc <- err
@@ -810,10 +871,10 @@ func (e *EthAdaptor) PollLogs(subscribeType int, LogBlockDiff, preBlockBuf uint6
 							}
 						}
 					case SubscribeDOSProxyLogUpdateRandom:
-						logs, err := e.wProxy.Contract.DOSProxyFilterer.FilterLogUpdateRandom(&bind.FilterOpts{
+						logs, err := proxyFilter.FilterLogUpdateRandom(&bind.FilterOpts{
 							Start:   targetBlockN,
 							End:     &targetBlockN,
-							Context: e.wCtx,
+							Context: ctx,
 						})
 						if err != nil {
 							errc <- err
@@ -831,10 +892,10 @@ func (e *EthAdaptor) PollLogs(subscribeType int, LogBlockDiff, preBlockBuf uint6
 							}
 						}
 					case SubscribeDOSProxyLogRequestUserRandom:
-						logs, err := e.wProxy.Contract.DOSProxyFilterer.FilterLogRequestUserRandom(&bind.FilterOpts{
+						logs, err := proxyFilter.FilterLogRequestUserRandom(&bind.FilterOpts{
 							Start:   targetBlockN,
 							End:     &targetBlockN,
-							Context: e.wCtx,
+							Context: ctx,
 						})
 						if err != nil {
 							errc <- err
@@ -854,10 +915,10 @@ func (e *EthAdaptor) PollLogs(subscribeType int, LogBlockDiff, preBlockBuf uint6
 							}
 						}
 					case SubscribeDOSProxyLogUrl:
-						logs, err := e.wProxy.Contract.DOSProxyFilterer.FilterLogUrl(&bind.FilterOpts{
+						logs, err := proxyFilter.FilterLogUrl(&bind.FilterOpts{
 							Start:   targetBlockN,
 							End:     &targetBlockN,
-							Context: e.wCtx,
+							Context: ctx,
 						})
 						if err != nil {
 							errc <- err
@@ -879,10 +940,10 @@ func (e *EthAdaptor) PollLogs(subscribeType int, LogBlockDiff, preBlockBuf uint6
 							}
 						}
 					case SubscribeDOSProxyLogValidationResult:
-						logs, err := e.wProxy.Contract.DOSProxyFilterer.FilterLogValidationResult(&bind.FilterOpts{
+						logs, err := proxyFilter.FilterLogValidationResult(&bind.FilterOpts{
 							Start:   targetBlockN,
 							End:     &targetBlockN,
-							Context: e.wCtx,
+							Context: ctx,
 						})
 						if err != nil {
 							errc <- err
@@ -907,12 +968,22 @@ func (e *EthAdaptor) PollLogs(subscribeType int, LogBlockDiff, preBlockBuf uint6
 					}
 				}
 				timer.Reset(LogCheckingInterval * time.Second)
-			case <-e.wCtx.Done():
+			case <-ctx.Done():
 				return
 			}
 		}
-	}()
-	return sink, errc
+
+	}
+
+	wg.Add(len(e.rClients) + 1)
+	go multiplex(e.wClient, &e.wProxy.Contract.DOSProxyFilterer, e.wCtx)
+	for i := 0; i < len(e.rClients); i++ {
+		go multiplex(e.rClients[i], &e.rProxies[i].DOSProxyFilterer, e.rCtxs[i])
+	}
+
+	wg.Wait()
+
+	return e.first(e.wCtx, mergeEvents(e.wCtx, sinks...)), mergeErrors(e.wCtx, errcs...)
 }
 
 func (e *EthAdaptor) LastRandomness() (rand *big.Int, err error) {

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
@@ -189,17 +190,27 @@ func main() {
 	if logger == nil {
 		logger = log.New("module", "AMAUser")
 	}
-	events := make(chan interface{}, 5)
-	userTestAdaptor.PollLogs(eth.SubscribeAskMeAnythingQueryResponseReady, events, LARGELOGBLOCKDIFF)
-	userTestAdaptor.PollLogs(eth.SubscribeAskMeAnythingRequestSent, events, SMALLLOGBLOCKDIFF)
-	userTestAdaptor.PollLogs(eth.SubscribeAskMeAnythingRandomReady, events, LARGELOGBLOCKDIFF)
+	var events []<-chan interface{}
+	var errcs []<-chan error
+	event, errc := userTestAdaptor.PollLogs(eth.SubscribeAskMeAnythingQueryResponseReady, LARGELOGBLOCKDIFF, 0)
+	events = append(events, event)
+	errcs = append(errcs, errc)
+	event, errc = userTestAdaptor.PollLogs(eth.SubscribeAskMeAnythingRequestSent, SMALLLOGBLOCKDIFF, 0)
+	events = append(events, event)
+	errcs = append(errcs, errc)
+	event, errc = userTestAdaptor.PollLogs(eth.SubscribeAskMeAnythingRandomReady, LARGELOGBLOCKDIFF, 0)
+	events = append(events, event)
+	errcs = append(errcs, errc)
+	event = eth.MergeEvents(context.Background(), events...)
+	errc = eth.MergeErrors(context.Background(), errcs...)
+
 	requestIdMap := make(map[string]bool)
 
 	go func() {
 		for {
 			select {
-			case event := <-events:
-				switch i := event.(type) {
+			case e := <-event:
+				switch i := e.(type) {
 				case *eth.AskMeAnythingSetTimeout:
 
 				case *eth.AskMeAnythingQueryResponseReady:

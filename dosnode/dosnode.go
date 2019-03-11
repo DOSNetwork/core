@@ -270,41 +270,36 @@ func (d *DosNode) buildPipeline(valueCtx context.Context, pubkey [4]*big.Int, gr
 }
 
 func (d *DosNode) listen() (err error) {
-
-	chUrl := make(chan interface{})
-	chRandom := make(chan interface{})
-	chUsrRandom := make(chan interface{})
-	eventValidation := make(chan interface{})
 	keyUploaded := make(chan interface{})
-	keyAccepted := make(chan interface{})
-	noworkinggroup := make(chan interface{})
 
 	var errcList []<-chan error
 	eventGrouping, errc := d.chain.PollLogs(onchain.SubscribeDOSProxyLogGrouping, 10, 0)
 	errcList = append(errcList, errc)
 	eventGroupDismiss, errc := d.chain.PollLogs(onchain.SubscribeDOSProxyLogGroupDismiss, 10, 0)
 	errcList = append(errcList, errc)
-	errc = mergeErrors(context.Background(), errcList...)
 
-	d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogUrl, chUrl)
-	d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogUpdateRandom, chRandom)
-	d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogRequestUserRandom, chUsrRandom)
-	d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogValidationResult, eventValidation)
-	d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogPublicKeyAccepted, keyAccepted)
-	d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogNoWorkingGroup, noworkinggroup)
+	chUrl, errc := d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogUrl)
+	errcList = append(errcList, errc)
+	chRandom, errc := d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogUpdateRandom)
+	errcList = append(errcList, errc)
+	chUsrRandom, errc := d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogRequestUserRandom)
+	errcList = append(errcList, errc)
+	eventValidation, errc := d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogValidationResult)
+	errcList = append(errcList, errc)
+	keyAccepted, errc := d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogPublicKeyAccepted)
+	errcList = append(errcList, errc)
+	noworkinggroup, errc := d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogNoWorkingGroup)
+	errcList = append(errcList, errc)
 
 	peerEvent, err := d.p.SubscribeEvent(50, vss.Signature{})
+	errcList = append(errcList, errc)
+	errc = mergeErrors(context.Background(), errcList...)
 
 	go func() {
 		pipeCancel := make(map[string]context.CancelFunc)
 		peerSignMap := make(map[string]*vss.Signature)
 		watchdog := time.NewTicker(WATCHDOGINTERVAL * time.Minute)
 
-		defer close(eventGrouping)
-		defer close(chUrl)
-		defer close(chRandom)
-		defer close(chUsrRandom)
-		defer close(eventValidation)
 		defer watchdog.Stop()
 		defer d.p.UnSubscribeEvent(vss.Signature{})
 		for {

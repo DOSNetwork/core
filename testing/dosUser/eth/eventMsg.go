@@ -2,6 +2,8 @@ package eth
 
 import (
 	"math/big"
+
+	"github.com/ethereum/go-ethereum/core/types"
 )
 
 //TODO: MAKE IT A UNIVERSAL INTERFACE FOR ALL KIND OF CHAINS IN FUTURE
@@ -17,6 +19,7 @@ type AskMeAnythingQueryResponseReady struct {
 	Tx      string
 	BlockN  uint64
 	Removed bool
+	Raw     types.Log
 }
 
 type AskMeAnythingRequestSent struct {
@@ -26,6 +29,7 @@ type AskMeAnythingRequestSent struct {
 	Tx             string
 	BlockN         uint64
 	Removed        bool
+	Raw            types.Log
 }
 
 type AskMeAnythingRandomReady struct {
@@ -34,4 +38,5 @@ type AskMeAnythingRandomReady struct {
 	Tx              string
 	BlockN          uint64
 	Removed         bool
+	Raw             types.Log
 }
