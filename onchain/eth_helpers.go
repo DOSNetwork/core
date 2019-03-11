@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"math"
 	"math/big"
+	"strings"
 	"sync"
 	"time"
 
@@ -24,8 +25,10 @@ const (
 	STOPSUBMITTHRESHOLD = 0.1
 	RETRTCOUNT          = 2
 	CHECKSYNCINTERVAL   = 1
+	REDIALINTERVAL      = 5
 	WCLIENTINDEX        = 0
 	SYNCBLOCKDRIFT      = 3
+	RETRYLIMIT          = 10
 )
 
 func ReadEthKey(credentialPath, passphrase string) (key *keystore.Key, err error) {
@@ -58,7 +61,13 @@ func DialToEth(ctx context.Context, urlPool []string) (out chan *ethclient.Clien
 
 	multiplex := func(index int) {
 		defer wg.Done()
+		connTemp := 1
 		client, e := ethclient.Dial(urlPool[index])
+		for connTemp < RETRYLIMIT && e != nil && strings.Contains(e.Error(), "no such host") {
+			client, e = ethclient.Dial(urlPool[index])
+			connTemp++
+			time.Sleep(time.Second * time.Duration(REDIALINTERVAL))
+		}
 		if e != nil {
 			select {
 			case <-ctx.Done():
@@ -78,28 +87,36 @@ func DialToEth(ctx context.Context, urlPool []string) (out chan *ethclient.Clien
 				select {
 				case <-ticker.C:
 					highestBlk, e := wClient.BlockByNumber(ctx, nil)
-					if e != nil && e != light.ErrNoPeers {
+					if e != nil {
 						fmt.Println(e)
-						select {
-						case <-ctx.Done():
-							ticker.Stop()
-							return
-						case err <- e:
-							ticker.Stop()
-							return
+						if e.Error() == light.ErrNoPeers.Error() {
+							continue
+						} else {
+							select {
+							case <-ctx.Done():
+								ticker.Stop()
+								return
+							case err <- e:
+								ticker.Stop()
+								return
+							}
 						}
 					}
 					highestBlkN := highestBlk.NumberU64()
 					currBlk, e := client.BlockByNumber(ctx, nil)
-					if e != nil && e != light.ErrNoPeers {
+					if e != nil {
 						fmt.Println(e)
-						select {
-						case <-ctx.Done():
-							ticker.Stop()
-							return
-						case err <- e:
-							ticker.Stop()
-							return
+						if e.Error() == light.ErrNoPeers.Error() {
+							continue
+						} else {
+							select {
+							case <-ctx.Done():
+								ticker.Stop()
+								return
+							case err <- e:
+								ticker.Stop()
+								return
+							}
 						}
 					}
 					currBlkN := currBlk.NumberU64()

@@ -68,6 +68,17 @@ docker-banker:
 docker-all: docker-bootnode docker-dosnode docker-usernode docker-peernode docker-peerTalk docker-banker
 	docker image prune -f
 
+docker-aws: docker-bootnode docker-dosnode docker-usernode docker-banker
+	docker image prune -f
+	docker tag usernode dosnetwork/usernode:latest
+	docker tag banker dosnetwork/banker:latest
+	docker tag bootstrap dosnetwork/bootstrap:latest
+	docker tag dosnode dosnetwork/dosnode:latest
+	docker push dosnetwork/usernode:latest
+	docker push dosnetwork/banker:latest
+	docker push dosnetwork/bootstrap:latest
+	docker push dosnetwork/dosnode:latest
+
 update-dosenv:
 	-docker rmi dosenv
 	-docker rmi dosnetwork/dosenv
