@@ -144,3 +144,11 @@ type DOSProxyLogNoWorkingGroup struct {
 	BlockN  uint64
 	Tx      string
 }
+
+type DOSProxyTestEvent struct {
+	Parameter *big.Int
+	Raw       types.Log
+	Removed   bool
+	BlockN    uint64
+	Tx        string
+}

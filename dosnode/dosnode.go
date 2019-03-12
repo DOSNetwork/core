@@ -373,13 +373,12 @@ func (d *DosNode) listen() (err error) {
 				if isMember {
 					sessionId := fmt.Sprintf("%x", content.GroupId)
 					f := map[string]interface{}{
-						"SessionID":    sessionId,
-						"WorkingGroup": d.chain.GetWorkingGroupSize(),
-						"Removed":      content.Removed,
-						"Tx":           content.Tx,
-						"CurBlkN":      currentBlockNumber,
-						"BlockN":       content.BlockN,
-						"Time":         time.Now()}
+						"SessionID": sessionId,
+						"Removed":   content.Removed,
+						"Tx":        content.Tx,
+						"CurBlkN":   currentBlockNumber,
+						"BlockN":    content.BlockN,
+						"Time":      time.Now()}
 					logger.Event("DOS_Grouping", f)
 					if !content.Removed {
 						ctx, cancelFunc := context.WithCancel(context.Background())
@@ -412,7 +411,6 @@ func (d *DosNode) listen() (err error) {
 						"DispatchedGroup_3": fmt.Sprintf("%x", content.PubKey[2].Bytes()),
 						"DispatchedGroup_4": fmt.Sprintf("%x", content.PubKey[3].Bytes()),
 						"Removed":           content.Removed,
-						"WorkingGroup":      d.chain.GetWorkingGroupSize(),
 						"Tx":                content.Tx,
 						"CurBlkN":           currentBlockNumber,
 						"BlockN":            content.BlockN,
@@ -444,7 +442,6 @@ func (d *DosNode) listen() (err error) {
 					"DispatchedGroup_4":    fmt.Sprintf("%x", content.DispatchedGroup[3].Bytes()),
 					"Removed":              content.Removed,
 					"IsMember":             d.isMember(content.DispatchedGroup),
-					"WorkingGroup":         d.chain.GetWorkingGroupSize(),
 					"Tx":                   content.Tx,
 					"CurBlkN":              currentBlockNumber,
 					"BlockN":               content.BlockN,
@@ -481,7 +478,6 @@ func (d *DosNode) listen() (err error) {
 					"DispatchedGroup_4":    fmt.Sprintf("%x", content.DispatchedGroup[3].Bytes()),
 					"Removed":              content.Removed,
 					"IsMember":             d.isMember(content.DispatchedGroup),
-					"WorkingGroup":         d.chain.GetWorkingGroupSize(),
 					"Tx":                   content.Tx,
 					"CurBlkN":              currentBlockNumber,
 					"BlockN":               content.BlockN,
@@ -521,7 +517,6 @@ func (d *DosNode) listen() (err error) {
 					"DispatchedGroup_4": fmt.Sprintf("%x", content.DispatchedGroup[3].Bytes()),
 					"Removed":           content.Removed,
 					"IsMember":          d.isMember(content.DispatchedGroup),
-					"WorkingGroup":      d.chain.GetWorkingGroupSize(),
 					"Tx":                content.Tx,
 					"CurBlkN":           currentBlockNumber,
 					"BlockN":            content.BlockN,
@@ -652,12 +647,11 @@ func (d *DosNode) listen() (err error) {
 					continue
 				}
 				f := map[string]interface{}{
-					"WorkingGroup": d.chain.GetWorkingGroupSize(),
-					"Removed":      content.Removed,
-					"Tx":           content.Tx,
-					"CurBlkN":      currentBlockNumber,
-					"BlockN":       content.BlockN,
-					"Time":         time.Now()}
+					"Removed": content.Removed,
+					"Tx":      content.Tx,
+					"CurBlkN": currentBlockNumber,
+					"BlockN":  content.BlockN,
+					"Time":    time.Now()}
 				logger.Event("DOS_NOWORKINGGROUP", f)
 			case <-d.done:
 				return

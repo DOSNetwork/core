@@ -31,6 +31,47 @@ const (
 	RETRYLIMIT          = 10
 )
 
+func first(ctx context.Context, source <-chan interface{}) <-chan interface{} {
+	out := make(chan interface{})
+	go func() {
+		defer close(out)
+		first := true
+		for val := range source {
+			if first {
+				out <- val
+				first = false
+			}
+		}
+	}()
+	return out
+}
+
+func merge(ctx context.Context, cs ...chan interface{}) <-chan interface{} {
+	var wg sync.WaitGroup
+	out := make(chan interface{})
+
+	// Start an output goroutine for each input channel in cs.  output
+	// copies values from c to out until c is closed, then calls wg.Done.
+	output := func(c <-chan interface{}) {
+		for n := range c {
+			out <- n
+		}
+		wg.Done()
+	}
+	wg.Add(len(cs))
+	for _, c := range cs {
+		go output(c)
+	}
+
+	// Start a goroutine to close out once all the output goroutines are
+	// done.  This must start after the wg.Add call.
+	go func() {
+		wg.Wait()
+		close(out)
+	}()
+	return out
+}
+
 func ReadEthKey(credentialPath, passphrase string) (key *keystore.Key, err error) {
 	fmt.Println("credentialPath: ", credentialPath)
 	newKeyStore := keystore.NewKeyStore(credentialPath, keystore.StandardScryptN, keystore.StandardScryptP)

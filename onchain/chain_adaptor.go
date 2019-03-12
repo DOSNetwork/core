@@ -23,14 +23,14 @@ type ProxyAdapter interface {
 	SubscribeEvent(subscribeType int) (<-chan interface{}, <-chan error)
 	PollLogs(subscribeType int, LogBlockDiff, preBlockBuf uint64) (<-chan interface{}, <-chan error)
 
-	GetWorkingGroupSize() (size uint64)
+	GetWorkingGroupSize() (size uint64, err error)
 	LastUpdatedBlock() (blknum uint64, err error)
-	GroupPubKey(idx int) (groupPubKeys [4]*big.Int, err error)
 
 	GetBalance() (balance *big.Float)
 	Address() (addr []byte)
 	CurrentBlock() (blknum uint64, err error)
 
+	GroupPubKey(idx int) (groupPubKeys [4]*big.Int, err error)
 	//BootStrap() error
 	ResetContract() error
 }
@@ -38,7 +38,7 @@ type ProxyAdapter interface {
 func NewProxyAdapter(ChainType, credentialPath, passphrase, proxyAddr string, urls []string) (ProxyAdapter, error) {
 	switch ChainType {
 	case ETH:
-		adaptor, err := NewEthAdaptor(credentialPath, passphrase, proxyAddr, urls)
+		adaptor, err := NewEthAdaptor(credentialPath, passphrase, proxyAddr, urls[:2], urls[2:])
 		return adaptor, err
 	default:
 		err := fmt.Errorf("Chain %s not supported error\n", ChainType)
