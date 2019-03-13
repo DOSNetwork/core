@@ -1,0 +1,22 @@
+version: '3.3'
+services:
+  geth:
+    image: ethereum/client-go
+    ports:
+      - target: 8546
+        published: 8546
+        protocol: tcp
+        mode: host
+    deploy:
+      replicas: 20
+      restart_policy:
+        condition: on-failure
+    command:
+      --rpc
+      --rpcaddr 0.0.0.0
+      --ws
+      --wsaddr 0.0.0.0
+      --wsorigins '*'
+      --rinkeby
+      --syncmode "light"
+      --lightkdf
