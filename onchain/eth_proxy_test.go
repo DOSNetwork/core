@@ -3,11 +3,8 @@ package onchain
 import (
 	"context"
 	"fmt"
-	"sync"
 	"testing"
 	"time"
-
-	"github.com/DOSNetwork/core/share/vss/pedersen"
 )
 
 const (
@@ -16,154 +13,122 @@ const (
 	TWOFULLNODES_2
 )
 
-func mergeErrors(ctx context.Context, cs ...<-chan error) <-chan error {
-	var wg sync.WaitGroup
-	// We must ensure that the output channel has the capacity to
-	// hold as many errors
-	// as there are error channels.
-	// This will ensure that it never blocks, even
-	// if WaitForPipeline returns early.
-	out := make(chan error, len(cs))
-	// Start an output goroutine for each input channel in cs.  output
-	// copies values from c to out until c is closed, then calls
-	// wg.Done.
-	output := func(c <-chan error) {
-		for n := range c {
-			select {
-			case <-ctx.Done():
-				return
-			case out <- n:
-			}
-		}
-		wg.Done()
-	}
-	wg.Add(len(cs))
-	for _, c := range cs {
-		go output(c)
-	}
-	// Start a goroutine to close out once all the output goroutines
-	// are done.  This must start after the wg.Add call.
-	go func() {
-		wg.Wait()
-		close(out)
-	}()
-	return out
-}
+func TestGetPendingNonce(t *testing.T) {
+	urls := []string{""}
+	proxyAddr := ""
+	credentialPath := ""
+	passphrase := ""
 
-func testProxy(setting int) (err error) {
-
-	proxyAddr := "0x25d1b6aD154C84a998a836663c867853A916d4bD"
-	urls := []string{"ws://51.15.0.157:8546", "ws://51.159.4.51:8546", "wss://rinkeby.infura.io/ws/8e609c76fce442f8a1735fbea9999747"}
-	if setting == TWOFULLNODES_1 {
-		//urls = []string{"wss://rinkeby.infura.io/ws/8e609c76fce442f8a1735fbea9999747"}
-		urls = []string{"ws://51.15.0.157:8546"}
-	} else if setting == TWOFULLNODES_2 {
-		urls = []string{"ws://51.159.4.51:8546"}
-	}
-
-	//proxyAddr := "0x4562daE9d912638413a5B290D657e28724E28e06"
-	//urls := []string{"ws://163.172.36.173:8546"}
-
-	credentialPath := "/Users/chenhaonien/go/src/github.com/DOSNetwork/core/credential"
-	passphrase := "123"
-	adaptor, err := NewETHProxySession(credentialPath, passphrase, proxyAddr, urls)
+	adaptor, err := NewEthAdaptor(credentialPath, passphrase, proxyAddr, urls)
 	if err != nil {
-		fmt.Println(err.Error())
+		t.Errorf("TestConcurrentSend Failed, got an Error : %s.", err.Error())
 		return
 	}
 
-	if adaptor.s == nil {
-		fmt.Println("adaptor is  nil ")
+	_, e := adaptor.PendingNonce()
+	if e != nil {
+		t.Errorf("TestGetPendingNonce Failed , got an error: %s.", err.Error())
+	}
+}
+
+func TestConcurrentSend(t *testing.T) {
+	urls := []string{""}
+
+	proxyAddr := ""
+	credentialPath := ""
+	passphrase := ""
+
+	adaptor, err := NewEthAdaptor(credentialPath, passphrase, proxyAddr, urls)
+	if err != nil {
+		t.Errorf("TestConcurrentSend Failed, got an error : %s.", err.Error())
+		return
 	}
 
-	sink := make(chan interface{}, 1)
-	if setting == TWOFULLNODES_1 {
-		_ = adaptor.SubscribeEvent(SubscribeDOSProxyLogUpdateRandom, sink)
-	} else if setting == TWOFULLNODES_2 {
-		_ = adaptor.SubscribeEvent(SubscribeDOSProxyLogInsufficientWorkingGroup, sink)
-	} else {
-		_ = adaptor.SubscribeEvent(SubscribeDOSProxyLogUpdateRandom, sink)
-		_ = adaptor.SubscribeEvent(SubscribeDOSProxyLogInsufficientWorkingGroup, sink)
-		_ = adaptor.SubscribeEvent(SubscribeDOSProxyLogInsufficientPendingNode, sink)
-		_ = adaptor.SubscribeEvent(SubscribeDOSProxyLogValidationResult, sink)
-	}
+	var errcList []<-chan error
+	sink, errc := adaptor.SubscribeEvent(SubscribeDOSProxyTestEvent)
+	errcList = append(errcList, errc)
 
 	ctx, _ := context.WithCancel(context.Background())
-	var errcList []<-chan error
-	sigC := make(chan *vss.Signature)
-	for i := 1; i <= 3; i++ {
 
-		if setting == TWOFULLNODES_1 {
-			err := adaptor.RegisterNewNode(ctx)
-			errcList = append(errcList, err)
-		} else if setting == TWOFULLNODES_2 {
-			err := adaptor.RandomNumberTimeOut(ctx)
-			errcList = append(errcList, err)
-		} else {
-
-			err := adaptor.SetRandomNum(ctx, sigC)
-			errcList = append(errcList, err)
-			b := []byte{'g', 'o', 'l', 'a', 'n', 'g', 'g', 'o', 'l', 'a',
-				'g', 'o', 'l', 'a', 'n', 'g', 'g', 'o', 'l', 'a',
-				'g', 'o', 'l', 'a', 'n', 'g', 'g', 'o', 'l', 'a',
-				'g', 'o', 'l', 'a', 'n', 'g', 'g', 'o', 'l', 'a',
-				'g', 'o', 'l', 'a', 'n', 'g', 'g', 'o', 'l', 'a',
-				'g', 'o', 'l', 'a', 'n', 'g', 'g', 'o', 'l', 'a',
-				'g', 'o', 'l', 'a'}
-			sig := &vss.Signature{Index: 1, QueryId: "test", Content: b, Signature: b}
-			sigC <- sig
-
-		}
-
+	for i := 0; i < 5; i++ {
+		go func(i int) {
+			_ = adaptor.TestContract(ctx, uint64(i))
+		}(i)
 	}
-	errc := mergeErrors(ctx, errcList...)
-
-	//count := 0
+	errc = mergeErrors(ctx, errcList...)
+	result := 0
 L:
 	for {
 		select {
 		case event := <-sink:
 			switch content := event.(type) {
-			case *DOSProxyLogInsufficientWorkingGroup:
-				fmt.Println(setting, " Event DOSProxyLogInsufficientGroupNumber")
-				//count++
-			case *DOSProxyLogInsufficientPendingNode:
-				fmt.Println(setting, " Event DOSProxyLogInsufficientPendingNode")
-				//count++
-			case *DOSProxyLogUpdateRandom:
-				if !content.Removed {
-					fmt.Println(setting, " Event DOSProxyLogUpdateRandom last: ", fmt.Sprintf("%x", content.LastRandomness))
-					fmt.Println(setting, " Event DOSProxyLogUpdateRandom tx : ", content.Tx)
-					//count++
-
-				}
-			case *DOSProxyLogValidationResult:
-				if !content.Removed {
-					fmt.Println(setting, " Event DOSProxyLogValidationResult ", content.Pass)
-					//count++
+			case *DOSProxyTestEvent:
+				result = result + int(content.Parameter.Uint64())
+				if result == 15 {
+					break L
 				}
 			}
-		case _, ok := <-errc:
-			if !ok {
-				fmt.Println("errc done")
-				adaptor.End()
-				break L
+		case e, ok := <-errc:
+			if ok {
+				err = e
+				fmt.Println(err)
 			}
 		}
 	}
-	close(sink)
-	return
 }
 
-func TestConcurrentSend(t *testing.T) {
-	testProxy(ONEFULLNODE)
-	err := testProxy(ONEFULLNODE)
-	for err != nil {
-		time.Sleep(3 * time.Second)
-		err = testProxy(ONEFULLNODE)
+func TestSendRequest(t *testing.T) {
+	urls := []string{""}
+
+	proxyAddr := ""
+	credentialPath := ""
+	passphrase := ""
+
+	adaptor, err := NewEthAdaptor(credentialPath, passphrase, proxyAddr, urls)
+	if err != nil {
+		t.Errorf("TestConcurrentSend Failed, got an error : %s.", err.Error())
+		return
+	}
+
+	var errcList []<-chan error
+	sink, errc := adaptor.SubscribeEvent(SubscribeDOSProxyTestEvent)
+	errcList = append(errcList, errc)
+
+	fmt.Println("!!!!!!!!stop geth")
+	time.Sleep(5 * time.Second)
+	ctx, _ := context.WithCancel(context.Background())
+	count := 5
+	for i := 0; i < count; i++ {
+		_ = adaptor.TestContract(ctx, uint64(i))
+		time.Sleep(1 * time.Second)
+	}
+	fmt.Println("!!!!!!!!restore geth")
+
+	errc = mergeErrors(ctx, errcList...)
+	result := 0
+L:
+	for {
+		select {
+		case event := <-sink:
+			switch content := event.(type) {
+			case *DOSProxyTestEvent:
+				result = result + int(content.Parameter.Uint64())
+				if result == 15 {
+					break L
+				}
+			}
+		case e, ok := <-errc:
+			if ok {
+				err = e
+				fmt.Println(err)
+				//t.Errorf("TestConcurrentSend Failed, got an error : %s.", err.Error())
+				//break L
+			}
+		}
 	}
 }
 
+/*
 func TestNonceConflict(t *testing.T) {
 
 	for i := 1; i < 2; i++ {
@@ -181,3 +146,4 @@ func TestNonceConflict(t *testing.T) {
 		wg.Wait()
 	}
 }
+*/

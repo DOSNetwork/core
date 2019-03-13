@@ -94,90 +94,29 @@ func ReadEthKey(credentialPath, passphrase string) (key *keystore.Key, err error
 	return
 }
 
-func DialToEth(ctx context.Context, urlPool []string) (out chan *ethclient.Client, err chan error) {
+func DialToEth(ctx context.Context, urlPool []string) (out chan *ethclient.Client) {
 	out = make(chan *ethclient.Client)
-	err = make(chan error)
 	var wg sync.WaitGroup
-	var wClient *ethclient.Client
-
-	multiplex := func(index int) {
+	connTemp := 1
+	multiplex := func(url string) {
+		var e error
+		var client *ethclient.Client
 		defer wg.Done()
-		connTemp := 1
-		client, e := ethclient.Dial(urlPool[index])
+		client, e = ethclient.Dial(url)
+
 		for connTemp < RETRYLIMIT && e != nil && strings.Contains(e.Error(), "no such host") {
-			client, e = ethclient.Dial(urlPool[index])
+			client, e = ethclient.Dial(url)
 			connTemp++
 			time.Sleep(time.Second * time.Duration(REDIALINTERVAL))
 		}
 		if e != nil {
-			select {
-			case <-ctx.Done():
-				return
-			case err <- e:
-				return
-			}
+			return
 		}
-
-		if index == WCLIENTINDEX {
-			wClient = client
-		} else {
-			fmt.Println("wait client to sync...")
-			ticker := time.NewTicker(time.Second * time.Duration(CHECKSYNCINTERVAL))
-		L:
-			for {
-				select {
-				case <-ticker.C:
-					highestBlk, e := wClient.BlockByNumber(ctx, nil)
-					if e != nil {
-						fmt.Println(e)
-						if e.Error() == light.ErrNoPeers.Error() {
-							continue
-						} else {
-							select {
-							case <-ctx.Done():
-								ticker.Stop()
-								return
-							case err <- e:
-								ticker.Stop()
-								return
-							}
-						}
-					}
-					highestBlkN := highestBlk.NumberU64()
-					currBlk, e := client.BlockByNumber(ctx, nil)
-					if e != nil {
-						fmt.Println(e)
-						if e.Error() == light.ErrNoPeers.Error() {
-							continue
-						} else {
-							select {
-							case <-ctx.Done():
-								ticker.Stop()
-								return
-							case err <- e:
-								ticker.Stop()
-								return
-							}
-						}
-					}
-					currBlkN := currBlk.NumberU64()
-					blockDiff := math.Abs(float64(highestBlkN) - float64(currBlkN))
-					fmt.Println("block to Sync ", blockDiff)
-					if blockDiff <= SYNCBLOCKDRIFT {
-						ticker.Stop()
-						break L
-					}
-				}
-			}
-			fmt.Println("sync success")
-		}
-
 		select {
 		case <-ctx.Done():
 			client.Close()
 			return
 		case out <- client:
-			fmt.Println("Client ", index, " initialized")
 		}
 	}
 
@@ -185,10 +124,8 @@ func DialToEth(ctx context.Context, urlPool []string) (out chan *ethclient.Clien
 	wg.Add(len(urlPool))
 
 	go func() {
-		//ensure the first is always http client
-		multiplex(WCLIENTINDEX)
-		for i := WCLIENTINDEX + 1; i < len(urlPool); i++ {
-			go multiplex(i)
+		for i := 0; i < len(urlPool); i++ {
+			go multiplex(urlPool[i])
 		}
 	}()
 
@@ -196,10 +133,60 @@ func DialToEth(ctx context.Context, urlPool []string) (out chan *ethclient.Clien
 	go func() {
 		wg.Wait()
 		close(out)
-		close(err)
 	}()
 
 	return
+}
+
+func CheckSync(ctx context.Context, mClient *ethclient.Client, cs chan *ethclient.Client) chan *ethclient.Client {
+	out := make(chan *ethclient.Client)
+	var wg sync.WaitGroup
+	size := 0
+
+	for client := range cs {
+		size++
+		go func(client *ethclient.Client) {
+			defer wg.Done()
+			ticker := time.NewTicker(time.Second * time.Duration(CHECKSYNCINTERVAL))
+			for _ = range ticker.C {
+				highestBlk, e := mClient.BlockByNumber(ctx, nil)
+				if e != nil {
+					fmt.Println(e)
+					if e.Error() == light.ErrNoPeers.Error() {
+						continue
+					} else {
+						return
+					}
+				}
+				highestBlkN := highestBlk.NumberU64()
+				currBlk, e := client.BlockByNumber(ctx, nil)
+				if e != nil {
+					fmt.Println(e)
+					if e.Error() == light.ErrNoPeers.Error() {
+						continue
+					} else {
+						return
+					}
+				}
+				currBlkN := currBlk.NumberU64()
+				fmt.Println("highestBlkN ", highestBlkN, "  currBlkN ", currBlkN)
+				blockDiff := math.Abs(float64(highestBlkN) - float64(currBlkN))
+				fmt.Println("block to Sync ", blockDiff)
+				if blockDiff <= SYNCBLOCKDRIFT {
+					ticker.Stop()
+					out <- client
+					return
+				}
+			}
+		}(client)
+	}
+	wg.Add(size)
+	// Wait for all the reads to complete
+	go func() {
+		wg.Wait()
+		close(out)
+	}()
+	return out
 }
 
 func GetCurrentBlock(client *ethclient.Client) (blknum uint64, err error) {
@@ -216,7 +203,7 @@ func CheckTransaction(client *ethclient.Client, tx *types.Transaction) (err erro
 	receipt, err := client.TransactionReceipt(context.Background(), tx.Hash())
 	for err == ethereum.NotFound {
 
-		if time.Since(start).Seconds() > 90 {
+		if time.Since(start).Seconds() > 150 {
 			err = errors.New("transaction not found")
 			fmt.Println("transaction failed. tx ", fmt.Sprintf("%x", tx.Hash()))
 			return

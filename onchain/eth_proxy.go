@@ -38,6 +38,7 @@ const (
 	LastRandomness
 	WorkingGroupSize
 	LastUpdatedBlock
+	PendingNonce
 )
 
 // TODO: Move constants to some unified places.
@@ -57,12 +58,14 @@ var logger log.Logger
 
 type Request struct {
 	ctx    context.Context
+	s      *dosproxy.DOSProxySession
 	f      func() (*types.Transaction, error)
 	result chan Reply
 }
 
 type RequestTest struct {
 	ctx       context.Context
+	s         *dosproxy.DOSProxySession
 	parameter *big.Int
 	f         func(*big.Int) (*types.Transaction, error)
 	result    chan Reply
@@ -70,6 +73,7 @@ type RequestTest struct {
 
 type ReqGrouping struct {
 	ctx        context.Context
+	s          *dosproxy.DOSProxySession
 	candidates []common.Address
 	size       *big.Int
 	f          func([]common.Address, *big.Int) (*types.Transaction, error)
@@ -78,6 +82,7 @@ type ReqGrouping struct {
 
 type ReqSetRandomNum struct {
 	ctx     context.Context
+	s       *dosproxy.DOSProxySession
 	sig     [2]*big.Int
 	version uint8
 	f       func([2]*big.Int, uint8) (*types.Transaction, error)
@@ -86,6 +91,7 @@ type ReqSetRandomNum struct {
 
 type ReqSetPublicKey struct {
 	ctx     context.Context
+	s       *dosproxy.DOSProxySession
 	groupId *big.Int
 	pubKey  [4]*big.Int
 	f       func(*big.Int, [4]*big.Int) (*types.Transaction, error)
@@ -94,6 +100,7 @@ type ReqSetPublicKey struct {
 
 type ReqTriggerCallback struct {
 	ctx         context.Context
+	s           *dosproxy.DOSProxySession
 	requestId   *big.Int
 	trafficType uint8
 	content     []byte
@@ -130,11 +137,22 @@ type EthAdaptor struct {
 	eCancelFunc context.CancelFunc
 }
 
-func NewEthAdaptor(credentialPath, passphrase, proxyAddr string, gethUrls []string, eventUrls []string) (adaptor *EthAdaptor, err error) {
+func NewEthAdaptor(credentialPath, passphrase, proxyAddr string, urls []string) (adaptor *EthAdaptor, err error) {
+	var httpUrls []string
+	var wsUrls []string
+	for _, url := range urls {
+		if strings.Contains(url, "http") {
+			httpUrls = append(httpUrls, url)
+		} else if strings.Contains(url, "ws") {
+			wsUrls = append(wsUrls, url)
+		}
+	}
+	fmt.Println("gethUrls ", httpUrls)
+	fmt.Println("eventUrls ", wsUrls)
 
 	adaptor = &EthAdaptor{}
-	adaptor.gethUrls = gethUrls
-	adaptor.eventUrls = eventUrls
+	adaptor.gethUrls = httpUrls
+	adaptor.eventUrls = wsUrls
 	adaptor.proxyAddr = proxyAddr
 
 	//Read Ethereum keystore
@@ -157,12 +175,7 @@ func NewEthAdaptor(credentialPath, passphrase, proxyAddr string, gethUrls []stri
 	adaptor.auth.Context = adaptor.ctx
 
 	//
-	clients, errs := DialToEth(context.Background(), gethUrls)
-	go func() {
-		for err := range errs {
-			logger.Error(err)
-		}
-	}()
+	clients := DialToEth(context.Background(), httpUrls)
 	for client := range clients {
 		p, e := dosproxy.NewDOSProxy(common.HexToAddress(proxyAddr), client)
 		if e != nil {
@@ -180,13 +193,9 @@ func NewEthAdaptor(credentialPath, passphrase, proxyAddr string, gethUrls []stri
 	adaptor.reqQueue = make(chan interface{})
 
 	adaptor.eCtx, adaptor.eCancelFunc = context.WithCancel(context.Background())
-	clients, errs = DialToEth(context.Background(), eventUrls)
-	go func() {
-		for err := range errs {
-			logger.Error(err)
-		}
-	}()
-	for client := range clients {
+	syncClients := CheckSync(adaptor.eCtx, adaptor.clients[0], DialToEth(context.Background(), wsUrls))
+	for client := range syncClients {
+		fmt.Println("syncClients")
 		p, err := dosproxy.NewDOSProxy(common.HexToAddress(proxyAddr), client)
 		if err != nil {
 			logger.Error(err)
@@ -240,7 +249,8 @@ func (e *EthAdaptor) reqLoop() {
 				reply := Reply{}
 
 				//TODO:Change this to Fan In and save nonce to e.auth
-				nonce, err := e.clients[0].PendingNonceAt(e.ctx, e.key.Address)
+
+				nonce, err := e.PendingNonce()
 				if err != nil {
 					reply.err = err
 					resultC <- reply
@@ -248,44 +258,50 @@ func (e *EthAdaptor) reqLoop() {
 				}
 
 				nonceBig := new(big.Int).SetUint64(nonce)
-				if e.proxies[0].TransactOpts.Nonce == nil {
-					e.proxies[0].TransactOpts.Nonce = nonceBig
-				} else if e.proxies[0].TransactOpts.Nonce.Cmp(nonceBig) == -1 {
-					e.proxies[0].TransactOpts.Nonce = nonceBig
+				if e.auth.Nonce == nil {
+					e.auth.Nonce = nonceBig
+				} else if e.auth.Nonce.Cmp(nonceBig) == -1 {
+					e.auth.Nonce = nonceBig
 				}
-				fmt.Println("Got a request nonce , ", e.proxies[0].TransactOpts.Nonce)
+				fmt.Println("Got a request nonce , ", e.auth.Nonce)
 
 				switch content := req.(type) {
 				case *Request:
+					content.s.TransactOpts.Nonce = e.auth.Nonce
 					tx, err = content.f()
 					resultC = content.result
 					ctx = content.ctx
 				case *ReqGrouping:
+					content.s.TransactOpts.Nonce = e.auth.Nonce
 					tx, err = content.f(content.candidates, content.size)
 					resultC = content.result
 					ctx = content.ctx
 				case *RequestTest:
+					content.s.TransactOpts.Nonce = e.auth.Nonce
 					tx, err = content.f(content.parameter)
 					resultC = content.result
 					ctx = content.ctx
 				case *ReqSetRandomNum:
+					content.s.TransactOpts.Nonce = e.auth.Nonce
 					tx, err = content.f(content.sig, content.version)
 					resultC = content.result
 					ctx = content.ctx
 				case *ReqTriggerCallback:
+					content.s.TransactOpts.Nonce = e.auth.Nonce
 					tx, err = content.f(content.requestId, content.trafficType, content.content, content.sig, content.version)
 					resultC = content.result
 					ctx = content.ctx
 				case *ReqSetPublicKey:
+					content.s.TransactOpts.Nonce = e.auth.Nonce
 					tx, err = content.f(content.groupId, content.pubKey)
 					resultC = content.result
 					ctx = content.ctx
 				}
 				if err != nil {
 					if err.Error() == "replacement transaction underpriced" ||
-						strings.Contains(err.Error(), "known transaction") {
-						e.proxies[0].TransactOpts.Nonce = e.proxies[0].TransactOpts.Nonce.Add(e.proxies[0].TransactOpts.Nonce, big.NewInt(1))
-
+						strings.Contains(err.Error(), "known transaction") ||
+						strings.Contains(err.Error(), "nonce too low") {
+						e.auth.Nonce = e.auth.Nonce.Add(e.auth.Nonce, big.NewInt(1))
 					}
 					reply.err = err
 					resultC <- reply
@@ -293,8 +309,8 @@ func (e *EthAdaptor) reqLoop() {
 				}
 
 				reply.tx = tx
-				reply.nonce = e.proxies[0].TransactOpts.Nonce.Uint64()
-				e.proxies[0].TransactOpts.Nonce = e.proxies[0].TransactOpts.Nonce.Add(e.proxies[0].TransactOpts.Nonce, big.NewInt(1))
+				reply.nonce = e.auth.Nonce.Uint64()
+				e.auth.Nonce = e.auth.Nonce.Add(e.auth.Nonce, big.NewInt(1))
 				select {
 				case resultC <- reply:
 				case <-ctx.Done():
@@ -306,16 +322,28 @@ func (e *EthAdaptor) reqLoop() {
 	}()
 }
 
-func (e *EthAdaptor) sendRequest(ctx context.Context, request interface{}, result chan Reply) <-chan error {
+func (e *EthAdaptor) sendRequest(ctx context.Context, c *ethclient.Client, pre <-chan error, request interface{}, result chan Reply) <-chan error {
 	errc := make(chan error)
 	go func() {
 		defer close(errc)
-		defer close(result)
-		//The same account might be used outside of system that causes a nonce conflict.
-		//Need to check if tx is confirmed to avoid lost transaction because of nonce conflict
-		for {
-			//fmt.Println("sendRequest")
+		retry := 10
+		if pre != nil {
+			select {
+			case <-ctx.Done():
+				return
+			case err := <-pre:
+				//Request has been fulfulled by previous sendRequest
+				if err == nil {
+					fmt.Println("Request has been fulfulled by previous sendRequest")
+					return
+				} else {
+					fmt.Println("Request handled by other sendRequest beacuse of e ,", err)
 
+				}
+			}
+		}
+
+		for {
 			select {
 			case <-ctx.Done():
 				return
@@ -329,24 +357,42 @@ func (e *EthAdaptor) sendRequest(ctx context.Context, request interface{}, resul
 				tx := reply.tx
 				//nonce := reply.nonce
 				if err != nil {
-					logger.Error(err)
-					f := map[string]interface{}{
-						"ErrMsg": err.Error(),
-						"Time":   time.Now()}
-					logger.Event("SendRequestFail", f)
-					continue
+					if err.Error() == "replacement transaction underpriced" ||
+						strings.Contains(err.Error(), "known transaction") ||
+						strings.Contains(err.Error(), "nonce too low") {
+						continue
+					}
+					if retry == 0 {
+						fmt.Println("Reply err ", err)
+						select {
+						case errc <- err:
+						case <-ctx.Done():
+						}
+						return
+					} else {
+						fmt.Println("Retry :Reply err ", err)
+						time.Sleep(5 * time.Second)
+						retry--
+						continue
+					}
 				}
 				defer logger.TimeTrack(time.Now(), "SendRequest", map[string]interface{}{"RequestId": ctx.Value("RequestID"), "Tx": fmt.Sprintf("%x", tx.Hash())})
 				fmt.Println("Tx", fmt.Sprintf("%x", tx.Hash()))
-				//TODO:Add a retry and FanIn
-				err = CheckTransaction(e.clients[0], tx)
+				//TODO : move this out of sendRequest
+				err = CheckTransaction(c, tx)
 				if err != nil {
+					if strings.Contains(err.Error(), "transaction not found") {
+						//Resend the request
+						continue
+					}
 					logger.Error(err)
 					f := map[string]interface{}{
 						"Tx":     tx,
 						"ErrMsg": err.Error(),
 						"Time":   time.Now()}
 					logger.Event("TransactionFail", f)
+					fmt.Println("TransactionFail err ", err)
+					//Don't return err to errc to delete the whole sendRequest chain
 					return
 				}
 				return
@@ -361,20 +407,26 @@ func (e *EthAdaptor) sendRequest(ctx context.Context, request interface{}, resul
 func (e *EthAdaptor) RegisterNewNode(ctx context.Context) (errc <-chan error) {
 	defer logger.TimeTrack(time.Now(), "RegisterNewNode", nil)
 	result := make(chan Reply)
-	request := &Request{ctx, e.proxies[0].RegisterNewNode, result}
-	return e.sendRequest(ctx, request, result)
+	for i, proxy := range e.proxies {
+		request := &Request{ctx, proxy, proxy.RegisterNewNode, result}
+		errc = e.sendRequest(ctx, e.clients[i], errc, request, result)
+	}
+	return
 }
 
 func (e *EthAdaptor) RandomNumberTimeOut(ctx context.Context) (errc <-chan error) {
+	defer logger.TimeTrack(time.Now(), "RandomNumberTimeOut", nil)
 	result := make(chan Reply)
-	request := &Request{ctx, e.proxies[0].HandleTimeout, result}
-	return e.sendRequest(ctx, request, result)
+	for i, proxy := range e.proxies {
+		request := &Request{ctx, proxy, proxy.HandleTimeout, result}
+		errc = e.sendRequest(ctx, e.clients[i], errc, request, result)
+	}
+	return
 }
 
-func (e *EthAdaptor) RegisterGroupPubKey(ctx context.Context, IdWithPubKeys chan [5]*big.Int) (errc chan error) {
+func (e *EthAdaptor) RegisterGroupPubKey(ctx context.Context, IdWithPubKeys chan [5]*big.Int) (errc <-chan error) {
 	errc = make(chan error)
 	go func() {
-		defer close(errc)
 		select {
 		case IdWithPubKey, ok := <-IdWithPubKeys:
 			if !ok {
@@ -384,10 +436,12 @@ func (e *EthAdaptor) RegisterGroupPubKey(ctx context.Context, IdWithPubKeys chan
 			groupId := IdWithPubKey[0]
 			var pubKey [4]*big.Int
 			copy(pubKey[:], IdWithPubKey[1:])
-			request := &ReqSetPublicKey{ctx, groupId, pubKey, e.proxies[0].RegisterGroupPubKey, result}
-			errChan := e.sendRequest(ctx, request, result)
-			err := <-errChan
-			errc <- err
+
+			for i, proxy := range e.proxies {
+				request := &ReqSetPublicKey{ctx, proxy, groupId, pubKey, proxy.RegisterGroupPubKey, result}
+				errc = e.sendRequest(ctx, e.clients[i], errc, request, result)
+			}
+
 			f := map[string]interface{}{
 				"DispatchedGroupId": fmt.Sprintf("%x", groupId.Bytes()),
 				"DispatchedGroup_1": fmt.Sprintf("%x", pubKey[0].Bytes()),
@@ -404,10 +458,9 @@ func (e *EthAdaptor) RegisterGroupPubKey(ctx context.Context, IdWithPubKeys chan
 	return errc
 }
 
-func (e *EthAdaptor) SetRandomNum(ctx context.Context, signatures <-chan *vss.Signature) (errc chan error) {
+func (e *EthAdaptor) SetRandomNum(ctx context.Context, signatures <-chan *vss.Signature) (errc <-chan error) {
 	errc = make(chan error)
 	go func() {
-		defer close(errc)
 		select {
 		case signature, ok := <-signatures:
 			if !ok {
@@ -415,10 +468,10 @@ func (e *EthAdaptor) SetRandomNum(ctx context.Context, signatures <-chan *vss.Si
 			}
 			x, y := DecodeSig(signature.Signature)
 			result := make(chan Reply)
-			request := &ReqSetRandomNum{ctx, [2]*big.Int{x, y}, 0, e.proxies[0].UpdateRandomness, result}
-			errChan := e.sendRequest(ctx, request, result)
-			err := <-errChan
-			errc <- err
+			for i, proxy := range e.proxies {
+				request := &ReqSetRandomNum{ctx, proxy, [2]*big.Int{x, y}, 0, proxy.UpdateRandomness, result}
+				errc = e.sendRequest(ctx, e.clients[i], errc, request, result)
+			}
 			return
 		case <-ctx.Done():
 			return
@@ -427,10 +480,9 @@ func (e *EthAdaptor) SetRandomNum(ctx context.Context, signatures <-chan *vss.Si
 	return errc
 }
 
-func (e *EthAdaptor) DataReturn(ctx context.Context, signatures <-chan *vss.Signature) (errc chan error) {
+func (e *EthAdaptor) DataReturn(ctx context.Context, signatures <-chan *vss.Signature) (errc <-chan error) {
 	errc = make(chan error)
 	go func() {
-		defer close(errc)
 		select {
 		case signature, ok := <-signatures:
 			if !ok {
@@ -442,16 +494,49 @@ func (e *EthAdaptor) DataReturn(ctx context.Context, signatures <-chan *vss.Sign
 			requestId := new(big.Int).SetBytes(signature.RequestId)
 
 			result := make(chan Reply)
-			request := &ReqTriggerCallback{ctx, requestId, uint8(signature.Index), signature.Content, [2]*big.Int{x, y}, 0, e.proxies[0].TriggerCallback, result}
-			errChan := e.sendRequest(ctx, request, result)
-			err := <-errChan
-			errc <- err
+			for i, proxy := range e.proxies {
+				request := &ReqTriggerCallback{ctx, proxy, requestId, uint8(signature.Index), signature.Content, [2]*big.Int{x, y}, 0, proxy.TriggerCallback, result}
+				errc = e.sendRequest(ctx, e.clients[i], errc, request, result)
+			}
 			return
 		case <-ctx.Done():
 			return
 		}
 	}()
 	return errc
+}
+
+/*
+func (e *EthAdaptor) BootStrap() error {
+	result := make(chan Reply)
+	request := &Request{e.wCtx, e.wProxy.BootStrap, result}
+	errc := e.sendRequest(e.wCtx, request, result)
+	return <-errc
+}
+*/
+func (e *EthAdaptor) ResetContract() error {
+	var errc <-chan error
+	ctx, _ := context.WithTimeout(context.Background(), 60*time.Second)
+	defer logger.TimeTrack(time.Now(), "TestContract", nil)
+	result := make(chan Reply)
+	for i, proxy := range e.proxies {
+		request := &Request{ctx, proxy, proxy.ResetContract, result}
+		errc = e.sendRequest(ctx, e.clients[i], errc, request, result)
+	}
+
+	return <-errc
+}
+
+func (e *EthAdaptor) TestContract(ctx context.Context, p uint64) (errc <-chan error) {
+	defer logger.TimeTrack(time.Now(), "TestContract", nil)
+	result := make(chan Reply)
+	x := new(big.Int)
+	x.SetUint64(p)
+	for i, proxy := range e.proxies {
+		request := &RequestTest{ctx, proxy, x, proxy.TestCall, result}
+		errc = e.sendRequest(ctx, e.clients[i], errc, request, result)
+	}
+	return
 }
 
 func mergeEvents(ctx context.Context, cs ...<-chan interface{}) chan interface{} {
@@ -562,6 +647,10 @@ func (e *EthAdaptor) firstEvent(ctx context.Context, source chan interface{}) <-
 						blkNum = content.BlockN
 						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
 					case *DOSProxyLogGroupDismiss:
+						bytes = append(bytes, content.Raw.Data...)
+						blkNum = content.BlockN
+						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
+					case *DOSProxyTestEvent:
 						bytes = append(bytes, content.Raw.Data...)
 						blkNum = content.BlockN
 						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
@@ -796,36 +885,35 @@ func subscribeEvent(ctx context.Context, proxy *dosproxy.DOSProxy, subscribeType
 				}
 			}
 		}()
-		/*
-			case SubscribeDOSProxyLogNoWorkingGroup:
-				go func() {
-					transitChan := make(chan *dosproxy.DOSProxyLogNoWorkingGroup)
-					defer close(transitChan)
-					defer close(errc)
-					defer close(out)
-					sub, err := proxy.DOSProxyFilterer.WatchLogNoWorkingGroup(opt, transitChan)
-					if err != nil {
-						return
+	case SubscribeDOSProxyTestEvent:
+		go func() {
+			transitChan := make(chan *dosproxy.DOSProxyTestEvent)
+			defer close(transitChan)
+			defer close(errc)
+			defer close(out)
+			sub, err := proxy.DOSProxyFilterer.WatchTestEvent(opt, transitChan)
+			if err != nil {
+				return
+			}
+			for {
+				select {
+				case <-ctx.Done():
+					sub.Unsubscribe()
+					return
+				case err := <-sub.Err():
+					errc <- err
+					return
+				case i := <-transitChan:
+					out <- &DOSProxyTestEvent{
+						Parameter: i.Parameter,
+						Tx:        i.Raw.TxHash.Hex(),
+						BlockN:    i.Raw.BlockNumber,
+						Removed:   i.Raw.Removed,
+						Raw:       i.Raw,
 					}
-					for {
-						select {
-						case <-ctx.Done():
-							sub.Unsubscribe()
-							return
-						case err := <-sub.Err():
-							errc <- err
-							return
-						case i := <-transitChan:
-							out <- &DOSProxyLogNoWorkingGroup{
-								Raw:     i.Raw,
-								Tx:      i.Raw.TxHash.Hex(),
-								BlockN:  i.Raw.BlockNumber,
-								Removed: i.Raw.Removed,
-							}
-						}
-					}
-				}()
-		*/
+				}
+			}
+		}()
 	}
 	return out, errc
 }
@@ -845,7 +933,6 @@ func (e *EthAdaptor) PollLogs(subscribeType int, logBlockDiff, preBlockBuf uint6
 		defer close(sink)
 		targetBlockN, err := GetCurrentBlock(client)
 		if err != nil {
-			fmt.Println("PollLogs GetCurrentBlock err ", err.Error())
 			return
 		}
 		targetBlockN -= preBlockBuf
@@ -1124,6 +1211,49 @@ func (e *EthAdaptor) LastUpdatedBlock() (blknum uint64, err error) {
 	return
 }
 
+func (e *EthAdaptor) clientGet(ctx context.Context, client *ethclient.Client, vType int) chan interface{} {
+	out := make(chan interface{})
+	go func(client *ethclient.Client) {
+		defer close(out)
+		var val uint64
+		var err error
+		switch vType {
+		case PendingNonce:
+			val, err = client.PendingNonceAt(ctx, e.key.Address)
+		}
+		if err != nil {
+			logger.Error(err)
+			return
+		}
+		select {
+		case out <- val:
+		case <-ctx.Done():
+		}
+	}(client)
+	return out
+}
+
+func (e *EthAdaptor) PendingNonce() (nonce uint64, err error) {
+	var ok bool
+	ctx, _ := context.WithTimeout(context.Background(), 60*time.Second)
+
+	var valList []chan interface{}
+	for _, client := range e.clients {
+		valList = append(valList, e.clientGet(ctx, client, PendingNonce))
+	}
+	out := first(ctx, merge(ctx, valList...))
+	select {
+	case val := <-out:
+		nonce, ok = val.(uint64)
+		if !ok {
+			err = errors.New("type error")
+		}
+	case <-ctx.Done():
+		err = errors.New("Timeout")
+	}
+	return
+}
+
 //TODO move this to eth_helper and add First/Merge/proxyGet in here
 func (e *EthAdaptor) CurrentBlock() (blknum uint64, err error) {
 	var header *types.Header
@@ -1143,31 +1273,6 @@ func (e *EthAdaptor) GroupPubKey(idx int) (groupPubKeys [4]*big.Int, err error) 
 //TODO move this to eth_helper and add First/Merge/proxyGet in here
 func (e *EthAdaptor) GetBalance() (balance *big.Float) {
 	return GetBalance(e.clients[0], e.key)
-}
-
-/*
-func (e *EthAdaptor) BootStrap() error {
-	result := make(chan Reply)
-	request := &Request{e.wCtx, e.wProxy.BootStrap, result}
-	errc := e.sendRequest(e.wCtx, request, result)
-	return <-errc
-}
-*/
-func (e *EthAdaptor) ResetContract() error {
-	result := make(chan Reply)
-	request := &Request{e.ctx, e.proxies[0].ResetContract, result}
-	errc := e.sendRequest(e.ctx, request, result)
-	return <-errc
-}
-
-func (e *EthAdaptor) TestContract(p uint64) error {
-	fmt.Println("TestContract")
-	result := make(chan Reply)
-	x := new(big.Int)
-	x.SetUint64(p)
-	request := &RequestTest{e.ctx, x, e.proxies[0].TestCall, result}
-	errc := e.sendRequest(e.ctx, request, result)
-	return <-errc
 }
 
 func (e *EthAdaptor) Address() (addr []byte) {

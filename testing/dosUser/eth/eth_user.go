@@ -58,14 +58,7 @@ func NewAMAUserSession(credentialPath, passphrase, addr string, gethUrls []strin
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	defer cancelFunc()
-	clients, errs := onchain.DialToEth(ctx, gethUrls)
-	go func() {
-		for e := range errs {
-			fmt.Println("NewETHProxySession ", e)
-			cancelFunc()
-		}
-	}()
-
+	clients := onchain.DialToEth(ctx, gethUrls)
 	//Use first client
 	c, ok := <-clients
 	if !ok {
