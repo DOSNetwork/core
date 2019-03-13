@@ -1,8 +1,7 @@
 package main
 
 import (
-	// Import the gorilla/mux library we just installed
-	//	"context"
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -51,18 +50,59 @@ func main() {
 	adaptor, err = onchain.NewProxyAdapter(config.GetCurrentType(), credentialPath, passphrase, chainConfig.DOSProxyAddress, chainConfig.RemoteNodeAddressPool)
 	if err != nil {
 		fmt.Println(err)
-		//return
+		return
 	}
 	id := adaptor.Address()
 	//Init log module with nodeID that is an onchain account address
 	log.Init(id[:])
-	//ctx, _ := context.WithCancel(context.Background())
-	//err = adaptor.ResetContract()
-	//fmt.Println("ResetContract ", err)
+	ctx, _ := context.WithCancel(context.Background())
 
-	//<-errc
-	//errc = adaptor.Grouping(ctx, config.GetRandomGroupSize())
-	//<-errc
+	var errcList []<-chan error
+	var eventList []<-chan interface{}
+	sink, errc := adaptor.PollLogs(onchain.SubscribeDOSProxyLogInsufficientPendingNode, 0, 0)
+	eventList = append(eventList, sink)
+	errcList = append(errcList, errc)
+	sink, errc = adaptor.PollLogs(onchain.SubscribeDOSProxyLogInsufficientWorkingGroup, 0, 0)
+	eventList = append(eventList, sink)
+	errcList = append(errcList, errc)
+	sink, errc = adaptor.PollLogs(onchain.SubscribeDOSProxyLogGroupingInitiated, 0, 0)
+	eventList = append(eventList, sink)
+	errcList = append(errcList, errc)
+	errc = onchain.MergeErrors(ctx, errcList...)
+	sink = onchain.MergeEvents(ctx, eventList...)
+	go func() {
+		for {
+			select {
+			case event := <-sink:
+				switch content := event.(type) {
+				case *onchain.DOSProxyLogInsufficientPendingNode:
+					fmt.Println("DOSProxyLogInsufficientPendingNode ", content.NumPendingNodes)
+				case *onchain.DOSProxyLogInsufficientWorkingGroup:
+					fmt.Println("DOSProxyLogInsufficientWorkingGroup ", content.NumPendingNodes)
+					numNodes := int(content.NumPendingNodes.Uint64())
+					if numNodes >= 10 {
+						errc = adaptor.BootStrap()
+						e := <-errc
+						fmt.Println("BootStrap done ", e)
+					}
+				case *onchain.DOSProxyLogGroupingInitiated:
+					fmt.Println("DOSProxyLogInsufficientWorkingGroup ", content.NumPendingNodes)
+				}
+			case e, ok := <-errc:
+				if ok {
+					err = e
+					fmt.Println(err)
+				}
+			}
+		}
+	}()
+	fmt.Println("ResetContract")
+	errc = adaptor.ResetContract()
+	fmt.Println("ResetContract", <-errc)
+
+	fmt.Println("SetGroupSize")
+	errc = adaptor.SetGroupSize(ctx, uint64(config.GetRandomGroupSize()))
+	fmt.Println("ResetContract", <-errc)
 
 	//2)Build a p2p network
 	id = []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20}

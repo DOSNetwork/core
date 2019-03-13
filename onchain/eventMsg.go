@@ -74,8 +74,18 @@ type DOSProxyLogValidationResult struct {
 	Raw         types.Log
 }
 
+type DOSProxyLogGroupingInitiated struct {
+	NumPendingNodes   *big.Int
+	GroupSize         *big.Int
+	GroupingThreshold *big.Int
+	Tx                string
+	BlockN            uint64
+	Removed           bool
+}
+
 type DOSProxyLogInsufficientWorkingGroup struct {
 	NumWorkingGroups *big.Int
+	NumPendingNodes  *big.Int
 	Tx               string
 	BlockN           uint64
 	Removed          bool

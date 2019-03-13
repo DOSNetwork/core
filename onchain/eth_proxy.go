@@ -34,6 +34,7 @@ const (
 	SubscribeDOSProxyLogInsufficientPendingNode
 	SubscribeDOSProxyLogInsufficientWorkingGroup
 	SubscribeDOSProxyLogNoWorkingGroup
+	SubscribeDOSProxyLogGroupingInitiated
 	SubscribeDOSProxyTestEvent
 	LastRandomness
 	WorkingGroupSize
@@ -63,7 +64,7 @@ type Request struct {
 	result chan Reply
 }
 
-type RequestTest struct {
+type ReqSetInt struct {
 	ctx       context.Context
 	s         *dosproxy.DOSProxySession
 	parameter *big.Int
@@ -187,10 +188,13 @@ func NewEthAdaptor(credentialPath, passphrase, proxyAddr string, urls []string) 
 		adaptor.proxies = append(adaptor.proxies, &dosproxy.DOSProxySession{Contract: p, CallOpts: bind.CallOpts{Context: adaptor.ctx}, TransactOpts: *adaptor.auth})
 	}
 	if len(adaptor.proxies) == 0 {
+		fmt.Println("No any working eth client ", len(adaptor.clients), len(adaptor.proxies))
+
 		adaptor = nil
 		return
 	}
 	adaptor.reqQueue = make(chan interface{})
+	fmt.Println("working eth client ", len(adaptor.clients))
 
 	adaptor.eCtx, adaptor.eCancelFunc = context.WithCancel(context.Background())
 	syncClients := CheckSync(adaptor.eCtx, adaptor.clients[0], DialToEth(context.Background(), wsUrls))
@@ -237,7 +241,7 @@ func (e *EthAdaptor) reqLoop() {
 					resultC = content.result
 				case *ReqGrouping:
 					resultC = content.result
-				case *RequestTest:
+				case *ReqSetInt:
 					resultC = content.result
 				case *ReqSetRandomNum:
 					resultC = content.result
@@ -276,7 +280,7 @@ func (e *EthAdaptor) reqLoop() {
 					tx, err = content.f(content.candidates, content.size)
 					resultC = content.result
 					ctx = content.ctx
-				case *RequestTest:
+				case *ReqSetInt:
 					content.s.TransactOpts.Nonce = e.auth.Nonce
 					tx, err = content.f(content.parameter)
 					resultC = content.result
@@ -405,6 +409,7 @@ func (e *EthAdaptor) sendRequest(ctx context.Context, c *ethclient.Client, pre <
 }
 
 func (e *EthAdaptor) RegisterNewNode(ctx context.Context) (errc <-chan error) {
+	fmt.Println("RegisterNewNode")
 	defer logger.TimeTrack(time.Now(), "RegisterNewNode", nil)
 	result := make(chan Reply)
 	for i, proxy := range e.proxies {
@@ -425,7 +430,6 @@ func (e *EthAdaptor) RandomNumberTimeOut(ctx context.Context) (errc <-chan error
 }
 
 func (e *EthAdaptor) RegisterGroupPubKey(ctx context.Context, IdWithPubKeys chan [5]*big.Int) (errc <-chan error) {
-	errc = make(chan error)
 	go func() {
 		select {
 		case IdWithPubKey, ok := <-IdWithPubKeys:
@@ -459,7 +463,6 @@ func (e *EthAdaptor) RegisterGroupPubKey(ctx context.Context, IdWithPubKeys chan
 }
 
 func (e *EthAdaptor) SetRandomNum(ctx context.Context, signatures <-chan *vss.Signature) (errc <-chan error) {
-	errc = make(chan error)
 	go func() {
 		select {
 		case signature, ok := <-signatures:
@@ -481,7 +484,6 @@ func (e *EthAdaptor) SetRandomNum(ctx context.Context, signatures <-chan *vss.Si
 }
 
 func (e *EthAdaptor) DataReturn(ctx context.Context, signatures <-chan *vss.Signature) (errc <-chan error) {
-	errc = make(chan error)
 	go func() {
 		select {
 		case signature, ok := <-signatures:
@@ -506,16 +508,18 @@ func (e *EthAdaptor) DataReturn(ctx context.Context, signatures <-chan *vss.Sign
 	return errc
 }
 
-/*
-func (e *EthAdaptor) BootStrap() error {
+func (e *EthAdaptor) BootStrap() (errc <-chan error) {
+	ctx, _ := context.WithTimeout(context.Background(), 60*time.Second)
 	result := make(chan Reply)
-	request := &Request{e.wCtx, e.wProxy.BootStrap, result}
-	errc := e.sendRequest(e.wCtx, request, result)
-	return <-errc
+	for i, proxy := range e.proxies {
+		request := &Request{ctx, proxy, proxy.BootStrap, result}
+		errc = e.sendRequest(ctx, e.clients[i], errc, request, result)
+	}
+
+	return errc
 }
-*/
-func (e *EthAdaptor) ResetContract() error {
-	var errc <-chan error
+
+func (e *EthAdaptor) ResetContract() (errc <-chan error) {
 	ctx, _ := context.WithTimeout(context.Background(), 60*time.Second)
 	defer logger.TimeTrack(time.Now(), "TestContract", nil)
 	result := make(chan Reply)
@@ -524,7 +528,7 @@ func (e *EthAdaptor) ResetContract() error {
 		errc = e.sendRequest(ctx, e.clients[i], errc, request, result)
 	}
 
-	return <-errc
+	return errc
 }
 
 func (e *EthAdaptor) TestContract(ctx context.Context, p uint64) (errc <-chan error) {
@@ -533,13 +537,49 @@ func (e *EthAdaptor) TestContract(ctx context.Context, p uint64) (errc <-chan er
 	x := new(big.Int)
 	x.SetUint64(p)
 	for i, proxy := range e.proxies {
-		request := &RequestTest{ctx, proxy, x, proxy.TestCall, result}
+		request := &ReqSetInt{ctx, proxy, x, proxy.TestCall, result}
 		errc = e.sendRequest(ctx, e.clients[i], errc, request, result)
 	}
 	return
 }
 
-func mergeEvents(ctx context.Context, cs ...<-chan interface{}) chan interface{} {
+func (e *EthAdaptor) SetGroupSize(ctx context.Context, size uint64) (errc <-chan error) {
+	defer logger.TimeTrack(time.Now(), "SetGroupSize", nil)
+	result := make(chan Reply)
+	x := new(big.Int)
+	x.SetUint64(size)
+	for i, proxy := range e.proxies {
+		request := &ReqSetInt{ctx, proxy, x, proxy.SetGroupSize, result}
+		errc = e.sendRequest(ctx, e.clients[i], errc, request, result)
+	}
+	return
+}
+
+func (e *EthAdaptor) SetGroupToPick(ctx context.Context, groupToPick uint64) (errc <-chan error) {
+	defer logger.TimeTrack(time.Now(), "SetGroupToPick", nil)
+	result := make(chan Reply)
+	x := new(big.Int)
+	x.SetUint64(groupToPick)
+	for i, proxy := range e.proxies {
+		request := &ReqSetInt{ctx, proxy, x, proxy.SetGroupToPick, result}
+		errc = e.sendRequest(ctx, e.clients[i], errc, request, result)
+	}
+	return
+}
+
+func (e *EthAdaptor) SetGroupingThreshold(ctx context.Context, threshold uint64) (errc <-chan error) {
+	defer logger.TimeTrack(time.Now(), "SetGroupToPick", nil)
+	result := make(chan Reply)
+	x := new(big.Int)
+	x.SetUint64(threshold)
+	for i, proxy := range e.proxies {
+		request := &ReqSetInt{ctx, proxy, x, proxy.SetGroupingThreshold, result}
+		errc = e.sendRequest(ctx, e.clients[i], errc, request, result)
+	}
+	return
+}
+
+func MergeEvents(ctx context.Context, cs ...<-chan interface{}) chan interface{} {
 	var wg sync.WaitGroup
 	// We must ensure that the output channel has the capacity to
 	// hold as many errors
@@ -573,7 +613,7 @@ func mergeEvents(ctx context.Context, cs ...<-chan interface{}) chan interface{}
 	return out
 }
 
-func mergeErrors(ctx context.Context, cs ...<-chan error) <-chan error {
+func MergeErrors(ctx context.Context, cs ...<-chan error) <-chan error {
 	var wg sync.WaitGroup
 	// We must ensure that the output channel has the capacity to
 	// hold as many errors
@@ -705,7 +745,7 @@ func (e *EthAdaptor) SubscribeEvent(subscribeType int) (<-chan interface{}, <-ch
 	out, errc := e.PollLogs(subscribeType, 0, 0)
 	eventList = append(eventList, out)
 	errcs = append(errcs, errc)
-	return e.firstEvent(e.ctx, mergeEvents(e.ctx, eventList...)), mergeErrors(e.ctx, errcs...)
+	return e.firstEvent(e.ctx, MergeEvents(e.ctx, eventList...)), MergeErrors(e.ctx, errcs...)
 }
 
 func subscribeEvent(ctx context.Context, proxy *dosproxy.DOSProxy, subscribeType int) (<-chan interface{}, <-chan error) {
@@ -881,6 +921,65 @@ func subscribeEvent(ctx context.Context, proxy *dosproxy.DOSProxy, subscribeType
 						Tx:              i.Raw.TxHash.Hex(),
 						BlockN:          i.Raw.BlockNumber,
 						Removed:         i.Raw.Removed,
+					}
+				}
+			}
+		}()
+	case SubscribeDOSProxyLogInsufficientWorkingGroup:
+		go func() {
+			transitChan := make(chan *dosproxy.DOSProxyLogInsufficientWorkingGroup)
+			defer close(transitChan)
+			defer close(errc)
+			defer close(out)
+			sub, err := proxy.DOSProxyFilterer.WatchLogInsufficientWorkingGroup(opt, transitChan)
+			if err != nil {
+				return
+			}
+			for {
+				select {
+				case <-ctx.Done():
+					sub.Unsubscribe()
+					return
+				case err := <-sub.Err():
+					errc <- err
+					return
+				case i := <-transitChan:
+					out <- &DOSProxyLogInsufficientWorkingGroup{
+						NumWorkingGroups: i.NumWorkingGroups,
+						NumPendingNodes:  i.NumPendingNodes,
+						Tx:               i.Raw.TxHash.Hex(),
+						BlockN:           i.Raw.BlockNumber,
+						Removed:          i.Raw.Removed,
+					}
+				}
+			}
+		}()
+	case SubscribeDOSProxyLogGroupingInitiated:
+		go func() {
+			transitChan := make(chan *dosproxy.DOSProxyLogGroupingInitiated)
+			defer close(transitChan)
+			defer close(errc)
+			defer close(out)
+			sub, err := proxy.DOSProxyFilterer.WatchLogGroupingInitiated(opt, transitChan)
+			if err != nil {
+				return
+			}
+			for {
+				select {
+				case <-ctx.Done():
+					sub.Unsubscribe()
+					return
+				case err := <-sub.Err():
+					errc <- err
+					return
+				case i := <-transitChan:
+					out <- &DOSProxyLogGroupingInitiated{
+						NumPendingNodes:   i.NumPendingNodes,
+						GroupSize:         i.GroupSize,
+						GroupingThreshold: i.GroupingThreshold,
+						Tx:                i.Raw.TxHash.Hex(),
+						BlockN:            i.Raw.BlockNumber,
+						Removed:           i.Raw.Removed,
 					}
 				}
 			}
@@ -1083,6 +1182,66 @@ func (e *EthAdaptor) PollLogs(subscribeType int, logBlockDiff, preBlockBuf uint6
 								Raw:         logs.Event.Raw,
 							}
 						}
+					case SubscribeDOSProxyLogInsufficientPendingNode:
+						logs, err := proxyFilter.FilterLogInsufficientPendingNode(&bind.FilterOpts{
+							Start:   targetBlockN,
+							End:     &targetBlockN,
+							Context: ctx,
+						})
+						if err != nil {
+							errc <- err
+							continue
+						}
+
+						for logs.Next() {
+							sink <- &DOSProxyLogInsufficientPendingNode{
+								NumPendingNodes: logs.Event.NumPendingNodes,
+								Tx:              logs.Event.Raw.TxHash.Hex(),
+								BlockN:          logs.Event.Raw.BlockNumber,
+								Removed:         logs.Event.Raw.Removed,
+							}
+						}
+					case SubscribeDOSProxyLogInsufficientWorkingGroup:
+						logs, err := proxyFilter.FilterLogInsufficientWorkingGroup(&bind.FilterOpts{
+							Start:   targetBlockN,
+							End:     &targetBlockN,
+							Context: ctx,
+						})
+						if err != nil {
+							errc <- err
+							continue
+						}
+
+						for logs.Next() {
+							sink <- &DOSProxyLogInsufficientWorkingGroup{
+								NumWorkingGroups: logs.Event.NumWorkingGroups,
+								NumPendingNodes:  logs.Event.NumPendingNodes,
+								Tx:               logs.Event.Raw.TxHash.Hex(),
+								BlockN:           logs.Event.Raw.BlockNumber,
+								Removed:          logs.Event.Raw.Removed,
+							}
+						}
+					case SubscribeDOSProxyLogGroupingInitiated:
+						logs, err := proxyFilter.FilterLogGroupingInitiated(&bind.FilterOpts{
+							Start:   targetBlockN,
+							End:     &targetBlockN,
+							Context: ctx,
+						})
+						if err != nil {
+							errc <- err
+							continue
+						}
+
+						for logs.Next() {
+							sink <- &DOSProxyLogGroupingInitiated{
+								NumPendingNodes:   logs.Event.NumPendingNodes,
+								GroupSize:         logs.Event.GroupSize,
+								GroupingThreshold: logs.Event.GroupingThreshold,
+								Tx:                logs.Event.Raw.TxHash.Hex(),
+								BlockN:            logs.Event.Raw.BlockNumber,
+								Removed:           logs.Event.Raw.Removed,
+							}
+						}
 					case SubscribeDOSProxyTestEvent:
 						logs, err := proxyFilter.FilterTestEvent(&bind.FilterOpts{
 							Start:   targetBlockN,
@@ -1120,7 +1279,7 @@ func (e *EthAdaptor) PollLogs(subscribeType int, logBlockDiff, preBlockBuf uint6
 
 	wg.Wait()
 
-	return e.firstEvent(e.ctx, mergeEvents(e.ctx, sinks...)), mergeErrors(e.ctx, errcs...)
+	return e.firstEvent(e.ctx, MergeEvents(e.ctx, sinks...)), MergeErrors(e.ctx, errcs...)
 }
 
 func proxyGet(proxy *dosproxy.DOSProxySession, vType int) chan interface{} {
@@ -1143,7 +1302,6 @@ func proxyGet(proxy *dosproxy.DOSProxySession, vType int) chan interface{} {
 		}
 		out <- val
 	}()
-	close(out)
 	return out
 }
 

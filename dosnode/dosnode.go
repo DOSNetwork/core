@@ -99,9 +99,13 @@ func NewDosNode(credentialPath, passphrase string) (dosNode *DosNode, err error)
 	chainConfig := config.GetChainConfig()
 	chainConn, err := onchain.NewProxyAdapter(config.GetCurrentType(), credentialPath, passphrase, chainConfig.DOSProxyAddress, chainConfig.RemoteNodeAddressPool)
 	if err != nil {
-		return
+		if err.Error() != "No any working eth client for event tracking" {
+			fmt.Println("NewDosNode failed ", err)
+			return
+		}
 	}
 	id := chainConn.Address()
+	fmt.Println("onchain adapter done")
 
 	//Build a p2p network
 	p, err := p2p.CreateP2PNetwork(id, port)
@@ -143,6 +147,7 @@ func NewDosNode(credentialPath, passphrase string) (dosNode *DosNode, err error)
 		cPipCancel:  make(chan []byte),
 		id:          id,
 	}
+	fmt.Println("dosNode.Start()")
 	err = dosNode.Start()
 	delay := 15 * rand.Intn(10)
 	time.Sleep(time.Duration(delay) * time.Second)
