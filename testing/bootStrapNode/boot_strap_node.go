@@ -18,8 +18,9 @@ import (
 )
 
 var (
-	lock            sync.Mutex
-	credentialIndex = 0
+	lock                sync.Mutex
+	credentialIndex     = 0
+	addressToDistribute []string
 )
 var adaptor onchain.ProxyAdapter
 
@@ -47,6 +48,7 @@ func main() {
 	//Set up an onchain adapter
 	chainConfig := config.GetChainConfig()
 	fmt.Println("chainConfig.RemoteNodeAddressPool", chainConfig.RemoteNodeAddressPool)
+	addressToDistribute = chainConfig.RemoteNodeAddressPool[1:]
 	adaptor, err = onchain.NewProxyAdapter(config.GetCurrentType(), credentialPath, passphrase, chainConfig.DOSProxyAddress, chainConfig.RemoteNodeAddressPool)
 	if err != nil {
 		fmt.Println(err)
@@ -70,6 +72,18 @@ func main() {
 	errcList = append(errcList, errc)
 	errc = onchain.MergeErrors(ctx, errcList...)
 	sink = onchain.MergeEvents(ctx, eventList...)
+
+	groupToPick, err := strconv.Atoi(os.Getenv(configuration.ENVGROUPTOPICK))
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("groupToPick: ", groupToPick)
+	groupSize, err := strconv.Atoi(os.Getenv(configuration.ENVGROUPSIZE))
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println("groupSize: ", groupSize)
+
 	go func() {
 		for {
 			select {
@@ -79,8 +93,7 @@ func main() {
 					fmt.Println("DOSProxyLogInsufficientPendingNode ", content.NumPendingNodes)
 				case *onchain.DOSProxyLogInsufficientWorkingGroup:
 					fmt.Println("DOSProxyLogInsufficientWorkingGroup ", content.NumPendingNodes)
-					numNodes := int(content.NumPendingNodes.Uint64())
-					if numNodes >= 10 {
+					if int(content.NumPendingNodes.Uint64()) >= groupSize*(groupToPick+1) {
 						errc = adaptor.BootStrap()
 						e := <-errc
 						fmt.Println("BootStrap done ", e)
@@ -134,8 +147,9 @@ func main() {
 func getCredential(w http.ResponseWriter, r *http.Request) {
 	lock.Lock()
 	credentialIndex++
-	fmt.Println("getCredential", credentialIndex)
-	if _, err := fmt.Fprintf(w, strconv.Itoa(credentialIndex)); err != nil {
+	response := strconv.Itoa(credentialIndex) + "," + addressToDistribute[credentialIndex%len(addressToDistribute)] + "," + addressToDistribute[(credentialIndex+1)%len(addressToDistribute)]
+	fmt.Println("getCredential", response)
+	if _, err := fmt.Fprintf(w, response); err != nil {
 		fmt.Println(err)
 	}
 	/*

@@ -24,8 +24,8 @@ import (
 )
 
 const (
-	WATCHDOGINTERVAL = 10 //In minutes
-	SYSRANDOMNTERVAL = 5  //In block numbers
+	WATCHDOGINTERVAL = 9999999 //In minutes
+	SYSRANDOMNTERVAL = 5       //In block numbers
 )
 
 var logger log.Logger
@@ -70,8 +70,9 @@ func NewDosNode(credentialPath, passphrase string) (dosNode *DosNode, err error)
 		workingDir = "."
 	}
 
+	chainConfig := config.GetChainConfig()
 	if config.NodeRole == "testNode" {
-		var credential []byte
+		var rspBytes []byte
 		var resp *http.Response
 		s := strings.Split(config.BootStrapIp, ":")
 		ip, _ := s[0], s[1]
@@ -82,7 +83,7 @@ func NewDosNode(credentialPath, passphrase string) (dosNode *DosNode, err error)
 			resp, err = http.Get(tServer)
 		}
 
-		credential, err = ioutil.ReadAll(resp.Body)
+		rspBytes, err = ioutil.ReadAll(resp.Body)
 		if err != nil {
 			return
 		}
@@ -90,13 +91,23 @@ func NewDosNode(credentialPath, passphrase string) (dosNode *DosNode, err error)
 		if err = resp.Body.Close(); err != nil {
 			return
 		}
-		credentialPath = workingDir + "/testAccounts/" + string(credential) + "/credential"
+
+		respArray := strings.Split(string(rspBytes), ",")
+		if len(respArray) < 1 {
+			return nil, errors.New("cannot get credential from bootNode")
+		}
+
+		credentialPath = workingDir + "/testAccounts/" + respArray[0] + "/credential"
+		chainConfig.RemoteNodeAddressPool = chainConfig.RemoteNodeAddressPool[:1]
+		for _, address := range respArray[1:] {
+			chainConfig.RemoteNodeAddressPool = append(chainConfig.RemoteNodeAddressPool, address)
+		}
+		fmt.Println("RemoteNodeAddressPool", chainConfig.RemoteNodeAddressPool)
 	} else if credentialPath == "" {
 		credentialPath = workingDir + "/credential"
 	}
 
 	//Set up an onchain adapter
-	chainConfig := config.GetChainConfig()
 	chainConn, err := onchain.NewProxyAdapter(config.GetCurrentType(), credentialPath, passphrase, chainConfig.DOSProxyAddress, chainConfig.RemoteNodeAddressPool)
 	if err != nil {
 		if err.Error() != "No any working eth client for event tracking" {

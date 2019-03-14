@@ -18,6 +18,7 @@ const (
 	ENVNODEPORT      = "NODEPORT"
 	ENVGROUPSIZE     = "GROUPSIZE"
 	ENVPASSPHRASE    = "PASSPHRASE"
+	ENVGROUPTOPICK   = "GROUPTOPICK"
 )
 
 type Config struct {
@@ -149,7 +150,6 @@ func (c *Config) overWrite() (err error) {
 			config.RemoteNodeAddressPool = append(config.RemoteNodeAddressPool, "ws://"+gethIP+":8546")
 			x++
 		}
-		fmt.Println("config.RemoteNodeAddressPool ", config.RemoteNodeAddressPool)
 		c.ChainConfigs[c.currentType][c.currentNode] = config
 	}
 

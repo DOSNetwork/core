@@ -3,6 +3,10 @@ services:
   geth:
     image: ethereum/client-go
     ports:
+      - target: 8545
+        published: 8545
+        protocol: tcp
+        mode: host
       - target: 8546
         published: 8546
         protocol: tcp
@@ -14,6 +18,7 @@ services:
     command:
       --rpc
       --rpcaddr 0.0.0.0
+      --rpccorsdomain "*"
       --ws
       --wsaddr 0.0.0.0
       --wsorigins '*'

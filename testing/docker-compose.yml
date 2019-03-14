@@ -84,6 +84,7 @@ services:
      - CHAINNODE=rinkebyPrivateNode
      - GROUPSIZE=3
      - PASSPHRASE=
+     - GROUPTOPICK=2
  banker:
    image: banker
    deploy:

@@ -74,7 +74,7 @@ func NewAMAUserSession(credentialPath, passphrase, addr string, gethUrls []strin
 	adaptor = &EthUserAdaptor{}
 	ctxD, cancelSession := context.WithCancel(context.Background())
 	auth := bind.NewKeyedTransactor(key.PrivateKey)
-	auth.GasLimit = uint64(5000000)
+	auth.GasLimit = uint64(3000000)
 	auth.Context = ctxD
 	//nonce, _ := c.PendingNonceAt(ctxD, key.Address)
 	//auth.Nonce = big.NewInt(0)
@@ -346,7 +346,7 @@ func MergeErrors(ctx context.Context, cs ...<-chan error) <-chan error {
 
 func (e *EthUserAdaptor) Query(internalSerial uint8, url, selector string) (err error) {
 	tx, err := e.s.AMA(internalSerial, url, selector)
-	for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
+	for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error() || err.Error() == core.ErrInsufficientFunds.Error()) {
 		fmt.Println(err)
 		time.Sleep(time.Second)
 		fmt.Println("transaction retry...")
