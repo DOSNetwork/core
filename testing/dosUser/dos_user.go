@@ -125,7 +125,7 @@ func main() {
 	}
 
 	if onChainConfig.NodeRole == "testNode" {
-		var credential []byte
+		var rspBytes []byte
 		var resp *http.Response
 		s := strings.Split(onChainConfig.BootStrapIp, ":")
 		ip, _ := s[0], s[1]
@@ -136,7 +136,7 @@ func main() {
 			resp, err = http.Get(tServer)
 		}
 
-		credential, err = ioutil.ReadAll(resp.Body)
+		rspBytes, err = ioutil.ReadAll(resp.Body)
 		if err != nil {
 			return
 		}
@@ -145,7 +145,13 @@ func main() {
 			return
 		}
 
-		credentialPath = workingDir + "/testAccounts/" + string(credential) + "/credential"
+		respArray := strings.Split(string(rspBytes), ",")
+		if len(respArray) < 1 {
+			return
+		}
+
+		credentialPath = workingDir + "/testAccounts/" + respArray[0] + "/credential"
+
 	} else if credentialPath == "" {
 		credentialPath = workingDir + "/credential"
 	}
