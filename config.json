@@ -19,8 +19,8 @@
                 ]
             },
             "rinkebyPrivateNode": {
-                "DOSProxyAddress": "0x3b8a20Af15c9914753F2F9B6caE8B34e279baB66",
-                "DOSAddressBridgeAddress": "0x6CfAEbC117E7cD26dD73492eCf9f61a71ff927BE",
+                "DOSProxyAddress": "0xdee5E23Eabf080C9cc0C5695A83b4c6b34589Fde",
+                "DOSAddressBridgeAddress": "0x48fc1d8a6D5bEbf3d34e0CE3595d9dfcBF627eEd",
                 "RemoteNodeAddressPool": [
                     "https://rinkeby.infura.io/8e609c76fce442f8a1735fbea9999747",
                     "ws://18.144.62.20:8546",
