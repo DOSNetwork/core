@@ -93,10 +93,13 @@ func main() {
 					fmt.Println("DOSProxyLogInsufficientPendingNode ", content.NumPendingNodes)
 				case *onchain.DOSProxyLogInsufficientWorkingGroup:
 					fmt.Println("DOSProxyLogInsufficientWorkingGroup ", content.NumPendingNodes)
-					if int(content.NumPendingNodes.Uint64()) >= groupSize*(groupToPick+1) {
+					if int(content.NumPendingNodes.Uint64()) == groupSize*(groupToPick+1)+1 {
 						errc = adaptor.BootStrap()
 						e := <-errc
 						fmt.Println("BootStrap done ", e)
+						if e != nil {
+							return
+						}
 					}
 				case *onchain.DOSProxyLogGroupingInitiated:
 					fmt.Println("DOSProxyLogInsufficientWorkingGroup ", content.NumPendingNodes)
@@ -111,11 +114,14 @@ func main() {
 	}()
 	fmt.Println("ResetContract")
 	errc = adaptor.ResetContract()
-	fmt.Println("ResetContract", <-errc)
-
+	e := <-errc
+	fmt.Println("ResetContract", e)
+	if e != nil {
+		return
+	}
 	fmt.Println("SetGroupSize")
 	errc = adaptor.SetGroupSize(ctx, uint64(config.GetRandomGroupSize()))
-	fmt.Println("ResetContract", <-errc)
+	fmt.Println("SetGroupSize", <-errc)
 
 	//2)Build a p2p network
 	id = []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20}
