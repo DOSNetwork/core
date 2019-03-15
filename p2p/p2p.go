@@ -58,6 +58,23 @@ func (n *P2P) Listen() (err error) {
 	var ip string
 	var listener net.Listener
 	var pubKeyBytes []byte
+
+	//FOR DOCKER AWS TESTING
+	//response, err := http.Get("http://ipconfig.me")
+	//if err != nil {
+	//	n.logger.Error(err)
+	//	return
+	//}
+
+	//ipBytes, err := ioutil.ReadAll(response.Body)
+	//if err != nil {
+	//	n.logger.Error(err)
+	//	return
+	//}
+	//ip = string(ipBytes)
+	//fmt.Println(ip)
+	//////////////////////////////
+
 	if ip, err = GetLocalIP(); err != nil {
 		n.logger.Error(err)
 		return
