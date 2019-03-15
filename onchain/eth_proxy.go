@@ -341,8 +341,11 @@ func (e *EthAdaptor) sendRequest(ctx context.Context, c *ethclient.Client, pre <
 					fmt.Println("Request has been fulfulled by previous sendRequest")
 					return
 				} else {
-					fmt.Println("Request handled by other sendRequest beacuse of e ,", err)
-
+					if strings.Contains(err.Error(), "transaction failed") {
+						fmt.Println("Transaction failed so delete the whole requestSend chain")
+						return
+					}
+					fmt.Println("Switch Client to handle request beacuse of e ,", err)
 				}
 			}
 		}
@@ -397,6 +400,10 @@ func (e *EthAdaptor) sendRequest(ctx context.Context, c *ethclient.Client, pre <
 					logger.Event("TransactionFail", f)
 					fmt.Println("TransactionFail err ", err)
 					//Don't return err to errc to delete the whole sendRequest chain
+					select {
+					case errc <- err:
+					case <-ctx.Done():
+					}
 					return
 				}
 				return
@@ -1284,8 +1291,9 @@ func (e *EthAdaptor) PollLogs(subscribeType int, logBlockDiff, preBlockBuf uint6
 
 func proxyGet(proxy *dosproxy.DOSProxySession, vType int) chan interface{} {
 	out := make(chan interface{})
+
 	go func() {
-		close(out)
+		defer close(out)
 		var val *big.Int
 		var err error
 		switch vType {
@@ -1295,6 +1303,7 @@ func proxyGet(proxy *dosproxy.DOSProxySession, vType int) chan interface{} {
 			val, err = proxy.GetWorkingGroupSize()
 		case LastUpdatedBlock:
 			val, err = proxy.LastUpdatedBlock()
+			fmt.Println("LastUpdatedBlock ", val, err)
 		}
 		if err != nil {
 			logger.Error(err)
@@ -1317,7 +1326,7 @@ func (e *EthAdaptor) LastRandomness() (rand *big.Int, err error) {
 	case val := <-out:
 		var ok bool
 		rand, ok = val.(*big.Int)
-		if ok {
+		if !ok {
 			err = errors.New("type error")
 		}
 	case <-ctx.Done():
@@ -1337,7 +1346,7 @@ func (e *EthAdaptor) GetWorkingGroupSize() (size uint64, err error) {
 	select {
 	case val := <-out:
 		sizeBig, ok := val.(*big.Int)
-		if ok {
+		if !ok {
 			err = errors.New("type error")
 		}
 		size = sizeBig.Uint64()
@@ -1359,7 +1368,7 @@ func (e *EthAdaptor) LastUpdatedBlock() (blknum uint64, err error) {
 	select {
 	case val := <-out:
 		blknumBig, ok := val.(*big.Int)
-		if ok {
+		if !ok {
 			err = errors.New("type error")
 		}
 		blknum = blknumBig.Uint64()
