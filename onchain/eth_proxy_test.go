@@ -31,9 +31,40 @@ func TestGetPendingNonce(t *testing.T) {
 	}
 }
 
+func TestLastUpdatedBlock(t *testing.T) {
+	urls := []string{""}
+	proxyAddr := ""
+	credentialPath := ""
+	passphrase := ""
+
+	adaptor, err := NewEthAdaptor(credentialPath, passphrase, proxyAddr, urls)
+	if err != nil {
+		t.Errorf("TestConcurrentSend Failed, got an Error : %s.", err.Error())
+		return
+	}
+
+	val, e := adaptor.LastUpdatedBlock()
+	if e != nil {
+		t.Errorf("LastUpdatedBlock Failed , got an error: %s.", e.Error())
+	}
+	fmt.Println("LastUpdatedBlock ", val)
+
+	val, e = adaptor.GetWorkingGroupSize()
+	if e != nil {
+		t.Errorf("GetWorkingGroupSize Failed , got an error: %s.", e.Error())
+	}
+	fmt.Println("GetWorkingGroupSize ", val)
+
+	rand, e := adaptor.LastRandomness()
+	if e != nil {
+		t.Errorf("LastRandomness() Failed , got an error: %s.", e.Error())
+	}
+	fmt.Println("LastRandomness()	 ", rand)
+
+}
+
 func TestConcurrentSend(t *testing.T) {
 	urls := []string{""}
-
 	proxyAddr := ""
 	credentialPath := ""
 	passphrase := ""
@@ -55,7 +86,7 @@ func TestConcurrentSend(t *testing.T) {
 			_ = adaptor.TestContract(ctx, uint64(i))
 		}(i)
 	}
-	errc = mergeErrors(ctx, errcList...)
+	errc = MergeErrors(ctx, errcList...)
 	result := 0
 L:
 	for {
@@ -79,7 +110,6 @@ L:
 
 func TestSendRequest(t *testing.T) {
 	urls := []string{""}
-
 	proxyAddr := ""
 	credentialPath := ""
 	passphrase := ""
@@ -104,7 +134,7 @@ func TestSendRequest(t *testing.T) {
 	}
 	fmt.Println("!!!!!!!!restore geth")
 
-	errc = mergeErrors(ctx, errcList...)
+	errc = MergeErrors(ctx, errcList...)
 	result := 0
 L:
 	for {
