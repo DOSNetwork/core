@@ -3,6 +3,7 @@ package node
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -28,37 +29,37 @@ type test1 struct{}
 
 func (r test1) StartTest(d *PeerNode) {
 	fmt.Println("StartTest")
-	if d.p.GetIP() == d.nodeIPs[0] {
-		cmd := &internalMsg.Cmd{
-			Ctype: internalMsg.Cmd_SIGNIN,
-			Args:  []byte{},
-		}
-		pb := proto.Message(cmd)
-		for i := 1; i < len(d.nodeIPs); i++ {
-			if d.p.GetIP() != d.nodeIPs[i] {
-				ip := d.nodeIPs[i]
-				id, err := d.p.ConnectTo(ip)
-				if err != nil {
-					fmt.Println("NewPeer err", err)
-				}
-				d.checkroll[string(id)] = 0
+	for i := 0; i < len(d.nodeIPs); i++ {
+		if d.p.GetIP() != d.nodeIPs[i] {
+			ip := d.nodeIPs[i]
+			id, err := d.p.ConnectTo(ip)
+			if err != nil {
+				fmt.Println("NewPeer err", err)
 			}
+			d.checkroll[string(id)] = 0
 		}
-		for i := 0; i < d.numMessages; i++ {
-			for id := range d.checkroll {
-				var err error
-				fmt.Println("SendMessage ", []byte(id))
-				if err = d.p.SendMessage([]byte(id), pb); err != nil {
-					retry := 1
-					for err != nil {
-						fmt.Println("SendMessage err", err)
+	}
+	for i := 0; i < d.numMessages; i++ {
+		for id := range d.checkroll {
+			var err error
+			fmt.Println("SendMessage ", []byte(id), ", ", i)
+			content := make([]byte, 2)
+			binary.BigEndian.PutUint16(content, uint16(i))
+			cmd := &internalMsg.Cmd{
+				Ctype: internalMsg.Cmd_SIGNIN,
+				Args:  content,
+			}
+			pb := proto.Message(cmd)
+			if err = d.p.SendMessage([]byte(id), pb); err != nil {
+				retry := 1
+				for err != nil {
+					fmt.Println("SendMessage err", err)
 
-						retry++
-						if retry > 20 {
-							break
-						}
-						err = d.p.SendMessage([]byte(id), pb)
+					retry++
+					if retry > 20 {
+						break
 					}
+					err = d.p.SendMessage([]byte(id), pb)
 				}
 			}
 		}
@@ -68,46 +69,21 @@ func (r test1) StartTest(d *PeerNode) {
 func (r test1) CheckResult(sender string, content *internalMsg.Cmd, d *PeerNode) {
 	fmt.Println("CheckResult ")
 
-	if d.p.GetIP() == d.nodeIPs[0] {
-		fmt.Println("CheckResult ")
+	if content.Ctype == internalMsg.Cmd_SIGNIN {
+		d.checkroll[sender] = d.checkroll[sender] + 1
+		if d.checkroll[sender] == d.numMessages {
+			delete(d.checkroll, sender)
 
-		if content.Ctype == internalMsg.Cmd_SIGNIN {
-			d.checkroll[sender] = d.checkroll[sender] + 1
-			if d.checkroll[sender] == d.numMessages {
-				delete(d.checkroll, sender)
-
-				if len(d.checkroll) == 0 {
-					d.FinishTest()
-				} else {
-					fmt.Println("wait for  = ", len(d.checkroll))
-					for id := range d.checkroll {
-						fmt.Println("wait for ", []byte(id))
-					}
-					fmt.Println("==================== ")
+			if len(d.checkroll) == 0 {
+				d.FinishTest()
+			} else {
+				fmt.Println("wait for  = ", len(d.checkroll))
+				for id := range d.checkroll {
+					fmt.Println("wait for ", []byte(id))
 				}
+				fmt.Println("==================== ")
 			}
 		}
-	} else {
-		cmd := &internalMsg.Cmd{
-			Ctype: internalMsg.Cmd_SIGNIN,
-			Args:  []byte{},
-		}
-		fmt.Println("SendMessage 11")
-
-		pb := proto.Message(cmd)
-		if err := d.p.SendMessage([]byte(sender), pb); err != nil {
-			retry := 0
-			for err != nil {
-				retry++
-				fmt.Println("SendMessage ")
-
-				err = d.p.SendMessage([]byte(sender), pb)
-				if retry >= 10 {
-					return
-				}
-			}
-		}
-		d.FinishTest()
 	}
 }
 

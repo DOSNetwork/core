@@ -216,11 +216,12 @@ func (d *PeerNode) Init(bootStrapIp string, port, peerSize int, numMessages int,
 			case *internalMsg.Cmd:
 
 				if content.Ctype == internalMsg.Cmd_SIGNIN {
+					fmt.Println("received, ", binary.BigEndian.Uint16(content.Args))
 					sender := string(msg.Sender)
-					go d.tStrategy.CheckResult(sender, content, d)
 					response := &internalMsg.Cmd{}
 					replyNonce := msg.RequestNonce
 					d.p.Reply([]byte(sender), replyNonce, response)
+					d.tStrategy.CheckResult(sender, content, d)
 				}
 			case *vss.Signature:
 				go func() { d.tblsChan <- *content }()
