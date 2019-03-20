@@ -114,37 +114,26 @@ func (r test1) CheckResult(sender string, content *internalMsg.Cmd, d *PeerNode)
 type test2 struct{}
 
 func (r test2) StartTest(d *PeerNode) {
-	id := len(d.nodeIPs) - 1
-
-	if d.p.GetIP() == d.nodeIPs[id] {
-		cmd := &internalMsg.Cmd{
-			Ctype: internalMsg.Cmd_SIGNIN,
-			Args:  []byte{},
-		}
-		pb := proto.Message(cmd)
-		for i := 0; i < len(d.nodeIDs); i++ {
-			if !bytes.Equal(d.p.GetID(), d.nodeIDs[i]) {
-				if err := d.p.SendMessage(d.nodeIDs[i], pb); err != nil {
-					retry := 0
-					for err != nil {
-						err = d.p.SendMessage(d.nodeIDs[i], pb)
-						if retry > 20 {
-							break
-						}
-						retry++
-					}
+	cmd := &internalMsg.Cmd{
+		Ctype: internalMsg.Cmd_SIGNIN,
+		Args:  []byte{},
+	}
+	pb := proto.Message(cmd)
+	for i := 0; i < len(d.nodeIDs); i++ {
+		if !bytes.Equal(d.p.GetID(), d.nodeIDs[i]) {
+			fmt.Println("SendMessage from ", d.p.GetID(), " to ", d.nodeIDs[i])
+			if err := d.p.SendMessage(d.nodeIDs[i], pb); err != nil {
+				fmt.Println("SendMessage err ", err)
+				for {
 				}
 			}
 		}
-		d.FinishTest()
 	}
+	d.FinishTest()
 }
 
 func (r test2) CheckResult(sender string, content *internalMsg.Cmd, d *PeerNode) {
-	id := len(d.nodeIPs) - 1
-	if d.p.GetIP() != d.nodeIPs[id] {
-		d.FinishTest()
-	}
+
 }
 
 type test3 struct{}
