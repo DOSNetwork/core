@@ -69,9 +69,11 @@ func (r test2) StartTest(d *PeerNode) {
 	pb := proto.Message(cmd)
 	for i := 0; i < len(d.nodeIDs); i++ {
 		if !bytes.Equal(d.p.GetID(), d.nodeIDs[i]) {
-			if _, err := d.p.Request(d.nodeIDs[i], pb); err != nil {
-				//log.Fatal(err)
-				fmt.Println(err)
+			fmt.Println("SendMessage from ", d.p.GetID(), " to ", d.nodeIDs[i])
+			if err := d.p.SendMessage(d.nodeIDs[i], pb); err != nil {
+				fmt.Println("SendMessage err ", err)
+				for {
+				}
 			}
 		}
 	}
