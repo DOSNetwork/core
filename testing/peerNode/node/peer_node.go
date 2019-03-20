@@ -30,6 +30,7 @@ type PeerNode struct {
 	checkCount  int
 	findNodeDur time.Duration
 	checkroll   map[string]int
+	idSet       map[string]struct{}
 	numMessages int
 	tStrategy   TestStrategy
 	tblsChan    chan vss.Signature
@@ -166,6 +167,7 @@ func (d *PeerNode) Init(bootStrapIp string, port, peerSize int, numMessages int,
 	d.checkCount = 1
 	d.bootStrapIp = bootStrapIp
 	d.checkroll = make(map[string]int)
+	d.idSet = make(map[string]struct{})
 	d.done = make(chan bool)
 	d.tblsChan = make(chan vss.Signature)
 	d.numMessages = numMessages

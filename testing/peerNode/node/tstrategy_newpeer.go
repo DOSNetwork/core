@@ -37,10 +37,11 @@ func (r test1) StartTest(d *PeerNode) {
 				fmt.Println("NewPeer err", err)
 			}
 			d.checkroll[string(id)] = 0
+			d.idSet[string(id)] = struct{}{}
 		}
 	}
 	for i := 0; i < d.numMessages; i++ {
-		for id := range d.checkroll {
+		for id := range d.idSet {
 			var err error
 			fmt.Println("SendMessage ", []byte(id), ", ", i)
 			content := make([]byte, 2)
