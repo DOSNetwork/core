@@ -27,7 +27,7 @@ retry:
 	var conn net.Conn
 	//1)Check if this address has been in peers map
 	existing := false
-	n.peers.Range(func(key, value interface{}) bool {
+	n.requestPeers.Range(func(key, value interface{}) bool {
 		client := value.(*PeerConn)
 		if client.identity.Address == addr {
 
@@ -55,7 +55,7 @@ retry:
 		goto retry
 	}
 
-	n.peers.Range(func(key, value interface{}) bool {
+	n.requestPeers.Range(func(key, value interface{}) bool {
 		client := value.(*PeerConn)
 		if client.identity.Address == addr {
 			existing = true

@@ -1,7 +1,7 @@
 {
     "NodeRole": "BootstrapNode",
     "BootStrapIp": "127.0.0.1",
-    "Port": 9501,
+    "Port": "9501",
     "ChainConfigs": {
         "ETH": {
             "privateNode": {
@@ -19,8 +19,8 @@
                 ]
             },
             "rinkebyPrivateNode": {
-                "DOSProxyAddress": "0xdee5E23Eabf080C9cc0C5695A83b4c6b34589Fde",
-                "DOSAddressBridgeAddress": "0x48fc1d8a6D5bEbf3d34e0CE3595d9dfcBF627eEd",
+                "DOSProxyAddress": "0xAC4B500aAc318ffD8203e5CC9B8E2F76Af581C8f",
+                "DOSAddressBridgeAddress": "0x1b822dD8554f2eF8cE51BD481F1Abc7c55f4d545",
                 "RemoteNodeAddressPool": [
                     "https://rinkeby.infura.io/8e609c76fce442f8a1735fbea9999747",
                     "ws://18.144.62.20:8546",
