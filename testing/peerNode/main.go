@@ -34,10 +34,7 @@ func main() {
 	//need to connect to bootstrap node to get credential
 	noderole := os.Getenv("NODEROLE")
 	bootStrapIP := os.Getenv("BOOTSTRAPIP")
-	port, err := strconv.Atoi(os.Getenv("NODEPORT"))
-	if err != nil {
-		fmt.Println("NODEPORT ", err)
-	}
+	port := os.Getenv("NODEPORT")
 	peerSize, err = strconv.Atoi(os.Getenv("PEERSIZE"))
 	if err != nil {
 		fmt.Println("PEERSIZE ", err)
@@ -60,9 +57,6 @@ func main() {
 		ip, _ = s[0], s[1]
 		d := new(node.PeerNode)
 		d.Init(ip, port, peerSize, numMessages, tStrategy)
-		if noderole == "sicknode" {
-			d.CloseConnectionRandom(5)
-		}
 		d.EventLoop()
 	}
 }

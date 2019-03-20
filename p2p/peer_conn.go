@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"sync"
@@ -12,15 +13,14 @@ import (
 	"time"
 
 	"github.com/DOSNetwork/core/log"
-	"github.com/DOSNetwork/core/p2p/dht"
 	"github.com/DOSNetwork/core/p2p/internal"
-	"github.com/DOSNetwork/core/sign/bls"
+	//"github.com/DOSNetwork/core/sign/bls"
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes"
 	"github.com/golang/protobuf/ptypes/any"
 
-	"crypto/aes"
-	"crypto/cipher"
+	//"crypto/aes"
+	//	"crypto/cipher"
 
 	"github.com/dedis/kyber"
 )
@@ -45,7 +45,6 @@ type PeerConn struct {
 	identity        internal.ID
 	RequestNonce    uint64
 	Requests        sync.Map
-	mux             sync.Mutex
 	readWriteCount  uint64
 	idelPeriodCount uint8
 	lastusedtime    time.Time
@@ -83,10 +82,6 @@ func NewPeerConn(p2pnet *P2P, conn *net.Conn, rxMessage chan P2PMessage, incomin
 		p2pnet.logger.Error(err)
 		return
 	}
-
-	go peer.heartBeat()
-
-	p2pnet.logger.Event("NewPeerConn", nil)
 	return
 }
 
@@ -121,81 +116,115 @@ func (p *PeerConn) receiveLoop() {
 	for {
 		if buf, err = p.receivePackage(); err != nil {
 			if err != io.EOF {
+				fmt.Println("receivePackage err ", err)
 				p.logger.Error(err)
 			} else {
-				p.logger.Event("EndEof", nil)
+				//p.logger.Event("EndEof", nil)
 			}
 			break
 		}
+		go func([]byte) {
+			if len(p.identity.Id) != 0 {
+				fmt.Println(log.ByteTohex(p.p2pnet.identity.Id), " receivePackage  from ", log.ByteTohex(p.identity.Id))
+				f := map[string]interface{}{
+					"fromID": log.ByteTohex(p.identity.Id),
+					"Time":   time.Now()}
+				p.logger.Event("ReceivePackage", f)
+			}
+			if pa, ptr, err = p.decodePackage(buf); err != nil {
+				fmt.Println("decodePackage err ", err)
+				return
+			}
 
-		if pa, ptr, err = p.decodePackage(buf); err != nil {
-			continue
-		}
-
-		if pa.GetRequestNonce() > 0 && pa.GetReplyFlag() {
-			if _state, exists := p.Requests.Load(pa.GetRequestNonce()); exists {
-				state := _state.(*RequestState)
-				select {
-				case state.data <- ptr.Message:
-				case <-state.closeSignal:
+			if pa.GetReplyFlag() {
+				if len(p.identity.Id) != 0 {
+					fmt.Println(log.ByteTohex(p.p2pnet.identity.Id), " receive Reply from ", log.ByteTohex(p.identity.Id))
+					f := map[string]interface{}{
+						"fromID": log.ByteTohex(p.identity.Id),
+						"nonce":  pa.GetRequestNonce(),
+						"Time":   time.Now()}
+					p.logger.Event("ReceiveReply", f)
+				}
+				for retry := 0; retry <= 10; retry++ {
+					if _state, exists := p.Requests.Load(pa.GetRequestNonce()); exists {
+						state := _state.(*RequestState)
+						f := map[string]interface{}{
+							"fromID": log.ByteTohex(p.identity.Id),
+							"nonce":  pa.GetRequestNonce(),
+							"Time":   time.Now()}
+						p.logger.Event("SendReplyBackTo", f)
+						select {
+						case state.data <- ptr.Message:
+						case <-state.closeSignal:
+						}
+						return
+					}
+					time.Sleep(1 * time.Second)
+				}
+				//if len(p.identity.Id) != 0 {
+				f := map[string]interface{}{
+					"fromID": log.ByteTohex(p.identity.Id),
+					"nonce":  pa.GetRequestNonce(),
+					"Time":   time.Now()}
+				p.logger.Event("NoNonce", f)
+				p.logger.Error(errors.New("NoNonce"))
+				//}
+				return
+			} else {
+				if len(p.identity.Id) != 0 {
+					fmt.Println(log.ByteTohex(p.p2pnet.identity.Id), " receive Message from ", log.ByteTohex(p.identity.Id))
 				}
 			}
-			continue
-		}
 
-		switch content := ptr.Message.(type) {
-		//TODO:Refactor this to use request/reply and move out of this loop
-		case *internal.Hi:
-			if len(p.identity.Id) == 0 {
-				p.identity.Id = content.GetId()
-				p.identity.Address = content.GetAddress()
-				p.identity.PublicKey = content.GetPublicKey()
-				pub := suite.G2().Point()
-				if err = pub.UnmarshalBinary(content.GetPublicKey()); err != nil {
-					p.logger.Error(err)
+			switch content := ptr.Message.(type) {
+			//TODO:Refactor this to use request/reply and move out of this loop
+			case *internal.Hi:
+
+				if len(p.identity.Id) == 0 {
+					fmt.Println("Reply Hi to ", log.ByteTohex(p.identity.Id), " ", pa.GetRequestNonce(), " ", pa.GetReplyFlag())
+					f := map[string]interface{}{
+						"fromID": log.ByteTohex(p.identity.Id),
+						"Time":   time.Now()}
+					p.logger.Event("ReplyHi", f)
+					p.identity.Id = content.GetId()
+					p.identity.Address = content.GetAddress()
+					p.identity.PublicKey = content.GetPublicKey()
+					pub := suite.G2().Point()
+					if err = pub.UnmarshalBinary(content.GetPublicKey()); err != nil {
+						p.logger.Error(err)
+					}
+					p.pubKey = pub
+					p.logger.Debug("Conn Established")
+
+					response := &internal.Hi{
+						PublicKey: p.p2pnet.identity.PublicKey,
+						Address:   p.p2pnet.identity.Address,
+						Id:        p.p2pnet.identity.Id,
+					}
+					p.p2pnet.replyPeers.LoadOrStore(string(p.identity.Id), p)
+
+					if err := p.Reply(pa.GetRequestNonce(), response); err != nil {
+						p.logger.Error(err)
+					}
+					if err := p.getShareKeyAndNonce(); err != nil {
+						p.logger.Error(err)
+					}
+
+					//p.waitForHi <- true
 				}
-				p.pubKey = pub
-				p.logger.Debug("Conn Established")
-				response := &internal.Hi{
-					PublicKey: p.p2pnet.identity.PublicKey,
-					Address:   p.p2pnet.identity.Address,
-					Id:        p.p2pnet.identity.Id,
-				}
+
+			case *internal.Ping:
+				response := &internal.Pong{}
 				if err := p.Reply(pa.GetRequestNonce(), response); err != nil {
 					p.logger.Error(err)
 				}
-				if err := p.getShareKeyAndNonce(); err != nil {
-					p.logger.Error(err)
-				}
-				p.waitForHi <- true
+			case *internal.Pong:
+			default:
+				p.lastusedtime = time.Now()
+				msg := P2PMessage{Msg: *ptr, Sender: p.identity.Id, RequestNonce: pa.GetRequestNonce(), PeerConn: p}
+				go func() { p.rxMessage <- msg }()
 			}
-
-			//TODO:move this to routing
-		case *internal.LookupNodeRequest:
-			// Prepare response.
-			response := &internal.LookupNodeResponse{}
-
-			// Respond back with closest peers to a provided target.
-			for _, peerID := range p.p2pnet.routingTable.FindClosestPeers(internal.ID(*content.GetTarget()), dht.BucketSize) {
-				id := internal.ID(peerID)
-				response.Peers = append(response.Peers, &id)
-			}
-
-			if err := p.Reply(pa.GetRequestNonce(), response); err != nil {
-				p.logger.Error(err)
-			}
-			p.waitForLookup <- true
-		case *internal.Ping:
-			response := &internal.Pong{}
-			if err := p.Reply(pa.GetRequestNonce(), response); err != nil {
-				p.logger.Error(err)
-			}
-		case *internal.Pong:
-		default:
-			p.lastusedtime = time.Now()
-			msg := P2PMessage{Msg: *ptr, Sender: p.identity.Id, RequestNonce: pa.GetRequestNonce(), PeerConn: p}
-			go func() { p.rxMessage <- msg }()
-		}
+		}(buf)
 	}
 	close(p.waitForHi)
 	close(p.waitForLookup)
@@ -203,26 +232,31 @@ func (p *PeerConn) receiveLoop() {
 }
 
 func (p *PeerConn) End() {
-	if p.conn == nil {
-		return
-	}
-	if err := (*p.conn).Close(); err != nil {
-		p.logger.Error(err)
-	}
-	p.cancel()
-	p.p2pnet.peers.DeletePeer(string(p.identity.Id))
-	p.logger.Event("End", nil)
+	/*
+		if p.conn == nil {
+			return
+		}
+		if err := (*p.conn).Close(); err != nil {
+			p.logger.Error(err)
+		}
+		p.cancel()
+		p.p2pnet.requestPeers.Delete(string(p.identity.Id))
+		p.p2pnet.requestPeers.Delete(string(p.identity.Id))
+	*/
+	//p.logger.Event("End", nil)
 }
 
 func (p *PeerConn) EndWithoutDelete() {
-	if p.conn == nil {
-		return
-	}
-	if err := (*p.conn).Close(); err != nil {
-		p.logger.Error(err)
-	}
-	p.cancel()
-	p.logger.Event("EndWithoutDelete", nil)
+	/*
+		if p.conn == nil {
+			return
+		}
+		if err := (*p.conn).Close(); err != nil {
+			p.logger.Error(err)
+		}
+		p.cancel()
+	*/
+	//p.logger.Event("EndWithoutDelete", nil)
 }
 
 func (p *PeerConn) receivePackage() ([]byte, error) {
@@ -235,6 +269,7 @@ func (p *PeerConn) receivePackage() ([]byte, error) {
 	c := *p.conn
 	for totalBytesRead < 4 && err == nil {
 		if bytesRead, err = c.Read(buffer[totalBytesRead:]); err != nil {
+			fmt.Println("receivePackage err ", err)
 			return nil, err
 		}
 		totalBytesRead += bytesRead
@@ -243,6 +278,8 @@ func (p *PeerConn) receivePackage() ([]byte, error) {
 	// Decode message size.
 	size := binary.BigEndian.Uint32(buffer)
 	if size == 0 {
+		fmt.Println("received an empty message from a peer err ", err)
+
 		err := errors.New("received an empty message from a peer")
 		return nil, err
 	}
@@ -254,6 +291,7 @@ func (p *PeerConn) receivePackage() ([]byte, error) {
 
 	for totalBytesRead < int(size) && err == nil {
 		if bytesRead, err = c.Read(buffer[totalBytesRead:]); err != nil {
+			fmt.Println("received err ", err)
 			return nil, err
 		}
 		totalBytesRead += bytesRead
@@ -268,29 +306,35 @@ func (p *PeerConn) decodePackage(bytes []byte) (*internal.Package, *ptypes.Dynam
 	content = bytes
 
 	if content, err = p.decrypt(bytes); err != nil {
+		fmt.Println("!!!!!!!!!!!!!! decodePackage decrypt err", err)
 		p.logger.Error(err)
 		return nil, nil, err
 	}
 	pa := new(internal.Package)
 	if err = proto.Unmarshal(content, pa); err != nil {
+		fmt.Println("!!!!!!!!!!!!!! decodePackage Unmarshal err", err)
+
 		p.logger.Error(err)
 		return nil, nil, err
 	}
+	/*
+		pub := suite.G2().Point()
+		if err = pub.UnmarshalBinary(pa.GetPubkey()); err != nil {
+			fmt.Println("!!!!!!!!!!!!!! decodePackage UnmarshalBinary err", err)
 
-	pub := suite.G2().Point()
-	if err = pub.UnmarshalBinary(pa.GetPubkey()); err != nil {
-		p.logger.Error(err)
-		return nil, nil, err
-	}
+			p.logger.Error(err)
+			return nil, nil, err
+		}
 
-	if err = bls.Verify(p.p2pnet.suite, pub, pa.GetAnything().Value, pa.GetSignature()); err != nil {
-		p.logger.Error(err)
-		return nil, nil, err
-	}
-
+		if err = bls.Verify(p.p2pnet.suite, pub, pa.GetAnything().Value, pa.GetSignature()); err != nil {
+			p.logger.Error(err)
+			return nil, nil, err
+		}
+	*/
 	var ptr ptypes.DynamicAny
 	if err = ptypes.UnmarshalAny(pa.GetAnything(), &ptr); err != nil {
 		p.logger.Error(err)
+		fmt.Println("!!!!!!!!!!!!!! decodePackage UnmarshalAny err", err)
 		return nil, nil, err
 	}
 
@@ -308,7 +352,10 @@ func (p *PeerConn) SayHi() (err error) {
 	var response proto.Message
 	var content *internal.Hi
 	var ok bool
-
+	f := map[string]interface{}{
+		"fromID": log.ByteTohex(p.identity.Id),
+		"Time":   time.Now()}
+	p.logger.Event("SayHi", f)
 	request := new(Request)
 	request.SetMessage(&internal.Hi{
 		PublicKey: p.p2pnet.identity.PublicKey,
@@ -341,6 +388,7 @@ func (p *PeerConn) SayHi() (err error) {
 		p.logger.Debug("Conn Established")
 
 	}
+
 	return nil
 }
 
@@ -356,64 +404,52 @@ func (p *PeerConn) getShareKeyAndNonce() (err error) {
 }
 
 func (p *PeerConn) encrypt(plaintext []byte) (c []byte, err error) {
-	var block cipher.Block
-	var aesgcm cipher.AEAD
 	c = plaintext
-	if len(p.dhkey) == 0 {
-		return
-	}
+	/*
+		var block cipher.Block
+		var aesgcm cipher.AEAD
+		c = plaintext
+		if len(p.dhkey) == 0 {
+			return
+		}
 
-	if block, err = aes.NewCipher(p.dhkey); err != nil {
-		p.logger.Error(err)
-		return
-	}
+		if block, err = aes.NewCipher(p.dhkey); err != nil {
+			p.logger.Error(err)
+			return
+		}
 
-	if aesgcm, err = cipher.NewGCM(block); err != nil {
-		p.logger.Error(err)
-		return
-	}
-	c = aesgcm.Seal(nil, p.nonce, plaintext, nil)
+		if aesgcm, err = cipher.NewGCM(block); err != nil {
+			p.logger.Error(err)
+			return
+		}
+		c = aesgcm.Seal(nil, p.nonce, plaintext, nil)
+	*/
 	return
 }
 
 func (p *PeerConn) decrypt(ciphertext []byte) (c []byte, err error) {
-	var block cipher.Block
-	var aesgcm cipher.AEAD
 	c = ciphertext
-	if len(p.dhkey) == 0 {
-		return
-	}
-	if block, err = aes.NewCipher(p.dhkey); err != nil {
-		p.logger.Error(err)
-		return
-	}
+	/*
+		var block cipher.Block
+		var aesgcm cipher.AEAD
+		c = ciphertext
+		if len(p.dhkey) == 0 {
+			return
+		}
+		if block, err = aes.NewCipher(p.dhkey); err != nil {
+			p.logger.Error(err)
+			return
+		}
 
-	if aesgcm, err = cipher.NewGCM(block); err != nil {
-		p.logger.Error(err)
-		return
-	}
+		if aesgcm, err = cipher.NewGCM(block); err != nil {
+			p.logger.Error(err)
+			return
+		}
 
-	if c, err = aesgcm.Open(nil, p.nonce, ciphertext, nil); err != nil {
-		p.logger.Error(err)
-	}
-	return
-}
-
-//Add a timer to avoid wait for Hi forever
-func (p *PeerConn) HeardConnType() (r int, err error) {
-	timer := time.NewTimer(HITIMEOUT * time.Second)
-
-	select {
-	case <-timer.C:
-		err = errors.New("Info Exchange Timeout")
-	case <-p.waitForHi:
-		timer.Stop()
-		r = 0
-	case <-p.waitForLookup:
-		timer.Stop()
-		r = 1
-	}
-
+		if c, err = aesgcm.Open(nil, p.nonce, ciphertext, nil); err != nil {
+			p.logger.Error(err)
+		}
+	*/
 	return
 }
 
@@ -439,8 +475,7 @@ func (p *PeerConn) SendPackage(msg proto.Message) (err error) {
 	prefix := make([]byte, 4)
 	binary.BigEndian.PutUint32(prefix, uint32(len(bytes)))
 	bytes = append(prefix, bytes...)
-	p.mux.Lock()
-	defer p.mux.Unlock()
+
 	if _, err := p.rw.Write(bytes); err != nil {
 		p.logger.Error(err)
 		p.End()
@@ -469,16 +504,17 @@ func (p *PeerConn) prepareMessage(msg proto.Message) (pa *internal.Package, err 
 		p.logger.Error(err)
 		return
 	}
-	//TODO:change to AES256-GCM
-	if sig, err = bls.Sign(p.p2pnet.suite, p.p2pnet.secKey, anything.Value); err != nil {
-		p.logger.Error(err)
-		return
-	}
-	if pub, err = p.p2pnet.pubKey.MarshalBinary(); err != nil {
-		p.logger.Error(err)
-		return
-	}
-
+	/*
+		//TODO:change to AES256-GCM
+		if sig, err = bls.Sign(p.p2pnet.suite, p.p2pnet.secKey, anything.Value); err != nil {
+			p.logger.Error(err)
+			return
+		}
+		if pub, err = p.p2pnet.pubKey.MarshalBinary(); err != nil {
+			p.logger.Error(err)
+			return
+		}
+	*/
 	pa = &internal.Package{
 		Sender:    &id,
 		Anything:  anything,
@@ -491,6 +527,7 @@ func (p *PeerConn) prepareMessage(msg proto.Message) (pa *internal.Package, err 
 
 // Request requests for a response for a request sent to a given peer.
 func (p *PeerConn) Request(req *Request) (proto.Message, error) {
+
 	prepared, err := p.prepareMessage(req.Message)
 	if err != nil {
 		return nil, err
@@ -512,7 +549,11 @@ func (p *PeerConn) Request(req *Request) (proto.Message, error) {
 		data:        channel,
 		closeSignal: closeSignal,
 	})
-
+	f := map[string]interface{}{
+		"fromID": log.ByteTohex(p.identity.Id),
+		"nonce":  prepared.GetRequestNonce(),
+		"Time":   time.Now()}
+	p.logger.Event("Request", f)
 	// Stop tracking the request.
 	defer p.logger.TimeTrack(time.Now(), "requestTime", map[string]interface{}{})
 	defer close(closeSignal)
@@ -526,6 +567,13 @@ func (p *PeerConn) Request(req *Request) (proto.Message, error) {
 	case res := <-channel:
 		return res, nil
 	case <-time.After(req.Timeout):
+		f := map[string]interface{}{
+			"localID": log.ByteTohex(p.p2pnet.identity.Id),
+			"fromID":  log.ByteTohex(p.identity.Id),
+			"Time":    time.Now()}
+		p.logger.Event("RequestTimeout", f)
+		fmt.Println("peer Request Timeout ",
+			req.Timeout, log.ByteTohex(p.p2pnet.identity.Id), " ", log.ByteTohex(p.identity.Id))
 		err := errors.New("Request Timeout")
 		p.logger.Error(err)
 		return nil, err
@@ -534,17 +582,28 @@ func (p *PeerConn) Request(req *Request) (proto.Message, error) {
 
 // Reply is equivalent to Write() with an appended nonce to signal a reply.
 func (p *PeerConn) Reply(nonce uint64, message proto.Message) error {
+	f := map[string]interface{}{
+		"fromID": log.ByteTohex(p.identity.Id),
+		"Time":   time.Now()}
+	p.logger.Event("Reply", f)
 	prepared, err := p.prepareMessage(message)
 	if err != nil {
+		p.logger.Error(err)
 		return err
 	}
 
 	// Set the nonce.
 	prepared.RequestNonce = nonce
 	prepared.ReplyFlag = true
-
-	if err := p.SendPackage(prepared); err != nil {
-		return err
+	//TODO :Handle short write err here?
+	retry := 0
+	for {
+		err := p.SendPackage(prepared)
+		if err == nil || retry >= 10 {
+			break
+		}
+		p.logger.Error(err)
+		retry++
 	}
 
 	switch message.(type) {
