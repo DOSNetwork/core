@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
 	"io/ioutil"
@@ -99,6 +100,7 @@ func main() {
 			path = strings.ToLower(os.Args[2])
 			pass = strings.ToLower(os.Args[3])
 		}
+		fmt.Println(path, pass)
 		runDos(path, pass)
 	}
 
@@ -123,27 +125,27 @@ func main() {
 				},
 			},
 			Action: func(c *cli.Context) error {
-				password := ""
-				fmt.Print("credentialPath: ", c.String("credential.path"))
-				if c.String("credential.passphrase") != "" {
-					fmt.Print("passPhrase: ", strings.TrimSpace(c.String("credential.passphrase")))
-				} else {
+				password := c.String("credential.passphrase")
+				fmt.Println(password)
+				for password == "" {
 					fmt.Print("Enter Password: ")
-					bytePassword, err := terminal.ReadPassword(0)
-					if err == nil {
-						fmt.Println("\nPassword typed: ***\n")
-					}
+					bytePassword, _ := terminal.ReadPassword(0)
 					password = strings.TrimSpace(string(bytePassword))
 				}
+
+				path := c.String("credential.path")
+				fmt.Println(path)
+				for path == "" {
+					fmt.Printf("\n%v", "Enter Credential Path: ")
+					reader := bufio.NewReader(os.Stdin)
+					text, _ := reader.ReadString('\n')
+					path = strings.TrimSpace(text)
+				}
+
 				// check if daemon already running.
 				if _, err := os.Stat(PIDFile); err == nil {
 					fmt.Println("Already running or /tmp/dosclient.pid file exist.")
 					os.Exit(1)
-				}
-				fmt.Println("!!!" + c.String("credential.path"))
-				path := ""
-				if c.String("credential.passphrase") != "" {
-					path = strings.TrimSpace(c.String("credential.path"))
 				}
 				cmd := exec.Command(os.Args[0], "run", path, password)
 				cmd.Start()
