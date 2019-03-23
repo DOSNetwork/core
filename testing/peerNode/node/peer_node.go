@@ -218,7 +218,6 @@ func (d *PeerNode) Init(bootStrapIp string, port, peerSize int, numMessages int,
 			case *internalMsg.Cmd:
 
 				if content.Ctype == internalMsg.Cmd_SIGNIN {
-					fmt.Println("received, ", binary.BigEndian.Uint16(content.Args))
 					sender := string(msg.Sender)
 					response := &internalMsg.Cmd{}
 					replyNonce := msg.RequestNonce

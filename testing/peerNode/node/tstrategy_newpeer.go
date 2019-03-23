@@ -3,7 +3,6 @@ package node
 import (
 	"bytes"
 	"context"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -21,7 +20,7 @@ import (
 	"github.com/DOSNetwork/core/suites"
 	"github.com/DOSNetwork/core/testing/peerNode/internalMsg"
 
-	//	log "github.com/DOSNetwork/core/log"
+	log "github.com/DOSNetwork/core/log"
 	"github.com/golang/protobuf/proto"
 )
 
@@ -29,38 +28,27 @@ type test1 struct{}
 
 func (r test1) StartTest(d *PeerNode) {
 	fmt.Println("StartTest")
+	cmd := &internalMsg.Cmd{
+		Ctype: internalMsg.Cmd_SIGNIN,
+		Args:  []byte{},
+	}
+	pb := proto.Message(cmd)
 	for i := 0; i < len(d.nodeIPs); i++ {
 		if d.p.GetIP() != d.nodeIPs[i] {
 			ip := d.nodeIPs[i]
 			id, err := d.p.ConnectTo(ip)
 			if err != nil {
-				fmt.Println("NewPeer err", err)
+				log.Fatal(err)
 			}
 			d.checkroll[string(id)] = 0
 			d.idSet[string(id)] = struct{}{}
 		}
 	}
 	for i := 0; i < d.numMessages; i++ {
-		for id := range d.idSet {
-			var err error
-			fmt.Println("SendMessage ", []byte(id), ", ", i)
-			content := make([]byte, 2)
-			binary.BigEndian.PutUint16(content, uint16(i))
-			cmd := &internalMsg.Cmd{
-				Ctype: internalMsg.Cmd_SIGNIN,
-				Args:  content,
-			}
-			pb := proto.Message(cmd)
-			if err = d.p.SendMessage([]byte(id), pb); err != nil {
-				retry := 1
-				for err != nil {
-					fmt.Println("SendMessage err", err)
-
-					retry++
-					if retry > 20 {
-						break
-					}
-					err = d.p.SendMessage([]byte(id), pb)
+		for i := 0; i < len(d.nodeIDs); i++ {
+			if !bytes.Equal(d.p.GetID(), d.nodeIDs[i]) {
+				if _, err := d.p.Request(d.nodeIDs[i], pb); err != nil {
+					log.Fatal(err)
 				}
 			}
 		}
@@ -68,60 +56,30 @@ func (r test1) StartTest(d *PeerNode) {
 }
 
 func (r test1) CheckResult(sender string, content *internalMsg.Cmd, d *PeerNode) {
-	fmt.Println("CheckResult ")
 
-	if content.Ctype == internalMsg.Cmd_SIGNIN {
-		d.checkroll[sender] = d.checkroll[sender] + 1
-		if d.checkroll[sender] == d.numMessages {
-			delete(d.checkroll, sender)
-
-			if len(d.checkroll) == 0 {
-				d.FinishTest()
-			} else {
-				fmt.Println("wait for  = ", len(d.checkroll))
-				for id := range d.checkroll {
-					fmt.Println("wait for ", []byte(id))
-				}
-				fmt.Println("==================== ")
-			}
-		}
-	}
 }
 
 type test2 struct{}
 
 func (r test2) StartTest(d *PeerNode) {
-	id := len(d.nodeIPs) - 1
-
-	if d.p.GetIP() == d.nodeIPs[id] {
-		cmd := &internalMsg.Cmd{
-			Ctype: internalMsg.Cmd_SIGNIN,
-			Args:  []byte{},
-		}
-		pb := proto.Message(cmd)
-		for i := 0; i < len(d.nodeIDs); i++ {
-			if !bytes.Equal(d.p.GetID(), d.nodeIDs[i]) {
-				if err := d.p.SendMessage(d.nodeIDs[i], pb); err != nil {
-					retry := 0
-					for err != nil {
-						err = d.p.SendMessage(d.nodeIDs[i], pb)
-						if retry > 20 {
-							break
-						}
-						retry++
-					}
-				}
+	cmd := &internalMsg.Cmd{
+		Ctype: internalMsg.Cmd_SIGNIN,
+		Args:  []byte{},
+	}
+	pb := proto.Message(cmd)
+	for i := 0; i < len(d.nodeIDs); i++ {
+		if !bytes.Equal(d.p.GetID(), d.nodeIDs[i]) {
+			if _, err := d.p.Request(d.nodeIDs[i], pb); err != nil {
+				//log.Fatal(err)
+				fmt.Println(err)
 			}
 		}
-		d.FinishTest()
 	}
+	d.FinishTest()
 }
 
 func (r test2) CheckResult(sender string, content *internalMsg.Cmd, d *PeerNode) {
-	id := len(d.nodeIPs) - 1
-	if d.p.GetIP() != d.nodeIPs[id] {
-		d.FinishTest()
-	}
+
 }
 
 type test3 struct{}
@@ -216,7 +174,7 @@ func (r test4) StartTest(d *PeerNode) {
 	signatures = append(signatures, sig)
 	for _, id := range d.nodeIDs {
 		if bytes.Compare(d.p.GetID(), id) != 0 {
-			if err = d.p.SendMessage(id, sign); err != nil {
+			if _, err = d.p.Request(id, sign); err != nil {
 				fmt.Println(err)
 			}
 		}
