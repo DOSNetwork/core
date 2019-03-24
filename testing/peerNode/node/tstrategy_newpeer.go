@@ -74,20 +74,26 @@ func (r test2) StartTest(d *PeerNode) {
 		Args:  []byte{},
 	}
 	pb := proto.Message(cmd)
-	/*
-		for i := 0; i < len(d.nodeIDs); i++ {
-			if !bytes.Equal(d.p.GetID(), d.nodeIDs[i]) {
-				start := time.Now()
+
+	for i := 0; i < len(d.nodeIDs); i++ {
+		if !bytes.Equal(d.p.GetID(), d.nodeIDs[i]) {
+			start := time.Now()
+			retry := 0
+			for {
 				if _, err := d.p.Request(d.nodeIDs[i], pb); err != nil {
-					fmt.Println(start, " ->", time.Now(), "testfailed ", d.p.GetID(), " ->", d.nodeIDs[i], err)
-					os.Exit(1)
+					fmt.Println(start, " ->", time.Now(), "retry ", retry, d.p.GetID(), " ->", d.nodeIDs[i], err)
+					retry++
+					time.Sleep(1 * time.Second)
 				} else {
-					fmt.Println("Test done", time.Since(start).Nanoseconds()/1000)
+					break
 				}
 			}
+			fmt.Println("Request done", time.Since(start).Nanoseconds()/1000)
 		}
-		time.Sleep(10 * time.Second)
-	*/
+	}
+	time.Sleep(10 * time.Second)
+	fmt.Println("Start Test FindNode")
+
 	var wg sync.WaitGroup
 	/*
 		wg.Add((len(d.nodeIDs) - 1) * d.numMessages)
@@ -112,6 +118,7 @@ func (r test2) StartTest(d *PeerNode) {
 			}
 		}
 	*/
+	start := time.Now()
 
 	wg.Add((len(d.nodeIDs) - 1))
 	for i := 0; i < len(d.nodeIDs); i++ {
@@ -131,6 +138,8 @@ func (r test2) StartTest(d *PeerNode) {
 	}
 
 	wg.Wait()
+	fmt.Println("Test done", time.Since(start).Nanoseconds()/1000)
+	time.Sleep(10 * time.Second)
 
 	d.FinishTest()
 }
@@ -147,7 +156,29 @@ func (r test3) StartTest(d *PeerNode) {
 	if err != nil {
 		//d.log.Fatal(err)
 	}
+	cmd := &internalMsg.Cmd{
+		Ctype: internalMsg.Cmd_SIGNIN,
+		Args:  []byte{},
+	}
+	pb := proto.Message(cmd)
+	for i := 0; i < len(d.nodeIDs); i++ {
+		if !bytes.Equal(d.p.GetID(), d.nodeIDs[i]) {
+			start := time.Now()
+			retry := 0
+			for {
+				if _, err := d.p.Request(d.nodeIDs[i], pb); err != nil {
+					fmt.Println(start, " ->", time.Now(), "testfailed ", d.p.GetID(), " ->", d.nodeIDs[i], err)
+					retry++
+				} else {
+					break
+				}
+			}
+			fmt.Println("Request done", time.Since(start).Nanoseconds()/1000)
 
+		}
+	}
+	time.Sleep(10 * time.Second)
+	start := time.Now()
 	for idx, id := range d.nodeIDs {
 		if bytes.Compare(d.p.GetID(), id) == 0 {
 			start := idx / groupSize * groupSize
@@ -168,6 +199,9 @@ func (r test3) StartTest(d *PeerNode) {
 			break
 		}
 	}
+
+	fmt.Println("Test done", time.Since(start).Nanoseconds()/1000)
+
 }
 
 func (r test3) CheckResult(sender string, content *internalMsg.Cmd, d *PeerNode) {}
