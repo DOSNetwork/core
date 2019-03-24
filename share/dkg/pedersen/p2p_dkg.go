@@ -181,15 +181,43 @@ func (d *P2PDkg) eventLoop() (err error) {
 			for {
 				select {
 				case msg := <-peerEvent:
+					//fmt.Println("DKG peerEvent")
+
 					switch content := msg.Msg.Message.(type) {
 					case *ReqPublicKey:
-						(*d.network).Reply(msg.Sender, msg.RequestNonce, peerPackageMap[content.SessionId].pubKey)
+						//fmt.Println("DKG ReqPublicKey")
+
+						var pubKey *vss.PublicKey
+						if peerPackageMap[content.SessionId].pubKey == nil {
+							//fmt.Println("DKG pubKey is nil")
+							pubKey = &vss.PublicKey{}
+						} else {
+							pubKey = peerPackageMap[content.SessionId].pubKey
+						}
+						(*d.network).Reply(msg.Sender, msg.RequestNonce, pubKey)
 					case *ReqDeal:
-						(*d.network).Reply(msg.Sender, msg.RequestNonce, peerPackageMap[content.SessionId].deals[string(msg.Sender)])
+						var deal *Deal
+						//fmt.Println("DKG ReqDeal")
+
+						if peerPackageMap[content.SessionId].deals[string(msg.Sender)] == nil {
+							deal = &Deal{}
+						} else {
+							deal = peerPackageMap[content.SessionId].deals[string(msg.Sender)]
+						}
+						(*d.network).Reply(msg.Sender, msg.RequestNonce, deal)
 					case *ReqResponses:
-						(*d.network).Reply(msg.Sender, msg.RequestNonce, peerPackageMap[content.SessionId].resps)
+						var resp *Responses
+						//fmt.Println("DKG ReqResponses")
+
+						if peerPackageMap[content.SessionId].resps == nil {
+							//fmt.Println("DKG resps is nil")
+							resp = &Responses{}
+						} else {
+							resp = peerPackageMap[content.SessionId].resps
+						}
+						(*d.network).Reply(msg.Sender, msg.RequestNonce, resp)
 					default:
-						fmt.Println("unknown request type")
+						//fmt.Println("DKG unknown request type")
 					}
 				case msg := <-d.outputChan:
 					switch content := msg.content.(type) {
@@ -342,7 +370,7 @@ func (d *P2PDkg) pipeExchangePubKey(newSession *DkgSession, outToEventloop chan<
 						continue
 					}
 				}
-				switch content := pubkey.(type) {
+				switch content := pubkey.Msg.Message.(type) {
 				case *vss.PublicKey:
 					if content.GetBinary() != nil {
 						p, err := content.GetPoint(d.suite)
@@ -447,7 +475,7 @@ func (d *P2PDkg) pipeNewDistKeyGenerator(dkgSession <-chan *DkgSession, outToEve
 							continue
 						}
 					}
-					switch content := deal.(type) {
+					switch content := deal.Msg.Message.(type) {
 					case *Deal:
 						if content.GetDeal() != nil {
 							newSession.deals = append(newSession.deals, *content)
@@ -528,7 +556,7 @@ func (d *P2PDkg) pipeProcessDealAndResponses(dkgSession <-chan *DkgSession, outT
 							continue
 						}
 					}
-					switch content := responses.(type) {
+					switch content := responses.Msg.Message.(type) {
 					case *Responses:
 						if resps := content.GetResponse(); resps != nil {
 							for _, r := range resps {
