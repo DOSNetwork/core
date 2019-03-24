@@ -34,8 +34,8 @@ type Server struct {
 
 	//Client lookup
 	cluster   *serf.Serf
-	calling   chan RequestClient
-	replying  chan RequestClient
+	calling   chan Request
+	replying  chan Request
 	incoming  chan *Client
 	registerC chan *Client
 
@@ -56,14 +56,6 @@ type Request struct {
 	msg   proto.Message
 	p     *Package
 	reply chan interface{}
-	errc  chan error
-}
-
-type RequestClient struct {
-	ctx   context.Context
-	addr  string
-	id    []byte
-	reply chan *Client
 	errc  chan error
 }
 
@@ -205,7 +197,7 @@ func (n *Server) Listen() (err error) {
 }
 func (n *Server) receiveHandler() {
 	n.incoming = make(chan *Client, 100)
-	n.replying = make(chan RequestClient)
+	n.replying = make(chan Request)
 	clients := make(map[string]*Client)
 
 	go func() {
@@ -242,7 +234,7 @@ func (n *Server) receiveHandler() {
 	}()
 }
 func (n *Server) callHandler() {
-	n.calling = make(chan RequestClient, 100)
+	n.calling = make(chan Request, 100)
 	hangup := make(chan string)
 	addrToid := make(map[string][]byte)
 	idTostatus := make(map[string][]byte)
@@ -277,7 +269,7 @@ func (n *Server) callHandler() {
 							}
 						} else {
 							fmt.Println(time.Now(), "callHandler req.addr pending", req.addr, id)
-							go func(req RequestClient) {
+							go func(req Request) {
 								select {
 								case n.calling <- req:
 								case <-req.ctx.Done():
@@ -326,7 +318,7 @@ func (n *Server) callHandler() {
 						if req.addr == "" {
 							//Retry later
 							fmt.Println(time.Now(), "callHandler Retry later", req.id)
-							go func(req RequestClient) {
+							go func(req Request) {
 								select {
 								case n.calling <- req:
 								case <-req.ctx.Done():
@@ -338,7 +330,7 @@ func (n *Server) callHandler() {
 					idTostatus[string(req.id)] = []byte{'p', 'e', 'n', 'd', 'i', 'n', 'g'}
 					addrToid[req.addr] = []byte{'p', 'e', 'n', 'd', 'i', 'n', 'g'}
 					fmt.Println(time.Now(), "callHandler Create Client ", len(clients), len(addrToid), req.id, req.addr)
-					go func(req RequestClient, start time.Time) {
+					go func(req Request, start time.Time) {
 						var conn net.Conn
 						var client *Client
 						if conn, err = net.Dial("tcp", req.addr+":"+n.port); err != nil {
@@ -349,7 +341,7 @@ func (n *Server) callHandler() {
 							case <-req.ctx.Done():
 							}
 							//Retry later
-							go func(req RequestClient) {
+							go func(req Request) {
 								select {
 								case n.calling <- req:
 								case <-req.ctx.Done():
@@ -369,7 +361,7 @@ func (n *Server) callHandler() {
 							conn.Close()
 							//Retry later
 							fmt.Println(time.Now(), "callHandler Retry later")
-							go func(req RequestClient) {
+							go func(req Request) {
 								select {
 								case n.calling <- req:
 								case <-req.ctx.Done():
@@ -445,10 +437,10 @@ func (n *Server) Leave() {
 This is a block call
 */
 func (n *Server) ConnectTo(addr string) (id []byte, err error) {
-	callReq := RequestClient{}
+	callReq := Request{}
 	callReq.ctx, _ = context.WithTimeout(context.Background(), 10*time.Second)
 	callReq.addr = addr
-	callReq.reply = make(chan *Client)
+	callReq.reply = make(chan interface{})
 	callReq.errc = make(chan error)
 	fmt.Println("ConnectTo addr ", addr)
 
@@ -460,10 +452,14 @@ func (n *Server) ConnectTo(addr string) (id []byte, err error) {
 	}
 
 	select {
-	case client := <-callReq.reply:
-		id = client.remoteID
-		fmt.Println("ConnectTo addr ", callReq.addr, " id ", id)
+	case r := <-callReq.reply:
+		client, ok := r.(*Client)
+		if ok {
+			id = client.remoteID
+			fmt.Println("ConnectTo addr ", callReq.addr, " id ", id)
+		}
 		return
+
 	case err = <-callReq.errc:
 		fmt.Println("ConnectTo err ", err)
 		return
@@ -479,10 +475,10 @@ func (n *Server) Request(id []byte, m proto.Message) (msg P2PMessage, err error)
 	defer logger.TimeTrack(time.Now(), "Request", nil)
 	fmt.Println("Request ", id)
 	start := time.Now()
-	callReq := RequestClient{}
+	callReq := Request{}
 	callReq.ctx, _ = context.WithTimeout(context.Background(), 15*time.Second)
 	callReq.id = id
-	callReq.reply = make(chan *Client)
+	callReq.reply = make(chan interface{})
 	callReq.errc = make(chan error)
 
 	select {
@@ -493,10 +489,11 @@ func (n *Server) Request(id []byte, m proto.Message) (msg P2PMessage, err error)
 	}
 
 	select {
-	case client, ok := <-callReq.reply:
+	case r, ok := <-callReq.reply:
 		if !ok {
 			return
 		}
+		client, ok := r.(*Client)
 		logger.TimeTrack(start, "RequestGotClient", nil)
 		fmt.Println(time.Now(), " ->", start, " callHandler Request got client ", client.localID, " - ", client.remoteID)
 		start = time.Now()
@@ -525,10 +522,10 @@ func (n *Server) Request(id []byte, m proto.Message) (msg P2PMessage, err error)
 }
 
 func (n *Server) Reply(id []byte, nonce uint64, response proto.Message) (err error) {
-	callReq := RequestClient{}
+	callReq := Request{}
 	callReq.ctx, _ = context.WithTimeout(context.Background(), 15*time.Second)
 	callReq.id = id
-	callReq.reply = make(chan *Client)
+	callReq.reply = make(chan interface{})
 	callReq.errc = make(chan error)
 	start := time.Now()
 	select {
@@ -539,11 +536,12 @@ func (n *Server) Reply(id []byte, nonce uint64, response proto.Message) (err err
 	}
 
 	select {
-	case client, ok := <-callReq.reply:
+	case r, ok := <-callReq.reply:
 		if !ok {
 			return
 		}
-		if client == nil {
+		client, ok := r.(*Client)
+		if !ok {
 			return
 		}
 		logger.TimeTrack(start, "ReplyGotClient", nil)
