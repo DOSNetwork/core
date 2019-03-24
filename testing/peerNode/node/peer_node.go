@@ -11,6 +11,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/DOSNetwork/core/suites"
+
+	"github.com/DOSNetwork/core/share/dkg/pedersen"
 	"github.com/DOSNetwork/core/share/vss/pedersen"
 
 	"github.com/DOSNetwork/core/testing/peerNode/internalMsg"
@@ -32,6 +35,7 @@ type PeerNode struct {
 	numMessages int
 	tStrategy   TestStrategy
 	tblsChan    chan vss.Signature
+	p2pDkg      dkg.P2PDkgInterface
 }
 
 func (d *PeerNode) MakeRequest(bootStrapIp, f string, args []byte) ([]byte, error) {
@@ -203,31 +207,30 @@ func (d *PeerNode) Init(bootStrapIp string, port string, peerSize int, numMessag
 
 	//2)Build a p2p network
 	d.p, _ = p2p.CreateP2PNetwork(d.nodeID[:], port)
-	peerEvent, _ := d.p.SubscribeEvent(100, internalMsg.Cmd{}, vss.Signature{})
 	d.p.Listen()
+	peerEvent, _ := d.p.SubscribeEvent(100, internalMsg.Cmd{})
+	suite := suites.MustFind("bn256")
+	d.p2pDkg, _ = dkg.CreateP2PDkg(d.p, suite)
+
 	go func() {
 		for msg := range peerEvent {
 			switch content := msg.Msg.Message.(type) {
 			case *internalMsg.Cmd:
-
 				if content.Ctype == internalMsg.Cmd_SIGNIN {
 					sender := string(msg.Sender)
 					go d.tStrategy.CheckResult(sender, content, d)
 					response := &internalMsg.Cmd{}
 					replyNonce := msg.RequestNonce
+
 					d.p.Reply([]byte(sender), replyNonce, response)
-				}
-			case *vss.Signature:
-				go func() { d.tblsChan <- *content }()
-				if err := d.p.Reply(msg.Sender, msg.RequestNonce, &vss.Signature{}); err != nil {
-					fmt.Println("signature reply", err)
 				}
 			default:
 			}
 		}
 	}()
 
-	//fmt.Println("nodeIP = ", d.p.GetIP())
+	fmt.Println("nodeIP = ", d.p.GetIP())
+	fmt.Println("get all ids")
 
 	d.requestAllIDs() //get all ids
 	d.requestAllIPs() //get all ips
@@ -238,19 +241,20 @@ func (d *PeerNode) Init(bootStrapIp string, port string, peerSize int, numMessag
 				d.p.Join(d.nodeIPs[i])
 			}
 		}
-	}
-	count := 0
-	start := time.Now()
-	for {
-		latestCount := d.p.Members()
-		if count != latestCount {
-			fmt.Println("Members ", count)
-			count = latestCount
-		}
-		if count == d.peerSize {
-			elapsed := time.Since(start).Nanoseconds() / 1000
-			fmt.Println("Members ", count, " took ", elapsed)
-			break
+
+		count := 0
+		start := time.Now()
+		for {
+			latestCount := d.p.Members()
+			if count != latestCount {
+				fmt.Println("Members ", count)
+				count = latestCount
+			}
+			if count == d.peerSize {
+				elapsed := time.Since(start).Nanoseconds() / 1000
+				fmt.Println("Members ", count, " took ", elapsed)
+				break
+			}
 		}
 	}
 
