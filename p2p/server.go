@@ -48,6 +48,17 @@ type Server struct {
 	cancel context.CancelFunc
 }
 
+type Request struct {
+	rType int
+	ctx   context.Context
+	addr  string
+	id    []byte
+	msg   proto.Message
+	p     *Package
+	reply chan interface{}
+	errc  chan error
+}
+
 type RequestClient struct {
 	ctx   context.Context
 	addr  string

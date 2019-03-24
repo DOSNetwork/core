@@ -12,7 +12,6 @@ import (
 	"sync"
 	"time"
 	//	"github.com/DOSNetwork/core/log"
-	//"github.com/DOSNetwork/core/p2p/internal"
 	"github.com/DOSNetwork/core/sign/bls"
 	"github.com/DOSNetwork/core/suites"
 
@@ -44,12 +43,6 @@ type Client struct {
 	sender   chan Request
 	receiver chan P2PMessage
 	errc     chan error
-}
-
-type Request struct {
-	ctx   context.Context
-	p     *Package
-	reply chan P2PMessage
 }
 
 func MergeErrors(ctx context.Context, cs ...<-chan error) chan error {
@@ -601,7 +594,7 @@ func (c *Client) Request(msg proto.Message) (P2PMessage, error) {
 		Signature: sig,
 	}
 
-	reply := make(chan P2PMessage)
+	reply := make(chan interface{})
 	req := Request{
 		ctx:   ctx,
 		p:     &pa,
@@ -621,7 +614,11 @@ func (c *Client) Request(msg proto.Message) (P2PMessage, error) {
 	select {
 	case r := <-reply:
 		//fmt.Println(time.Now(), "!!!!!!!!Request reply has been received  ", c.localID, " to ", c.remoteID)
-		return r, err
+		msg, ok := r.(P2PMessage)
+		if !ok {
+			return P2PMessage{}, ctx.Err()
+		}
+		return msg, err
 	case <-ctx.Done():
 		//fmt.Println(time.Now(), "!!!!!!!!Request wait for Reply timeout  ", c.localID, " to ", c.remoteID, " err", ctx.Err())
 		err := errors.New("Request Timeout")
