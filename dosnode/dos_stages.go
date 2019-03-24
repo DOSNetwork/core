@@ -182,7 +182,7 @@ func requestSign(
 			retryCount := 0
 			for retryCount < 30 {
 				if msg, err := p.Request(id, sign); err == nil {
-					switch content := msg.(type) {
+					switch content := msg.Msg.Message.(type) {
 					case *vss.Signature:
 						sign.Content = content.Content
 						sign.Signature = content.Signature
