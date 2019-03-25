@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
-	"fmt"
+	//	"fmt"
 	//	"io"
 	//"encoding/hex"
 	"net"
@@ -41,7 +41,7 @@ type Client struct {
 	ctx      context.Context
 	cancel   context.CancelFunc
 	sender   chan Request
-	receiver chan P2PMessage
+	receiver chan interface{}
 	errc     chan error
 }
 
@@ -90,15 +90,15 @@ func NewClient(suite suites.Suite, secKey kyber.Scalar, localPubKey kyber.Point,
 	}
 	client.ctx, client.cancel = context.WithCancel(context.Background())
 	client.sender = make(chan Request, 100)
-	fmt.Println(time.Now(), "!!!!!!NewClient , ", incomingConn, " ", client.localID, client.remoteID)
+	//fmt.Println(time.Now(), "!!!!!!NewClient , ", incomingConn, " ", client.localID, client.remoteID)
 
 	//Wait for exchanging ID complete
 	err = client.exchangeID()
 	if err != nil {
-		fmt.Println(time.Now(), "!!!!!!NewClient , exchangeID err", err, incomingConn, " ", client.localID, client.remoteID)
+		//fmt.Println(time.Now(), "!!!!!!NewClient , exchangeID err", err, incomingConn, " ", client.localID, client.remoteID)
 		return
 	}
-	fmt.Println(time.Now(), "!!!!!!NewClient , exchangeID ", incomingConn, " ", client.localID, client.remoteID)
+	//fmt.Println(time.Now(), "!!!!!!NewClient , exchangeID ", incomingConn, " ", client.localID, client.remoteID)
 
 	var errs []<-chan error
 	var packByte chan []byte
@@ -118,7 +118,7 @@ func NewClient(suite suites.Suite, secKey kyber.Scalar, localPubKey kyber.Point,
 }
 
 func (c *Client) Close() {
-	fmt.Println("Client Close")
+	//fmt.Println("Client Close")
 	c.conn.Close()
 	c.cancel()
 
@@ -127,7 +127,7 @@ func (c *Client) ErrorHandling(errc <-chan error) {
 	go func() {
 		for err := range errc {
 			if err.Error() != "cipher: message authentication failed" {
-				fmt.Println("ErrorHandling err ", err)
+				//fmt.Println("ErrorHandling err ", err)
 			}
 			if err.Error() == "EOF" {
 				c.Close()
@@ -147,12 +147,12 @@ func (c *Client) exchangeID() (err error) {
 		ch <- struct{}{}
 	}()
 	timeout := time.Duration(10) * time.Second
-	//fmt.Printf("Wait for waitgroup (up to %s)\n", timeout)
+	////fmt.Printf("Wait for waitgroup (up to %s)\n", timeout)
 	select {
 	case <-ch:
-		//fmt.Printf("Wait group finished\n")
+		////fmt.Printf("Wait group finished\n")
 	case <-time.After(timeout):
-		fmt.Printf("Timed out waiting for wait group\n")
+		//fmt.Printf("Timed out waiting for wait group\n")
 	}
 	return
 }
@@ -162,17 +162,17 @@ func (c *Client) receiveID(wg *sync.WaitGroup) (err error) {
 
 	pa := new(Package)
 	if err = proto.Unmarshal(buffer, pa); err != nil {
-		fmt.Println(time.Now(), "!!!!!!receiveID Unmarshal err ", err.Error(), c.incomingConn, " ", c.localID, c.remoteID)
+		//fmt.Println(time.Now(), "!!!!!!receiveID Unmarshal err ", err.Error(), c.incomingConn, " ", c.localID, c.remoteID)
 		return
 	}
 	var ptr ptypes.DynamicAny
 	if err = ptypes.UnmarshalAny(pa.GetAnything(), &ptr); err != nil {
-		fmt.Println(time.Now(), "!!!!!!receiveID UnmarshalAny err ", err.Error(), c.incomingConn, " ", c.localID, c.remoteID)
+		//fmt.Println(time.Now(), "!!!!!!receiveID UnmarshalAny err ", err.Error(), c.incomingConn, " ", c.localID, c.remoteID)
 		return
 	}
 	id, ok := ptr.Message.(*ID)
 	if !ok {
-		fmt.Println(time.Now(), "!!!!!!receiveID cast to ID !OK err ", c.incomingConn, " ", c.localID, c.remoteID)
+		//fmt.Println(time.Now(), "!!!!!!receiveID cast to ID !OK err ", c.incomingConn, " ", c.localID, c.remoteID)
 		return
 	}
 	c.remoteID = id.GetId()
@@ -181,7 +181,7 @@ func (c *Client) receiveID(wg *sync.WaitGroup) (err error) {
 	}
 	pub := c.suite.G2().Point()
 	if err = pub.UnmarshalBinary(id.GetPublicKey()); err != nil {
-		fmt.Println(time.Now(), "!!!!!!receiveID UnmarshalBinary err ", err.Error(), c.incomingConn, " ", c.localID, c.remoteID)
+		//fmt.Println(time.Now(), "!!!!!!receiveID UnmarshalBinary err ", err.Error(), c.incomingConn, " ", c.localID, c.remoteID)
 		return
 	}
 	c.remotePubKey = pub
@@ -189,7 +189,7 @@ func (c *Client) receiveID(wg *sync.WaitGroup) (err error) {
 	var dhBytes []byte
 	dhKey := c.suite.Point().Mul(c.localSecKey, c.remotePubKey)
 	if dhBytes, err = dhKey.MarshalBinary(); err != nil {
-		fmt.Println(time.Now(), "!!!!!!receiveID MarshalBinary err ", err.Error(), c.incomingConn, " ", c.localID, c.remoteID)
+		//fmt.Println(time.Now(), "!!!!!!receiveID MarshalBinary err ", err.Error(), c.incomingConn, " ", c.localID, c.remoteID)
 		return
 	}
 	c.dhKey = dhBytes[0:32]
@@ -202,7 +202,7 @@ func (c *Client) sendID(wg *sync.WaitGroup) (err error) {
 	var anything *any.Any
 	var bytes, pubKeyBytes []byte
 	if pubKeyBytes, err = c.localPubKey.MarshalBinary(); err != nil {
-		fmt.Println("prepareID pubKey.MarshalBinary ", err)
+		//fmt.Println("prepareID pubKey.MarshalBinary ", err)
 		return
 	}
 
@@ -212,24 +212,24 @@ func (c *Client) sendID(wg *sync.WaitGroup) (err error) {
 	}
 
 	if anything, err = ptypes.MarshalAny(pID); err != nil {
-		fmt.Println("prepareID ptypes.MarshalAny ", err)
+		//fmt.Println("prepareID ptypes.MarshalAny ", err)
 		return
 	}
 	pa := &Package{
 		Anything: anything,
 	}
 	if bytes, err = proto.Marshal(pa); err != nil {
-		fmt.Println("prepareID proto.Marshal(pa) ", err)
+		//fmt.Println("prepareID proto.Marshal(pa) ", err)
 		return
 	}
 	prefix := make([]byte, 4)
 	binary.BigEndian.PutUint32(prefix, uint32(len(bytes)))
 	bytes = append(prefix, bytes...)
 	if _, E := c.conn.Write(bytes); E != nil {
-		fmt.Println("prepareID sendBytes err ", E)
+		//fmt.Println("prepareID sendBytes err ", E)
 		return
 	}
-	//fmt.Println(time.Now(), "!!!!!!conn.Write ", c.incomingConn, " ", c.localID, c.remoteID)
+	////fmt.Println(time.Now(), "!!!!!!conn.Write ", c.incomingConn, " ", c.localID, c.remoteID)
 
 	return
 }
@@ -300,7 +300,7 @@ func decrypt(ctx context.Context, dhKey, dhNonce []byte, ciphertext chan []byte)
 				var err error
 
 				if block, err = aes.NewCipher(dhKey); err != nil {
-					fmt.Println("NewCipher err ", err)
+					//fmt.Println("NewCipher err ", err)
 					select {
 					case errc <- err:
 					case <-ctx.Done():
@@ -309,7 +309,7 @@ func decrypt(ctx context.Context, dhKey, dhNonce []byte, ciphertext chan []byte)
 				}
 
 				if aesgcm, err = cipher.NewGCM(block); err != nil {
-					fmt.Println("NewGCM err ", err)
+					//fmt.Println("NewGCM err ", err)
 					select {
 					case errc <- err:
 					case <-ctx.Done():
@@ -337,14 +337,14 @@ func decrypt(ctx context.Context, dhKey, dhNonce []byte, ciphertext chan []byte)
 	return out, errc
 }
 
-func dispatch(localID, remoteID []byte, incomingConn bool, ctx context.Context, suite suites.Suite, pub kyber.Point, Id []byte, sendMsg chan Request, receiveBytes chan []byte) (chan P2PMessage, chan []byte, chan error) {
-	receiver := make(chan P2PMessage, 100)
+func dispatch(localID, remoteID []byte, incomingConn bool, ctx context.Context, suite suites.Suite, pub kyber.Point, Id []byte, sendMsg chan Request, receiveBytes chan []byte) (chan interface{}, chan []byte, chan error) {
+	receiver := make(chan interface{}, 100)
 	sender := make(chan []byte, 100)
 	errc := make(chan error)
 	requests := make(map[uint64]Request)
 	var nonce uint64
 	go func() {
-		defer fmt.Println("close dispatch")
+		//defer //fmt.Println("close dispatch")
 		defer close(receiver)
 		defer close(sender)
 		defer close(errc)
@@ -355,63 +355,91 @@ func dispatch(localID, remoteID []byte, incomingConn bool, ctx context.Context, 
 				if !ok {
 					return
 				}
+				//fmt.Println(time.Now(), "!!!!!!Dispatch senter got a request flag ", req.p.ReplyFlag)
+
 				if !req.p.ReplyFlag {
-					fmt.Println(time.Now(), "!!!!!!Dispatch receive req to sent , ", nonce, " ", incomingConn, " ", localID, remoteID)
-					if req.ctx == nil {
-						fmt.Println(time.Now(), "!!!!!!Dispatch  not find request ", nonce, incomingConn, " ", localID, remoteID)
-					}
-					if req.reply == nil {
-						fmt.Println(time.Now(), "!!!!!!Dispatch  not find reply ", nonce, incomingConn, " ", localID, remoteID)
-					}
 					if req.ctx == nil && req.reply == nil {
 						continue
 					}
-					requests[nonce] = req
 					req.p.RequestNonce = nonce
-					nonce++
-
+					//fmt.Println(time.Now(), "!!!!!!Dispatch sent a request , ", nonce)
 				} else {
-					//fmt.Println(time.Now(), "!!!!!!Dispatch receive req to reply , ", incomingConn, " ", localID, remoteID)
+					//fmt.Println(time.Now(), "!!!!!!Dispatch sent a reply , ")
 
 				}
 				//Encode the package
 				var bytes []byte
 				var err error
 				if bytes, err = proto.Marshal(req.p); err != nil {
-					fmt.Println(time.Now(), "!!!!!!Dispatch sent Marshal err , ", err, incomingConn, " ", localID, remoteID)
+					//fmt.Println(time.Now(), "!!!!!!Dispatch sent Marshal err , ", err, incomingConn, " ", localID, remoteID)
+					go func() {
+						select {
+						case req.errc <- err:
+						case <-req.ctx.Done():
+						}
+					}()
+					continue
+				}
+				if !req.p.ReplyFlag {
+					//fmt.Println(time.Now(), "!!!!!!Dispatch save a request , nonce", nonce, " ", localID, remoteID)
 
+					requests[nonce] = req
+					nonce++
+				}
+				select {
+				case sender <- bytes:
+					if !req.p.ReplyFlag {
+						//fmt.Println(time.Now(), "!!!!!!Dispatch sent a request Done , nonce", nonce-1, " ", localID, remoteID)
+					} else {
+						//fmt.Println(time.Now(), "!!!!!!Dispatch sent a reply Done , ", " ", localID, remoteID)
+						//req.cancel()
+					}
+				case <-req.ctx.Done():
+					//fmt.Println(time.Now(), "!!!!!!Dispatch sent ctx , ", ctx.Err(), incomingConn, " ", localID, remoteID)
+				}
+			case bytes, ok := <-receiveBytes:
+				if !ok {
+					//fmt.Println("Dispatch receive byte !ok")
+					return
+				}
+
+				pa := new(Package)
+				if err := proto.Unmarshal(bytes, pa); err != nil {
 					select {
 					case errc <- err:
 					case <-ctx.Done():
 					}
+					////fmt.Println(time.Now(), "!!!!!!Dispatch Unmarshal err ", err.Error(), incomingConn, " ", localID, remoteID)
 					continue
 				}
-				select {
-				case sender <- bytes:
-					fmt.Println(time.Now(), "!!!!!!Dispatch sent Done , ", incomingConn, " ", localID, remoteID)
+				if pa.GetReplyFlag() {
+					//fmt.Println(time.Now(), "!!!!!!Dispatch receive a reply , nonce ", pa.RequestNonce, " ", localID, remoteID)
+				} else {
+					//fmt.Println(time.Now(), "!!!!!!Dispatch receive a request , ", incomingConn, " ", localID, remoteID)
 
-				case <-ctx.Done():
-					fmt.Println(time.Now(), "!!!!!!Dispatch sent ctx , ", ctx.Err(), incomingConn, " ", localID, remoteID)
 				}
-			case bytes, ok := <-receiveBytes:
-				if !ok {
-					fmt.Println("Dispatch receive byte !ok")
-					return
-				}
-				//fmt.Println(time.Now(), "!!!!!!Dispatch receive byte , ", incomingConn, " ", localID, remoteID)
+				replyErrc := errc
+				replyCtx := ctx
+				replyRecivier := receiver
+				if pa.GetReplyFlag() {
+					//fmt.Println(time.Now(), "!!!!!!Dispatch Got a reply nonce", pa.RequestNonce, " ", localID, remoteID)
+					request := requests[pa.RequestNonce]
+					if request.ctx == nil {
+						//fmt.Println(time.Now(), "!!!!!!Dispatch Got a reply request.ctx is nil ")
+						continue
+					}
+					delete(requests, pa.RequestNonce)
 
-				pa := new(Package)
-				if err := proto.Unmarshal(bytes, pa); err != nil {
-					//fmt.Println(time.Now(), "!!!!!!Dispatch Unmarshal err ", err.Error(), incomingConn, " ", localID, remoteID)
-					continue
+					replyErrc = request.errc
+					replyCtx = request.ctx
+					replyRecivier = request.reply
 				}
-
+				//go func(replyCtx context.Context, pa *Package, replyRecivier chan interface{}, errc chan error) {
 				if pub != nil {
 					if err := bls.Verify(suite, pub, pa.GetAnything().Value, pa.GetSignature()); err != nil {
-						//fmt.Println(time.Now(), "!!!!!!Dispatch Verify err ", err.Error(), incomingConn, " ", localID, remoteID)
 						select {
-						case errc <- err:
-						case <-ctx.Done():
+						case replyErrc <- err:
+						case <-replyCtx.Done():
 						}
 						continue
 					}
@@ -420,45 +448,24 @@ func dispatch(localID, remoteID []byte, incomingConn bool, ctx context.Context, 
 				var ptr ptypes.DynamicAny
 				if err := ptypes.UnmarshalAny(pa.GetAnything(), &ptr); err != nil {
 					//fmt.Println(time.Now(), "!!!!!!Dispatch UnmarshalAny err ", err.Error(), incomingConn, " ", localID, remoteID)
+					select {
+					case replyErrc <- err:
+					case <-replyCtx.Done():
+					}
 					continue
 				}
 
 				msg := P2PMessage{Msg: ptr, Sender: pa.GetSender(), RequestNonce: pa.GetRequestNonce()}
 
-				if pa.GetReplyFlag() {
-					fmt.Println(time.Now(), "!!!!!!Dispatch Got a reply ", incomingConn, " ", localID, remoteID)
-
-					request := requests[pa.RequestNonce]
-					if request.ctx == nil {
-						fmt.Println(time.Now(), "!!!!!!Dispatch  not find request ", pa.RequestNonce, incomingConn, " ", localID, remoteID)
-					}
-					if request.reply == nil {
-						fmt.Println(time.Now(), "!!!!!!Dispatch  not find reply ", pa.RequestNonce, incomingConn, " ", localID, remoteID)
-					}
-					select {
-					case <-request.ctx.Done():
-						//fmt.Println(time.Now(), "!!!!!!Dispatch reply Ctx ", ctx.Err(), incomingConn, " ", localID, remoteID)
-
-					case request.reply <- msg:
-						//fmt.Println(time.Now(), "!!!!!!Dispatch reply Done", incomingConn, " ", localID, remoteID)
-
-					}
-					delete(requests, pa.RequestNonce)
-
-					continue
-				}
-
 				select {
-				case receiver <- msg:
+				case replyRecivier <- msg:
 					//fmt.Println(time.Now(), "!!!!!!Dispatch receive byte send to receiver Done", incomingConn, " ", localID, remoteID)
-
-				case <-ctx.Done():
-					//fmt.Println(time.Now(), "!!!!!!Dispatch receive byte send to receiverCtx ", ctx.Err(), incomingConn, " ", localID, remoteID)
-
+				case <-replyCtx.Done():
+					////fmt.Println(time.Now(), "!!!!!!Dispatch receive byte send to receiverCtx ", ctx.Err(), incomingConn, " ", localID, remoteID)
 				}
-				//}()
+				continue
 			case <-ctx.Done():
-				return
+				continue
 			}
 		}
 	}()
@@ -480,20 +487,18 @@ func sendBytes(ctx context.Context, c net.Conn, bytesC chan []byte, localID, rem
 				bytes = append(prefix, bytes...)
 				if _, err := c.Write(bytes); err != nil {
 					//fmt.Println(time.Now(), "!!!!!!sendBytes , ", incomingConn, " ", localID, remoteID, " err", err)
-
 					select {
 					case errc <- err:
 					case <-ctx.Done():
-						fmt.Println("sendBytes ctx ", ctx.Err())
+						//fmt.Println("sendBytes ctx ", ctx.Err())
 						return
 					}
 				} else {
 					//fmt.Println(time.Now(), "!!!!!!sendBytes , ", incomingConn, " ", localID, remoteID)
 
 				}
-
 			case <-ctx.Done():
-				fmt.Println("sendBytes ctx ", ctx.Err())
+				//fmt.Println("sendBytes ctx ", ctx.Err())
 
 				return
 			}
@@ -509,7 +514,7 @@ func readConn(c net.Conn, localID, remoteID []byte, incomingConn bool) (buffer [
 	bytesRead, totalBytesRead := 0, 0
 	for totalBytesRead < 4 && err == nil {
 		if bytesRead, err = c.Read(header[totalBytesRead:]); err != nil {
-			//fmt.Println(time.Now(), "!!!!!!ReadByte , err ", err.Error(), incomingConn, " ", localID, remoteID)
+			////fmt.Println(time.Now(), "!!!!!!ReadByte , err ", err.Error(), incomingConn, " ", localID, remoteID)
 			if err.Error() == "EOF" {
 				c.Close()
 			}
@@ -520,19 +525,19 @@ func readConn(c net.Conn, localID, remoteID []byte, incomingConn bool) (buffer [
 
 	// Decode message size.
 	size := binary.BigEndian.Uint32(header)
-	//fmt.Println(time.Now(), "!!!!!!ReadByte , ", size, incomingConn, " ", localID, remoteID)
+	////fmt.Println(time.Now(), "!!!!!!ReadByte , ", size, incomingConn, " ", localID, remoteID)
 
 	// Read until all message bytes have been read.
 	buffer = make([]byte, size)
 	if size == 0 {
-		//fmt.Println(time.Now(), "!!!!!!message is 0 , ", incomingConn, " ", localID, remoteID)
+		////fmt.Println(time.Now(), "!!!!!!message is 0 , ", incomingConn, " ", localID, remoteID)
 		return
 	}
 	bytesRead, totalBytesRead = 0, 0
 
 	for totalBytesRead < int(size) && err == nil {
 		if bytesRead, err = c.Read(buffer[totalBytesRead:]); err != nil {
-			//fmt.Println(time.Now(), "!!!!!!ReadByte , err ", err.Error(), incomingConn, " ", localID, remoteID)
+			////fmt.Println(time.Now(), "!!!!!!ReadByte , err ", err.Error(), incomingConn, " ", localID, remoteID)
 		}
 		totalBytesRead += bytesRead
 	}
@@ -572,109 +577,66 @@ func readBytes(ctx context.Context, c net.Conn, localID, remoteID []byte, incomi
 	return out, errc
 }
 
-func (c *Client) Request(msg proto.Message) (P2PMessage, error) {
-	var anything *any.Any
-	var err error
-	var sig []byte
-	fmt.Println(time.Now(), "!!!!!!!!!Request from ", c.localID, " to ", c.remoteID)
+func (c *Client) send(req Request) error {
+	if req.msg == nil {
+		//fmt.Println(time.Now(), "client send msg is nil ", c.localID, " to ", c.remoteID)
 
-	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
-
-	if anything, err = ptypes.MarshalAny(msg); err != nil {
-		fmt.Println("Request MarshalAny err ", err.Error())
-		return P2PMessage{}, err
+		//return errors.New("Request msg is nil")
 	}
-	if sig, err = bls.Sign(c.suite, c.localSecKey, anything.Value); err != nil {
-		fmt.Println("Request bls.Sign err ", err.Error())
-		return P2PMessage{}, err
+	if req.ctx == nil {
+		//fmt.Println(time.Now(), "client send req is nil ", c.localID, " to ", c.remoteID)
+		return errors.New("Request msg is nil")
 	}
-	pa := Package{
-		Sender:    c.localID,
-		Anything:  anything,
-		Signature: sig,
-	}
-
-	reply := make(chan interface{})
-	req := Request{
-		ctx:   ctx,
-		p:     &pa,
-		reply: reply,
-	}
-
-	select {
-	case c.sender <- req:
-		//fmt.Println(time.Now(), "!!!!!!!!Request has been sent to sender  ", c.localID, " to ", c.remoteID)
-
-	case <-ctx.Done():
-		//fmt.Println(time.Now(), "!!!!!!!!Request timeout  ", c.localID, " to ", c.remoteID, " err", ctx.Err())
-		err := errors.New("Request Timeout")
-		logger.Error(err)
-	}
-
-	select {
-	case r := <-reply:
-		//fmt.Println(time.Now(), "!!!!!!!!Request reply has been received  ", c.localID, " to ", c.remoteID)
-		msg, ok := r.(P2PMessage)
-		if !ok {
-			return P2PMessage{}, ctx.Err()
+	go func(req Request) {
+		var anything *any.Any
+		var err error
+		var sig []byte
+		if req.rType == 2 {
+			//fmt.Println(time.Now(), "client send Rply ", c.localID, " to ", c.remoteID)
+		} else {
+			//fmt.Println(time.Now(), "client send Request ", c.localID, " to ", c.remoteID)
 		}
-		return msg, err
-	case <-ctx.Done():
-		//fmt.Println(time.Now(), "!!!!!!!!Request wait for Reply timeout  ", c.localID, " to ", c.remoteID, " err", ctx.Err())
-		err := errors.New("Request Timeout")
-		logger.Error(err)
-	}
-	return P2PMessage{}, ctx.Err()
-}
+		if anything, err = ptypes.MarshalAny(req.msg); err != nil {
+			//fmt.Println("Request MarshalAny err ", err.Error())
+			select {
+			case req.errc <- err:
+			case <-req.ctx.Done():
+			}
+			return
+		}
+		if sig, err = bls.Sign(c.suite, c.localSecKey, anything.Value); err != nil {
+			//fmt.Println("Request bls.Sign err ", err.Error())
+			select {
+			case req.errc <- err:
+			case <-req.ctx.Done():
+			}
+			return
+		}
 
-func (c *Client) Reply(nonce uint64, msg proto.Message) error {
-	var anything *any.Any
-	var err error
-	var sig []byte
-	////fmt.Println(time.Now(), "!!!!!!!!Reply  ", c.localID, " to ", c.remoteID)
+		req.p = &Package{
+			Sender:    c.localID,
+			Anything:  anything,
+			Signature: sig,
+		}
+		if req.rType == 2 {
+			req.p.RequestNonce = req.nonce
+			req.p.ReplyFlag = true
+		}
 
-	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
-	//ctx := context.Background()
-	if anything, err = ptypes.MarshalAny(msg); err != nil {
-		fmt.Println("Reply MarshalAny err ", err.Error())
+		select {
+		case c.sender <- req:
+			if req.rType == 2 {
+				//fmt.Println(time.Now(), "!!!!!!!!Reply has been sent to dispatch  ", c.localID, " to ", c.remoteID)
+			} else {
+				//fmt.Println(time.Now(), "!!!!!!!!Request has been sent to dispatch  ", c.localID, " to ", c.remoteID)
 
-		return err
-	}
-	if c.suite == nil {
-		fmt.Println(" Reply err c.suite == nil", c.suite)
-	}
-	if c.suite == nil {
-		fmt.Println(" Reply err c.localSecKey == nil", c.localSecKey)
-	}
-	if anything.Value == nil {
-		fmt.Println(" Reply err anything.Value", anything.Value)
-	}
-	if sig, err = bls.Sign(c.suite, c.localSecKey, anything.Value); err != nil {
-		fmt.Println("Reply bls.Sig err ", err.Error())
-
-		return err
-	}
-	pa := Package{
-		Sender:       c.localID,
-		Anything:     anything,
-		Signature:    sig,
-		RequestNonce: nonce,
-		ReplyFlag:    true,
-	}
-
-	req := Request{
-		ctx: ctx,
-		p:   &pa,
-	}
-	select {
-	case c.sender <- req:
-		//fmt.Println(time.Now(), "!!!!!!!!!Reply Success  ", c.localID, " to ", c.remoteID)
-
-		return nil
-	case <-ctx.Done():
-		//fmt.Println(time.Now(), "!!!!!!!!!Reply Timeout  ", c.localID, " to ", c.remoteID, " err", ctx.Err())
-		err := errors.New("Request Timeout")
-		logger.Error(err)
-	}
-	return ctx.Err()
+			}
+		case <-req.ctx.Done():
+			////fmt.Println(time.Now(), "!!!!!!!!Request timeout  ", c.localID, " to ", c.remoteID, " err", ctx.Err())
+			err := errors.New("Request Timeout")
+			logger.Error(err)
+		}
+		return
+	}(req)
+	return nil
 }

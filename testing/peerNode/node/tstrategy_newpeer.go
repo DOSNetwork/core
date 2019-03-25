@@ -173,12 +173,11 @@ func (r test3) StartTest(d *PeerNode) {
 					break
 				}
 			}
-			fmt.Println("Request done", time.Since(start).Nanoseconds()/1000)
-
+			fmt.Println("Request done retry=", retry, time.Since(start).Nanoseconds()/1000)
 		}
 	}
 	time.Sleep(10 * time.Second)
-	start := time.Now()
+	startTime := time.Now()
 	for idx, id := range d.nodeIDs {
 		if bytes.Compare(d.p.GetID(), id) == 0 {
 			start := idx / groupSize * groupSize
@@ -189,18 +188,16 @@ func (r test3) StartTest(d *PeerNode) {
 					fmt.Println("errorChan", err)
 				}
 			}()
-			if pubKey, succ := <-dkgEvent; succ {
-				fmt.Println("eventCheckDone", pubKey)
+			if _, succ := <-dkgEvent; succ {
+				fmt.Println("dkgTest done", time.Since(startTime).Nanoseconds()/1000)
 				d.FinishTest()
 			} else {
-				fmt.Println(errors.New("err: dkg fail"))
+				fmt.Println("dkgTest Failed", time.Since(startTime).Nanoseconds()/1000)
 				return
 			}
 			break
 		}
 	}
-
-	fmt.Println("Test done", time.Since(start).Nanoseconds()/1000)
 
 }
 
