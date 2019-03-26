@@ -224,7 +224,6 @@ func (d *PeerNode) Init(bootStrapIp string, port string, peerSize int, numMessag
 					replyNonce := msg.RequestNonce
 
 					d.p.Reply([]byte(sender), replyNonce, response)
-					d.tStrategy.CheckResult(sender, content, d)
 				}
 			default:
 			}
