@@ -3,12 +3,12 @@ package node
 import (
 	"crypto/rand"
 	"encoding/binary"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"strconv"
 	"sync"
-
 	"time"
 
 	"github.com/DOSNetwork/core/log"
@@ -49,7 +49,7 @@ func GenerateRandomBytes(n int) ([]byte, error) {
 	return b, nil
 }
 
-func (b *BootNode) Init(port, peerSize int) {
+func (b *BootNode) Init(port string, peerSize int) {
 	//0)prepare round count for dkg test
 	dkgRoundStr := os.Getenv("DKGROUND")
 	if len(dkgRoundStr) > 0 {
@@ -97,7 +97,7 @@ func (b *BootNode) Init(port, peerSize int) {
 	go http.ListenAndServe(":8080", r)
 
 	//3)Build a p2p network
-	b.p, _ = p2p.CreateP2PNetwork(bootID, port)
+	b.p, _ = p2p.CreateP2PNetwork(bootID, port, p2p.SWIM)
 
 	go b.p.Listen()
 }
@@ -209,6 +209,7 @@ func (b *BootNode) isTestFinish(w http.ResponseWriter, r *http.Request) {
 
 	if b.isAllnodefinish() {
 		w.Write([]byte{ALLNODEFINISH})
+		fmt.Println("isAllnodefinish ", b.testFinishCount)
 		b.testFinishCount++
 		if b.testFinishCount >= b.peerSize {
 			b.done <- true

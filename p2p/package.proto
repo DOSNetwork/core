@@ -1,0 +1,28 @@
+syntax = "proto3";
+package p2p;
+
+import "protobuf/ptypes/any/any.proto";
+
+message Package {
+    google.protobuf.Any anything = 1;
+    bytes signature = 2;
+    // Sender's address and public key.
+    bytes sender = 3;
+    // request_nonce is the request/response ID. Null if ID associated to a message is not a request/response.
+    uint64 request_nonce = 4;
+    // reply_flag indicates this is a reply to a request
+    bool reply_flag = 5;
+}
+
+message ID {
+    // public_key of the peer (we no longer use the public key as the peer ID, but use it to verify messages)
+    bytes public_key = 1;
+    // id is the computed hash of the public key
+    bytes id = 2;
+}
+message Ping {
+    uint64 count = 1;
+}
+message Pong {
+    uint64 count = 1;
+}

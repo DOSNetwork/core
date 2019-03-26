@@ -1,74 +1,90 @@
 package p2p
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"net"
 
 	"github.com/DOSNetwork/core/log"
+	"github.com/DOSNetwork/core/p2p/network"
 	"github.com/DOSNetwork/core/suites"
-	"github.com/dedis/kyber"
+
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes"
 )
 
-var (
-	suite = suites.MustFind("bn256")
+var logger log.Logger
+
+const (
+	NONE = iota // 0
+	SWIM
 )
 
-func genPair() (kyber.Scalar, kyber.Point) {
-	secret := suite.Scalar().Pick(suite.RandomStream())
-	public := suite.Point().Mul(secret, nil)
-	return secret, public
-}
-
-func CreateP2PNetwork(id []byte, port int) (P2PInterface, error) {
-	p := &P2P{
-		peers:    CreatePeerConnManager(),
-		suite:    suite,
-		messages: make(chan P2PMessage, 100),
-		port:     port,
-		logger:   log.New("module", "p2p"),
+func CreateP2PNetwork(id []byte, port string, netType int) (P2PInterface, error) {
+	suite := suites.MustFind("bn256")
+	logger = log.New("module", "p2p")
+	p := &Server{
+		suite:     suite,
+		messages:  make(chan P2PMessage, 100),
+		subscribe: make(chan Subscription),
+		unscribe:  make(chan Subscription),
+		port:      port,
 	}
-	p.identity.Id = id
+	p.ctx, p.cancel = context.WithCancel(context.Background())
+	p.secKey = suite.Scalar().Pick(suite.RandomStream())
+	p.pubKey = suite.Point().Mul(p.secKey, nil)
+	p.id = id
+	ip, err := GetLocalIP()
+	if err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+	p.addr = ip
+
+	switch netType {
+	case SWIM:
+		p.network, err = network.NewSerfNet(ip, id)
+	default:
+
+	}
 	return p, nil
 }
 
-func GetLocalIP() (ip string, err error) {
+func GetLocalIP() (ip net.IP, err error) {
 	var addrs []net.Addr
 
 	if addrs, err = net.InterfaceAddrs(); err != nil {
-		return "", err
+		return nil, err
 	}
 
 	for _, a := range addrs {
 		if ipnet, ok := a.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
 			if ipnet.IP.To4() != nil {
-				return ipnet.IP.String(), nil
+				return ipnet.IP, nil
 			}
 		}
 	}
-	return "", errors.New("IP not found")
+	return nil, errors.New("IP not found")
 }
 
 type P2PMessage struct {
 	Msg          ptypes.DynamicAny
 	Sender       []byte
 	RequestNonce uint64
-	PeerConn     *PeerConn
 }
 
 type P2PInterface interface {
-	GetIP() string
+	GetIP() net.IP
 	GetID() []byte
+	SetPort(port string)
 	Listen() error
-	Join(bootstrapIp string) error
-	ConnectTo(IpAddr string) (id []byte, err error)
+	Join(bootstrapIp []string) error
+	ConnectTo(ip string) (id []byte, err error)
 	Leave()
-	SendMessage(id []byte, msg proto.Message) error
-	Request(id []byte, m proto.Message) (msg proto.Message, err error)
+	Request(id []byte, m proto.Message) (msg P2PMessage, err error)
 	Reply(id []byte, nonce uint64, m proto.Message) (err error)
-	GetPeerConnManager() *PeerConnManager
 	SubscribeEvent(chanBuffer int, messages ...interface{}) (outch chan P2PMessage, err error)
 	UnSubscribeEvent(messages ...interface{})
-	CloseMessagesChannel()
+	Members() int
 }

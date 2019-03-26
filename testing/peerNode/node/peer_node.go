@@ -11,11 +11,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/DOSNetwork/core/suites"
+
+	"github.com/DOSNetwork/core/share/dkg/pedersen"
 	"github.com/DOSNetwork/core/share/vss/pedersen"
 
 	"github.com/DOSNetwork/core/testing/peerNode/internalMsg"
-
-	"math/rand"
 
 	"github.com/DOSNetwork/core/log"
 	"github.com/DOSNetwork/core/p2p"
@@ -24,6 +25,7 @@ import (
 type PeerNode struct {
 	node
 	bootStrapIp string
+	port        string
 	nodeID      []byte
 	nodeIDs     [][]byte
 	nodeIPs     []string
@@ -34,6 +36,7 @@ type PeerNode struct {
 	numMessages int
 	tStrategy   TestStrategy
 	tblsChan    chan vss.Signature
+	p2pDkg      dkg.P2PDkgInterface
 }
 
 func (d *PeerNode) MakeRequest(bootStrapIp, f string, args []byte) ([]byte, error) {
@@ -103,7 +106,6 @@ func (d *PeerNode) requestAllIPs() {
 
 func (d *PeerNode) requestIsReady() bool {
 	ip, _ := p2p.GetLocalIP()
-	ip += ":44460"
 
 	r, err := d.MakeRequest(d.bootStrapIp, "isTestReady", []byte(ip))
 	for err != nil {
@@ -125,7 +127,6 @@ func (d *PeerNode) requestIsReady() bool {
 
 func (d *PeerNode) requestIsNextRoundReady(roundCount uint16) byte {
 	ip, _ := p2p.GetLocalIP()
-	ip += ":44460"
 	roundCountBytes := make([]byte, 2)
 	binary.LittleEndian.PutUint16(roundCountBytes, roundCount)
 	request := append([]byte(ip), roundCountBytes...)
@@ -141,7 +142,6 @@ func (d *PeerNode) requestIsNextRoundReady(roundCount uint16) byte {
 
 func (d *PeerNode) requestIsFinish() bool {
 	ip, _ := p2p.GetLocalIP()
-	ip += ":44460"
 
 	r, err := d.MakeRequest(d.bootStrapIp, "isTestFinish", []byte(ip))
 	for err != nil {
@@ -162,7 +162,7 @@ func (d *PeerNode) requestIsFinish() bool {
 
 }
 
-func (d *PeerNode) Init(bootStrapIp string, port, peerSize int, numMessages int, tStrategy string) {
+func (d *PeerNode) Init(bootStrapIp string, port string, peerSize int, numMessages int, tStrategy string) {
 	d.peerSize = peerSize
 	d.checkCount = 1
 	d.bootStrapIp = bootStrapIp
@@ -188,11 +188,10 @@ func (d *PeerNode) Init(bootStrapIp string, port, peerSize int, numMessages int,
 	//1)Wait until bootstrap node assign an ID
 	for {
 		ip, _ := p2p.GetLocalIP()
-		ip = ip + ":44460"
-		r, err := d.MakeRequest(bootStrapIp, "getID", []byte(ip))
+		r, err := d.MakeRequest(bootStrapIp, "getID", []byte(ip.String()))
 		for err != nil {
 			time.Sleep(10 * time.Second)
-			r, err = d.MakeRequest(bootStrapIp, "getID", []byte(ip))
+			r, err = d.MakeRequest(bootStrapIp, "getID", []byte(ip.String()))
 		}
 
 		if err != nil {
@@ -209,43 +208,59 @@ func (d *PeerNode) Init(bootStrapIp string, port, peerSize int, numMessages int,
 	log.Init(d.nodeID[:])
 
 	//2)Build a p2p network
-	d.p, _ = p2p.CreateP2PNetwork(d.nodeID[:], port)
-	peerEvent, _ := d.p.SubscribeEvent(100, internalMsg.Cmd{}, vss.Signature{})
+	d.p, _ = p2p.CreateP2PNetwork(d.nodeID[:], port, p2p.SWIM)
 	d.p.Listen()
+	peerEvent, _ := d.p.SubscribeEvent(100, internalMsg.Cmd{})
+	suite := suites.MustFind("bn256")
+	d.p2pDkg, _ = dkg.CreateP2PDkg(d.p, suite)
+
 	go func() {
 		for msg := range peerEvent {
 			switch content := msg.Msg.Message.(type) {
 			case *internalMsg.Cmd:
-
 				if content.Ctype == internalMsg.Cmd_SIGNIN {
 					sender := string(msg.Sender)
 					response := &internalMsg.Cmd{}
 					replyNonce := msg.RequestNonce
+
 					d.p.Reply([]byte(sender), replyNonce, response)
-					d.tStrategy.CheckResult(sender, content, d)
-				}
-			case *vss.Signature:
-				go func() { d.tblsChan <- *content }()
-				if err := d.p.Reply(msg.Sender, msg.RequestNonce, &vss.Signature{}); err != nil {
-					fmt.Println("signature reply", err)
 				}
 			default:
 			}
 		}
 	}()
 
-	//fmt.Println("nodeIP = ", d.p.GetIP())
+	fmt.Println("get all ids")
 
 	d.requestAllIDs() //get all ids
 	d.requestAllIPs() //get all ips
+	fmt.Println("nodeIPs ", len(d.nodeIPs))
 
 	if tStrategy != "SENDMESSAGE" {
-		for i := 0; i < int(math.Min(4, float64(len(d.nodeIPs)))); i++ {
-			if d.p.GetIP() != d.nodeIPs[i] {
-				d.p.Join(d.nodeIPs[i])
+		bootIps := []string{}
+		for i := 0; i < int(math.Min(2, float64(len(d.nodeIPs)))); i++ {
+			if d.p.GetIP().String() != d.nodeIPs[i] {
+				bootIps = append(bootIps, d.nodeIPs[i])
+			}
+		}
+		d.p.Join(bootIps)
+
+		count := 0
+		start := time.Now()
+		for {
+			latestCount := d.p.Members()
+			if count != latestCount {
+				fmt.Println("Members ", count)
+				count = latestCount
+			}
+			if count == d.peerSize {
+				elapsed := time.Since(start).Nanoseconds() / 1000
+				fmt.Println("Members ", count, " took ", elapsed)
+				break
 			}
 		}
 	}
+
 }
 
 func (d *PeerNode) FinishTest() {
@@ -255,6 +270,7 @@ L:
 		select {
 		case <-ticker.C:
 			if d.requestIsFinish() {
+				fmt.Println("FinishTest")
 				ticker.Stop()
 				d.done <- true
 				break L
@@ -282,34 +298,4 @@ L:
 		}
 	}
 	os.Exit(0)
-}
-
-func (d *PeerNode) CloseConnectionRandom(interval int) {
-	fmt.Println("CloseConnectionLoop begin")
-	ticker := time.NewTicker(time.Duration(interval) * time.Second)
-	for {
-		select {
-		case <-ticker.C:
-			n := d.p.GetPeerConnManager().PeerConnNum()
-			if n > 0 {
-				rn := rand.Uint32() % n
-				count := 0
-				var peerid string
-				peerid = ""
-				d.p.GetPeerConnManager().Range(func(key, value interface{}) bool {
-					if uint32(count) == rn {
-						peerid = key.(string)
-						return false
-					}
-					count++
-					return true
-				})
-				if peerid != "" {
-					d.p.GetPeerConnManager().DeletePeer(peerid)
-				}
-			}
-
-		default:
-		}
-	}
 }

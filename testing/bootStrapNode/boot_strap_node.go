@@ -130,8 +130,6 @@ func main() {
 		log.Fatal(err)
 	}
 
-	defer p.CloseMessagesChannel()
-
 	//2-2)Start to listen incoming connection
 	if err = p.Listen(); err != nil {
 		log.Fatal(err)
@@ -148,6 +146,7 @@ func main() {
 	if err = http.ListenAndServe(":8080", r); err != nil {
 		log.Fatal(err)
 	}
+	fmt.Println("Boot done")
 }
 
 func getCredential(w http.ResponseWriter, r *http.Request) {

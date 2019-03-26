@@ -24,7 +24,7 @@ const (
 type Config struct {
 	NodeRole        string
 	BootStrapIp     string
-	Port            int
+	Port            string
 	ChainConfigs    map[string]map[string]ChainConfig
 	randomGroupSize int
 	queryGroupSize  int
@@ -124,10 +124,8 @@ func (c *Config) overWrite() (err error) {
 
 	port := os.Getenv(ENVNODEPORT)
 	if port != "" {
-		i, err := strconv.Atoi(port)
-		if err == nil {
-			c.Port = i
-		}
+		//TODO:add a check
+		c.Port = port
 	}
 
 	chainType := os.Getenv(ENVCHAINTYPE)

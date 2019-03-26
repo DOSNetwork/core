@@ -1,6 +1,7 @@
 package log
 
 import (
+	"os"
 	"runtime"
 	"strings"
 	"time"
@@ -99,9 +100,11 @@ func (l *logger) Error(err error) {
 
 func (l *logger) Fatal(err error) {
 	if l.entry == nil {
+		os.Exit(1)
 		return
 	}
 	l.entry.Fatal(err)
+	os.Exit(1)
 }
 
 func (l *logger) Metrics(value interface{}) {
