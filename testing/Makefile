@@ -9,18 +9,21 @@ REMOTE_USER_CONTRACT := ../onchain/eth/contracts/examples
 USER_CONTRACTS := dosUser/contract
 BOOT_CREDENTIAL := ../testAccounts/bootCredential
 AMA_CONFIGPATH := dosUser/ama.json
+FLATTENERPATH := ../../../solidity-flattener
 
 gen:
 	cd .. && make gen
 	mkdir -p $(USER_CONTRACTS)
 	cp $(ETH_CONTRACTS)/DOSOnChainSDK.sol $(USER_CONTRACTS)/
 	cp $(ETH_CONTRACTS)/Ownable.sol $(USER_CONTRACTS)/
-	mkdir -p $(USER_CONTRACTS)/lib/
-	cp $(ETH_CONTRACTS)/lib/utils.sol $(USER_CONTRACTS)/lib/
-	cp $(REMOTE_USER_CONTRACT)/AskMeAnything.sol $(USER_CONTRACTS)/
+	cp -r $(ETH_CONTRACTS)/lib $(USER_CONTRACTS)/
+	cp -r $(REMOTE_USER_CONTRACT) $(USER_CONTRACTS)/
+	npm --prefix $(FLATTENERPATH) start "../DOSNetwork/core/testing/dosUser/contract/examples/AskMeAnything.sol"
+	cp $(FLATTENERPATH)/out/AskMeAnything_flat.sol $(USER_CONTRACTS)/AskMeAnything.sol
 	abigen -sol $(USER_CONTRACTS)/AskMeAnything.sol --pkg dosUser --out $(USER_CONTRACTS)/AskMeAnything.go
 	rm $(USER_CONTRACTS)/*.sol
 	rm -r $(USER_CONTRACTS)/lib
+	rm -r $(USER_CONTRACTS)/examples
 
 clean:
 	cd .. && make clean
@@ -29,13 +32,15 @@ deploy: gen
 	go run contracts_deploy/deploy.go -credentialPath $(BOOT_CREDENTIAL) -contractPath $(ETH_CONTRACTS) -contract DOSProxy
 	cp $(ETH_CONTRACTS)/DOSOnChainSDK.sol $(USER_CONTRACTS)/
 	cp $(ETH_CONTRACTS)/Ownable.sol $(USER_CONTRACTS)/
-	mkdir -p $(USER_CONTRACTS)/lib/
-	cp $(ETH_CONTRACTS)/lib/utils.sol $(USER_CONTRACTS)/lib/
-	cp $(REMOTE_USER_CONTRACT)/AskMeAnything.sol $(USER_CONTRACTS)/
+	cp -r $(ETH_CONTRACTS)/lib $(USER_CONTRACTS)/
+	cp -r $(REMOTE_USER_CONTRACT) $(USER_CONTRACTS)/
+	npm --prefix $(FLATTENERPATH) start "../DOSNetwork/core/testing/dosUser/contract/examples/AskMeAnything.sol"
+	cp $(FLATTENERPATH)/out/AskMeAnything_flat.sol $(USER_CONTRACTS)/AskMeAnything.sol
 	abigen -sol $(USER_CONTRACTS)/AskMeAnything.sol --pkg dosUser --out $(USER_CONTRACTS)/AskMeAnything.go
 	go run contracts_deploy/deploy.go -credentialPath $(BOOT_CREDENTIAL) -contractPath $(ETH_CONTRACTS) -contract AMA -configPath $(AMA_CONFIGPATH)
 	rm $(USER_CONTRACTS)/*.sol
 	rm -r $(USER_CONTRACTS)/lib
+	rm -r $(USER_CONTRACTS)/examples
 
 docker-bootnode:
 	cp bootStrapNode/Dockerfile  ../Dockerfile.bootstrap	
@@ -85,3 +90,7 @@ update-dosenv:
 	cd .. && docker build -t dosenv -f Dockerfile.env .
 	docker tag dosenv dosnetwork/dosenv:latest
 	docker push dosnetwork/dosenv:latest
+
+install-flattener:
+	-git clone https://github.com/poanetwork/solidity-flattener ../../..
+	npm --prefix $(FLATTENERPATH) install
