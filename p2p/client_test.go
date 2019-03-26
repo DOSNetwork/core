@@ -1,16 +1,18 @@
 package p2p
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/DOSNetwork/core/suites"
 	"github.com/golang/protobuf/proto"
 )
 
-func listen(listener net.Listener, sID string) {
+func listen(t *testing.T, listener net.Listener, sID string) {
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
@@ -26,12 +28,26 @@ func listen(listener net.Listener, sID string) {
 
 				return
 			}
+
 			for msg := range client.receiver {
-				p, ok := msg.Msg.Message.(*Ping)
+				pmsg, ok := msg.(P2PMessage)
 				if !ok {
-					fmt.Println("not ok")
+					t.Errorf("casting failed")
 				}
-				client.Reply(msg.RequestNonce, proto.Message(&Pong{Count: p.Count + 10}))
+				p, ok := pmsg.Msg.Message.(*Ping)
+				if !ok {
+					t.Errorf("casting failed")
+				}
+				reply := Request{}
+
+				reply.ctx, reply.cancel = context.WithTimeout(context.Background(), 5*time.Second)
+				reply.id = client.remoteID
+				reply.rType = 2
+				reply.nonce = pmsg.RequestNonce
+				errc := make(chan error)
+				reply.errc = errc
+				reply.msg = proto.Message(&Pong{Count: p.Count + 10})
+				client.send(reply)
 			}
 		}(conn, sID)
 	}
@@ -43,7 +59,7 @@ func TestExchangeID(t *testing.T) {
 	if listenerA, err = net.Listen("tcp", ":9901"); err != nil {
 		return
 	}
-	go listen(listenerA, "server")
+	go listen(t, listenerA, "server")
 
 	add := "localhost:9901"
 	var conn net.Conn
@@ -69,7 +85,7 @@ func TestRequest(t *testing.T) {
 	if listenerA, err = net.Listen("tcp", ":9902"); err != nil {
 		return
 	}
-	go listen(listenerA, "server")
+	go listen(t, listenerA, "server")
 
 	add := "localhost:9902"
 	var conn net.Conn
@@ -92,15 +108,43 @@ func TestRequest(t *testing.T) {
 	for count = 0; count < 5; count++ {
 		go func(count uint64) {
 			defer wg.Done()
-			cmd := &Ping{Count: count}
-			pb := proto.Message(cmd)
-			reply, _ := client.Request(pb)
-			p, ok := reply.Msg.Message.(*Pong)
-			if !ok {
+			callReq := Request{}
+			callReq.ctx, callReq.cancel = context.WithTimeout(context.Background(), 5*time.Second)
+			callReq.rType = 1
+			callReq.id = client.remoteID
+			callReq.reply = make(chan interface{})
+			callReq.errc = make(chan error)
+			defer close(callReq.reply)
+			defer close(callReq.errc)
+			callReq.msg = proto.Message(&Ping{Count: count})
+			client.send(callReq)
+			select {
+			case r, ok := <-callReq.reply:
+				if !ok {
+					return
+				}
+				msg, ok := r.(P2PMessage)
+				if ok {
+
+				}
+				p, ok := msg.Msg.Message.(*Pong)
+				if !ok {
+					t.Errorf("casting failed")
+				}
+				checkRoll[count] = p.Count
+				return
+			case e, ok := <-callReq.errc:
+				if ok {
+					err = e
+					fmt.Println("reply err ", err)
+					return
+				}
+			case <-callReq.ctx.Done():
+				err = callReq.ctx.Err()
+				t.Errorf("TestRequest, ctx Error %s", callReq.ctx.Err())
+
 				return
 			}
-			fmt.Println("reply count ", p.Count)
-			checkRoll[count] = p.Count
 		}(count)
 	}
 	wg.Wait()

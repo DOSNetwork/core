@@ -37,7 +37,7 @@ func (r test1) StartTest(d *PeerNode) {
 	var wg sync.WaitGroup
 	wg.Add(len(d.nodeIDs) - 1)
 	for i := 0; i < len(d.nodeIPs); i++ {
-		if !strings.Contains(d.p.GetIP(), d.nodeIPs[i]) {
+		if !strings.Contains(d.p.GetIP().String(), d.nodeIPs[i]) {
 			go func(j int) {
 				defer wg.Done()
 				ip := d.nodeIPs[j]
@@ -156,6 +156,7 @@ func (r test3) StartTest(d *PeerNode) {
 	if err != nil {
 		//d.log.Fatal(err)
 	}
+
 	cmd := &internalMsg.Cmd{
 		Ctype: internalMsg.Cmd_SIGNIN,
 		Args:  []byte{},

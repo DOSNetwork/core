@@ -186,10 +186,10 @@ func (d *PeerNode) Init(bootStrapIp string, port string, peerSize int, numMessag
 	//1)Wait until bootstrap node assign an ID
 	for {
 		ip, _ := p2p.GetLocalIP()
-		r, err := d.MakeRequest(bootStrapIp, "getID", []byte(ip))
+		r, err := d.MakeRequest(bootStrapIp, "getID", []byte(ip.String()))
 		for err != nil {
 			time.Sleep(10 * time.Second)
-			r, err = d.MakeRequest(bootStrapIp, "getID", []byte(ip))
+			r, err = d.MakeRequest(bootStrapIp, "getID", []byte(ip.String()))
 		}
 
 		if err != nil {
@@ -206,7 +206,7 @@ func (d *PeerNode) Init(bootStrapIp string, port string, peerSize int, numMessag
 	log.Init(d.nodeID[:])
 
 	//2)Build a p2p network
-	d.p, _ = p2p.CreateP2PNetwork(d.nodeID[:], port)
+	d.p, _ = p2p.CreateP2PNetwork(d.nodeID[:], port, p2p.SWIM)
 	d.p.Listen()
 	peerEvent, _ := d.p.SubscribeEvent(100, internalMsg.Cmd{})
 	suite := suites.MustFind("bn256")
@@ -229,18 +229,20 @@ func (d *PeerNode) Init(bootStrapIp string, port string, peerSize int, numMessag
 		}
 	}()
 
-	fmt.Println("nodeIP = ", d.p.GetIP())
 	fmt.Println("get all ids")
 
 	d.requestAllIDs() //get all ids
 	d.requestAllIPs() //get all ips
+	fmt.Println("nodeIPs ", len(d.nodeIPs))
 
 	if tStrategy != "SENDMESSAGE" {
+		bootIps := []string{}
 		for i := 0; i < int(math.Min(2, float64(len(d.nodeIPs)))); i++ {
-			if d.p.GetIP() != d.nodeIPs[i] {
-				d.p.Join(d.nodeIPs[i])
+			if d.p.GetIP().String() != d.nodeIPs[i] {
+				bootIps = append(bootIps, d.nodeIPs[i])
 			}
 		}
+		d.p.Join(bootIps)
 
 		count := 0
 		start := time.Now()
