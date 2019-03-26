@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"reflect"
 	//	"strings"
@@ -17,9 +16,8 @@ import (
 
 	//	"reflect"
 	//	"github.com/DOSNetwork/core/log"
+	"github.com/DOSNetwork/core/p2p/network"
 	"github.com/DOSNetwork/core/suites"
-
-	"github.com/hashicorp/serf/serf"
 )
 
 const DefaultModelName = "Undefined"
@@ -30,12 +28,12 @@ type Server struct {
 	secKey kyber.Scalar
 	pubKey kyber.Point
 
-	address  string
+	addr     net.IP
 	port     string
 	listener net.Listener
 
 	//Client lookup
-	cluster   *serf.Serf
+	network   network.Network
 	calling   chan Request
 	replying  chan Request
 	incoming  chan *Client
@@ -54,7 +52,7 @@ type Request struct {
 	rType  int
 	ctx    context.Context
 	cancel context.CancelFunc
-	addr   string
+	addr   net.IP
 	id     []byte
 	//Client signs and packs msg into Package
 	msg proto.Message
@@ -70,46 +68,38 @@ type Subscription struct {
 	message   chan P2PMessage
 }
 
-func SetupCluster(advertiseAddr string, id []byte) (*serf.Serf, error) {
-	conf := serf.DefaultConfig()
-	conf.Init()
-	conf.LogOutput = ioutil.Discard
-	conf.MemberlistConfig.AdvertiseAddr = advertiseAddr
-	conf.NodeName = string(id)
-	cluster, err := serf.Create(conf)
-	if err != nil {
-		return nil, err
-	}
+func (n *Server) Join(bootstrapIp []string) (err error) {
+	//fmt.Println("Server bootstrapIp ", len(bootstrapIp))
+	if n.network == nil {
+		//fmt.Println("Server n.network == nil ")
 
-	return cluster, nil
-}
-
-func (n *Server) Join(bootstrapIp string) (err error) {
-	_, err = n.cluster.Join([]string{bootstrapIp}, true)
-	if err != nil {
-		//fmt.Println(err)
 	}
+	n.network.Join(bootstrapIp)
 	return
 }
 
 func (n *Server) Members() int {
-	return len(n.cluster.Members())
+	return n.network.NumPeers()
 }
 
 func (n *Server) SetID(id []byte) {
 	n.id = id
 }
 
+func (n *Server) SetPort(port string) {
+	n.port = port
+}
+
 func (n *Server) GetID() []byte {
 	return n.id
 }
 
-func (n *Server) GetIP() string {
-	return n.address
+func (n *Server) GetIP() net.IP {
+	return n.addr
 }
 
 func (n *Server) Listen() (err error) {
-	var ip string
+	var ip net.IP
 	n.receiveHandler()
 	n.callHandler()
 	go n.messageDispatch(context.Background())
@@ -155,7 +145,7 @@ func (n *Server) Listen() (err error) {
 	//	ip = ip + ":" + strconv.Itoa(n.port)
 	//}
 
-	n.address = ip
+	n.addr = ip
 	//fmt.Println("Listen to ", ip, " ", n.port)
 	go func() {
 		for {
@@ -274,16 +264,24 @@ func (n *Server) callHandler() {
 				start := time.Now()
 
 				if req.id == nil {
-					if req.addr == "" || req.ctx == nil || req.reply == nil {
+					if req.addr == nil || req.ctx == nil {
 						continue
 					}
-					//fmt.Println(time.Now(), "callHandler req.id == nil ", len(clients), len(addrToid), addrToid[req.addr], req.addr)
 
-					id := addrToid[req.addr]
+					id := addrToid[req.addr.String()+n.port]
+					//fmt.Println(time.Now(), "callHandler req.id == nil ", req.addr.String()+n.port, "addrToid ", id)
+
 					if id != nil {
 						if !bytes.Equal(id, []byte{'p', 'e', 'n', 'd', 'i', 'n', 'g'}) {
 							if client := clients[string(id)]; client != nil {
-								client.send(req)
+								if req.rType == 1 {
+									client.send(req)
+								} else if req.rType == 0 {
+									select {
+									case req.reply <- client:
+									case <-req.ctx.Done():
+									}
+								}
 							}
 						} else {
 							//fmt.Println(time.Now(), "callHandler req.addr pending", req.addr, id)
@@ -299,10 +297,17 @@ func (n *Server) callHandler() {
 				} else {
 					if client := clients[string(req.id)]; client != nil {
 						//TODO:ASK Client to send request here
-						client.send(req)
+						if req.rType == 1 {
+							client.send(req)
+						} else if req.rType == 0 {
+							select {
+							case req.reply <- client:
+							case <-req.ctx.Done():
+							}
+						}
 						continue
 					}
-					//fmt.Println(time.Now(), "callHandler req.id not nil ", len(clients), len(addrToid), req.id, addrToid[req.addr], req.addr)
+					//fmt.Println(time.Now(), "callHandler req.id not nil ", len(clients), len(addrToid), req.id, addrToid[req.addr.String()+n.port], req.addr)
 				}
 
 				var err error
@@ -311,22 +316,15 @@ func (n *Server) callHandler() {
 					continue
 				default:
 
-					if req.addr == "" && req.id != nil {
+					if req.addr == nil && req.id != nil {
 						if bytes.Equal(idTostatus[string(req.id)], []byte{'p', 'e', 'n', 'd', 'i', 'n', 'g'}) {
 							continue
 						}
 						// Find Peer from routing map
-						//fmt.Println(time.Now(), "callHandler Find Peer from routing map ", req.id, req.addr)
+						req.addr = n.network.Lookups(req.id)
+						//fmt.Println(time.Now(), "callHandler Find Peer from routing map ", req.id, req.addr.String()+n.port)
 
-						members := n.cluster.Members()
-						for i := 0; i < len(members); i++ {
-							if members[i].Name == string(req.id) {
-								req.addr = members[i].Addr.String()
-								//fmt.Println(time.Now(), "callHandler Find client addr from routing map", req.id, req.addr)
-								break
-							}
-						}
-						if req.addr == "" {
+						if req.addr == nil {
 							//Retry later
 							//fmt.Println(time.Now(), "callHandler Retry later", req.id)
 							go func(req Request) {
@@ -339,12 +337,13 @@ func (n *Server) callHandler() {
 						}
 					}
 					idTostatus[string(req.id)] = []byte{'p', 'e', 'n', 'd', 'i', 'n', 'g'}
-					addrToid[req.addr] = []byte{'p', 'e', 'n', 'd', 'i', 'n', 'g'}
+					addrToid[req.addr.String()+n.port] = []byte{'p', 'e', 'n', 'd', 'i', 'n', 'g'}
 					//fmt.Println(time.Now(), "callHandler Create Client ", len(clients), len(addrToid), req.id, req.addr)
 					go func(req Request, start time.Time) {
 						var conn net.Conn
 						var client *Client
-						if conn, err = net.Dial("tcp", req.addr+":"+n.port); err != nil {
+
+						if conn, err = net.Dial("tcp", req.addr.String()+":"+n.port); err != nil {
 							//fmt.Println(time.Now(), "callHandler Dial err", err)
 							logger.Error(err)
 							select {
@@ -360,7 +359,7 @@ func (n *Server) callHandler() {
 							}(req)
 							return
 						}
-						//fmt.Println(time.Now(), "callHandler Dial success", req.addr)
+						//fmt.Println(time.Now(), "callHandler Dial success", n.id, req.addr.String()+":"+n.port)
 
 						if client, err = NewClient(n.suite, n.secKey, n.pubKey, n.id, conn, false); err != nil {
 							//fmt.Println("connect to client err", err)
@@ -407,7 +406,14 @@ func (n *Server) callHandler() {
 							}
 						}()
 						//TODO:ASK Client to send request here
-						client.send(req)
+						if req.rType == 1 {
+							client.send(req)
+						} else if req.rType == 0 {
+							select {
+							case req.reply <- client:
+							case <-req.ctx.Done():
+							}
+						}
 						select {
 						case n.registerC <- client:
 						case <-req.ctx.Done():
@@ -420,7 +426,7 @@ func (n *Server) callHandler() {
 					return
 				}
 				clients[string(client.remoteID)] = client
-				addrToid[client.conn.RemoteAddr().String()] = client.remoteID
+				addrToid[client.conn.RemoteAddr().String()+n.port] = client.remoteID
 				delete(idTostatus, string(client.remoteID))
 				//fmt.Println(time.Now(), "callHandler Register", client.conn.RemoteAddr().String(), client.localID, " - ", client.remoteID)
 			case _, _ = <-hangup:
@@ -438,8 +444,8 @@ func (n *Server) Leave() {
 	}
 	n.cancel()
 
-	if n.cluster != nil {
-		n.cluster.Leave()
+	if n.network != nil {
+		n.network.Leave()
 	}
 
 	return
@@ -451,15 +457,14 @@ This is a block call
 func (n *Server) ConnectTo(addr string) (id []byte, err error) {
 	callReq := Request{}
 	callReq.ctx, _ = context.WithTimeout(context.Background(), 10*time.Second)
-	callReq.addr = addr
+	callReq.rType = 0
+	callReq.addr = net.ParseIP(addr)
 	callReq.reply = make(chan interface{})
 	callReq.errc = make(chan error)
-	//fmt.Println("ConnectTo addr ", addr)
 
 	select {
 	case n.calling <- callReq:
 	case <-callReq.ctx.Done():
-		//fmt.Println("ConnectTo ctx err ", callReq.ctx.Err(), callReq.addr, " id ", callReq.id)
 		return
 	}
 
@@ -468,15 +473,12 @@ func (n *Server) ConnectTo(addr string) (id []byte, err error) {
 		client, ok := r.(*Client)
 		if ok {
 			id = client.remoteID
-			//fmt.Println("ConnectTo addr ", callReq.addr, " id ", id)
 		}
 		return
 
 	case err = <-callReq.errc:
-		//fmt.Println("ConnectTo err ", err)
 		return
 	case <-callReq.ctx.Done():
-		//fmt.Println("ConnectTo ctx err ", callReq.ctx.Err(), callReq.addr, " id ", callReq.id)
 		return
 	}
 
@@ -578,7 +580,7 @@ func (n *Server) Reply(id []byte, nonce uint64, response proto.Message) (err err
 		case <-callReq.ctx.Done():
 			err = callReq.ctx.Err()
 			//if strings.Contains(callReq.ctx.Err(), "deadline exceeded") {
-			fmt.Println(time.Now(), "Reply ctx err ", callReq.ctx.Err())
+			//fmt.Println(time.Now(), "Reply ctx err ", callReq.ctx.Err())
 			//}
 			return
 

@@ -97,7 +97,7 @@ func (b *BootNode) Init(port string, peerSize int) {
 	go http.ListenAndServe(":8080", r)
 
 	//3)Build a p2p network
-	b.p, _ = p2p.CreateP2PNetwork(bootID, port)
+	b.p, _ = p2p.CreateP2PNetwork(bootID, port, p2p.SWIM)
 
 	go b.p.Listen()
 }
