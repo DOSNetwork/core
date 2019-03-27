@@ -167,7 +167,7 @@ func deployContract(client *ethclient.Client, key *keystore.Key, contractName in
 }
 
 func main() {
-	credentialPathPtr := flag.String("credentialPath", "./testAccounts/bootCredential", "credential path")
+	credentialPathPtr := flag.String("credentialPath", "./testAccounts/bootCredential/fundKey", "credential path")
 	contractPathPtr := flag.String("contractPath", "./contracts", "Contract file path")
 	contractPtr := flag.String("contract", "DOSProxy", "DOSProxy or AMA or SimpleDice")
 	configPathPtr := flag.String("configPath", "", "config path")

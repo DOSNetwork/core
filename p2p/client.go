@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
-
 	"net"
 	"os"
 	"sync"
@@ -162,7 +161,9 @@ func (c *Client) receiveID(wg *sync.WaitGroup) (err error) {
 	if !ok {
 		return
 	}
+
 	c.remoteID = id.GetId()
+
 	if string(c.remoteID) == string(c.localID) {
 		os.Exit(2)
 	}
@@ -348,6 +349,10 @@ func dispatch(localID, remoteID []byte, incomingConn bool, ctx context.Context, 
 						case req.errc <- err:
 						case <-req.ctx.Done():
 						}
+						close(req.errc)
+						if req.reply != nil {
+							close(req.reply)
+						}
 					}()
 					continue
 				}
@@ -362,6 +367,10 @@ func dispatch(localID, remoteID []byte, incomingConn bool, ctx context.Context, 
 						//req.cancel()
 					}
 				case <-req.ctx.Done():
+					close(req.errc)
+					if req.reply != nil {
+						close(req.reply)
+					}
 				}
 			case bytes, ok := <-receiveBytes:
 				if !ok {
@@ -391,7 +400,6 @@ func dispatch(localID, remoteID []byte, incomingConn bool, ctx context.Context, 
 					replyCtx = request.ctx
 					replyRecivier = request.reply
 				}
-				//go func(replyCtx context.Context, pa *Package, replyRecivier chan interface{}, errc chan error) {
 				if pub != nil {
 					if err := bls.Verify(suite, pub, pa.GetAnything().Value, pa.GetSignature()); err != nil {
 						select {
@@ -539,12 +547,20 @@ func (c *Client) send(req Request) error {
 			case req.errc <- err:
 			case <-req.ctx.Done():
 			}
+			close(req.errc)
+			if req.reply != nil {
+				close(req.reply)
+			}
 			return
 		}
 		if sig, err = bls.Sign(c.suite, c.localSecKey, anything.Value); err != nil {
 			select {
 			case req.errc <- err:
 			case <-req.ctx.Done():
+			}
+			close(req.errc)
+			if req.reply != nil {
+				close(req.reply)
 			}
 			return
 		}
@@ -561,10 +577,13 @@ func (c *Client) send(req Request) error {
 
 		select {
 		case c.sender <- req:
-
 		case <-req.ctx.Done():
 			err := errors.New("Request Timeout")
 			logger.Error(err)
+			close(req.errc)
+			if req.reply != nil {
+				close(req.reply)
+			}
 		}
 		return
 	}(req)

@@ -14,15 +14,20 @@ const (
 
 type ProxyAdapter interface {
 	RegisterNewNode(ctx context.Context) (errc <-chan error)
-	RandomNumberTimeOut(ctx context.Context) (errc <-chan error)
 	RegisterGroupPubKey(ctx context.Context, IdWithPubKeys chan [5]*big.Int) (errc <-chan error)
 	SetRandomNum(ctx context.Context, signatures <-chan *vss.Signature) (errc <-chan error)
 	DataReturn(ctx context.Context, signatures <-chan *vss.Signature) (errc <-chan error)
 	SetGroupingThreshold(ctx context.Context, threshold uint64) (errc <-chan error)
 	SetGroupToPick(ctx context.Context, groupToPick uint64) (errc <-chan error)
 	SetGroupSize(ctx context.Context, size uint64) (errc <-chan error)
-	BootStrap() (errc <-chan error)
-	ResetContract() (errc <-chan error)
+	SetGroupMaturityPeriod(ctx context.Context, size uint64) (errc <-chan error)
+	//Guardian node functions
+	SignalRandom(ctx context.Context) (errc <-chan error)
+	SignalGroupFormation(ctx context.Context) (errc <-chan error)
+	SignalDissolve(ctx context.Context, idx uint64) (errc <-chan error)
+
+	//For testing
+	BootStrap(rand uint64) (errc <-chan error)
 
 	SubscribeEvent(subscribeType int) (<-chan interface{}, <-chan error)
 	PollLogs(subscribeType int, LogBlockDiff, preBlockBuf uint64) (<-chan interface{}, <-chan error)

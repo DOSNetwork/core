@@ -69,11 +69,6 @@ type Subscription struct {
 }
 
 func (n *Server) Join(bootstrapIp []string) (err error) {
-	//fmt.Println("Server bootstrapIp ", len(bootstrapIp))
-	if n.network == nil {
-		//fmt.Println("Server n.network == nil ")
-
-	}
 	n.network.Join(bootstrapIp)
 	return
 }
@@ -281,6 +276,8 @@ func (n *Server) callHandler() {
 									case req.reply <- client:
 									case <-req.ctx.Done():
 									}
+									close(req.reply)
+									close(req.errc)
 								}
 							}
 						} else {
@@ -304,6 +301,8 @@ func (n *Server) callHandler() {
 							case req.reply <- client:
 							case <-req.ctx.Done():
 							}
+							close(req.reply)
+							close(req.errc)
 						}
 						continue
 					}
@@ -322,11 +321,9 @@ func (n *Server) callHandler() {
 						}
 						// Find Peer from routing map
 						req.addr = n.network.Lookups(req.id)
-						//fmt.Println(time.Now(), "callHandler Find Peer from routing map ", req.id, req.addr.String()+n.port)
 
 						if req.addr == nil {
 							//Retry later
-							//fmt.Println(time.Now(), "callHandler Retry later", req.id)
 							go func(req Request) {
 								select {
 								case n.calling <- req:
@@ -338,13 +335,11 @@ func (n *Server) callHandler() {
 					}
 					idTostatus[string(req.id)] = []byte{'p', 'e', 'n', 'd', 'i', 'n', 'g'}
 					addrToid[req.addr.String()+n.port] = []byte{'p', 'e', 'n', 'd', 'i', 'n', 'g'}
-					//fmt.Println(time.Now(), "callHandler Create Client ", len(clients), len(addrToid), req.id, req.addr)
 					go func(req Request, start time.Time) {
 						var conn net.Conn
 						var client *Client
 
 						if conn, err = net.Dial("tcp", req.addr.String()+":"+n.port); err != nil {
-							//fmt.Println(time.Now(), "callHandler Dial err", err)
 							logger.Error(err)
 							select {
 							case req.errc <- err:
@@ -359,10 +354,8 @@ func (n *Server) callHandler() {
 							}(req)
 							return
 						}
-						//fmt.Println(time.Now(), "callHandler Dial success", n.id, req.addr.String()+":"+n.port)
 
 						if client, err = NewClient(n.suite, n.secKey, n.pubKey, n.id, conn, false); err != nil {
-							//fmt.Println("connect to client err", err)
 							logger.Error(err)
 							select {
 							case req.errc <- err:
@@ -375,15 +368,12 @@ func (n *Server) callHandler() {
 								select {
 								case n.calling <- req:
 								case <-req.ctx.Done():
-									//fmt.Println(time.Now(), "callHandler NewClient ctx ", req.ctx.Err())
 								}
 							}(req)
 							return
 						}
-						//fmt.Println(time.Now(), "callHandler NewClient", client.localID, " - ", client.remoteID)
 
 						go func() {
-							//defer //fmt.Println("connect to client over")
 							for {
 								select {
 								case pa, ok := <-client.receiver:
@@ -394,13 +384,11 @@ func (n *Server) callHandler() {
 										n.messages <- m
 									}
 								case err := <-client.errc:
-									//fmt.Println(client.localID, " err ", err)
 									if err.Error() == "EOF" {
 										client.Close()
 										return
 									}
 								case <-client.ctx.Done():
-									//fmt.Println(client.localID, " Over")
 									return
 								}
 							}
@@ -413,11 +401,12 @@ func (n *Server) callHandler() {
 							case req.reply <- client:
 							case <-req.ctx.Done():
 							}
+							close(req.reply)
+							close(req.errc)
 						}
 						select {
 						case n.registerC <- client:
 						case <-req.ctx.Done():
-							//fmt.Println(start, "callHandler NewClient ctx ", req.ctx.Err())
 						}
 					}(req, start)
 				}
@@ -428,7 +417,6 @@ func (n *Server) callHandler() {
 				clients[string(client.remoteID)] = client
 				addrToid[client.conn.RemoteAddr().String()+n.port] = client.remoteID
 				delete(idTostatus, string(client.remoteID))
-				//fmt.Println(time.Now(), "callHandler Register", client.conn.RemoteAddr().String(), client.localID, " - ", client.remoteID)
 			case _, _ = <-hangup:
 			}
 		}
@@ -437,10 +425,8 @@ func (n *Server) callHandler() {
 }
 
 func (n *Server) Leave() {
-	//fmt.Println("server Leave")
 	err := n.listener.Close()
 	if err != nil {
-		//fmt.Println("listener.Close err", err)
 	}
 	n.cancel()
 
@@ -454,18 +440,22 @@ func (n *Server) Leave() {
 /*
 This is a block call
 */
-func (n *Server) ConnectTo(addr string) (id []byte, err error) {
+func (n *Server) ConnectTo(addr string, id []byte) ([]byte, error) {
+	var err error
 	callReq := Request{}
 	callReq.ctx, _ = context.WithTimeout(context.Background(), 10*time.Second)
 	callReq.rType = 0
-	callReq.addr = net.ParseIP(addr)
+	callReq.id = id
+	if addr != "" {
+		callReq.addr = net.ParseIP(addr)
+	}
 	callReq.reply = make(chan interface{})
 	callReq.errc = make(chan error)
 
 	select {
 	case n.calling <- callReq:
 	case <-callReq.ctx.Done():
-		return
+		return nil, callReq.ctx.Err()
 	}
 
 	select {
@@ -474,20 +464,19 @@ func (n *Server) ConnectTo(addr string) (id []byte, err error) {
 		if ok {
 			id = client.remoteID
 		}
-		return
+		return id, nil
 
 	case err = <-callReq.errc:
-		return
+		return nil, err
 	case <-callReq.ctx.Done():
-		return
+		return nil, callReq.ctx.Err()
 	}
 
-	return
+	return nil, err
 }
 
 func (n *Server) Request(id []byte, m proto.Message) (msg P2PMessage, err error) {
 	defer logger.TimeTrack(time.Now(), "Request", nil)
-	//fmt.Println(time.Now(), "Server call Request ", id)
 	start := time.Now()
 	callReq := Request{}
 	callReq.ctx, callReq.cancel = context.WithTimeout(context.Background(), 5*time.Second)
@@ -499,13 +488,11 @@ func (n *Server) Request(id []byte, m proto.Message) (msg P2PMessage, err error)
 	select {
 	case n.calling <- callReq:
 	case <-callReq.ctx.Done():
-		//fmt.Println("Request ask for clinet ctx err ", callReq.ctx.Err())
 		return
 	}
 
 	select {
 	case r, ok := <-callReq.reply:
-		//fmt.Println(time.Now(), "Request got reply ", ok)
 		if !ok {
 			return
 		}
@@ -514,16 +501,12 @@ func (n *Server) Request(id []byte, m proto.Message) (msg P2PMessage, err error)
 			logger.TimeTrack(start, "RequestSent", nil)
 		} else {
 			err = errors.New("Reply cast error")
-			//fmt.Println(time.Now(), "Request Reply cast error", err)
 
 		}
-		close(callReq.reply)
-		close(callReq.errc)
 		return
 	case e, ok := <-callReq.errc:
 		if ok {
 			err = e
-			//fmt.Println(time.Now(), "Request err ", err)
 			return
 		}
 	case <-callReq.ctx.Done():
@@ -533,19 +516,14 @@ func (n *Server) Request(id []byte, m proto.Message) (msg P2PMessage, err error)
 			case _ = <-callReq.reply:
 			case <-time.After(5 * time.Second):
 			}
-			close(callReq.reply)
-			close(callReq.errc)
 		}()
-		//fmt.Println(time.Now(), "Request ctx err ", callReq.ctx.Err())
 		return
 	}
 	return
 }
 
 func (n *Server) Reply(id []byte, nonce uint64, response proto.Message) (err error) {
-	//defer //fmt.Println("Server call Reply done")
 	callReq := Request{}
-	//fmt.Println(time.Now(), "Server call Reply ", nonce, id)
 
 	callReq.ctx, callReq.cancel = context.WithTimeout(context.Background(), 5*time.Second)
 	callReq.id = id
@@ -553,17 +531,13 @@ func (n *Server) Reply(id []byte, nonce uint64, response proto.Message) (err err
 	callReq.nonce = nonce
 	errc := make(chan error)
 	callReq.errc = errc
-	defer close(callReq.errc)
 	callReq.msg = response
 	if callReq.ctx == nil {
-		//fmt.Println(time.Now(), "Server  req is nil ")
 	}
 	select {
 	case n.replying <- callReq:
-		//fmt.Println(time.Now(), "Server has been send to replying")
 
 	case <-callReq.ctx.Done():
-		//fmt.Println(time.Now(), "Request ctx err ", callReq.ctx.Err())
 		return
 	}
 	/*
@@ -597,7 +571,6 @@ func (n *Server) messageDispatch(ctx context.Context) {
 					return
 				}
 				if msg.Msg.Message == nil {
-					//fmt.Println("msg.Msg.Message is nil")
 
 					continue
 				}
@@ -605,16 +578,13 @@ func (n *Server) messageDispatch(ctx context.Context) {
 				if len(messagetype) > 0 && messagetype[0] == '*' {
 					messagetype = messagetype[1:]
 				}
-				////fmt.Println("subscriptions ", len(subscriptions))
 				out := subscriptions[messagetype]
 				if out != nil {
 
 					select {
 					case out <- msg:
-						////fmt.Println("dispatch message done")
 					}
 				} else {
-					//fmt.Println("!!!!!no dispatch message err")
 				}
 			case sub, ok := <-n.subscribe:
 				if !ok {

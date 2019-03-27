@@ -81,6 +81,7 @@ func (d *P2PDkg) GetSessionID(pubKeyCoor [4]*big.Int) (sessionId string) {
 }
 
 func (d *P2PDkg) Start(ctx context.Context, groupIds [][]byte, sessionId string) (chan [5]*big.Int, <-chan error) {
+	fmt.Println("P2PDkg Start")
 	partSec := d.suite.Scalar().Pick(d.suite.RandomStream())
 	newSession := &DkgSession{
 		SessionId:      sessionId,
@@ -91,7 +92,22 @@ func (d *P2PDkg) Start(ctx context.Context, groupIds [][]byte, sessionId string)
 		ctx:            ctx,
 		errc:           make(chan error),
 	}
+	for i := 0; i < len(groupIds); i++ {
+		start := time.Now()
+		if !bytes.Equal((*d.network).GetID(), groupIds[i]) {
+			retry := 0
+			for {
+				if _, err := (*d.network).ConnectTo("", groupIds[i]); err != nil {
+					fmt.Println("ConnectTo done retry=", retry, err)
+					retry++
 
+				} else {
+					break
+				}
+			}
+			fmt.Println("ConnectTo done retry=", retry, time.Since(start).Nanoseconds()/1000)
+		}
+	}
 	go func() {
 		var errcList []<-chan error
 		outForDeal, pubKeyErrc := d.pipeExchangePubKey(newSession, d.outputChan)
@@ -316,7 +332,6 @@ func hashPoint(pubKeyCoor [4]*big.Int) string {
 func (d *P2PDkg) pipeExchangePubKey(newSession *DkgSession, outToEventloop chan<- packageToLoop) (<-chan *DkgSession, <-chan error) {
 	out := make(chan *DkgSession)
 	errc := make(chan error)
-
 	go func() {
 		defer d.logger.TimeTrack(time.Now(), "pipeExchangePubKey", map[string]interface{}{"SessionID": newSession.ctx.Value("SessionID")})
 

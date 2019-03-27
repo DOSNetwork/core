@@ -41,7 +41,7 @@ func (r test1) StartTest(d *PeerNode) {
 			go func(j int) {
 				defer wg.Done()
 				ip := d.nodeIPs[j]
-				id, err := d.p.ConnectTo(ip)
+				id, err := d.p.ConnectTo(ip, nil)
 				if err != nil {
 					os.Exit(1)
 				}
@@ -157,26 +157,24 @@ func (r test3) StartTest(d *PeerNode) {
 		//d.log.Fatal(err)
 	}
 
-	cmd := &internalMsg.Cmd{
-		Ctype: internalMsg.Cmd_SIGNIN,
-		Args:  []byte{},
-	}
-	pb := proto.Message(cmd)
 	for i := 0; i < len(d.nodeIDs); i++ {
 		if !bytes.Equal(d.p.GetID(), d.nodeIDs[i]) {
 			start := time.Now()
 			retry := 0
 			for {
-				if _, err := d.p.Request(d.nodeIDs[i], pb); err != nil {
+				fmt.Println(start, " ->", time.Now(), "ConnectTo ", d.p.GetID(), " ->", d.nodeIDs[i])
+
+				if _, err := d.p.ConnectTo("", d.nodeIDs[i]); err != nil {
 					fmt.Println(start, " ->", time.Now(), "testfailed ", d.p.GetID(), " ->", d.nodeIDs[i], err)
 					retry++
 				} else {
 					break
 				}
 			}
-			fmt.Println("Request done retry=", retry, time.Since(start).Nanoseconds()/1000)
+			fmt.Println("Request ConnectTo retry=", retry, d.p.GetID(), " ->", d.nodeIDs[i], time.Since(start).Nanoseconds()/1000)
 		}
 	}
+
 	time.Sleep(10 * time.Second)
 	startTime := time.Now()
 	for idx, id := range d.nodeIDs {

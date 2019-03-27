@@ -74,8 +74,7 @@ func NewDosNode(credentialPath, passphrase string) (dosNode *DosNode, err error)
 	if config.NodeRole == "testNode" {
 		var rspBytes []byte
 		var resp *http.Response
-		s := strings.Split(config.BootStrapIp, ":")
-		ip, _ := s[0], s[1]
+		ip := config.BootStrapIp
 		tServer := "http://" + ip + ":8080/getCredential"
 		resp, err = http.Get(tServer)
 		for err != nil {
@@ -119,7 +118,7 @@ func NewDosNode(credentialPath, passphrase string) (dosNode *DosNode, err error)
 	fmt.Println("onchain adapter done")
 
 	//Build a p2p network
-	p, err := p2p.CreateP2PNetwork(id, port)
+	p, err := p2p.CreateP2PNetwork(id, port, p2p.SWIM)
 	if err != nil {
 		return
 	}
@@ -131,7 +130,7 @@ func NewDosNode(credentialPath, passphrase string) (dosNode *DosNode, err error)
 
 	//Bootstrapping p2p network
 	if role != "BootstrapNode" {
-		err = p.Join(bootstrapIp)
+		err = p.Join([]string{bootstrapIp})
 		if err != nil {
 			return
 		}
@@ -289,9 +288,9 @@ func (d *DosNode) listen() (err error) {
 	keyUploaded := make(chan interface{})
 
 	var errcList []<-chan error
-	eventGrouping, errc := d.chain.PollLogs(onchain.SubscribeDOSProxyLogGrouping, 10, 0)
+	eventGrouping, errc := d.chain.PollLogs(onchain.SubscribeDOSProxyLogGrouping, 1, 0)
 	errcList = append(errcList, errc)
-	eventGroupDismiss, errc := d.chain.PollLogs(onchain.SubscribeDOSProxyLogGroupDismiss, 10, 0)
+	eventGroupDismiss, errc := d.chain.PollLogs(onchain.SubscribeDOSProxyLogGroupDismiss, 1, 0)
 	errcList = append(errcList, errc)
 
 	chUrl, errc := d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogUrl)
@@ -344,7 +343,7 @@ func (d *DosNode) listen() (err error) {
 					diff := currentBlockNumber - lastUpdatedBlock
 					if diff > SYSRANDOMNTERVAL {
 						ctx, _ := context.WithCancel(context.Background())
-						d.chain.RandomNumberTimeOut(ctx)
+						d.chain.SignalRandom(ctx)
 					}
 				}
 			case requestID := <-d.cPipCancel:
@@ -449,23 +448,22 @@ func (d *DosNode) listen() (err error) {
 				if !ok {
 					log.Error(err)
 				}
-				f := map[string]interface{}{
-					"LastSystemRandomness": fmt.Sprintf("%x", content.LastRandomness),
-					"DispatchedGroupId":    fmt.Sprintf("%x", content.DispatchedGroupId.Bytes()),
-					"DispatchedGroup_1":    fmt.Sprintf("%x", content.DispatchedGroup[0].Bytes()),
-					"DispatchedGroup_2":    fmt.Sprintf("%x", content.DispatchedGroup[1].Bytes()),
-					"DispatchedGroup_3":    fmt.Sprintf("%x", content.DispatchedGroup[2].Bytes()),
-					"DispatchedGroup_4":    fmt.Sprintf("%x", content.DispatchedGroup[3].Bytes()),
-					"Removed":              content.Removed,
-					"IsMember":             d.isMember(content.DispatchedGroup),
-					"Tx":                   content.Tx,
-					"CurBlkN":              currentBlockNumber,
-					"BlockN":               content.BlockN,
-					"Time":                 time.Now()}
-				logger.Event("DOS_QuerySysRandom", f)
-				fmt.Println("EthLog : systemRandom", d.isMember(content.DispatchedGroup))
-
 				if d.isMember(content.DispatchedGroup) {
+					f := map[string]interface{}{
+						"LastSystemRandomness": fmt.Sprintf("%x", content.LastRandomness),
+						"DispatchedGroupId":    fmt.Sprintf("%x", content.DispatchedGroupId.Bytes()),
+						"DispatchedGroup_1":    fmt.Sprintf("%x", content.DispatchedGroup[0].Bytes()),
+						"DispatchedGroup_2":    fmt.Sprintf("%x", content.DispatchedGroup[1].Bytes()),
+						"DispatchedGroup_3":    fmt.Sprintf("%x", content.DispatchedGroup[2].Bytes()),
+						"DispatchedGroup_4":    fmt.Sprintf("%x", content.DispatchedGroup[3].Bytes()),
+						"Removed":              content.Removed,
+						"IsMember":             d.isMember(content.DispatchedGroup),
+						"Tx":                   content.Tx,
+						"CurBlkN":              currentBlockNumber,
+						"BlockN":               content.BlockN,
+						"Time":                 time.Now()}
+					logger.Event("DOS_QuerySysRandom", f)
+					fmt.Println("EthLog : systemRandom", d.isMember(content.DispatchedGroup))
 					if !content.Removed {
 						requestID := content.LastRandomness.String()
 						//if pipeCancel[requestID] != nil {
@@ -484,24 +482,23 @@ func (d *DosNode) listen() (err error) {
 					log.Error(err)
 					continue
 				}
-				f := map[string]interface{}{
-					"RequestId":            fmt.Sprintf("%x", content.RequestId),
-					"LastSystemRandomness": fmt.Sprintf("%x", content.LastSystemRandomness),
-					"DispatchedGroupId":    fmt.Sprintf("%x", content.DispatchedGroupId),
-					"DispatchedGroup_1":    fmt.Sprintf("%x", content.DispatchedGroup[0].Bytes()),
-					"DispatchedGroup_2":    fmt.Sprintf("%x", content.DispatchedGroup[1].Bytes()),
-					"DispatchedGroup_3":    fmt.Sprintf("%x", content.DispatchedGroup[2].Bytes()),
-					"DispatchedGroup_4":    fmt.Sprintf("%x", content.DispatchedGroup[3].Bytes()),
-					"Removed":              content.Removed,
-					"IsMember":             d.isMember(content.DispatchedGroup),
-					"Tx":                   content.Tx,
-					"CurBlkN":              currentBlockNumber,
-					"BlockN":               content.BlockN,
-					"Time":                 time.Now()}
-				logger.Event("DOS_QueryUserRandom", f)
-				fmt.Println("EthLog : userRandom ", d.isMember(content.DispatchedGroup))
-
 				if d.isMember(content.DispatchedGroup) {
+					f := map[string]interface{}{
+						"RequestId":            fmt.Sprintf("%x", content.RequestId),
+						"LastSystemRandomness": fmt.Sprintf("%x", content.LastSystemRandomness),
+						"DispatchedGroupId":    fmt.Sprintf("%x", content.DispatchedGroupId),
+						"DispatchedGroup_1":    fmt.Sprintf("%x", content.DispatchedGroup[0].Bytes()),
+						"DispatchedGroup_2":    fmt.Sprintf("%x", content.DispatchedGroup[1].Bytes()),
+						"DispatchedGroup_3":    fmt.Sprintf("%x", content.DispatchedGroup[2].Bytes()),
+						"DispatchedGroup_4":    fmt.Sprintf("%x", content.DispatchedGroup[3].Bytes()),
+						"Removed":              content.Removed,
+						"IsMember":             d.isMember(content.DispatchedGroup),
+						"Tx":                   content.Tx,
+						"CurBlkN":              currentBlockNumber,
+						"BlockN":               content.BlockN,
+						"Time":                 time.Now()}
+					logger.Event("DOS_QueryUserRandom", f)
+					fmt.Println("EthLog : userRandom ", d.isMember(content.DispatchedGroup))
 					if !content.Removed {
 						requestID := content.RequestId.String()
 						//if pipeCancel[requestID] != nil {
@@ -520,27 +517,26 @@ func (d *DosNode) listen() (err error) {
 					log.Error(err)
 					continue
 				}
-				startTime := time.Now()
-				fmt.Println("set up time ", startTime)
-				f := map[string]interface{}{
-					"RequestId":         fmt.Sprintf("%x", content.QueryId),
-					"Randomness":        fmt.Sprintf("%x", content.Randomness),
-					"DataSource":        fmt.Sprintf("%x", content.DataSource),
-					"DispatchedGroupId": fmt.Sprintf("%x", content.DispatchedGroupId),
-					"DispatchedGroup_1": fmt.Sprintf("%x", content.DispatchedGroup[0].Bytes()),
-					"DispatchedGroup_2": fmt.Sprintf("%x", content.DispatchedGroup[1].Bytes()),
-					"DispatchedGroup_3": fmt.Sprintf("%x", content.DispatchedGroup[2].Bytes()),
-					"DispatchedGroup_4": fmt.Sprintf("%x", content.DispatchedGroup[3].Bytes()),
-					"Removed":           content.Removed,
-					"IsMember":          d.isMember(content.DispatchedGroup),
-					"Tx":                content.Tx,
-					"CurBlkN":           currentBlockNumber,
-					"BlockN":            content.BlockN,
-					"Time":              time.Now()}
-				logger.Event("DOS_QueryURL", f)
-				fmt.Println("EthLog : queryLog ", d.isMember(content.DispatchedGroup))
-
 				if d.isMember(content.DispatchedGroup) {
+					startTime := time.Now()
+					fmt.Println("set up time ", startTime)
+					f := map[string]interface{}{
+						"RequestId":         fmt.Sprintf("%x", content.QueryId),
+						"Randomness":        fmt.Sprintf("%x", content.Randomness),
+						"DataSource":        fmt.Sprintf("%x", content.DataSource),
+						"DispatchedGroupId": fmt.Sprintf("%x", content.DispatchedGroupId),
+						"DispatchedGroup_1": fmt.Sprintf("%x", content.DispatchedGroup[0].Bytes()),
+						"DispatchedGroup_2": fmt.Sprintf("%x", content.DispatchedGroup[1].Bytes()),
+						"DispatchedGroup_3": fmt.Sprintf("%x", content.DispatchedGroup[2].Bytes()),
+						"DispatchedGroup_4": fmt.Sprintf("%x", content.DispatchedGroup[3].Bytes()),
+						"Removed":           content.Removed,
+						"IsMember":          d.isMember(content.DispatchedGroup),
+						"Tx":                content.Tx,
+						"CurBlkN":           currentBlockNumber,
+						"BlockN":            content.BlockN,
+						"Time":              time.Now()}
+					logger.Event("DOS_QueryURL", f)
+					fmt.Println("EthLog : queryLog ", d.isMember(content.DispatchedGroup))
 					if !content.Removed {
 						requestID := content.QueryId.String()
 						//if pipeCancel[requestID] != nil {
@@ -560,7 +556,7 @@ func (d *DosNode) listen() (err error) {
 					continue
 				}
 				if d.isMember(content.PubKey) {
-					fmt.Println("EthLog : validationResult", content.Pass)
+					fmt.Println("EthLog : validationResult", content.TrafficType, content.Pass)
 					if content.TrafficType == onchain.TrafficUserQuery {
 						z := new(big.Int)
 						z.SetBytes(content.Message)

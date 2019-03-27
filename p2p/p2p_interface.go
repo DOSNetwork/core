@@ -80,7 +80,7 @@ type P2PInterface interface {
 	SetPort(port string)
 	Listen() error
 	Join(bootstrapIp []string) error
-	ConnectTo(ip string) (id []byte, err error)
+	ConnectTo(ip string, id []byte) ([]byte, error)
 	Leave()
 	Request(id []byte, m proto.Message) (msg P2PMessage, err error)
 	Reply(id []byte, nonce uint64, m proto.Message) (err error)

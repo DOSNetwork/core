@@ -85,7 +85,6 @@ type DOSProxyLogGroupingInitiated struct {
 
 type DOSProxyLogInsufficientWorkingGroup struct {
 	NumWorkingGroups *big.Int
-	NumPendingNodes  *big.Int
 	Tx               string
 	BlockN           uint64
 	Removed          bool
@@ -155,10 +154,3 @@ type DOSProxyLogNoWorkingGroup struct {
 	Tx      string
 }
 
-type DOSProxyTestEvent struct {
-	Parameter *big.Int
-	Raw       types.Log
-	Removed   bool
-	BlockN    uint64
-	Tx        string
-}

@@ -100,9 +100,7 @@ func main() {
 	}
 
 	//It also need to connect to bootstrape node to get crential
-	bootStrapIP := os.Getenv("BOOTSTRAPIP")
-	s := strings.Split(bootStrapIP, ":")
-	ip, _ := s[0], s[1]
+	ip := os.Getenv("BOOTSTRAPIP")
 
 	//
 	config := eth.AMAConfig{}
@@ -127,8 +125,7 @@ func main() {
 	if onChainConfig.NodeRole == "testNode" {
 		var rspBytes []byte
 		var resp *http.Response
-		s := strings.Split(onChainConfig.BootStrapIp, ":")
-		ip, _ := s[0], s[1]
+		ip := onChainConfig.BootStrapIp
 		tServer := "http://" + ip + ":8080/getCredential"
 		resp, err = http.Get(tServer)
 		for err != nil {

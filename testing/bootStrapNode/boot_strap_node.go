@@ -44,7 +44,7 @@ func main() {
 	if workingDir == "/" {
 		workingDir = "."
 	}
-	credentialPath := workingDir + "/testAccounts/bootCredential"
+	credentialPath := workingDir + "/testAccounts/bootCredential/fundKey"
 	//Set up an onchain adapter
 	chainConfig := config.GetChainConfig()
 	fmt.Println("chainConfig.RemoteNodeAddressPool", chainConfig.RemoteNodeAddressPool)
@@ -61,13 +61,13 @@ func main() {
 
 	var errcList []<-chan error
 	var eventList []<-chan interface{}
-	sink, errc := adaptor.PollLogs(onchain.SubscribeDOSProxyLogInsufficientPendingNode, 0, 0)
+	sink, errc := adaptor.PollLogs(onchain.SubscribeDOSProxyLogInsufficientPendingNode, 1, 0)
 	eventList = append(eventList, sink)
 	errcList = append(errcList, errc)
-	sink, errc = adaptor.PollLogs(onchain.SubscribeDOSProxyLogInsufficientWorkingGroup, 0, 0)
+	sink, errc = adaptor.PollLogs(onchain.SubscribeDOSProxyLogInsufficientWorkingGroup, 1, 0)
 	eventList = append(eventList, sink)
 	errcList = append(errcList, errc)
-	sink, errc = adaptor.PollLogs(onchain.SubscribeDOSProxyLogGroupingInitiated, 0, 0)
+	sink, errc = adaptor.PollLogs(onchain.SubscribeDOSProxyLogGroupingInitiated, 1, 0)
 	eventList = append(eventList, sink)
 	errcList = append(errcList, errc)
 	errc = onchain.MergeErrors(ctx, errcList...)
@@ -90,19 +90,14 @@ func main() {
 			case event := <-sink:
 				switch content := event.(type) {
 				case *onchain.DOSProxyLogInsufficientPendingNode:
-					fmt.Println("DOSProxyLogInsufficientPendingNode ", content.NumPendingNodes)
+					fmt.Println("BootStrap DOSProfxyLogInsufficientPendingNode  ", content.NumPendingNodes)
 				case *onchain.DOSProxyLogInsufficientWorkingGroup:
-					fmt.Println("DOSProxyLogInsufficientWorkingGroup ", content.NumPendingNodes)
-					if int(content.NumPendingNodes.Uint64()) == groupSize*(groupToPick+1)+1 {
-						errc = adaptor.BootStrap()
-						e := <-errc
-						fmt.Println("BootStrap done ", e)
-						if e != nil {
-							return
-						}
-					}
+					errc = adaptor.BootStrap(1)
+					e := <-errc
+					fmt.Println("BootStrap done ", e)
 				case *onchain.DOSProxyLogGroupingInitiated:
 					fmt.Println("DOSProxyLogInsufficientWorkingGroup ", content.NumPendingNodes)
+					return
 				}
 			case e, ok := <-errc:
 				if ok {
@@ -112,20 +107,20 @@ func main() {
 			}
 		}
 	}()
-	fmt.Println("ResetContract")
 	errc = adaptor.ResetContract()
 	e := <-errc
 	fmt.Println("ResetContract", e)
 	if e != nil {
 		return
 	}
-	fmt.Println("SetGroupSize")
 	errc = adaptor.SetGroupSize(ctx, uint64(config.GetRandomGroupSize()))
 	fmt.Println("SetGroupSize", <-errc)
+	errc = adaptor.SetGroupMaturityPeriod(ctx, uint64(80))
+	fmt.Println("SetGroupMaturityPeriod", <-errc)
 
 	//2)Build a p2p network
 	id = []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20}
-	p, err := p2p.CreateP2PNetwork(id[:], config.Port)
+	p, err := p2p.CreateP2PNetwork(id[:], config.Port, p2p.SWIM)
 	if err != nil {
 		log.Fatal(err)
 	}
