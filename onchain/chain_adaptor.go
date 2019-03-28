@@ -21,6 +21,9 @@ type ProxyAdapter interface {
 	SetGroupToPick(ctx context.Context, groupToPick uint64) (errc <-chan error)
 	SetGroupSize(ctx context.Context, size uint64) (errc <-chan error)
 	SetGroupMaturityPeriod(ctx context.Context, size uint64) (errc <-chan error)
+	Commit(ctx context.Context, commitment [32]byte) (errc <-chan error)
+	Reveal(ctx context.Context, secret uint64) (errc <-chan error)
+
 	//Guardian node functions
 	SignalRandom(ctx context.Context) (errc <-chan error)
 	SignalGroupFormation(ctx context.Context) (errc <-chan error)
@@ -44,7 +47,7 @@ type ProxyAdapter interface {
 func NewProxyAdapter(ChainType, credentialPath, passphrase, proxyAddr string, urls []string) (ProxyAdapter, error) {
 	switch ChainType {
 	case ETH:
-		adaptor, err := NewEthAdaptor(credentialPath, passphrase, proxyAddr, urls)
+		adaptor, err := NewEthAdaptor(credentialPath, passphrase, proxyAddr, "", urls)
 		return adaptor, err
 	default:
 		err := fmt.Errorf("Chain %s not supported error\n", ChainType)

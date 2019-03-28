@@ -14,8 +14,6 @@ const (
 )
 
 func TestReadEthKey(t *testing.T) {
-	credentialPath := ""
-	passphrase := ""
 	_, err := ReadEthKey(credentialPath, passphrase)
 	if err != nil {
 		t.Errorf("ReadEthKey Error: %s.", err.Error())
@@ -25,7 +23,6 @@ func TestReadEthKey(t *testing.T) {
 func TestDialToEth(t *testing.T) {
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	defer cancelFunc()
-	urls := []string{""}
 	clients := DialToEth(ctx, urls)
 	count := 0
 	for client := range clients {
@@ -49,7 +46,6 @@ func TestCheckSync(t *testing.T) {
 	var mClient *ethclient.Client
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	defer cancelFunc()
-	urls := []string{""}
 	clients := DialToEth(ctx, urls[:1])
 	mClient = <-clients
 	id, err := mClient.NetworkID(ctx)
@@ -83,7 +79,6 @@ func TestDialToEthDeadline(t *testing.T) {
 	d := time.Now().Add(1 * time.Second)
 	ctx, cancelFunc := context.WithDeadline(context.Background(), d)
 	defer cancelFunc()
-	urls := []string{""}
 	clients := DialToEth(ctx, urls)
 	time.Sleep(2 * time.Second)
 
@@ -95,7 +90,6 @@ func TestDialToEthDeadline(t *testing.T) {
 func TestDialToEthErrHandling(t *testing.T) {
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	defer cancelFunc()
-	urls := []string{""}
 	clients := DialToEth(ctx, urls)
 	time.Sleep(2 * time.Second)
 

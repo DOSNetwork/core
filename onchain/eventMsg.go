@@ -81,6 +81,7 @@ type DOSProxyLogGroupingInitiated struct {
 	Tx                string
 	BlockN            uint64
 	Removed           bool
+	Raw               types.Log
 }
 
 type DOSProxyLogInsufficientWorkingGroup struct {
@@ -88,6 +89,7 @@ type DOSProxyLogInsufficientWorkingGroup struct {
 	Tx               string
 	BlockN           uint64
 	Removed          bool
+	Raw              types.Log
 }
 
 type DOSProxyLogInsufficientPendingNode struct {
@@ -95,37 +97,43 @@ type DOSProxyLogInsufficientPendingNode struct {
 	Tx              string
 	BlockN          uint64
 	Removed         bool
+	Raw             types.Log
 }
 
 type DOSProxyLogGrouping struct {
 	GroupId *big.Int
 	NodeId  []common.Address
-	Removed bool
-	BlockN  uint64
 	Tx      string
+	BlockN  uint64
+	Removed bool
 	Raw     types.Log
 }
 
 type DOSProxyLogDuplicatePubKey struct {
 	GroupId *big.Int
 	PubKey  [4]*big.Int
+	BlockN  uint64
+	Removed bool
+	Raw     types.Log
 }
 
 type DOSProxyLogAddressNotFound struct {
 	GroupId *big.Int
 	PubKey  [4]*big.Int
-	Removed bool
-	BlockN  uint64
 	Tx      string
+	BlockN  uint64
+	Removed bool
+	Raw     types.Log
 }
 
 type DOSProxyLogPublicKeyAccepted struct {
 	GroupId          *big.Int
 	PubKey           [4]*big.Int
 	WorkingGroupSize *big.Int
-	Removed          bool
-	BlockN           uint64
 	Tx               string
+	BlockN           uint64
+	Removed          bool
+	Raw              types.Log
 }
 
 type DOSProxyLogPublicKeyUploaded struct {
@@ -133,17 +141,18 @@ type DOSProxyLogPublicKeyUploaded struct {
 	PubKey    [4]*big.Int
 	Count     *big.Int
 	GroupSize *big.Int
-	Removed   bool
-	BlockN    uint64
 	Tx        string
+	BlockN    uint64
+	Removed   bool
+	Raw       types.Log
 }
 
 type DOSProxyLogGroupDismiss struct {
 	GroupId *big.Int
 	PubKey  [4]*big.Int
-	Removed bool
-	BlockN  uint64
 	Tx      string
+	BlockN  uint64
+	Removed bool
 	Raw     types.Log
 }
 
@@ -154,3 +163,47 @@ type DOSProxyLogNoWorkingGroup struct {
 	Tx      string
 }
 
+type DOSProxyUpdateGroupToPick struct {
+	OldNum  *big.Int
+	NewNum  *big.Int
+	Tx      string
+	BlockN  uint64
+	Removed bool
+	Raw     types.Log
+}
+
+type DOSCommitRevealLogStartCommitReveal struct {
+	Tx             string
+	TargetBlkNum   *big.Int
+	CommitDuration *big.Int
+	RevealDuration *big.Int
+	BlockN         uint64
+	Removed        bool
+	Raw            types.Log
+}
+
+type DOSCommitRevealLogCommit struct {
+	Tx         string
+	From       common.Address
+	Commitment [32]byte
+	BlockN     uint64
+	Removed    bool
+	Raw        types.Log
+}
+
+type DOSCommitRevealLogReveal struct {
+	Tx      string
+	From    common.Address
+	Secret  *big.Int
+	BlockN  uint64
+	Removed bool
+	Raw     types.Log
+}
+
+type DOSCommitRevealLogRandom struct {
+	Tx      string
+	Random  *big.Int
+	BlockN  uint64
+	Removed bool
+	Raw     types.Log
+}

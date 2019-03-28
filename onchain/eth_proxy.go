@@ -14,6 +14,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 
 	"github.com/DOSNetwork/core/log"
+	"github.com/DOSNetwork/core/onchain/doscommitreveal"
 	"github.com/DOSNetwork/core/onchain/dosproxy"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -35,7 +36,12 @@ const (
 	SubscribeDOSProxyLogInsufficientWorkingGroup
 	SubscribeDOSProxyLogNoWorkingGroup
 	SubscribeDOSProxyLogGroupingInitiated
-	SubscribeDOSProxyTestEvent
+	SubscribeDOSProxyUpdateGroupToPick
+	//For bootstraping
+	SubscribeDOSCommitRevealLogStartCommitReveal
+	SubscribeDOSCommitRevealLogCommit
+	SubscribeDOSCommitRevealLogReveal
+	SubscribeDOSCommitRevealLogRandom
 	LastRandomness
 	WorkingGroupSize
 	LastUpdatedBlock
@@ -59,22 +65,30 @@ var logger log.Logger
 
 type Request struct {
 	ctx    context.Context
-	s      *dosproxy.DOSProxySession
+	tOpts  *bind.TransactOpts
 	f      func() (*types.Transaction, error)
 	result chan Reply
 }
 
 type ReqSetInt struct {
 	ctx       context.Context
-	s         *dosproxy.DOSProxySession
+	tOpts     *bind.TransactOpts
 	parameter *big.Int
 	f         func(*big.Int) (*types.Transaction, error)
 	result    chan Reply
 }
 
+type ReqSetByte32 struct {
+	ctx       context.Context
+	tOpts     *bind.TransactOpts
+	parameter [32]byte
+	f         func([32]byte) (*types.Transaction, error)
+	result    chan Reply
+}
+
 type ReqGrouping struct {
 	ctx        context.Context
-	s          *dosproxy.DOSProxySession
+	tOpts      *bind.TransactOpts
 	candidates []common.Address
 	size       *big.Int
 	f          func([]common.Address, *big.Int) (*types.Transaction, error)
@@ -83,7 +97,7 @@ type ReqGrouping struct {
 
 type ReqSetRandomNum struct {
 	ctx     context.Context
-	s       *dosproxy.DOSProxySession
+	tOpts   *bind.TransactOpts
 	sig     [2]*big.Int
 	version uint8
 	f       func([2]*big.Int, uint8) (*types.Transaction, error)
@@ -92,7 +106,7 @@ type ReqSetRandomNum struct {
 
 type ReqSetPublicKey struct {
 	ctx     context.Context
-	s       *dosproxy.DOSProxySession
+	tOpts   *bind.TransactOpts
 	groupId *big.Int
 	pubKey  [4]*big.Int
 	f       func(*big.Int, [4]*big.Int) (*types.Transaction, error)
@@ -101,7 +115,7 @@ type ReqSetPublicKey struct {
 
 type ReqTriggerCallback struct {
 	ctx         context.Context
-	s           *dosproxy.DOSProxySession
+	tOpts       *bind.TransactOpts
 	requestId   *big.Int
 	trafficType uint8
 	content     []byte
@@ -118,17 +132,19 @@ type Reply struct {
 }
 
 type EthAdaptor struct {
-	proxyAddr string
-	gethUrls  []string
-	eventUrls []string
-	key       *keystore.Key
-	auth      *bind.TransactOpts
+	proxyAddr        string
+	commitRevealAddr string
+	gethUrls         []string
+	eventUrls        []string
+	key              *keystore.Key
+	auth             *bind.TransactOpts
 	//rpc connection over http/https
-	proxies    []*dosproxy.DOSProxySession
-	clients    []*ethclient.Client
-	ctx        context.Context
-	cancelFunc context.CancelFunc
-	reqQueue   chan interface{}
+	proxies       []*dosproxy.DOSProxySession
+	commitReveals []*doscommitreveal.DOSCommitRevealSession
+	clients       []*ethclient.Client
+	ctx           context.Context
+	cancelFunc    context.CancelFunc
+	reqQueue      chan interface{}
 
 	//rpc connection over WebSockets for event notification
 
@@ -138,7 +154,7 @@ type EthAdaptor struct {
 	eCancelFunc context.CancelFunc
 }
 
-func NewEthAdaptor(credentialPath, passphrase, proxyAddr string, urls []string) (adaptor *EthAdaptor, err error) {
+func NewEthAdaptor(credentialPath, passphrase, proxyAddr, commitRevealAddr string, urls []string) (adaptor *EthAdaptor, err error) {
 	var httpUrls []string
 	var wsUrls []string
 	for _, url := range urls {
@@ -183,6 +199,11 @@ func NewEthAdaptor(credentialPath, passphrase, proxyAddr string, urls []string) 
 			logger.Error(e)
 			err = errors.New("No any working eth client")
 			continue
+		}
+		c, e := doscommitreveal.NewDOSCommitReveal(common.HexToAddress(commitRevealAddr), client)
+		if e != nil {
+			logger.Error(e)
+			adaptor.commitReveals = append(adaptor.commitReveals, &doscommitreveal.DOSCommitRevealSession{Contract: c, CallOpts: bind.CallOpts{Context: adaptor.ctx}, TransactOpts: *adaptor.auth})
 		}
 		adaptor.clients = append(adaptor.clients, client)
 		adaptor.proxies = append(adaptor.proxies, &dosproxy.DOSProxySession{Contract: p, CallOpts: bind.CallOpts{Context: adaptor.ctx}, TransactOpts: *adaptor.auth})
@@ -243,6 +264,8 @@ func (e *EthAdaptor) reqLoop() {
 					resultC = content.result
 				case *ReqSetInt:
 					resultC = content.result
+				case *ReqSetByte32:
+					resultC = content.result
 				case *ReqSetRandomNum:
 					resultC = content.result
 				case *ReqTriggerCallback:
@@ -271,32 +294,37 @@ func (e *EthAdaptor) reqLoop() {
 
 				switch content := req.(type) {
 				case *Request:
-					content.s.TransactOpts.Nonce = e.auth.Nonce
+					content.tOpts.Nonce = e.auth.Nonce
 					tx, err = content.f()
 					resultC = content.result
 					ctx = content.ctx
 				case *ReqGrouping:
-					content.s.TransactOpts.Nonce = e.auth.Nonce
+					content.tOpts.Nonce = e.auth.Nonce
 					tx, err = content.f(content.candidates, content.size)
 					resultC = content.result
 					ctx = content.ctx
 				case *ReqSetInt:
-					content.s.TransactOpts.Nonce = e.auth.Nonce
+					content.tOpts.Nonce = e.auth.Nonce
+					tx, err = content.f(content.parameter)
+					resultC = content.result
+					ctx = content.ctx
+				case *ReqSetByte32:
+					content.tOpts.Nonce = e.auth.Nonce
 					tx, err = content.f(content.parameter)
 					resultC = content.result
 					ctx = content.ctx
 				case *ReqSetRandomNum:
-					content.s.TransactOpts.Nonce = e.auth.Nonce
+					content.tOpts.Nonce = e.auth.Nonce
 					tx, err = content.f(content.sig, content.version)
 					resultC = content.result
 					ctx = content.ctx
 				case *ReqTriggerCallback:
-					content.s.TransactOpts.Nonce = e.auth.Nonce
+					content.tOpts.Nonce = e.auth.Nonce
 					tx, err = content.f(content.requestId, content.trafficType, content.content, content.sig, content.version)
 					resultC = content.result
 					ctx = content.ctx
 				case *ReqSetPublicKey:
-					content.s.TransactOpts.Nonce = e.auth.Nonce
+					content.tOpts.Nonce = e.auth.Nonce
 					tx, err = content.f(content.groupId, content.pubKey)
 					resultC = content.result
 					ctx = content.ctx
@@ -421,7 +449,7 @@ func (e *EthAdaptor) RegisterNewNode(ctx context.Context) (errc <-chan error) {
 	defer logger.TimeTrack(time.Now(), "RegisterNewNode", nil)
 	result := make(chan Reply)
 	for i, proxy := range e.proxies {
-		request := &Request{ctx, proxy, proxy.RegisterNewNode, result}
+		request := &Request{ctx, &proxy.TransactOpts, proxy.RegisterNewNode, result}
 		errc = e.sendRequest(ctx, e.clients[i], errc, request, result)
 	}
 	return
@@ -431,7 +459,7 @@ func (e *EthAdaptor) SignalRandom(ctx context.Context) (errc <-chan error) {
 	defer logger.TimeTrack(time.Now(), "SignalRandom", nil)
 	result := make(chan Reply)
 	for i, proxy := range e.proxies {
-		request := &Request{ctx, proxy, proxy.SignalRandom, result}
+		request := &Request{ctx, &proxy.TransactOpts, proxy.SignalRandom, result}
 		errc = e.sendRequest(ctx, e.clients[i], errc, request, result)
 	}
 	return
@@ -441,7 +469,7 @@ func (e *EthAdaptor) SignalGroupFormation(ctx context.Context) (errc <-chan erro
 	defer logger.TimeTrack(time.Now(), "SignalGroupFormation", nil)
 	result := make(chan Reply)
 	for i, proxy := range e.proxies {
-		request := &Request{ctx, proxy, proxy.SignalGroupFormation, result}
+		request := &Request{ctx, &proxy.TransactOpts, proxy.SignalGroupFormation, result}
 		errc = e.sendRequest(ctx, e.clients[i], errc, request, result)
 	}
 	return
@@ -453,7 +481,29 @@ func (e *EthAdaptor) SignalDissolve(ctx context.Context, idx uint64) (errc <-cha
 	x := new(big.Int)
 	x.SetUint64(idx)
 	for i, proxy := range e.proxies {
-		request := &ReqSetInt{ctx, proxy, x, proxy.SignalDissolve, result}
+		request := &ReqSetInt{ctx, &proxy.TransactOpts, x, proxy.SignalDissolve, result}
+		errc = e.sendRequest(ctx, e.clients[i], errc, request, result)
+	}
+	return
+}
+
+func (e *EthAdaptor) Commit(ctx context.Context, commitment [32]byte) (errc <-chan error) {
+	defer logger.TimeTrack(time.Now(), "Commit", nil)
+	result := make(chan Reply)
+	for i, cr := range e.commitReveals {
+		request := &ReqSetByte32{ctx, &cr.TransactOpts, commitment, cr.Commit, result}
+		errc = e.sendRequest(ctx, e.clients[i], errc, request, result)
+	}
+	return
+}
+
+func (e *EthAdaptor) Reveal(ctx context.Context, secret uint64) (errc <-chan error) {
+	defer logger.TimeTrack(time.Now(), "Reveal", nil)
+	result := make(chan Reply)
+	x := new(big.Int)
+	x.SetUint64(secret)
+	for i, cr := range e.commitReveals {
+		request := &ReqSetInt{ctx, &cr.TransactOpts, x, cr.Reveal, result}
 		errc = e.sendRequest(ctx, e.clients[i], errc, request, result)
 	}
 	return
@@ -472,7 +522,7 @@ func (e *EthAdaptor) RegisterGroupPubKey(ctx context.Context, IdWithPubKeys chan
 			copy(pubKey[:], IdWithPubKey[1:])
 
 			for i, proxy := range e.proxies {
-				request := &ReqSetPublicKey{ctx, proxy, groupId, pubKey, proxy.RegisterGroupPubKey, result}
+				request := &ReqSetPublicKey{ctx, &proxy.TransactOpts, groupId, pubKey, proxy.RegisterGroupPubKey, result}
 				errc = e.sendRequest(ctx, e.clients[i], errc, request, result)
 			}
 
@@ -502,7 +552,7 @@ func (e *EthAdaptor) SetRandomNum(ctx context.Context, signatures <-chan *vss.Si
 			x, y := DecodeSig(signature.Signature)
 			result := make(chan Reply)
 			for i, proxy := range e.proxies {
-				request := &ReqSetRandomNum{ctx, proxy, [2]*big.Int{x, y}, 0, proxy.UpdateRandomness, result}
+				request := &ReqSetRandomNum{ctx, &proxy.TransactOpts, [2]*big.Int{x, y}, 0, proxy.UpdateRandomness, result}
 				errc = e.sendRequest(ctx, e.clients[i], errc, request, result)
 			}
 			return
@@ -527,7 +577,7 @@ func (e *EthAdaptor) DataReturn(ctx context.Context, signatures <-chan *vss.Sign
 
 			result := make(chan Reply)
 			for i, proxy := range e.proxies {
-				request := &ReqTriggerCallback{ctx, proxy, requestId, uint8(signature.Index), signature.Content, [2]*big.Int{x, y}, 0, proxy.TriggerCallback, result}
+				request := &ReqTriggerCallback{ctx, &proxy.TransactOpts, requestId, uint8(signature.Index), signature.Content, [2]*big.Int{x, y}, 0, proxy.TriggerCallback, result}
 				errc = e.sendRequest(ctx, e.clients[i], errc, request, result)
 			}
 			return
@@ -544,7 +594,7 @@ func (e *EthAdaptor) BootStrap(rndSeed uint64) (errc <-chan error) {
 	x := new(big.Int)
 	x.SetUint64(rndSeed)
 	for i, proxy := range e.proxies {
-		request := &ReqSetInt{ctx, proxy, x, proxy.BootStrap, result}
+		request := &ReqSetInt{ctx, &proxy.TransactOpts, x, proxy.BootStrap, result}
 		errc = e.sendRequest(ctx, e.clients[i], errc, request, result)
 	}
 	return errc
@@ -556,7 +606,7 @@ func (e *EthAdaptor) SetGroupSize(ctx context.Context, size uint64) (errc <-chan
 	x := new(big.Int)
 	x.SetUint64(size)
 	for i, proxy := range e.proxies {
-		request := &ReqSetInt{ctx, proxy, x, proxy.SetGroupSize, result}
+		request := &ReqSetInt{ctx, &proxy.TransactOpts, x, proxy.SetGroupSize, result}
 		errc = e.sendRequest(ctx, e.clients[i], errc, request, result)
 	}
 	return
@@ -567,7 +617,7 @@ func (e *EthAdaptor) SetGroupMaturityPeriod(ctx context.Context, period uint64) 
 	x := new(big.Int)
 	x.SetUint64(period)
 	for i, proxy := range e.proxies {
-		request := &ReqSetInt{ctx, proxy, x, proxy.SetGroupMaturityPeriod, result}
+		request := &ReqSetInt{ctx, &proxy.TransactOpts, x, proxy.SetGroupMaturityPeriod, result}
 		errc = e.sendRequest(ctx, e.clients[i], errc, request, result)
 	}
 	return
@@ -579,7 +629,7 @@ func (e *EthAdaptor) SetGroupToPick(ctx context.Context, groupToPick uint64) (er
 	x := new(big.Int)
 	x.SetUint64(groupToPick)
 	for i, proxy := range e.proxies {
-		request := &ReqSetInt{ctx, proxy, x, proxy.SetGroupToPick, result}
+		request := &ReqSetInt{ctx, &proxy.TransactOpts, x, proxy.SetGroupToPick, result}
 		errc = e.sendRequest(ctx, e.clients[i], errc, request, result)
 	}
 	return
@@ -591,7 +641,7 @@ func (e *EthAdaptor) SetGroupingThreshold(ctx context.Context, threshold uint64)
 	x := new(big.Int)
 	x.SetUint64(threshold)
 	for i, proxy := range e.proxies {
-		request := &ReqSetInt{ctx, proxy, x, proxy.SetGroupingThreshold, result}
+		request := &ReqSetInt{ctx, &proxy.TransactOpts, x, proxy.SetGroupingThreshold, result}
 		errc = e.sendRequest(ctx, e.clients[i], errc, request, result)
 	}
 	return
@@ -705,6 +755,26 @@ func (e *EthAdaptor) firstEvent(ctx context.Context, source chan interface{}) <-
 						blkNum = content.BlockN
 						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
 					case *DOSProxyLogGroupDismiss:
+						bytes = append(bytes, content.Raw.Data...)
+						blkNum = content.BlockN
+						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
+					case *DOSProxyUpdateGroupToPick:
+						bytes = append(bytes, content.Raw.Data...)
+						blkNum = content.BlockN
+						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
+					case *DOSCommitRevealLogStartCommitReveal:
+						bytes = append(bytes, content.Raw.Data...)
+						blkNum = content.BlockN
+						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
+					case *DOSCommitRevealLogCommit:
+						bytes = append(bytes, content.Raw.Data...)
+						blkNum = content.BlockN
+						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
+					case *DOSCommitRevealLogReveal:
+						bytes = append(bytes, content.Raw.Data...)
+						blkNum = content.BlockN
+						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
+					case *DOSCommitRevealLogRandom:
 						bytes = append(bytes, content.Raw.Data...)
 						blkNum = content.BlockN
 						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
@@ -934,6 +1004,7 @@ func subscribeEvent(ctx context.Context, proxy *dosproxy.DOSProxy, subscribeType
 						Tx:              i.Raw.TxHash.Hex(),
 						BlockN:          i.Raw.BlockNumber,
 						Removed:         i.Raw.Removed,
+						Raw:             i.Raw,
 					}
 				}
 			}
@@ -962,6 +1033,7 @@ func subscribeEvent(ctx context.Context, proxy *dosproxy.DOSProxy, subscribeType
 						Tx:               i.Raw.TxHash.Hex(),
 						BlockN:           i.Raw.BlockNumber,
 						Removed:          i.Raw.Removed,
+						Raw:              i.Raw,
 					}
 				}
 			}
@@ -989,6 +1061,37 @@ func subscribeEvent(ctx context.Context, proxy *dosproxy.DOSProxy, subscribeType
 						Tx:      i.Raw.TxHash.Hex(),
 						BlockN:  i.Raw.BlockNumber,
 						Removed: i.Raw.Removed,
+						Raw:     i.Raw,
+					}
+				}
+			}
+		}()
+	case SubscribeDOSProxyUpdateGroupToPick:
+		go func() {
+			transitChan := make(chan *dosproxy.DOSProxyUpdateGroupToPick)
+			defer close(transitChan)
+			defer close(errc)
+			defer close(out)
+			sub, err := proxy.DOSProxyFilterer.WatchUpdateGroupToPick(opt, transitChan)
+			if err != nil {
+				return
+			}
+			for {
+				select {
+				case <-ctx.Done():
+					sub.Unsubscribe()
+					return
+				case err := <-sub.Err():
+					errc <- err
+					return
+				case i := <-transitChan:
+					out <- &DOSProxyUpdateGroupToPick{
+						Tx:      i.Raw.TxHash.Hex(),
+						OldNum:  i.OldNum,
+						NewNum:  i.NewNum,
+						BlockN:  i.Raw.BlockNumber,
+						Removed: i.Raw.Removed,
+						Raw:     i.Raw,
 					}
 				}
 			}
@@ -1178,6 +1281,7 @@ func (e *EthAdaptor) PollLogs(subscribeType int, logBlockDiff, preBlockBuf uint6
 								Tx:              logs.Event.Raw.TxHash.Hex(),
 								BlockN:          logs.Event.Raw.BlockNumber,
 								Removed:         logs.Event.Raw.Removed,
+								Raw:             logs.Event.Raw,
 							}
 						}
 					case SubscribeDOSProxyLogInsufficientWorkingGroup:
@@ -1197,6 +1301,7 @@ func (e *EthAdaptor) PollLogs(subscribeType int, logBlockDiff, preBlockBuf uint6
 								Tx:               logs.Event.Raw.TxHash.Hex(),
 								BlockN:           logs.Event.Raw.BlockNumber,
 								Removed:          logs.Event.Raw.Removed,
+								Raw:              logs.Event.Raw,
 							}
 						}
 					case SubscribeDOSProxyLogGroupingInitiated:
@@ -1215,6 +1320,28 @@ func (e *EthAdaptor) PollLogs(subscribeType int, logBlockDiff, preBlockBuf uint6
 								Tx:      logs.Event.Raw.TxHash.Hex(),
 								BlockN:  logs.Event.Raw.BlockNumber,
 								Removed: logs.Event.Raw.Removed,
+								Raw:     logs.Event.Raw,
+							}
+						}
+					case SubscribeDOSProxyUpdateGroupToPick:
+						logs, err := proxyFilter.FilterUpdateGroupToPick(&bind.FilterOpts{
+							Start:   targetBlockN,
+							End:     &targetBlockN,
+							Context: ctx,
+						})
+						if err != nil {
+							errc <- err
+							continue
+						}
+
+						for logs.Next() {
+							sink <- &DOSProxyUpdateGroupToPick{
+								Tx:      logs.Event.Raw.TxHash.Hex(),
+								OldNum:  logs.Event.OldNum,
+								NewNum:  logs.Event.NewNum,
+								BlockN:  logs.Event.Raw.BlockNumber,
+								Removed: logs.Event.Raw.Removed,
+								Raw:     logs.Event.Raw,
 							}
 						}
 					}
@@ -1226,12 +1353,130 @@ func (e *EthAdaptor) PollLogs(subscribeType int, logBlockDiff, preBlockBuf uint6
 		}
 
 	}
+	multiplexCr := func(client *ethclient.Client, commitFilter *doscommitreveal.DOSCommitRevealFilterer, ctx context.Context) {
+		errc := make(chan error)
+		errcs = append(errcs, errc)
+		sink := make(chan interface{})
+		sinks = append(sinks, sink)
+		wg.Done()
+		defer close(errc)
+		defer close(sink)
+		targetBlockN, err := GetCurrentBlock(client)
+		if err != nil {
+			return
+		}
+		targetBlockN -= preBlockBuf
+		timer := time.NewTimer(LogCheckingInterval * time.Second)
+		for {
+			select {
+			case <-timer.C:
+				currentBlockN, err := GetCurrentBlock(client)
+				if err != nil {
+					timer.Reset(LogCheckingInterval * time.Second)
+					continue
+				}
 
-	wg.Add(len(e.proxies))
+				for ; currentBlockN-logBlockDiff >= targetBlockN; targetBlockN++ {
+					switch subscribeType {
+					case SubscribeDOSCommitRevealLogStartCommitReveal:
+						logs, err := commitFilter.FilterLogStartCommitReveal(&bind.FilterOpts{
+							Start:   targetBlockN,
+							End:     &targetBlockN,
+							Context: ctx,
+						})
+						if err != nil {
+							errc <- err
+							continue
+						}
+
+						for logs.Next() {
+							sink <- &DOSCommitRevealLogStartCommitReveal{
+								Tx:             logs.Event.Raw.TxHash.Hex(),
+								TargetBlkNum:   logs.Event.TargetBlkNum,
+								CommitDuration: logs.Event.CommitDuration,
+								RevealDuration: logs.Event.RevealDuration,
+								BlockN:         logs.Event.Raw.BlockNumber,
+								Removed:        logs.Event.Raw.Removed,
+								Raw:            logs.Event.Raw,
+							}
+						}
+					case SubscribeDOSCommitRevealLogCommit:
+						logs, err := commitFilter.FilterLogCommit(&bind.FilterOpts{
+							Start:   targetBlockN,
+							End:     &targetBlockN,
+							Context: ctx,
+						})
+						if err != nil {
+							errc <- err
+							continue
+						}
+
+						for logs.Next() {
+							sink <- &DOSCommitRevealLogCommit{
+								Tx:         logs.Event.Raw.TxHash.Hex(),
+								From:       logs.Event.From,
+								Commitment: logs.Event.Commitment,
+								BlockN:     logs.Event.Raw.BlockNumber,
+								Removed:    logs.Event.Raw.Removed,
+								Raw:        logs.Event.Raw,
+							}
+						}
+					case SubscribeDOSCommitRevealLogReveal:
+						logs, err := commitFilter.FilterLogReveal(&bind.FilterOpts{
+							Start:   targetBlockN,
+							End:     &targetBlockN,
+							Context: ctx,
+						})
+						if err != nil {
+							errc <- err
+							continue
+						}
+
+						for logs.Next() {
+							sink <- &DOSCommitRevealLogReveal{
+								Tx:      logs.Event.Raw.TxHash.Hex(),
+								From:    logs.Event.From,
+								Secret:  logs.Event.Secret,
+								BlockN:  logs.Event.Raw.BlockNumber,
+								Removed: logs.Event.Raw.Removed,
+								Raw:     logs.Event.Raw,
+							}
+						}
+					case SubscribeDOSCommitRevealLogRandom:
+						logs, err := commitFilter.FilterLogRandom(&bind.FilterOpts{
+							Start:   targetBlockN,
+							End:     &targetBlockN,
+							Context: ctx,
+						})
+						if err != nil {
+							errc <- err
+							continue
+						}
+
+						for logs.Next() {
+							sink <- &DOSCommitRevealLogRandom{
+								Tx:      logs.Event.Raw.TxHash.Hex(),
+								Random:  logs.Event.Random,
+								BlockN:  logs.Event.Raw.BlockNumber,
+								Removed: logs.Event.Raw.Removed,
+								Raw:     logs.Event.Raw,
+							}
+						}
+					}
+				}
+				timer.Reset(LogCheckingInterval * time.Second)
+			case <-ctx.Done():
+				return
+			}
+		}
+	}
+	wg.Add(len(e.proxies) + len(e.commitReveals))
 	for i := 0; i < len(e.clients); i++ {
 		go multiplex(e.clients[i], &e.proxies[i].Contract.DOSProxyFilterer, e.ctx)
 	}
-
+	for i := 0; i < len(e.commitReveals); i++ {
+		go multiplexCr(e.clients[i], &e.commitReveals[i].Contract.DOSCommitRevealFilterer, e.ctx)
+	}
 	wg.Wait()
 
 	return e.firstEvent(e.ctx, MergeEvents(e.ctx, sinks...)), MergeErrors(e.ctx, errcs...)

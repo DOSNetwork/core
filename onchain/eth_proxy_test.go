@@ -13,13 +13,15 @@ const (
 	TWOFULLNODES_2
 )
 
-func TestGetPendingNonce(t *testing.T) {
-	urls := []string{""}
-	proxyAddr := ""
-	credentialPath := ""
-	passphrase := ""
+var (
+	urls           = []string{""}
+	proxyAddr      = ""
+	credentialPath = ""
+	passphrase     = ""
+)
 
-	adaptor, err := NewEthAdaptor(credentialPath, passphrase, proxyAddr, urls)
+func TestGetPendingNonce(t *testing.T) {
+	adaptor, err := NewEthAdaptor(credentialPath, passphrase, proxyAddr, "", urls)
 	if err != nil {
 		t.Errorf("TestConcurrentSend Failed, got an Error : %s.", err.Error())
 		return
@@ -32,12 +34,7 @@ func TestGetPendingNonce(t *testing.T) {
 }
 
 func TestLastUpdatedBlock(t *testing.T) {
-	urls := []string{""}
-	proxyAddr := ""
-	credentialPath := ""
-	passphrase := ""
-
-	adaptor, err := NewEthAdaptor(credentialPath, passphrase, proxyAddr, urls)
+	adaptor, err := NewEthAdaptor(credentialPath, passphrase, proxyAddr, "", urls)
 	if err != nil {
 		t.Errorf("TestConcurrentSend Failed, got an Error : %s.", err.Error())
 		return
@@ -64,26 +61,21 @@ func TestLastUpdatedBlock(t *testing.T) {
 }
 
 func TestConcurrentSend(t *testing.T) {
-	urls := []string{""}
-	proxyAddr := ""
-	credentialPath := ""
-	passphrase := ""
-
-	adaptor, err := NewEthAdaptor(credentialPath, passphrase, proxyAddr, urls)
+	adaptor, err := NewEthAdaptor(credentialPath, passphrase, proxyAddr, "", urls)
 	if err != nil {
 		t.Errorf("TestConcurrentSend Failed, got an error : %s.", err.Error())
 		return
 	}
 
 	var errcList []<-chan error
-	sink, errc := adaptor.SubscribeEvent(SubscribeDOSProxyTestEvent)
+	sink, errc := adaptor.SubscribeEvent(SubscribeDOSProxyUpdateGroupToPick)
 	errcList = append(errcList, errc)
 
 	ctx, _ := context.WithCancel(context.Background())
 
-	for i := 0; i < 5; i++ {
+	for i := 3; i < 8; i++ {
 		go func(i int) {
-			_ = adaptor.TestContract(ctx, uint64(i))
+			_ = adaptor.SetGroupToPick(ctx, uint64(i))
 		}(i)
 	}
 	errc = MergeErrors(ctx, errcList...)
@@ -93,10 +85,14 @@ L:
 		select {
 		case event := <-sink:
 			switch content := event.(type) {
-			case *DOSProxyTestEvent:
-				result = result + int(content.Parameter.Uint64())
-				if result == 15 {
-					break L
+			case *DOSProxyUpdateGroupToPick:
+				fmt.Println("DOSProxyUpdateGroupToPick ", int(content.NewNum.Uint64()), content.Removed)
+				if content.Removed != true {
+					result = result + int(content.NewNum.Uint64())
+					if result == 25 {
+						time.Sleep(15 * time.Second)
+						break L
+					}
 				}
 			}
 		case e, ok := <-errc:
@@ -109,27 +105,22 @@ L:
 }
 
 func TestSendRequest(t *testing.T) {
-	urls := []string{""}
-	proxyAddr := ""
-	credentialPath := ""
-	passphrase := ""
-
-	adaptor, err := NewEthAdaptor(credentialPath, passphrase, proxyAddr, urls)
+	adaptor, err := NewEthAdaptor(credentialPath, passphrase, proxyAddr, "", urls)
 	if err != nil {
-		t.Errorf("TestConcurrentSend Failed, got an error : %s.", err.Error())
+		t.Errorf("ReqSetInt Failed, got an error : %s.", err.Error())
 		return
 	}
 
 	var errcList []<-chan error
-	sink, errc := adaptor.SubscribeEvent(SubscribeDOSProxyTestEvent)
+	sink, errc := adaptor.PollLogs(SubscribeDOSProxyUpdateGroupToPick, 0, 0)
 	errcList = append(errcList, errc)
 
 	fmt.Println("!!!!!!!!stop geth")
 	time.Sleep(5 * time.Second)
 	ctx, _ := context.WithCancel(context.Background())
-	count := 5
-	for i := 0; i < count; i++ {
-		_ = adaptor.TestContract(ctx, uint64(i))
+	count := 13
+	for i := 8; i < count; i++ {
+		_ = adaptor.SetGroupToPick(ctx, uint64(i))
 		time.Sleep(1 * time.Second)
 	}
 	fmt.Println("!!!!!!!!restore geth")
@@ -141,10 +132,13 @@ L:
 		select {
 		case event := <-sink:
 			switch content := event.(type) {
-			case *DOSProxyTestEvent:
-				result = result + int(content.Parameter.Uint64())
-				if result == 15 {
-					break L
+			case *DOSProxyUpdateGroupToPick:
+				fmt.Println("DOSProxyUpdateGroupToPick ", int(content.NewNum.Uint64()), content.Removed, result)
+				if content.Removed != true {
+					result = result + int(content.NewNum.Uint64())
+					if result == 50 {
+						break L
+					}
 				}
 			}
 		case e, ok := <-errc:
