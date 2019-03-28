@@ -288,9 +288,9 @@ func (d *DosNode) listen() (err error) {
 	keyUploaded := make(chan interface{})
 
 	var errcList []<-chan error
-	eventGrouping, errc := d.chain.PollLogs(onchain.SubscribeDOSProxyLogGrouping, 1, 0)
+	eventGrouping, errc := d.chain.PollLogs(onchain.SubscribeDOSProxyLogGrouping, 10, 0)
 	errcList = append(errcList, errc)
-	eventGroupDismiss, errc := d.chain.PollLogs(onchain.SubscribeDOSProxyLogGroupDismiss, 1, 0)
+	eventGroupDismiss, errc := d.chain.PollLogs(onchain.SubscribeDOSProxyLogGroupDismiss, 10, 0)
 	errcList = append(errcList, errc)
 
 	chUrl, errc := d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogUrl)
@@ -318,10 +318,7 @@ func (d *DosNode) listen() (err error) {
 		defer watchdog.Stop()
 		defer d.p.UnSubscribeEvent(vss.Signature{})
 		for {
-			currentBlockNumber, err := d.chain.CurrentBlock()
-			if err != nil {
-				logger.Error(err)
-			}
+
 			select {
 			case err, ok := <-errc:
 				if ok && err.Error() == "EOF" {
@@ -335,6 +332,10 @@ func (d *DosNode) listen() (err error) {
 			case <-watchdog.C:
 				ids := d.dkg.GetAnyGroupIDs()
 				if len(ids) != 0 {
+					currentBlockNumber, err := d.chain.CurrentBlock()
+					if err != nil {
+						logger.Error(err)
+					}
 					lastUpdatedBlock, err := d.chain.LastUpdatedBlock()
 					if err != nil {
 						logger.Error(err)
@@ -386,6 +387,10 @@ func (d *DosNode) listen() (err error) {
 				}
 
 				if isMember {
+					currentBlockNumber, err := d.chain.CurrentBlock()
+					if err != nil {
+						logger.Error(err)
+					}
 					sessionId := fmt.Sprintf("%x", content.GroupId)
 					f := map[string]interface{}{
 						"SessionID": sessionId,
@@ -419,6 +424,10 @@ func (d *DosNode) listen() (err error) {
 				}
 
 				if d.isMember(content.PubKey) && d.dkg.GroupDismiss(content.PubKey) {
+					currentBlockNumber, err := d.chain.CurrentBlock()
+					if err != nil {
+						logger.Error(err)
+					}
 					f := map[string]interface{}{
 						"SessionID":         fmt.Sprintf("%x", content.GroupId),
 						"DispatchedGroup_1": fmt.Sprintf("%x", content.PubKey[0].Bytes()),
@@ -449,6 +458,10 @@ func (d *DosNode) listen() (err error) {
 					log.Error(err)
 				}
 				if d.isMember(content.DispatchedGroup) {
+					currentBlockNumber, err := d.chain.CurrentBlock()
+					if err != nil {
+						logger.Error(err)
+					}
 					f := map[string]interface{}{
 						"LastSystemRandomness": fmt.Sprintf("%x", content.LastRandomness),
 						"DispatchedGroupId":    fmt.Sprintf("%x", content.DispatchedGroupId.Bytes()),
@@ -483,6 +496,10 @@ func (d *DosNode) listen() (err error) {
 					continue
 				}
 				if d.isMember(content.DispatchedGroup) {
+					currentBlockNumber, err := d.chain.CurrentBlock()
+					if err != nil {
+						logger.Error(err)
+					}
 					f := map[string]interface{}{
 						"RequestId":            fmt.Sprintf("%x", content.RequestId),
 						"LastSystemRandomness": fmt.Sprintf("%x", content.LastSystemRandomness),
@@ -518,6 +535,10 @@ func (d *DosNode) listen() (err error) {
 					continue
 				}
 				if d.isMember(content.DispatchedGroup) {
+					currentBlockNumber, err := d.chain.CurrentBlock()
+					if err != nil {
+						logger.Error(err)
+					}
 					startTime := time.Now()
 					fmt.Println("set up time ", startTime)
 					f := map[string]interface{}{
@@ -556,6 +577,10 @@ func (d *DosNode) listen() (err error) {
 					continue
 				}
 				if d.isMember(content.PubKey) {
+					currentBlockNumber, err := d.chain.CurrentBlock()
+					if err != nil {
+						logger.Error(err)
+					}
 					fmt.Println("EthLog : validationResult", content.TrafficType, content.Pass)
 					if content.TrafficType == onchain.TrafficUserQuery {
 						z := new(big.Int)
@@ -650,6 +675,10 @@ func (d *DosNode) listen() (err error) {
 					})
 				}
 			case msg := <-noworkinggroup:
+				currentBlockNumber, err := d.chain.CurrentBlock()
+				if err != nil {
+					logger.Error(err)
+				}
 				content, ok := msg.(*onchain.DOSProxyLogNoWorkingGroup)
 				if !ok {
 					e, ok := msg.(error)
