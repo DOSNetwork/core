@@ -29,9 +29,6 @@ type ProxyAdapter interface {
 	SignalGroupFormation(ctx context.Context) (errc <-chan error)
 	SignalDissolve(ctx context.Context, idx uint64) (errc <-chan error)
 
-	//For testing
-	BootStrap(rand uint64) (errc <-chan error)
-
 	SubscribeEvent(subscribeType int) (<-chan interface{}, <-chan error)
 	PollLogs(subscribeType int, LogBlockDiff, preBlockBuf uint64) (<-chan interface{}, <-chan error)
 

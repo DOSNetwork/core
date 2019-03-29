@@ -588,18 +588,6 @@ func (e *EthAdaptor) DataReturn(ctx context.Context, signatures <-chan *vss.Sign
 	return errc
 }
 
-func (e *EthAdaptor) BootStrap(rndSeed uint64) (errc <-chan error) {
-	ctx, _ := context.WithTimeout(context.Background(), 60*time.Second)
-	result := make(chan Reply)
-	x := new(big.Int)
-	x.SetUint64(rndSeed)
-	for i, proxy := range e.proxies {
-		request := &ReqSetInt{ctx, &proxy.TransactOpts, x, proxy.BootStrap, result}
-		errc = e.sendRequest(ctx, e.clients[i], errc, request, result)
-	}
-	return errc
-}
-
 func (e *EthAdaptor) SetGroupSize(ctx context.Context, size uint64) (errc <-chan error) {
 	defer logger.TimeTrack(time.Now(), "SetGroupSize", nil)
 	result := make(chan Reply)
@@ -826,9 +814,9 @@ func (e *EthAdaptor) SubscribeEvent(subscribeType int) (<-chan interface{}, <-ch
 		eventList = append(eventList, out)
 		errcs = append(errcs, errc)
 	}
-	out, errc := e.PollLogs(subscribeType, 0, 0)
-	eventList = append(eventList, out)
-	errcs = append(errcs, errc)
+	//out, errc := e.PollLogs(subscribeType, 0, 0)
+	//eventList = append(eventList, out)
+	//errcs = append(errcs, errc)
 	return e.firstEvent(e.ctx, MergeEvents(e.ctx, eventList...)), MergeErrors(e.ctx, errcs...)
 }
 

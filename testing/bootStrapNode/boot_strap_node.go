@@ -61,13 +61,13 @@ func main() {
 
 	var errcList []<-chan error
 	var eventList []<-chan interface{}
-	sink, errc := adaptor.PollLogs(onchain.SubscribeDOSProxyLogInsufficientPendingNode, 1, 0)
+	sink, errc := adaptor.SubscribeEvent(onchain.SubscribeDOSProxyLogInsufficientPendingNode)
 	eventList = append(eventList, sink)
 	errcList = append(errcList, errc)
-	sink, errc = adaptor.PollLogs(onchain.SubscribeDOSProxyLogInsufficientWorkingGroup, 1, 0)
+	sink, errc = adaptor.SubscribeEvent(onchain.SubscribeDOSProxyLogInsufficientWorkingGroup)
 	eventList = append(eventList, sink)
 	errcList = append(errcList, errc)
-	sink, errc = adaptor.PollLogs(onchain.SubscribeDOSProxyLogGroupingInitiated, 1, 0)
+	sink, errc = adaptor.SubscribeEvent(onchain.SubscribeDOSProxyLogGroupingInitiated)
 	eventList = append(eventList, sink)
 	errcList = append(errcList, errc)
 	errc = onchain.MergeErrors(ctx, errcList...)
@@ -92,9 +92,9 @@ func main() {
 				case *onchain.DOSProxyLogInsufficientPendingNode:
 					fmt.Println("BootStrap DOSProfxyLogInsufficientPendingNode  ", content.NumPendingNodes)
 				case *onchain.DOSProxyLogInsufficientWorkingGroup:
-					errc = adaptor.BootStrap(1)
-					e := <-errc
-					fmt.Println("BootStrap done ", e)
+					//errc = adaptor.BootStrap(1)
+					//e := <-errc
+					fmt.Println("DOSProxyLogInsufficientWorkingGroup")
 				case *onchain.DOSProxyLogGroupingInitiated:
 					fmt.Println("DOSProxyLogInsufficientWorkingGroup ", content.NumPendingNodes)
 					return
@@ -107,16 +107,16 @@ func main() {
 			}
 		}
 	}()
-	errc = adaptor.ResetContract()
-	e := <-errc
-	fmt.Println("ResetContract", e)
-	if e != nil {
-		return
-	}
-	errc = adaptor.SetGroupSize(ctx, uint64(config.GetRandomGroupSize()))
-	fmt.Println("SetGroupSize", <-errc)
-	errc = adaptor.SetGroupMaturityPeriod(ctx, uint64(80))
-	fmt.Println("SetGroupMaturityPeriod", <-errc)
+	//errc = adaptor.ResetContract()
+	//e := <-errc
+	//fmt.Println("ResetContract", e)
+	//if e != nil {
+	//	return
+	//}
+	//errc = adaptor.SetGroupSize(ctx, uint64(config.GetRandomGroupSize()))
+	//fmt.Println("SetGroupSize", <-errc)
+	//errc = adaptor.SetGroupMaturityPeriod(ctx, uint64(80))
+	//fmt.Println("SetGroupMaturityPeriod", <-errc)
 
 	//2)Build a p2p network
 	id = []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20}
