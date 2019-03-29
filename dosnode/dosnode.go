@@ -146,7 +146,6 @@ func NewDosNode(credentialPath, passphrase string) (dosNode *DosNode, err error)
 	if logger == nil {
 		logger = log.New("module", "dosclient")
 	}
-
 	dosNode = &DosNode{
 		suite:       suite,
 		p:           p,
@@ -159,8 +158,6 @@ func NewDosNode(credentialPath, passphrase string) (dosNode *DosNode, err error)
 	}
 	fmt.Println("dosNode.Start()")
 	err = dosNode.Start()
-	delay := 15 * rand.Intn(10)
-	time.Sleep(time.Duration(delay) * time.Second)
 	ctx, _ := context.WithCancel(context.Background())
 	errc := dosNode.chain.RegisterNewNode(ctx)
 	<-errc
@@ -696,7 +693,6 @@ func (d *DosNode) listen() (err error) {
 				logger.Event("DOS_NOWORKINGGROUP", f)
 			case <-d.done:
 				return
-			default:
 			}
 		}
 	}()
