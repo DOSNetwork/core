@@ -58,7 +58,7 @@ func NewAMAUserSession(credentialPath, passphrase, addr string, gethUrls []strin
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	defer cancelFunc()
-	clients := onchain.DialToEth(ctx, gethUrls)
+	clients := onchain.DialToEth(ctx, gethUrls, key)
 	//Use first client
 	c, ok := <-clients
 	if !ok {

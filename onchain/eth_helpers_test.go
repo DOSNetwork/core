@@ -23,7 +23,7 @@ func TestReadEthKey(t *testing.T) {
 func TestDialToEth(t *testing.T) {
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	defer cancelFunc()
-	clients := DialToEth(ctx, urls)
+	clients := DialToEth(ctx, urls, nil)
 	count := 0
 	for client := range clients {
 		id, err := client.NetworkID(ctx)
@@ -46,7 +46,7 @@ func TestCheckSync(t *testing.T) {
 	var mClient *ethclient.Client
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	defer cancelFunc()
-	clients := DialToEth(ctx, urls[:1])
+	clients := DialToEth(ctx, urls[:1], nil)
 	mClient = <-clients
 	id, err := mClient.NetworkID(ctx)
 	if err != nil {
@@ -56,7 +56,7 @@ func TestCheckSync(t *testing.T) {
 		t.Errorf("ID incorrect, got: %d, want: %d.", id.Uint64(), ID)
 	}
 
-	syncClients := CheckSync(context.Background(), mClient, DialToEth(context.Background(), urls[1:]))
+	syncClients := CheckSync(context.Background(), mClient, DialToEth(context.Background(), urls[1:], nil))
 	count := 0
 	for client := range syncClients {
 		id, err := client.NetworkID(ctx)
@@ -79,7 +79,7 @@ func TestDialToEthDeadline(t *testing.T) {
 	d := time.Now().Add(1 * time.Second)
 	ctx, cancelFunc := context.WithDeadline(context.Background(), d)
 	defer cancelFunc()
-	clients := DialToEth(ctx, urls)
+	clients := DialToEth(ctx, urls, nil)
 	time.Sleep(2 * time.Second)
 
 	for _ = range clients {
@@ -90,7 +90,7 @@ func TestDialToEthDeadline(t *testing.T) {
 func TestDialToEthErrHandling(t *testing.T) {
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	defer cancelFunc()
-	clients := DialToEth(ctx, urls)
+	clients := DialToEth(ctx, urls, nil)
 	time.Sleep(2 * time.Second)
 
 	count := 0

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
@@ -179,11 +180,12 @@ func NewEthAdaptor(credentialPath, passphrase, proxyAddr, commitRevealAddr strin
 		return
 	}
 	adaptor.key = key
-
+	debug.FreeOSMemory()
 	//Use account address as ID to init log module
 	log.Init(key.Address.Bytes()[:])
 	if logger == nil {
 		logger = log.New("module", "EthProxy")
+		fmt.Println("logger init EthProxy")
 	}
 
 	adaptor.ctx, adaptor.cancelFunc = context.WithCancel(context.Background())
@@ -192,10 +194,11 @@ func NewEthAdaptor(credentialPath, passphrase, proxyAddr, commitRevealAddr strin
 	adaptor.auth.Context = adaptor.ctx
 
 	//
-	clients := DialToEth(context.Background(), httpUrls)
+	clients := DialToEth(context.Background(), httpUrls, key)
 	for client := range clients {
 		p, e := dosproxy.NewDOSProxy(common.HexToAddress(proxyAddr), client)
 		if e != nil {
+			fmt.Println("NewDOSProxy e ", e)
 			logger.Error(e)
 			err = errors.New("No any working eth client")
 			continue
@@ -218,7 +221,7 @@ func NewEthAdaptor(credentialPath, passphrase, proxyAddr, commitRevealAddr strin
 	fmt.Println("working eth client ", len(adaptor.clients), "Balance ", adaptor.GetBalance())
 
 	adaptor.eCtx, adaptor.eCancelFunc = context.WithCancel(context.Background())
-	syncClients := CheckSync(adaptor.eCtx, adaptor.clients[0], DialToEth(context.Background(), wsUrls))
+	syncClients := CheckSync(adaptor.eCtx, adaptor.clients[0], DialToEth(context.Background(), wsUrls, key))
 	for client := range syncClients {
 		fmt.Println("syncClients")
 		p, err := dosproxy.NewDOSProxy(common.HexToAddress(proxyAddr), client)
@@ -445,8 +448,8 @@ func (e *EthAdaptor) sendRequest(ctx context.Context, c *ethclient.Client, pre <
 }
 
 func (e *EthAdaptor) RegisterNewNode(ctx context.Context) (errc <-chan error) {
-	fmt.Println("RegisterNewNode")
 	defer logger.TimeTrack(time.Now(), "RegisterNewNode", nil)
+
 	result := make(chan Reply)
 	for i, proxy := range e.proxies {
 		request := &Request{ctx, &proxy.TransactOpts, proxy.RegisterNewNode, result}

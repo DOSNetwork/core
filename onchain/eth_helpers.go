@@ -94,7 +94,7 @@ func ReadEthKey(credentialPath, passphrase string) (key *keystore.Key, err error
 	return
 }
 
-func DialToEth(ctx context.Context, urlPool []string) (out chan *ethclient.Client) {
+func DialToEth(ctx context.Context, urlPool []string, key *keystore.Key) (out chan *ethclient.Client) {
 	out = make(chan *ethclient.Client)
 	var wg sync.WaitGroup
 	connTemp := 1
@@ -108,6 +108,24 @@ func DialToEth(ctx context.Context, urlPool []string) (out chan *ethclient.Clien
 			client, e = ethclient.Dial(url)
 			connTemp++
 			time.Sleep(time.Second * time.Duration(REDIALINTERVAL))
+		}
+		retry := 10
+		if key != nil {
+			//Read balance to make sure client is working
+			for {
+				b := GetBalance(client, key)
+				if b != nil {
+					fmt.Println("balance ", b)
+
+					break
+				}
+				if retry == 0 {
+					return
+				}
+				retry--
+				time.Sleep(15 * time.Second)
+				fmt.Println("Retry to get balance")
+			}
 		}
 		if e != nil {
 			return
