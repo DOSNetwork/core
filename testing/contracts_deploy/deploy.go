@@ -17,8 +17,8 @@ import (
 	"github.com/DOSNetwork/core/configuration"
 	"github.com/DOSNetwork/core/onchain"
 	"github.com/DOSNetwork/core/onchain/dosbridge"
+	"github.com/DOSNetwork/core/onchain/doscommitreveal"
 	"github.com/DOSNetwork/core/onchain/dosproxy"
-
 	"github.com/DOSNetwork/core/testing/dosUser/contract"
 	"github.com/DOSNetwork/core/testing/dosUser/eth"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -30,9 +30,8 @@ import (
 )
 
 const (
-	DOSAddressBridge = iota
-	DOSProxy
-	AMA
+	ProxyAddressType = iota
+	CommitRevealAddressType
 )
 
 func between(value string, a string, b string) string {
@@ -52,8 +51,8 @@ func between(value string, a string, b string) string {
 	return value[posFirstAdjusted:posLast]
 }
 
-func updateSDK(path string, updated string) error {
-	path = path + "/DOSOnChainSDK.sol"
+func updateBridgeAddr(path string, updated string) error {
+	//path = path + "/DOSOnChainSDK.sol"
 	f, err := os.Open(path)
 	if err != nil {
 		fmt.Println(err)
@@ -82,7 +81,7 @@ func updateSDK(path string, updated string) error {
 	return nil
 }
 
-func updateBridge(client *ethclient.Client, key *keystore.Key, bridgeAddress, proxyAddress common.Address) (err error) {
+func updateBridge(client *ethclient.Client, key *keystore.Key, bridgeAddress common.Address, targetType int, target common.Address) (err error) {
 	var auth *bind.TransactOpts
 	fmt.Println("start to update proxy address to bridge...")
 	auth = bind.NewKeyedTransactor(key.PrivateKey)
@@ -92,13 +91,26 @@ func updateBridge(client *ethclient.Client, key *keystore.Key, bridgeAddress, pr
 	if err != nil {
 		return
 	}
-
-	tx, err := bridge.SetProxyAddress(auth, proxyAddress)
-	for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
-		fmt.Println(err)
-		time.Sleep(time.Second)
-		fmt.Println("transaction retry...")
-		tx, err = bridge.SetProxyAddress(auth, proxyAddress)
+	var tx *types.Transaction
+	switch targetType {
+	case ProxyAddressType:
+		tx, err = bridge.SetProxyAddress(auth, target)
+		for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
+			fmt.Println(err)
+			time.Sleep(time.Second)
+			fmt.Println("transaction retry...")
+			tx, err = bridge.SetProxyAddress(auth, target)
+		}
+	case CommitRevealAddressType:
+		tx, err = bridge.SetCommitRevealAddress(auth, target)
+		for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
+			fmt.Println(err)
+			time.Sleep(time.Second)
+			fmt.Println("transaction retry...")
+			tx, err = bridge.SetCommitRevealAddress(auth, target)
+		}
+	default:
+		return
 	}
 	if err != nil {
 		return
@@ -115,14 +127,13 @@ func updateBridge(client *ethclient.Client, key *keystore.Key, bridgeAddress, pr
 	return
 }
 
-func deployContract(client *ethclient.Client, key *keystore.Key, contractName int) string {
+func deployContract(targetTask, configPath string, config configuration.Config, chainConfig configuration.ChainConfig, client *ethclient.Client, key *keystore.Key) {
 	var tx *types.Transaction
 	var address common.Address
 	auth := bind.NewKeyedTransactor(key.PrivateKey)
 	auth.GasLimit = uint64(5000000)
 	var err error
-	switch contractName {
-	case DOSAddressBridge:
+	if targetTask == "deployBridge" {
 		fmt.Println("Starting deploy DOSAddressBridge.sol...")
 		address, tx, _, err = dosbridge.DeployDOSAddressBridge(auth, client)
 		for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
@@ -131,7 +142,38 @@ func deployContract(client *ethclient.Client, key *keystore.Key, contractName in
 			fmt.Println("transaction retry...")
 			address, tx, _, err = dosbridge.DeployDOSAddressBridge(auth, client)
 		}
-	case DOSProxy:
+		fmt.Println("contract Address: ", address.Hex())
+		fmt.Println("tx sent: ", tx.Hash().Hex())
+		fmt.Println("contract deployed, waiting for confirmation...")
+		err = onchain.CheckTransaction(client, tx)
+		if err != nil {
+			fmt.Println(err)
+		}
+		chainConfig.DOSAddressBridgeAddress = address.Hex()
+		if err := config.UpdateConfig(chainConfig); err != nil {
+			log.Fatal(err)
+		}
+	} else if targetTask == "deployCommitReveal" {
+		fmt.Println("Starting deploy CommitReveal.sol...")
+		address, tx, _, err = doscommitreveal.DeployDOSCommitReveal(auth, client)
+		for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
+			fmt.Println(err)
+			time.Sleep(time.Second)
+			fmt.Println("transaction retry...")
+			address, tx, _, err = doscommitreveal.DeployDOSCommitReveal(auth, client)
+		}
+		fmt.Println("contract Address: ", address.Hex())
+		fmt.Println("tx sent: ", tx.Hash().Hex())
+		fmt.Println("contract deployed, waiting for confirmation...")
+		err = onchain.CheckTransaction(client, tx)
+		if err != nil {
+			fmt.Println(err)
+		}
+		chainConfig.DOSCommitReveal = address.Hex()
+		if err := config.UpdateConfig(chainConfig); err != nil {
+			log.Fatal(err)
+		}
+	} else if targetTask == "deployProxy" {
 		fmt.Println("Starting deploy DOSProxy.sol...")
 		address, tx, _, err = dosproxy.DeployDOSProxy(auth, client)
 		for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
@@ -140,42 +182,72 @@ func deployContract(client *ethclient.Client, key *keystore.Key, contractName in
 			fmt.Println("transaction retry...")
 			address, tx, _, err = dosproxy.DeployDOSProxy(auth, client)
 		}
-	case AMA:
-		fmt.Println("Starting deploy AskMeAnyThing.sol...")
-		address, tx, _, err = dosUser.DeployAskMeAnything(auth, client)
-		for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
+		fmt.Println("contract Address: ", address.Hex())
+		fmt.Println("tx sent: ", tx.Hash().Hex())
+		fmt.Println("contract deployed, waiting for confirmation...")
+		err = onchain.CheckTransaction(client, tx)
+		if err != nil {
 			fmt.Println(err)
-			time.Sleep(time.Second)
-			fmt.Println("transaction retry...")
+		}
+		chainConfig.DOSProxyAddress = address.Hex()
+		if err := config.UpdateConfig(chainConfig); err != nil {
+			log.Fatal(err)
+		}
+		bridgeAddress := common.HexToAddress(chainConfig.DOSAddressBridgeAddress)
+		proxyAddress := common.HexToAddress(chainConfig.DOSProxyAddress)
+		err := updateBridge(client, key, bridgeAddress, ProxyAddressType, proxyAddress)
+		if err != nil {
+			log.Fatal(err)
+		}
+	} else if targetTask == "deployAMA" {
+		fmt.Println("Starting deploy AskMeAnyThing.sol...")
+		amaConfig := eth.AMAConfig{}
+		amaCount := os.Getenv("AMACOUNT")
+		if amaCount == "" {
+			fmt.Println("No AMACOUNT Environment variable.")
+			amaCount = "1"
+		}
+		count, err := strconv.Atoi(amaCount)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+
+		var amaAdd []string
+		for i := 0; i < count; i++ {
 			address, tx, _, err = dosUser.DeployAskMeAnything(auth, client)
+			for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
+				fmt.Println(err)
+				time.Sleep(time.Second)
+				fmt.Println("transaction retry...")
+				address, tx, _, err = dosUser.DeployAskMeAnything(auth, client)
+			}
+			fmt.Println("contract Address: ", address.Hex())
+			fmt.Println("tx sent: ", tx.Hash().Hex())
+			fmt.Println("contract deployed, waiting for confirmation...")
+			err = onchain.CheckTransaction(client, tx)
+			if err != nil {
+				fmt.Println(err)
+			}
+			amaAdd = append(amaAdd, address.Hex())
+		}
+		amaConfig.AskMeAnythingAddressPool = amaAdd
+		if err := configuration.UpdateConfig(configPath, amaConfig); err != nil {
+			log.Fatal(err)
 		}
 	}
-	if err != nil {
-		fmt.Println(err)
-		return ""
-	}
-
-	fmt.Println("contract Address: ", address.Hex())
-	fmt.Println("tx sent: ", tx.Hash().Hex())
-	fmt.Println("contract deployed, waiting for confirmation...")
-
-	err = onchain.CheckTransaction(client, tx)
-	if err != nil {
-		fmt.Println(err)
-	}
-	return address.Hex()
 }
 
 func main() {
 	credentialPathPtr := flag.String("credentialPath", "./testAccounts/bootCredential/fundKey", "credential path")
 	contractPathPtr := flag.String("contractPath", "./contracts", "Contract file path")
-	contractPtr := flag.String("contract", "DOSProxy", "DOSProxy or AMA or SimpleDice")
+	targetPtr := flag.String("target", "DOSProxy", "DOSProxy or AMA or SimpleDice")
 	configPathPtr := flag.String("configPath", "", "config path")
 
 	flag.Parse()
 	credentialPath := *credentialPathPtr
 	contractPath := *contractPathPtr
-	contract := *contractPtr
+	target := *targetPtr
 	configPath := *configPathPtr
 
 	if err := os.Setenv("CONFIGPATH", ".."); err != nil {
@@ -191,6 +263,19 @@ func main() {
 	fmt.Println("Use : ", chainConfig)
 	fmt.Println(" address ", chainConfig.RemoteNodeAddressPool[0])
 
+	if target == "updateBridgeAddrToOtherContract" {
+		if err := updateBridgeAddr(contractPath+"/DOSOnChainSDK.sol", chainConfig.DOSAddressBridgeAddress); err != nil {
+			log.Fatal(err)
+		}
+		if err := updateBridgeAddr(contractPath+"/DOSProxy.sol", chainConfig.DOSAddressBridgeAddress); err != nil {
+			log.Fatal(err)
+		}
+		if err := updateBridgeAddr(contractPath+"/DOSCommitReveal.sol", chainConfig.DOSAddressBridgeAddress); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
+
 	fmt.Print("Enter Password: ")
 	bytePassword, err := terminal.ReadPassword(0)
 	if err == nil {
@@ -205,7 +290,7 @@ func main() {
 		return
 	}
 
-	clients := onchain.DialToEth(context.Background(), chainConfig.RemoteNodeAddressPool[:1])
+	clients := onchain.DialToEth(context.Background(), chainConfig.RemoteNodeAddressPool[:1], key)
 
 	//Use first client
 	c, ok := <-clients
@@ -213,44 +298,25 @@ func main() {
 		err = errors.New("No any working eth client")
 		return
 	}
-
-	if contract == "DOSProxy" {
-		chainConfig.DOSProxyAddress = deployContract(c, key, DOSProxy)
-		chainConfig.DOSAddressBridgeAddress = deployContract(c, key, DOSAddressBridge)
-		if err := config.UpdateConfig(chainConfig); err != nil {
+	if target == "all" {
+		deployContract("deployBridge", configPath, config, chainConfig, c, key)
+		if err := config.LoadConfig(); err != nil {
 			log.Fatal(err)
 		}
-
-		if err := updateSDK(contractPath, chainConfig.DOSAddressBridgeAddress); err != nil {
+		chainConfig = config.GetChainConfig()
+		deployContract("updateBridgeAddrToOtherContract", configPath, config, chainConfig, c, key)
+		deployContract("deployProxy", configPath, config, chainConfig, c, key)
+		if err := config.LoadConfig(); err != nil {
 			log.Fatal(err)
 		}
-
-		bridgeAddress := common.HexToAddress(chainConfig.DOSAddressBridgeAddress)
-		proxyAddress := common.HexToAddress(chainConfig.DOSProxyAddress)
-		err := updateBridge(c, key, bridgeAddress, proxyAddress)
-		if err != nil {
+		chainConfig = config.GetChainConfig()
+		deployContract("deployCommitReveal", configPath, config, chainConfig, c, key)
+		if err := config.LoadConfig(); err != nil {
 			log.Fatal(err)
 		}
-	} else if contract == "AMA" {
-		amaConfig := eth.AMAConfig{}
-		amaCount := os.Getenv("AMACOUNT")
-		if amaCount == "" {
-			fmt.Println("No AMACOUNT Environment variable.")
-			amaCount = "1"
-		}
-		count, err := strconv.Atoi(amaCount)
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-
-		var amaAdd []string
-		for i := 0; i < count; i++ {
-			amaAdd = append(amaAdd, deployContract(c, key, AMA))
-		}
-		amaConfig.AskMeAnythingAddressPool = amaAdd
-		if err := configuration.UpdateConfig(configPath, amaConfig); err != nil {
-			log.Fatal(err)
-		}
+		chainConfig = config.GetChainConfig()
+		deployContract("deployAMA", configPath, config, chainConfig, c, key)
+		return
 	}
+	deployContract(target, configPath, config, chainConfig, c, key)
 }
