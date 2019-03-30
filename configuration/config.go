@@ -37,6 +37,7 @@ type Config struct {
 type ChainConfig struct {
 	DOSProxyAddress         string
 	DOSAddressBridgeAddress string
+	DOSCommitReveal         string
 	RemoteNodeAddressPool   []string
 }
 
