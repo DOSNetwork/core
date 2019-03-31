@@ -8,6 +8,7 @@
 DOSPROXY_PATH := onchain/eth/contracts/DOSProxy.sol
 DOSPROXY_GOPATH := onchain/dosproxy
 DOSBRIDGE_GOPATH := onchain/dosbridge
+DOSCOMMITREVEAL_GOPATH := onchain/doscommitreveal
 TEST_CONTRACTS_GOPATH := testing/dosUser/contract
 GENERATED_FILES := $(shell find $(DOSPROXY_GOPATH) $(DOSBRIDGE_GOPATH) $(TEST_CONTRACTS_GOPATH) -name '*.go')
 ETH_CONTRACTS := onchain/eth/contracts
@@ -34,6 +35,7 @@ updateSubmodule:
 gen: updateSubmodule
 	abigen -sol $(ETH_CONTRACTS)/DOSAddressBridge.sol --pkg dosbridge --out $(DOSBRIDGE_GOPATH)/DOSAddressBridge.go
 	abigen -sol $(ETH_CONTRACTS)/DOSProxy.sol --pkg dosproxy --out $(DOSPROXY_GOPATH)/DOSProxy.go
+	abigen -sol $(ETH_CONTRACTS)/DOSCommitReveal.sol --pkg doscommitreveal --out $(DOSCOMMITREVEAL_GOPATH)/DOSCommitReveal.go
 
 clean:
 	rm -f client
