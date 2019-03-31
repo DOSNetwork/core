@@ -173,6 +173,12 @@ func deployContract(targetTask, configPath string, config configuration.Config, 
 		if err := config.UpdateConfig(chainConfig); err != nil {
 			log.Fatal(err)
 		}
+		bridgeAddress := common.HexToAddress(chainConfig.DOSAddressBridgeAddress)
+		crAddress := common.HexToAddress(chainConfig.DOSCommitReveal)
+		err := updateBridge(client, key, bridgeAddress, CommitRevealAddressType, crAddress)
+		if err != nil {
+			log.Fatal(err)
+		}
 	} else if targetTask == "deployProxy" {
 		fmt.Println("Starting deploy DOSProxy.sol...")
 		address, tx, _, err = dosproxy.DeployDOSProxy(auth, client)
@@ -275,14 +281,15 @@ func main() {
 		}
 		return
 	}
-
-	fmt.Print("Enter Password: ")
-	bytePassword, err := terminal.ReadPassword(0)
-	if err == nil {
-		fmt.Println("\nPassword typed: ***\n")
+	password := os.Getenv("PASSPHRASE")
+	for password == "" {
+		fmt.Print("Enter Password: ")
+		bytePassword, err := terminal.ReadPassword(0)
+		if err == nil {
+			fmt.Println("\nPassword typed: ***\n")
+		}
+		password = strings.TrimSpace(string(bytePassword))
 	}
-	password := strings.TrimSpace(string(bytePassword))
-
 	//Dial to blockchain
 	key, err := onchain.ReadEthKey(credentialPath, password)
 	if err != nil {
@@ -298,25 +305,6 @@ func main() {
 		err = errors.New("No any working eth client")
 		return
 	}
-	if target == "all" {
-		deployContract("deployBridge", configPath, config, chainConfig, c, key)
-		if err := config.LoadConfig(); err != nil {
-			log.Fatal(err)
-		}
-		chainConfig = config.GetChainConfig()
-		deployContract("updateBridgeAddrToOtherContract", configPath, config, chainConfig, c, key)
-		deployContract("deployProxy", configPath, config, chainConfig, c, key)
-		if err := config.LoadConfig(); err != nil {
-			log.Fatal(err)
-		}
-		chainConfig = config.GetChainConfig()
-		deployContract("deployCommitReveal", configPath, config, chainConfig, c, key)
-		if err := config.LoadConfig(); err != nil {
-			log.Fatal(err)
-		}
-		chainConfig = config.GetChainConfig()
-		deployContract("deployAMA", configPath, config, chainConfig, c, key)
-		return
-	}
+
 	deployContract(target, configPath, config, chainConfig, c, key)
 }
