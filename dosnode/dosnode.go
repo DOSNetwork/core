@@ -24,8 +24,8 @@ import (
 )
 
 const (
-	WATCHDOGINTERVAL = 9999999 //In minutes
-	SYSRANDOMNTERVAL = 5       //In block numbers
+	WATCHDOGINTERVAL = 20 //In minutes
+	SYSRANDOMNTERVAL = 5  //In block numbers
 )
 
 var logger log.Logger
@@ -129,12 +129,13 @@ func NewDosNode(credentialPath, passphrase string) (dosNode *DosNode, err error)
 	}
 
 	//Bootstrapping p2p network
-	if role != "BootstrapNode" {
-		err = p.Join([]string{bootstrapIp})
-		if err != nil {
-			return
-		}
+	//	if role != "BootstrapNode" {
+	fmt.Println("role ", role)
+	err = p.Join([]string{bootstrapIp})
+	if err != nil {
+		return
 	}
+	//	}
 
 	//Build a p2pDKG
 	suite := suites.MustFind("bn256")
@@ -285,9 +286,9 @@ func (d *DosNode) listen() (err error) {
 	keyUploaded := make(chan interface{})
 
 	var errcList []<-chan error
-	eventGrouping, errc := d.chain.PollLogs(onchain.SubscribeDOSProxyLogGrouping, 10, 0)
+	eventGrouping, errc := d.chain.PollLogs(onchain.SubscribeDOSProxyLogGrouping, 5, 0)
 	errcList = append(errcList, errc)
-	eventGroupDismiss, errc := d.chain.PollLogs(onchain.SubscribeDOSProxyLogGroupDismiss, 10, 0)
+	eventGroupDismiss, errc := d.chain.PollLogs(onchain.SubscribeDOSProxyLogGroupDismiss, 30, 0)
 	errcList = append(errcList, errc)
 
 	chUrl, errc := d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogUrl)
@@ -302,6 +303,8 @@ func (d *DosNode) listen() (err error) {
 	errcList = append(errcList, errc)
 	noworkinggroup, errc := d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogNoWorkingGroup)
 	errcList = append(errcList, errc)
+	//chInsufficientWG, errc := d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogInsufficientWorkingGroup)
+	//errcList = append(errcList, errc)
 
 	peerEvent, err := d.p.SubscribeEvent(50, vss.Signature{})
 	errcList = append(errcList, errc)
@@ -327,6 +330,7 @@ func (d *DosNode) listen() (err error) {
 					TODO: otherwise possibly closed errc will keep consuming "select",
 				*/
 			case <-watchdog.C:
+				fmt.Println("watchdog")
 				ids := d.dkg.GetAnyGroupIDs()
 				if len(ids) != 0 {
 					currentBlockNumber, err := d.chain.CurrentBlock()
@@ -342,6 +346,27 @@ func (d *DosNode) listen() (err error) {
 					if diff > SYSRANDOMNTERVAL {
 						ctx, _ := context.WithCancel(context.Background())
 						d.chain.SignalRandom(ctx)
+					}
+				}
+				workingGroup, err := d.chain.GetWorkingGroupSize()
+				if err != nil {
+					continue
+				}
+				groupToPick, err := d.chain.GetGroupToPick()
+				if err != nil {
+
+					continue
+				}
+
+				if workingGroup < groupToPick {
+					commitRevealState, err := d.chain.CommitRevealState()
+					if err != nil {
+
+						continue
+					}
+
+					if commitRevealState == 0 {
+						d.chain.SignalGroupFormation(context.Background())
 					}
 				}
 			case requestID := <-d.cPipCancel:
