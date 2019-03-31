@@ -92,11 +92,15 @@ func (d *P2PDkg) Start(ctx context.Context, groupIds [][]byte, sessionId string)
 		ctx:            ctx,
 		errc:           make(chan error),
 	}
+	d.logger.Event("DKGStart", nil)
 	for i := 0; i < len(groupIds); i++ {
 		start := time.Now()
 		if !bytes.Equal((*d.network).GetID(), groupIds[i]) {
 			retry := 0
 			for {
+				if retry >= 10 {
+					break
+				}
 				if _, err := (*d.network).ConnectTo("", groupIds[i]); err != nil {
 					fmt.Println("ConnectTo done retry=", retry, err)
 					retry++
@@ -105,7 +109,19 @@ func (d *P2PDkg) Start(ctx context.Context, groupIds [][]byte, sessionId string)
 					break
 				}
 			}
-			fmt.Println("ConnectTo done retry=", retry, time.Since(start).Nanoseconds()/1000)
+
+			f := map[string]interface{}{
+				"SessionID": sessionId,
+				"retry":     retry,
+				"costTime":  time.Since(start).Nanoseconds() / 1000,
+				"From":      (*d.network).GetID(),
+				"To":        groupIds[i],
+				"Time":      time.Now()}
+			if retry >= 10 {
+				d.logger.Event("DKGConnectToSuccess", f)
+			} else {
+				d.logger.Event("DKGConnectToFaile", f)
+			}
 		}
 	}
 	go func() {
@@ -337,6 +353,7 @@ func (d *P2PDkg) pipeExchangePubKey(newSession *DkgSession, outToEventloop chan<
 
 		defer close(errc)
 		defer close(out)
+		d.logger.Event("pipeExchangePubKey", nil)
 		newSession.pubkeyIdMap = make(map[string]string)
 		newSession.pubkeyIdMap[newSession.partPub.String()] = string(d.groupId)
 		newSession.pubKeys = append(newSession.pubKeys, newSession.partPub)
