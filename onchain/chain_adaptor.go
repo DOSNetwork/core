@@ -33,12 +33,14 @@ type ProxyAdapter interface {
 	PollLogs(subscribeType int, LogBlockDiff, preBlockBuf uint64) (<-chan interface{}, <-chan error)
 
 	GetWorkingGroupSize() (size uint64, err error)
+	GetGroupToPick() (size uint64, err error)
 	LastUpdatedBlock() (blknum uint64, err error)
 	GetBalance() (balance *big.Float)
 	Address() (addr []byte)
 	CurrentBlock() (blknum uint64, err error)
 	PendingNonce() (nonce uint64, err error)
 	GroupPubKey(idx int) (groupPubKeys [4]*big.Int, err error)
+	CommitRevealState() (state uint8, err error)
 }
 
 func NewProxyAdapter(ChainType, credentialPath, passphrase, proxyAddr string, urls []string) (ProxyAdapter, error) {

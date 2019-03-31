@@ -47,6 +47,8 @@ const (
 	WorkingGroupSize
 	LastUpdatedBlock
 	PendingNonce
+	GroupToPick
+	CommitRevealState
 )
 
 // TODO: Move constants to some unified places.
@@ -415,8 +417,6 @@ func (e *EthAdaptor) sendRequest(ctx context.Context, c *ethclient.Client, pre <
 						continue
 					}
 				}
-				defer logger.TimeTrack(time.Now(), "SendRequest", map[string]interface{}{"RequestId": ctx.Value("RequestID"), "Tx": fmt.Sprintf("%x", tx.Hash())})
-				fmt.Println("Tx", fmt.Sprintf("%x", tx.Hash()))
 				//TODO : move this out of sendRequest
 				err = CheckTransaction(c, tx)
 				if err != nil {
@@ -1485,9 +1485,19 @@ func proxyGet(proxy *dosproxy.DOSProxySession, vType int) chan interface{} {
 			val, err = proxy.LastRandomness()
 		case WorkingGroupSize:
 			val, err = proxy.GetWorkingGroupSize()
+		case GroupToPick:
+			val, err = proxy.GroupToPick()
 		case LastUpdatedBlock:
 			val, err = proxy.LastUpdatedBlock()
 			fmt.Println("LastUpdatedBlock ", val, err)
+		case CommitRevealState:
+			var val uint8
+			val, err = proxy.CommitRevealState()
+			if err != nil {
+				logger.Error(err)
+				return
+			}
+			out <- val
 		}
 		if err != nil {
 			logger.Error(err)
@@ -1525,6 +1535,47 @@ func (e *EthAdaptor) GetWorkingGroupSize() (size uint64, err error) {
 	var valList []chan interface{}
 	for _, proxy := range e.proxies {
 		valList = append(valList, proxyGet(proxy, WorkingGroupSize))
+	}
+	out := first(ctx, merge(ctx, valList...))
+	select {
+	case val := <-out:
+		sizeBig, ok := val.(*big.Int)
+		if !ok {
+			err = errors.New("type error")
+		}
+		size = sizeBig.Uint64()
+	case <-ctx.Done():
+		err = errors.New("Timeout")
+	}
+	return
+}
+
+func (e *EthAdaptor) CommitRevealState() (state uint8, err error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	var valList []chan interface{}
+	for _, proxy := range e.proxies {
+		valList = append(valList, proxyGet(proxy, CommitRevealState))
+	}
+	out := first(ctx, merge(ctx, valList...))
+	select {
+	case val := <-out:
+		s, ok := val.(uint8)
+		if !ok {
+			err = errors.New("type error")
+		}
+		state = s
+	case <-ctx.Done():
+		err = errors.New("Timeout")
+	}
+	return
+}
+func (e *EthAdaptor) GetGroupToPick() (size uint64, err error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	var valList []chan interface{}
+	for _, proxy := range e.proxies {
+		valList = append(valList, proxyGet(proxy, GroupToPick))
 	}
 	out := first(ctx, merge(ctx, valList...))
 	select {
