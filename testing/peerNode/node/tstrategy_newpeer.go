@@ -218,10 +218,11 @@ func (r test4) StartTest(d *PeerNode) {
 
 	var succ bool
 
+	var group [][]byte
 	for idx, id := range d.nodeIDs {
 		if bytes.Compare(d.p.GetID(), id) == 0 {
 			start := idx / groupSize * groupSize
-			group := d.nodeIDs[start : start+groupSize]
+			group = d.nodeIDs[start : start+groupSize]
 			dkgEvent, errChan := p2pDkg.Start(context.Background(), group, fmt.Sprintf("%x", group))
 			go func() {
 				for err := range errChan {
@@ -252,30 +253,49 @@ func (r test4) StartTest(d *PeerNode) {
 		Content:   rawMsg,
 		Signature: sig,
 	}
-	signatures = append(signatures, sig)
-	for _, id := range d.nodeIDs {
+
+	peerEvent, err := d.p.SubscribeEvent(100, vss.Signature{})
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	groupPeers := make(map[string][]byte)
+	for _, id := range group {
 		if bytes.Compare(d.p.GetID(), id) != 0 {
-			if _, err = d.p.Request(id, sign); err != nil {
-				fmt.Println(err)
-			}
+			groupPeers[string(id)] = id
 		}
 	}
-	for sig := range d.tblsChan {
-		signatures = append(signatures, sig.Signature)
-		if len(signatures) > groupSize/2 {
-			finalSig, err := tbls.Recover(suite, p2pDkg.GetGroupPublicPoly(pubKey), sig.Content, signatures, groupSize/2+1, groupSize)
-			if err != nil {
-				fmt.Println(err)
-				continue
+
+	go func() {
+		for len(groupPeers) > 0 {
+			for key, id := range groupPeers {
+				if msg, err := d.p.Request(id, &vss.Signature{}); err == nil {
+					delete(groupPeers, key)
+					sigMsg := msg.Msg.Message.(*vss.Signature)
+					signatures = append(signatures, sigMsg.Signature)
+					if len(signatures) > groupSize/2 {
+						finalSig, err := tbls.Recover(suite, p2pDkg.GetGroupPublicPoly(pubKey), sigMsg.Content, signatures, groupSize/2+1, groupSize)
+						if err != nil {
+							fmt.Println(err)
+							continue
+						}
+						if err = bls.Verify(suite, p2pDkg.GetGroupPublicPoly(pubKey).Commit(), sigMsg.Content, finalSig); err != nil {
+							fmt.Println(err)
+							continue
+						} else {
+							fmt.Println("TBLS SUCCESS!!!")
+							d.FinishTest()
+							break
+						}
+					}
+				}
 			}
-			if err = bls.Verify(suite, p2pDkg.GetGroupPublicPoly(pubKey).Commit(), sig.Content, finalSig); err != nil {
-				fmt.Println(err)
-				continue
-			} else {
-				fmt.Println("TBLS SUCCESS!!!")
-				d.FinishTest()
-				break
-			}
+		}
+	}()
+
+	for msg := range peerEvent {
+		if err = d.p.Reply(msg.Sender, msg.RequestNonce, sign); err != nil {
+			fmt.Println(err)
 		}
 	}
 }
@@ -344,7 +364,8 @@ func (r test5) StartTest(d *PeerNode) {
 			break
 		} else {
 			roundCount++
-			rand.Shuffle(len(d.nodeIDs), func(i, j int) {
+			rdm := rand.New(rand.NewSource(0))
+			rdm.Shuffle(len(d.nodeIDs), func(i, j int) {
 				d.nodeIDs[i], d.nodeIDs[j] = d.nodeIDs[j], d.nodeIDs[i]
 			})
 		}
