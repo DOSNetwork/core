@@ -2,9 +2,11 @@ package p2p
 
 import (
 	"context"
-	"errors"
+	//	"errors"
 	"fmt"
+	"io/ioutil"
 	"net"
+	"net/http"
 
 	"github.com/DOSNetwork/core/log"
 	"github.com/DOSNetwork/core/p2p/network"
@@ -52,20 +54,35 @@ func CreateP2PNetwork(id []byte, port string, netType int) (P2PInterface, error)
 }
 
 func GetLocalIP() (ip net.IP, err error) {
-	var addrs []net.Addr
-
-	if addrs, err = net.InterfaceAddrs(); err != nil {
-		return nil, err
+	//FOR DOCKER AWS TESTING
+	response, err := http.Get("http://ipconfig.me")
+	if err != nil {
+		return
 	}
 
-	for _, a := range addrs {
-		if ipnet, ok := a.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
-			if ipnet.IP.To4() != nil {
-				return ipnet.IP, nil
-			}
+	ipBytes, err := ioutil.ReadAll(response.Body)
+	if err != nil {
+		return
+	}
+	ipString := string(ipBytes)
+	ip = net.ParseIP(ipString)
+	//fmt.Println(ip)
+	//////////////////////////////
+	/*
+		var addrs []net.Addr
+
+		if addrs, err = net.InterfaceAddrs(); err != nil {
+			return nil, err
 		}
-	}
-	return nil, errors.New("IP not found")
+
+		for _, a := range addrs {
+			if ipnet, ok := a.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
+				if ipnet.IP.To4() != nil {
+					return ipnet.IP, nil
+				}
+			}
+		}*/
+	return
 }
 
 type P2PMessage struct {
