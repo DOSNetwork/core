@@ -60,6 +60,7 @@ func runDos(credentialPath, passphrase string) {
 
 	}()
 	mux := http.NewServeMux()
+
 	dosclient, err := dosnode.NewDosNode(credentialPath, passphrase)
 	if err != nil {
 		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -93,14 +94,14 @@ func makeRequest(f string, args []byte) ([]byte, error) {
 // main
 func main() {
 	if len(os.Args) > 1 && strings.ToLower(os.Args[1]) == "run" {
-		path := ""
-		pass := ""
-		if len(os.Args) > 3 {
-			path = strings.ToLower(os.Args[2])
-			pass = strings.ToLower(os.Args[3])
+		password := os.Getenv("PASSPHRASE")
+		for password == "" {
+			fmt.Print("Enter Password: ")
+			bytePassword, _ := terminal.ReadPassword(0)
+			password = strings.TrimSpace(string(bytePassword))
 		}
-		fmt.Println(path, pass)
-		runDos(path, pass)
+
+		runDos("", password)
 	}
 
 	app := cli.NewApp()
@@ -124,20 +125,19 @@ func main() {
 				},
 			},
 			Action: func(c *cli.Context) error {
-				password := c.String("credential.passphrase")
-				fmt.Println(password)
-				for password == "" {
-					fmt.Print("Enter Password: ")
-					bytePassword, _ := terminal.ReadPassword(0)
-					password = strings.TrimSpace(string(bytePassword))
-				}
-
 				// check if daemon already running.
 				if _, err := os.Stat(PIDFile); err == nil {
 					fmt.Println("Already running or /tmp/dosclient.pid file exist.")
 					os.Exit(1)
 				}
-				cmd := exec.Command(os.Args[0], "run", "", password)
+				password := os.Getenv("PASSPHRASE")
+				for password == "" {
+					fmt.Print("Enter Password: ")
+					bytePassword, _ := terminal.ReadPassword(0)
+					password = strings.TrimSpace(string(bytePassword))
+				}
+				os.Setenv("PASSPHRASE", password)
+				cmd := exec.Command(os.Args[0], "run")
 				cmd.Start()
 				//runDos(c.String("credential.path"), password)
 				savePID(cmd.Process.Pid)
