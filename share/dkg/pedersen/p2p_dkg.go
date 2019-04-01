@@ -104,7 +104,7 @@ func (d *P2PDkg) Start(ctx context.Context, groupIds [][]byte, sessionId string)
 				if _, err := (*d.network).ConnectTo("", groupIds[i]); err != nil {
 					fmt.Println("ConnectTo done retry=", retry, err)
 					retry++
-
+					time.Sleep(1 * time.Second)
 				} else {
 					break
 				}
@@ -118,9 +118,9 @@ func (d *P2PDkg) Start(ctx context.Context, groupIds [][]byte, sessionId string)
 				"To":        groupIds[i],
 				"Time":      time.Now()}
 			if retry >= 10 {
-				d.logger.Event("DKGConnectToSuccess", f)
-			} else {
 				d.logger.Event("DKGConnectToFaile", f)
+			} else {
+				d.logger.Event("DKGConnectToSuccess", f)
 			}
 		}
 	}

@@ -30,7 +30,11 @@ updateClient_func(){
 
 runClient_func(){
   #ssh tt -i "" ubuntu@${ips[$i]} 'source ~/.env_profile; echo -n Password:;read -s password ;export PASSPHRASE=$password ;setsid ./dosclient start'
-  ssh -tt -i "" ubuntu@${ips[$i]} 'source ~/.env_profile; export PASSPHRASE= ;setsid ./dosclient start'
+  ssh -tt -i "" ubuntu@${ips[$i]} 'source ~/.env_profile; export PASSPHRASE= ;setsid ./dosclient start >dos.log 2>&1'
+}
+
+showClient_func(){
+ssh -tt -i "LightsailDefaultKey-us-west-2.pem" ubuntu@${ips[$i]} './dosclient show balance;./dosclient show proxy'
 }
 
 stopClient_func(){
@@ -68,8 +72,24 @@ case "$1" in
     wait
     echo "All done"
     ;;
-  "-runclient")
-    for (( i=0; i<${ipslength}; i++ ));
+  "-runclient1")
+    for (( i=0; i<6; i++ ));
+    do
+        runClient_func $i & # Put a function in the background
+    done
+    wait
+    echo "All done"
+    ;;
+  "-runclient2")
+    for (( i=6; i<12; i++ ));
+    do
+        runClient_func $i & # Put a function in the background
+    done
+    wait
+    echo "All done"
+    ;;
+  "-runclient3")
+    for (( i=12; i<${ipslength}; i++ ));
     do
         runClient_func $i & # Put a function in the background
     done
@@ -82,6 +102,13 @@ case "$1" in
         stopClient_func $i & # Put a function in the background
     done
     wait
+    echo "All done"
+    ;;
+  "-showclient")
+    for (( i=0; i<${ipslength}; i++ ));
+    do
+        showClient_func $i# Put a function in the background
+    done
     echo "All done"
     ;;
   *)

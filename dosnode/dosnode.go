@@ -3,16 +3,20 @@ package dosnode
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"math/big"
-	"math/rand"
 	"net/http"
 	"os"
 	"strings"
 	"time"
+	"unsafe"
+
+	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/crypto/sha3"
 
 	"github.com/DOSNetwork/core/configuration"
 	"github.com/DOSNetwork/core/log"
@@ -115,32 +119,31 @@ func NewDosNode(credentialPath, passphrase string) (dosNode *DosNode, err error)
 		}
 	}
 	id := chainConn.Address()
-	fmt.Println("onchain adapter done")
 
 	//Build a p2p network
 	p, err := p2p.CreateP2PNetwork(id, port, p2p.SWIM)
 	if err != nil {
+		fmt.Println("CreateP2PNetwork err ", err)
 		return
 	}
 
 	err = p.Listen()
 	if err != nil {
+		fmt.Println("Listen() err ", err)
 		return
 	}
 
 	//Bootstrapping p2p network
-	//	if role != "BootstrapNode" {
-	fmt.Println("role ", role)
 	err = p.Join([]string{bootstrapIp})
 	if err != nil {
-		return
+		fmt.Println("Join ", err)
 	}
-	//	}
 
 	//Build a p2pDKG
 	suite := suites.MustFind("bn256")
 	p2pDkg, err := dkg.CreateP2PDkg(p, suite)
 	if err != nil {
+		fmt.Println("p2pDKG ", err)
 		return
 	}
 
@@ -157,19 +160,25 @@ func NewDosNode(credentialPath, passphrase string) (dosNode *DosNode, err error)
 		cPipCancel:  make(chan []byte),
 		id:          id,
 	}
-	fmt.Println("dosNode.Start()")
-	err = dosNode.Start()
-	ctx, _ := context.WithCancel(context.Background())
-	errc := dosNode.chain.RegisterNewNode(ctx)
-	<-errc
-	return
+	return dosNode, nil
 }
 
 func (d *DosNode) Start() (err error) {
 	if err = d.listen(); err != nil {
+		fmt.Println("listen err ", err)
 		logger.Error(err)
 		return
 	}
+	ctx, _ := context.WithCancel(context.Background())
+	_ = d.chain.RegisterNewNode(ctx)
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", d.status)
+	mux.HandleFunc("/balance", d.balance)
+	mux.HandleFunc("/groupSize", d.groupSize)
+	mux.HandleFunc("/proxy", d.proxy)
+	mux.HandleFunc("/guardian", d.guardian)
+	http.ListenAndServe("localhost:8080", mux)
 	return
 }
 
@@ -306,6 +315,9 @@ func (d *DosNode) listen() (err error) {
 	//chInsufficientWG, errc := d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogInsufficientWorkingGroup)
 	//errcList = append(errcList, errc)
 
+	commitRevealStart, errc := d.chain.SubscribeEvent(onchain.SubscribeDOSCommitRevealLogStartCommitReveal)
+	errcList = append(errcList, errc)
+
 	peerEvent, err := d.p.SubscribeEvent(50, vss.Signature{})
 	errcList = append(errcList, errc)
 	errc = mergeErrors(context.Background(), errcList...)
@@ -317,9 +329,63 @@ func (d *DosNode) listen() (err error) {
 
 		defer watchdog.Stop()
 		defer d.p.UnSubscribeEvent(vss.Signature{})
+
 		for {
 
 			select {
+			case msg := <-commitRevealStart:
+				content, ok := msg.(*onchain.DOSCommitRevealLogStartCommitReveal)
+				if !ok {
+					log.Error(err)
+					continue
+				}
+				go func(blkNumUint uint64, commitDurUint uint64, revealDurUint uint64) {
+					var hash *[32]byte
+
+					var prime1 *big.Int
+					// Generate random numbers in range [0..prime1]
+					prime1, ok = new(big.Int).SetString("21888242871839275222246405745257275088548364400416034343698204186575808495617", 10)
+					if !ok {
+						return
+					}
+					// Don't use this code to generate secret keys that protect important stuff!
+					sec, err := rand.Int(rand.Reader, prime1)
+					if err != nil {
+						sec.SetInt64(0)
+						return
+					}
+					h := sha3.NewKeccak256()
+					h.Write(abi.U256(sec))
+					b := h.Sum(nil)
+					hash = byte32(b)
+					for {
+						cur, err := d.chain.CurrentBlock()
+						if err != nil {
+							logger.Error(err)
+							return
+						}
+						fmt.Println("Waiting for commit ", cur, blkNumUint-revealDurUint-commitDurUint)
+						if cur >= blkNumUint-revealDurUint-commitDurUint {
+							break
+						}
+						time.Sleep(15 * time.Second)
+					}
+					d.chain.Commit(context.Background(), *hash)
+					for {
+						cur, err := d.chain.CurrentBlock()
+						if err != nil {
+							logger.Error(err)
+							return
+						}
+						fmt.Println("Waiting for Reveal ", cur, blkNumUint-revealDurUint)
+						if cur > blkNumUint-revealDurUint {
+							break
+						}
+						time.Sleep(15 * time.Second)
+					}
+					d.chain.Reveal(context.Background(), sec.Uint64())
+				}(content.TargetBlkNum.Uint64(), content.CommitDuration.Uint64(), content.RevealDuration.Uint64())
+
 			case err, ok := <-errc:
 				if ok && err.Error() == "EOF" {
 					fmt.Println("!!!dosnode err ", err)
@@ -330,9 +396,30 @@ func (d *DosNode) listen() (err error) {
 					TODO: otherwise possibly closed errc will keep consuming "select",
 				*/
 			case <-watchdog.C:
-				fmt.Println("watchdog")
-				ids := d.dkg.GetAnyGroupIDs()
-				if len(ids) != 0 {
+				//Let pending node as a guardian
+				if d.dkg.GetGroupNumber() == 0 {
+					fmt.Println("watchdog")
+					ids := d.dkg.GetAnyGroupIDs()
+					workingGroup, err := d.chain.GetWorkingGroupSize()
+					if err != nil {
+						continue
+					}
+					groupToPick, err := d.chain.GetGroupToPick()
+					if err != nil {
+						continue
+					}
+					commitRevealTargetBlk, err := d.chain.CommitRevealTargetBlk()
+					if err != nil {
+						continue
+					}
+					pendingNodeSize, err := d.chain.GetPengindNodeSize()
+					if err != nil {
+						continue
+					}
+					pendingGrouSize, err := d.chain.NumPendingGroups()
+					if err != nil {
+						continue
+					}
 					currentBlockNumber, err := d.chain.CurrentBlock()
 					if err != nil {
 						logger.Error(err)
@@ -342,31 +429,29 @@ func (d *DosNode) listen() (err error) {
 						logger.Error(err)
 						continue
 					}
-					diff := currentBlockNumber - lastUpdatedBlock
-					if diff > SYSRANDOMNTERVAL {
-						ctx, _ := context.WithCancel(context.Background())
-						d.chain.SignalRandom(ctx)
-					}
-				}
-				workingGroup, err := d.chain.GetWorkingGroupSize()
-				if err != nil {
-					continue
-				}
-				groupToPick, err := d.chain.GetGroupToPick()
-				if err != nil {
+					f := map[string]interface{}{
+						"WorkingGroupSize":      workingGroup,
+						"GroupToPick":           groupToPick,
+						"currentBlockNumber":    currentBlockNumber,
+						"commitRevealTargetBlk": commitRevealTargetBlk,
+						"PendingNodeSize":       pendingNodeSize,
+						"PendingGrouSize":       pendingGrouSize,
+						"Members":               d.p.Members(),
+						"Time":                  time.Now()}
+					logger.Event("DOS_Watchdog", f)
 
-					continue
-				}
-
-				if workingGroup < groupToPick {
-					commitRevealState, err := d.chain.CommitRevealState()
-					if err != nil {
-
-						continue
+					if len(ids) != 0 {
+						diff := currentBlockNumber - lastUpdatedBlock
+						if diff > SYSRANDOMNTERVAL {
+							ctx, _ := context.WithCancel(context.Background())
+							d.chain.SignalRandom(ctx)
+						}
 					}
 
-					if commitRevealState == 0 {
-						d.chain.SignalGroupFormation(context.Background())
+					if workingGroup < groupToPick {
+						if currentBlockNumber > commitRevealTargetBlk {
+							d.chain.SignalGroupFormation(context.Background())
+						}
 					}
 				}
 			case requestID := <-d.cPipCancel:
@@ -464,8 +549,7 @@ func (d *DosNode) listen() (err error) {
 					logger.Event("DOS_GroupDismiss", f)
 					ctx, _ := context.WithCancel(context.Background())
 					go func() {
-						delay := 15 * rand.Intn(10)
-						time.Sleep(time.Duration(delay) * time.Second)
+
 						errc := d.chain.RegisterNewNode(ctx)
 						err := <-errc
 						if err != nil {
@@ -726,4 +810,11 @@ func (d *DosNode) listen() (err error) {
 
 func (d *DosNode) isMember(pubkey [4]*big.Int) bool {
 	return d.dkg.GetShareSecurity(pubkey) != nil
+}
+
+func byte32(s []byte) (a *[32]byte) {
+	if len(a) <= len(s) {
+		a = (*[len(a)]byte)(unsafe.Pointer(&s[0]))
+	}
+	return a
 }

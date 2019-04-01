@@ -48,7 +48,9 @@ const (
 	LastUpdatedBlock
 	PendingNonce
 	GroupToPick
-	CommitRevealState
+	CommitRevealTargetBlk
+	NumPendingGroups
+	PengindNodeSize
 )
 
 // TODO: Move constants to some unified places.
@@ -1485,19 +1487,17 @@ func proxyGet(proxy *dosproxy.DOSProxySession, vType int) chan interface{} {
 			val, err = proxy.LastRandomness()
 		case WorkingGroupSize:
 			val, err = proxy.GetWorkingGroupSize()
+		case PengindNodeSize:
+			val, err = proxy.GetPengindNodeSize()
+		case NumPendingGroups:
+			val, err = proxy.NumPendingGroups()
 		case GroupToPick:
 			val, err = proxy.GroupToPick()
 		case LastUpdatedBlock:
 			val, err = proxy.LastUpdatedBlock()
 			fmt.Println("LastUpdatedBlock ", val, err)
-		case CommitRevealState:
-			var val uint8
-			val, err = proxy.CommitRevealState()
-			if err != nil {
-				logger.Error(err)
-				return
-			}
-			out <- val
+		case CommitRevealTargetBlk:
+			val, err = proxy.CommitRevealTargetBlk()
 		}
 		if err != nil {
 			logger.Error(err)
@@ -1550,21 +1550,62 @@ func (e *EthAdaptor) GetWorkingGroupSize() (size uint64, err error) {
 	return
 }
 
-func (e *EthAdaptor) CommitRevealState() (state uint8, err error) {
+func (e *EthAdaptor) NumPendingGroups() (size uint64, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 	var valList []chan interface{}
 	for _, proxy := range e.proxies {
-		valList = append(valList, proxyGet(proxy, CommitRevealState))
+		valList = append(valList, proxyGet(proxy, NumPendingGroups))
 	}
 	out := first(ctx, merge(ctx, valList...))
 	select {
 	case val := <-out:
-		s, ok := val.(uint8)
+		sizeBig, ok := val.(*big.Int)
 		if !ok {
 			err = errors.New("type error")
 		}
-		state = s
+		size = sizeBig.Uint64()
+	case <-ctx.Done():
+		err = errors.New("Timeout")
+	}
+	return
+}
+
+func (e *EthAdaptor) GetPengindNodeSize() (size uint64, err error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	var valList []chan interface{}
+	for _, proxy := range e.proxies {
+		valList = append(valList, proxyGet(proxy, PengindNodeSize))
+	}
+	out := first(ctx, merge(ctx, valList...))
+	select {
+	case val := <-out:
+		sizeBig, ok := val.(*big.Int)
+		if !ok {
+			err = errors.New("type error")
+		}
+		size = sizeBig.Uint64()
+	case <-ctx.Done():
+		err = errors.New("Timeout")
+	}
+	return
+}
+func (e *EthAdaptor) CommitRevealTargetBlk() (blk uint64, err error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	var valList []chan interface{}
+	for _, proxy := range e.proxies {
+		valList = append(valList, proxyGet(proxy, CommitRevealTargetBlk))
+	}
+	out := first(ctx, merge(ctx, valList...))
+	select {
+	case val := <-out:
+		s, ok := val.(*big.Int)
+		if !ok {
+			err = errors.New("type error")
+		}
+		blk = s.Uint64()
 	case <-ctx.Done():
 		err = errors.New("Timeout")
 	}

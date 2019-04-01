@@ -59,20 +59,13 @@ func runDos(credentialPath, passphrase string) {
 		os.Exit(0)
 
 	}()
-	mux := http.NewServeMux()
 
 	dosclient, err := dosnode.NewDosNode(credentialPath, passphrase)
 	if err != nil {
-		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-			content := "Error:" + err.Error() + "\n"
-			w.Write([]byte(content))
-		})
-	} else {
-		mux.HandleFunc("/", dosclient.Status)
-		mux.HandleFunc("/balance", dosclient.Balance)
-		mux.HandleFunc("/groups", dosclient.Groups)
+		fmt.Println(" err", err)
+		return
 	}
-	http.ListenAndServe("localhost:8080", mux)
+	dosclient.Start()
 }
 
 func makeRequest(f string, args []byte) ([]byte, error) {
@@ -138,6 +131,7 @@ func main() {
 				}
 				os.Setenv("PASSPHRASE", password)
 				cmd := exec.Command(os.Args[0], "run")
+				cmd.Stdout = os.Stdout
 				cmd.Start()
 				//runDos(c.String("credential.path"), password)
 				savePID(cmd.Process.Pid)
@@ -218,6 +212,24 @@ func main() {
 					Action: func(c *cli.Context) error {
 						r, _ := makeRequest("groups", []byte{})
 						fmt.Println("show group number: ", string(r))
+						return nil
+					},
+				},
+				{
+					Name:  "proxy",
+					Usage: "show proxy status",
+					Action: func(c *cli.Context) error {
+						r, _ := makeRequest("proxy", []byte{})
+						fmt.Println("show proxy status : \n", string(r))
+						return nil
+					},
+				},
+				{
+					Name:  "guardian",
+					Usage: "trigger guardian functions",
+					Action: func(c *cli.Context) error {
+						r, _ := makeRequest("guardian", []byte{})
+						fmt.Println("trigger guardian functions : \n", string(r))
 						return nil
 					},
 				},

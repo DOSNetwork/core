@@ -51,7 +51,8 @@ deployAMA:genAMA
 	go run contracts_deploy/deploy.go -credentialPath $(BOOT_CREDENTIAL) -contractPath $(ETH_CONTRACTS) -target deployAMA -configPath $(AMA_CONFIGPATH)
 
 buildAll:deployAll
-	xgo --targets=linux/amd64 -out .testEnv/dosclient ../
+	xgo --targets=linux/amd64 -out testEnv/dosclient ../
+	mv testEnv/dosclient-linux-amd64 testEnv/dosclient
 	cp ../config.json testEnv/
 	go build -o testEnv/dos_user dosUser/dos_user.go
 	cp dosUser/ama.json testEnv/
