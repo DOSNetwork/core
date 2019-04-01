@@ -45,10 +45,10 @@ type ProxyAdapter interface {
 	GroupPubKey(idx int) (groupPubKeys [4]*big.Int, err error)
 }
 
-func NewProxyAdapter(ChainType, credentialPath, passphrase, proxyAddr string, urls []string) (ProxyAdapter, error) {
+func NewProxyAdapter(ChainType, credentialPath, passphrase, proxyAddr, crAddress string, urls []string) (ProxyAdapter, error) {
 	switch ChainType {
 	case ETH:
-		adaptor, err := NewEthAdaptor(credentialPath, passphrase, proxyAddr, "", urls)
+		adaptor, err := NewEthAdaptor(credentialPath, passphrase, proxyAddr, crAddress, urls)
 		return adaptor, err
 	default:
 		err := fmt.Errorf("Chain %s not supported error\n", ChainType)

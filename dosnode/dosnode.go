@@ -110,7 +110,7 @@ func NewDosNode(credentialPath, passphrase string) (dosNode *DosNode, err error)
 	}
 
 	//Set up an onchain adapter
-	chainConn, err := onchain.NewProxyAdapter(config.GetCurrentType(), credentialPath, passphrase, chainConfig.DOSProxyAddress, chainConfig.RemoteNodeAddressPool)
+	chainConn, err := onchain.NewProxyAdapter(config.GetCurrentType(), credentialPath, passphrase, chainConfig.DOSProxyAddress, chainConfig.DOSCommitReveal, chainConfig.RemoteNodeAddressPool)
 	if err != nil {
 		if err.Error() != "No any working eth client for event tracking" {
 			fmt.Println("NewDosNode failed ", err)
@@ -314,7 +314,7 @@ func (d *DosNode) listen() (err error) {
 	//chInsufficientWG, errc := d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogInsufficientWorkingGroup)
 	//errcList = append(errcList, errc)
 
-	commitRevealStart, errc := d.chain.SubscribeEvent(onchain.SubscribeDOSCommitRevealLogStartCommitReveal)
+	commitRevealStart, errc := d.chain.PollLogs(onchain.SubscribeDOSCommitRevealLogStartCommitReveal, 0, 0)
 	errcList = append(errcList, errc)
 
 	peerEvent, err := d.p.SubscribeEvent(50, vss.Signature{})
@@ -339,6 +339,12 @@ func (d *DosNode) listen() (err error) {
 					continue
 				}
 				go func(blkNumUint uint64, commitDurUint uint64, revealDurUint uint64) {
+					f := map[string]interface{}{
+						"blkNumUint":    blkNumUint,
+						"commitDurUint": commitDurUint,
+						"revealDurUint": revealDurUint,
+						"Time":          time.Now()}
+					logger.Event("commitRevealStart", f)
 					var hash *[32]byte
 
 					var prime1 *big.Int

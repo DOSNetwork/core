@@ -208,9 +208,10 @@ func NewEthAdaptor(credentialPath, passphrase, proxyAddr, commitRevealAddr strin
 			continue
 		}
 		c, e := doscommitreveal.NewDOSCommitReveal(common.HexToAddress(commitRevealAddr), client)
-		if e != nil {
-			logger.Error(e)
+		if e == nil {
 			adaptor.commitReveals = append(adaptor.commitReveals, &doscommitreveal.DOSCommitRevealSession{Contract: c, CallOpts: bind.CallOpts{Context: adaptor.ctx}, TransactOpts: *adaptor.auth})
+		} else {
+			logger.Error(e)
 		}
 		adaptor.clients = append(adaptor.clients, client)
 		adaptor.proxies = append(adaptor.proxies, &dosproxy.DOSProxySession{Contract: p, CallOpts: bind.CallOpts{Context: adaptor.ctx}, TransactOpts: *adaptor.auth})
