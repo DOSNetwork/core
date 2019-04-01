@@ -62,7 +62,6 @@ func NewDosNode(credentialPath, passphrase string) (dosNode *DosNode, err error)
 		return
 	}
 
-	role := config.NodeRole
 	port := config.Port
 	bootstrapIp := config.BootStrapIp
 

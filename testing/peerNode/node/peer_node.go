@@ -14,8 +14,6 @@ import (
 	"github.com/DOSNetwork/core/suites"
 
 	"github.com/DOSNetwork/core/share/dkg/pedersen"
-	"github.com/DOSNetwork/core/share/vss/pedersen"
-
 	"github.com/DOSNetwork/core/testing/peerNode/internalMsg"
 
 	"github.com/DOSNetwork/core/log"
@@ -35,7 +33,6 @@ type PeerNode struct {
 	idSet       map[string]struct{}
 	numMessages int
 	tStrategy   TestStrategy
-	tblsChan    chan vss.Signature
 	p2pDkg      dkg.P2PDkgInterface
 }
 
@@ -129,7 +126,7 @@ func (d *PeerNode) requestIsNextRoundReady(roundCount uint16) byte {
 	ip, _ := p2p.GetLocalIP()
 	roundCountBytes := make([]byte, 2)
 	binary.LittleEndian.PutUint16(roundCountBytes, roundCount)
-	request := append([]byte(ip), roundCountBytes...)
+	request := append([]byte(ip.String()), roundCountBytes...)
 
 	r, err := d.MakeRequest(d.bootStrapIp, "isNextRoundReady", request)
 	for r[0] == byte(ALLNODENOTREADY) || err != nil {
@@ -169,7 +166,6 @@ func (d *PeerNode) Init(bootStrapIp string, port string, peerSize int, numMessag
 	d.checkroll = make(map[string]int)
 	d.idSet = make(map[string]struct{})
 	d.done = make(chan bool)
-	d.tblsChan = make(chan vss.Signature)
 	d.numMessages = numMessages
 
 	switch tStrategy {
