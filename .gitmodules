@@ -1,4 +1,4 @@
 [submodule "onchain/eth"]
 	path = onchain/eth
 	url = https://github.com/DOSNetwork/eth-contracts
-  branch = dismiss
+  branch = beta
