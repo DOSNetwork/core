@@ -22,7 +22,7 @@ type ProxyAdapter interface {
 	SetGroupSize(ctx context.Context, size uint64) (errc <-chan error)
 	SetGroupMaturityPeriod(ctx context.Context, size uint64) (errc <-chan error)
 	Commit(ctx context.Context, commitment [32]byte) (errc <-chan error)
-	Reveal(ctx context.Context, secret uint64) (errc <-chan error)
+	Reveal(ctx context.Context, secret *big.Int) (errc <-chan error)
 
 	//Guardian node functions
 	SignalRandom(ctx context.Context) (errc <-chan error)

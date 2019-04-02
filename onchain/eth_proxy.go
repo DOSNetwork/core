@@ -503,13 +503,11 @@ func (e *EthAdaptor) Commit(ctx context.Context, commitment [32]byte) (errc <-ch
 	return
 }
 
-func (e *EthAdaptor) Reveal(ctx context.Context, secret uint64) (errc <-chan error) {
+func (e *EthAdaptor) Reveal(ctx context.Context, secret *big.Int) (errc <-chan error) {
 	defer logger.TimeTrack(time.Now(), "Reveal", nil)
 	result := make(chan Reply)
-	x := new(big.Int)
-	x.SetUint64(secret)
 	for i, cr := range e.commitReveals {
-		request := &ReqSetInt{ctx, &cr.TransactOpts, x, cr.Reveal, result}
+		request := &ReqSetInt{ctx, &cr.TransactOpts, secret, cr.Reveal, result}
 		errc = e.sendRequest(ctx, e.clients[i], errc, request, result)
 	}
 	return

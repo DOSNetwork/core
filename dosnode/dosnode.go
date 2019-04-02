@@ -311,9 +311,10 @@ func (d *DosNode) listen() (err error) {
 	errcList = append(errcList, errc)
 	noworkinggroup, errc := d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogNoWorkingGroup)
 	errcList = append(errcList, errc)
-	//chInsufficientWG, errc := d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogInsufficientWorkingGroup)
-	//errcList = append(errcList, errc)
-
+	chInsufficientWG, errc := d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogInsufficientWorkingGroup)
+	errcList = append(errcList, errc)
+	groupInitated, errc := d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogGroupingInitiated)
+	errcList = append(errcList, errc)
 	commitRevealStart, errc := d.chain.PollLogs(onchain.SubscribeDOSCommitRevealLogStartCommitReveal, 0, 0)
 	errcList = append(errcList, errc)
 
@@ -332,7 +333,37 @@ func (d *DosNode) listen() (err error) {
 		for {
 
 			select {
-			case msg := <-commitRevealStart:
+			case _, ok := <-chInsufficientWG:
+				if !ok {
+					continue
+				}
+				if d.dkg.GetGroupNumber() == 0 {
+					f := map[string]interface{}{
+						"Time": time.Now()}
+					logger.Event("InsufficientWorkingGroup", f)
+					d.chain.SignalGroupFormation(context.Background())
+				}
+			case msg, ok := <-groupInitated:
+				if !ok {
+					continue
+				}
+				content, ok := msg.(*onchain.DOSProxyLogGroupingInitiated)
+				if !ok {
+					log.Error(err)
+					continue
+				}
+				if d.dkg.GetGroupNumber() == 0 {
+					f := map[string]interface{}{
+						"NumPendingNodes":   content.NumPendingNodes,
+						"GroupSize":         content.GroupSize,
+						"GroupingThreshold": content.GroupingThreshold,
+						"Time":              time.Now()}
+					logger.Event("GroupingInitiated", f)
+				}
+			case msg, ok := <-commitRevealStart:
+				if !ok {
+					continue
+				}
 				content, ok := msg.(*onchain.DOSCommitRevealLogStartCommitReveal)
 				if !ok {
 					log.Error(err)
@@ -359,6 +390,7 @@ func (d *DosNode) listen() (err error) {
 						sec.SetInt64(0)
 						return
 					}
+
 					h := sha3.NewKeccak256()
 					h.Write(abi.U256(sec))
 					b := h.Sum(nil)
@@ -375,7 +407,11 @@ func (d *DosNode) listen() (err error) {
 						}
 						time.Sleep(15 * time.Second)
 					}
-					d.chain.Commit(context.Background(), *hash)
+					errc := d.chain.Commit(context.Background(), *hash)
+					err = <-errc
+					if err != nil {
+						return
+					}
 					for {
 						cur, err := d.chain.CurrentBlock()
 						if err != nil {
@@ -388,7 +424,7 @@ func (d *DosNode) listen() (err error) {
 						}
 						time.Sleep(15 * time.Second)
 					}
-					d.chain.Reveal(context.Background(), sec.Uint64())
+					d.chain.Reveal(context.Background(), sec)
 				}(content.TargetBlkNum.Uint64(), content.CommitDuration.Uint64(), content.RevealDuration.Uint64())
 
 			case err, ok := <-errc:
@@ -470,19 +506,23 @@ func (d *DosNode) listen() (err error) {
 					pipeCancel[requestID]()
 					delete(pipeCancel, requestID)
 				}*/
-			case msg := <-d.cSignToPeer:
+			case msg, ok := <-d.cSignToPeer:
+				if !ok {
+					continue
+				}
 				peerSignMap[string(msg.Nonce)] = msg
-				fmt.Println("Save nonce ", msg.Nonce)
 			case msg := <-peerEvent:
 				switch content := msg.Msg.Message.(type) {
 				case *vss.Signature:
-					fmt.Println("Ask for nonce ", content.Nonce)
 					if peerSignMap[string(content.Nonce)] != nil {
 						fmt.Println("Got Sign ", peerSignMap[string(content.Nonce)].RequestId)
 					}
 					d.p.Reply(msg.Sender, msg.RequestNonce, peerSignMap[string(content.Nonce)])
 				}
-			case msg := <-eventGrouping:
+			case msg, ok := <-eventGrouping:
+				if !ok {
+					continue
+				}
 				content, ok := msg.(*onchain.DOSProxyLogGrouping)
 				if !ok {
 					log.Error(err)
@@ -525,7 +565,10 @@ func (d *DosNode) listen() (err error) {
 						go d.waitForGrouping(valueCtx, errc)
 					}
 				}
-			case msg := <-eventGroupDismiss:
+			case msg, ok := <-eventGroupDismiss:
+				if !ok {
+					continue
+				}
 				content, ok := msg.(*onchain.DOSProxyLogGroupDismiss)
 				if !ok {
 					e, ok := msg.(error)
@@ -563,7 +606,10 @@ func (d *DosNode) listen() (err error) {
 					}()
 
 				}
-			case msg := <-chRandom:
+			case msg, ok := <-chRandom:
+				if !ok {
+					continue
+				}
 				content, ok := msg.(*onchain.DOSProxyLogUpdateRandom)
 				if !ok {
 					log.Error(err)
@@ -600,7 +646,10 @@ func (d *DosNode) listen() (err error) {
 						d.buildPipeline(valueCtx, content.DispatchedGroup, content.DispatchedGroupId, content.LastRandomness, content.LastRandomness, nil, "", "", uint32(onchain.TrafficSystemRandom))
 					}
 				}
-			case msg := <-chUsrRandom:
+			case msg, ok := <-chUsrRandom:
+				if !ok {
+					continue
+				}
 				content, ok := msg.(*onchain.DOSProxyLogRequestUserRandom)
 				if !ok {
 					log.Error(err)
@@ -639,7 +688,10 @@ func (d *DosNode) listen() (err error) {
 						d.buildPipeline(valueCtx, content.DispatchedGroup, content.DispatchedGroupId, content.RequestId, content.LastSystemRandomness, content.UserSeed, "", "", uint32(onchain.TrafficUserRandom))
 					}
 				}
-			case msg := <-chUrl:
+			case msg, ok := <-chUrl:
+				if !ok {
+					continue
+				}
 				content, ok := msg.(*onchain.DOSProxyLogUrl)
 				if !ok {
 					log.Error(err)
@@ -681,7 +733,10 @@ func (d *DosNode) listen() (err error) {
 						d.buildPipeline(valueCtx, content.DispatchedGroup, content.DispatchedGroupId, content.QueryId, content.Randomness, nil, content.DataSource, content.Selector, uint32(onchain.TrafficUserQuery))
 					}
 				}
-			case msg := <-eventValidation:
+			case msg, ok := <-eventValidation:
+				if !ok {
+					continue
+				}
 				content, ok := msg.(*onchain.DOSProxyLogValidationResult)
 				if !ok {
 					log.Error(err)
@@ -745,7 +800,10 @@ func (d *DosNode) listen() (err error) {
 						logger.Event("DOS_SysRandomResult", f)
 					}
 				}
-			case msg := <-keyUploaded:
+			case msg, ok := <-keyUploaded:
+				if !ok {
+					continue
+				}
 				content, ok := msg.(*onchain.DOSProxyLogPublicKeyUploaded)
 				if !ok {
 					e, ok := msg.(error)
@@ -768,7 +826,10 @@ func (d *DosNode) listen() (err error) {
 						"BlockN":    content.BlockN,
 					})
 				}
-			case msg := <-keyAccepted:
+			case msg, ok := <-keyAccepted:
+				if !ok {
+					continue
+				}
 				content, ok := msg.(*onchain.DOSProxyLogPublicKeyAccepted)
 				if !ok {
 					e, ok := msg.(error)
@@ -785,7 +846,10 @@ func (d *DosNode) listen() (err error) {
 						"BlockN":           content.BlockN,
 					})
 				}
-			case msg := <-noworkinggroup:
+			case msg, ok := <-noworkinggroup:
+				if !ok {
+					continue
+				}
 				currentBlockNumber, err := d.chain.CurrentBlock()
 				if err != nil {
 					logger.Error(err)
