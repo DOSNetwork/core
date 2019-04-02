@@ -30,8 +30,7 @@ func TestServer(t *testing.T) {
 		}
 	}(p2)
 	p1.SetPort("9905")
-	connected, _ := p1.ConnectTo("192.168.1.104")
-	fmt.Println("Start Test!!!!!!!!!!! ", string(connected))
+	connected, _ := p1.ConnectTo("0.0.0.0", nil)
 
 	var count uint64
 	checkRoll := make(map[uint64]uint64)
@@ -47,7 +46,6 @@ func TestServer(t *testing.T) {
 			if !ok {
 				return
 			}
-			fmt.Println("!!!!!!!!!!!!!reply count ", p.Count)
 			checkRoll[count] = p.Count
 		}(count)
 	}
