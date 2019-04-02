@@ -186,8 +186,6 @@ func (n *Server) Listen() (err error) {
 					}
 				}(client, n.messages)
 				n.incoming <- client
-				logger.TimeTrack(start, "ExchangeReceive", nil)
-
 			}(conn, start)
 		}
 	}()
