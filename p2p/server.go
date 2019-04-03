@@ -77,6 +77,20 @@ func (n *Server) Members() int {
 	return n.network.NumPeers()
 }
 
+func (n *Server) ConnectToAll() (memNum, connNum int) {
+	addrs := n.network.GetOtherMembersIP()
+	memNum = len(addrs)
+	for _, addr := range addrs {
+		if _, err := n.ConnectTo(addr.String(), nil); err != nil {
+			fmt.Println("ConnectTo ", addr, " fail", err)
+		} else {
+			connNum++
+		}
+	}
+
+	return
+}
+
 func (n *Server) SetID(id []byte) {
 	n.id = id
 }
@@ -141,7 +155,7 @@ func (n *Server) Listen() (err error) {
 	//}
 
 	n.addr = ip
-	//fmt.Println("Listen to ", ip, " ", n.port)
+	fmt.Println("Listen to ", ip, " ", n.port)
 	go func() {
 		for {
 			conn, err := n.listener.Accept()
@@ -261,11 +275,11 @@ func (n *Server) callHandler() {
 						continue
 					}
 
-					id := addrToid[req.addr.String()+n.port]
-					//fmt.Println(time.Now(), "callHandler req.id == nil ", req.addr.String()+n.port, "addrToid ", id)
+					id := addrToid[req.addr.String()+":"+n.port]
 
 					if id != nil {
 						if !bytes.Equal(id, []byte{'p', 'e', 'n', 'd', 'i', 'n', 'g'}) {
+
 							if client := clients[string(id)]; client != nil {
 								if req.rType == 1 {
 									client.send(req)
@@ -279,7 +293,6 @@ func (n *Server) callHandler() {
 								}
 							}
 						} else {
-							//fmt.Println(time.Now(), "callHandler req.addr pending", req.addr, id)
 							go func(req Request) {
 								select {
 								case n.calling <- req:
@@ -304,7 +317,6 @@ func (n *Server) callHandler() {
 						}
 						continue
 					}
-					//fmt.Println(time.Now(), "callHandler req.id not nil ", len(clients), len(addrToid), req.id, addrToid[req.addr.String()+n.port], req.addr)
 				}
 
 				var err error
@@ -332,11 +344,11 @@ func (n *Server) callHandler() {
 						}
 					}
 					idTostatus[string(req.id)] = []byte{'p', 'e', 'n', 'd', 'i', 'n', 'g'}
-					addrToid[req.addr.String()+n.port] = []byte{'p', 'e', 'n', 'd', 'i', 'n', 'g'}
+					addrToid[req.addr.String()+":"+n.port] = []byte{'p', 'e', 'n', 'd', 'i', 'n', 'g'}
+
 					go func(req Request, start time.Time) {
 						var conn net.Conn
 						var client *Client
-
 						if conn, err = net.Dial("tcp", req.addr.String()+":"+n.port); err != nil {
 							logger.Error(err)
 							select {
@@ -361,7 +373,6 @@ func (n *Server) callHandler() {
 							}
 							conn.Close()
 							//Retry later
-							//fmt.Println(time.Now(), "callHandler Retry later")
 							go func(req Request) {
 								select {
 								case n.calling <- req:
@@ -391,7 +402,7 @@ func (n *Server) callHandler() {
 								}
 							}
 						}()
-						//TODO:ASK Client to send request here
+						//TODO:ASK Client to send request her
 						if req.rType == 1 {
 							client.send(req)
 						} else if req.rType == 0 {
@@ -412,9 +423,17 @@ func (n *Server) callHandler() {
 				if !ok {
 					return
 				}
+
 				clients[string(client.remoteID)] = client
-				addrToid[client.conn.RemoteAddr().String()+n.port] = client.remoteID
+				addrToid[client.conn.RemoteAddr().String()] = client.remoteID
+
 				delete(idTostatus, string(client.remoteID))
+				f := map[string]interface{}{
+					"localID":    client.localID,
+					"remoteID":   client.remoteID,
+					"RemoteAddr": client.conn.RemoteAddr().String(),
+					"Time":       time.Now()}
+				logger.Event("registerClient", f)
 			case _, _ = <-hangup:
 			}
 		}
@@ -475,7 +494,6 @@ func (n *Server) ConnectTo(addr string, id []byte) ([]byte, error) {
 
 func (n *Server) Request(id []byte, m proto.Message) (msg P2PMessage, err error) {
 	defer logger.TimeTrack(time.Now(), "Request", nil)
-	start := time.Now()
 	callReq := Request{}
 	callReq.ctx, callReq.cancel = context.WithTimeout(context.Background(), 5*time.Second)
 	callReq.rType = 1
@@ -495,11 +513,8 @@ func (n *Server) Request(id []byte, m proto.Message) (msg P2PMessage, err error)
 			return
 		}
 		msg, ok = r.(P2PMessage)
-		if ok {
-			logger.TimeTrack(start, "RequestSent", nil)
-		} else {
+		if !ok {
 			err = errors.New("Reply cast error")
-
 		}
 		return
 	case e, ok := <-callReq.errc:

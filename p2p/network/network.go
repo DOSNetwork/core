@@ -1,6 +1,7 @@
 package network
 
 import (
+	"fmt"
 	"io/ioutil"
 	"net"
 
@@ -12,6 +13,7 @@ type Network interface {
 	Leave()
 	Lookups(id []byte) (addr net.IP)
 	NumPeers() int
+	GetOtherMembersIP() (addr []net.IP)
 }
 
 func NewSerfNet(Addr net.IP, id []byte) (n Network, err error) {
@@ -49,6 +51,21 @@ func (s *SerfNet) Lookups(id []byte) (addr net.IP) {
 	for i := 0; i < len(members); i++ {
 		if members[i].Name == string(id) {
 			return members[i].Addr
+		}
+	}
+	return
+}
+
+func (s *SerfNet) GetOtherMembersIP() (addr []net.IP) {
+	fmt.Println("members len ", len(s.serf.Members()))
+
+	members := s.serf.Members()
+	for i := 0; i < len(members); i++ {
+
+		if members[i].Name != s.serf.LocalMember().Name && members[i].Status == serf.StatusAlive {
+			fmt.Println("localMember ", []byte(s.serf.LocalMember().Name), "members[i].Name ", []byte(members[i].Name), " status ", members[i].Status, " addr ", members[i].Addr)
+
+			addr = append(addr, members[i].Addr)
 		}
 	}
 	return

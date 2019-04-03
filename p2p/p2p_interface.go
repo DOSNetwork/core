@@ -104,4 +104,5 @@ type P2PInterface interface {
 	SubscribeEvent(chanBuffer int, messages ...interface{}) (outch chan P2PMessage, err error)
 	UnSubscribeEvent(messages ...interface{})
 	Members() int
+	ConnectToAll() (memNum, connNum int)
 }
