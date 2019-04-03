@@ -13,6 +13,7 @@ import (
 	"syscall"
 
 	"github.com/DOSNetwork/core/dosnode"
+	"github.com/pkg/profile"
 
 	"github.com/urfave/cli"
 	"golang.org/x/crypto/ssh/terminal"
@@ -48,6 +49,9 @@ func runDos(credentialPath, passphrase string) {
 	signal.Notify(ch, os.Interrupt, os.Kill, syscall.SIGTERM)
 
 	go func() {
+		defer profile.Start().Stop()
+
+		//defer os.Exit(0)
 		signalType := <-ch
 		signal.Stop(ch)
 
@@ -55,8 +59,6 @@ func runDos(credentialPath, passphrase string) {
 
 		// remove PID file
 		os.Remove(PIDFile)
-
-		os.Exit(0)
 
 	}()
 
@@ -66,6 +68,7 @@ func runDos(credentialPath, passphrase string) {
 		return
 	}
 	dosclient.Start()
+
 }
 
 func makeRequest(f string, args []byte) ([]byte, error) {
@@ -185,11 +188,11 @@ func main() {
 			},
 		},
 		{
-			Name:  "show",
-			Usage: "Show dos-client status",
+			Name:  "cmd",
+			Usage: "cmd",
 			Subcommands: []cli.Command{
 				{
-					Name:  "status",
+					Name:  "showStatus",
 					Usage: "show status",
 					Action: func(c *cli.Context) error {
 						r, _ := makeRequest("/", []byte{})
@@ -198,7 +201,7 @@ func main() {
 					},
 				},
 				{
-					Name:  "balance",
+					Name:  "showBalance",
 					Usage: "show balance",
 					Action: func(c *cli.Context) error {
 						r, _ := makeRequest("balance", []byte{})
@@ -207,8 +210,8 @@ func main() {
 					},
 				},
 				{
-					Name:  "groups",
-					Usage: "show group number",
+					Name:  "showGroups",
+					Usage: "show how many group this client belong to",
 					Action: func(c *cli.Context) error {
 						r, _ := makeRequest("groups", []byte{})
 						fmt.Println("show group number: ", string(r))
@@ -216,7 +219,7 @@ func main() {
 					},
 				},
 				{
-					Name:  "proxy",
+					Name:  "showProxyStatus",
 					Usage: "show proxy status",
 					Action: func(c *cli.Context) error {
 						r, _ := makeRequest("proxy", []byte{})
@@ -225,11 +228,20 @@ func main() {
 					},
 				},
 				{
-					Name:  "guardian",
+					Name:  "triggerGuardian",
 					Usage: "trigger guardian functions",
 					Action: func(c *cli.Context) error {
 						r, _ := makeRequest("guardian", []byte{})
 						fmt.Println("trigger guardian functions : \n", string(r))
+						return nil
+					},
+				},
+				{
+					Name:  "testP2P",
+					Usage: "connect to all peer in members to check network condition",
+					Action: func(c *cli.Context) error {
+						r, _ := makeRequest("p2p", []byte{})
+						fmt.Println("test p2p : \n", string(r))
 						return nil
 					},
 				},

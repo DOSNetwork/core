@@ -133,6 +133,7 @@ func NewDosNode(credentialPath, passphrase string) (dosNode *DosNode, err error)
 	}
 
 	//Bootstrapping p2p network
+	fmt.Println("Join :", bootstrapIp)
 	err = p.Join([]string{bootstrapIp})
 	if err != nil {
 		fmt.Println("Join ", err)
@@ -177,6 +178,8 @@ func (d *DosNode) Start() (err error) {
 	mux.HandleFunc("/groupSize", d.groupSize)
 	mux.HandleFunc("/proxy", d.proxy)
 	mux.HandleFunc("/guardian", d.guardian)
+	mux.HandleFunc("/p2p", d.p2p)
+
 	http.ListenAndServe("localhost:8080", mux)
 	return
 }

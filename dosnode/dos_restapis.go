@@ -28,7 +28,11 @@ func (d *DosNode) groupSize(w http.ResponseWriter, r *http.Request) {
 func (d *DosNode) guardian(w http.ResponseWriter, r *http.Request) {
 	d.chain.SignalGroupFormation(context.Background())
 }
-
+func (d *DosNode) p2p(w http.ResponseWriter, r *http.Request) {
+	memNum, connNum := d.p.ConnectToAll()
+	html := "members length : " + strconv.Itoa(memNum) + "\n connection length : " + strconv.Itoa(connNum)
+	w.Write([]byte(html))
+}
 func (d *DosNode) proxy(w http.ResponseWriter, r *http.Request) {
 	html := ""
 
