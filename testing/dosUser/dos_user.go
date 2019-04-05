@@ -124,7 +124,7 @@ func main() {
 	if onChainConfig.NodeRole == "testNode" {
 		var rspBytes []byte
 		var resp *http.Response
-		ip := onChainConfig.BootStrapIp
+		ip := onChainConfig.BootStrapIp[0]
 		tServer := "http://" + ip + ":8080/getCredential"
 		resp, err = http.Get(tServer)
 		for err != nil {

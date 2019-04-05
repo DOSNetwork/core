@@ -78,7 +78,7 @@ func NewDosNode(credentialPath, passphrase string) (dosNode *DosNode, err error)
 	if config.NodeRole == "testNode" {
 		var rspBytes []byte
 		var resp *http.Response
-		ip := config.BootStrapIp
+		ip := config.BootStrapIp[0]
 		tServer := "http://" + ip + ":8080/getCredential"
 		resp, err = http.Get(tServer)
 		for err != nil {
@@ -135,7 +135,7 @@ func NewDosNode(credentialPath, passphrase string) (dosNode *DosNode, err error)
 
 	//Bootstrapping p2p network
 	fmt.Println("Join :", bootstrapIp)
-	err = p.Join([]string{bootstrapIp})
+	err = p.Join(bootstrapIp)
 	if err != nil {
 		fmt.Println("Join ", err)
 	}

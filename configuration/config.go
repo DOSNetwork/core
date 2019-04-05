@@ -23,7 +23,7 @@ const (
 
 type Config struct {
 	NodeRole        string
-	BootStrapIp     string
+	BootStrapIp     []string
 	Port            string
 	ChainConfigs    map[string]map[string]ChainConfig
 	randomGroupSize int
@@ -102,10 +102,11 @@ func (c *Config) LoadConfig() (err error) {
 }
 
 func (c *Config) overWrite() (err error) {
-	bootStrapIP := os.Getenv(ENVBOOTSTRAPIP)
-	if bootStrapIP != "" {
-		c.BootStrapIp = bootStrapIP
-	}
+	/*
+		bootStrapIP := os.Getenv(ENVBOOTSTRAPIP)
+		if bootStrapIP != "" {
+			c.BootStrapIp = bootStrapIP
+		}*/
 
 	envSize := os.Getenv(ENVGROUPSIZE)
 	if envSize != "" {
