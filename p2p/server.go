@@ -431,8 +431,7 @@ func (n *Server) callHandler() {
 				f := map[string]interface{}{
 					"localID":    client.localID,
 					"remoteID":   client.remoteID,
-					"RemoteAddr": client.conn.RemoteAddr().String(),
-					"Time":       time.Now()}
+					"RemoteAddr": client.conn.RemoteAddr().String()}
 				logger.Event("registerClient", f)
 			case _, _ = <-hangup:
 			}
@@ -493,7 +492,7 @@ func (n *Server) ConnectTo(addr string, id []byte) ([]byte, error) {
 }
 
 func (n *Server) Request(id []byte, m proto.Message) (msg P2PMessage, err error) {
-	defer logger.TimeTrack(time.Now(), "Request", nil)
+	//defer logger.TimeTrack(time.Now(), "Request", nil)
 	callReq := Request{}
 	callReq.ctx, callReq.cancel = context.WithTimeout(context.Background(), 5*time.Second)
 	callReq.rType = 1

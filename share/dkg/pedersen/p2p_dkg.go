@@ -74,7 +74,7 @@ func CreateP2PDkg(p p2p.P2PInterface, suite suites.Suite) (P2PDkgInterface, erro
 }
 
 func (d *P2PDkg) GetSessionID(pubKeyCoor [4]*big.Int) (sessionId string) {
-	if targetSession, loaded := d.finSessions.Load(hashPoint(pubKeyCoor)); loaded {
+	if targetSession, loaded := d.finSessions.Load(HashPoint(pubKeyCoor)); loaded {
 		sessionId = targetSession.(*DkgSession).SessionId
 	}
 	return
@@ -115,8 +115,7 @@ func (d *P2PDkg) Start(ctx context.Context, groupIds [][]byte, sessionId string)
 				"retry":     retry,
 				"costTime":  time.Since(start).Nanoseconds() / 1000,
 				"From":      (*d.network).GetID(),
-				"To":        groupIds[i],
-				"Time":      time.Now()}
+				"To":        groupIds[i]}
 			if retry >= 10 {
 				d.logger.Event("DKGConnectToFaile", f)
 			} else {
@@ -140,7 +139,7 @@ func (d *P2PDkg) Start(ctx context.Context, groupIds [][]byte, sessionId string)
 }
 
 func (d *P2PDkg) GetGroupPublicPoly(pubKeyCoor [4]*big.Int) *share.PubPoly {
-	if targetSession, loaded := d.finSessions.Load(hashPoint(pubKeyCoor)); loaded {
+	if targetSession, loaded := d.finSessions.Load(HashPoint(pubKeyCoor)); loaded {
 		return targetSession.(*DkgSession).groupPubPoly
 	}
 	return nil
@@ -167,21 +166,21 @@ func (d *P2PDkg) GetAnyGroupIDs() [][]byte {
 }
 
 func (d *P2PDkg) GetGroupIDs(pubKeyCoor [4]*big.Int) [][]byte {
-	if targetSession, loaded := d.finSessions.Load(hashPoint(pubKeyCoor)); loaded {
+	if targetSession, loaded := d.finSessions.Load(HashPoint(pubKeyCoor)); loaded {
 		return targetSession.(*DkgSession).GroupIds
 	}
 	return nil
 }
 
 func (d *P2PDkg) GetShareSecurity(pubKeyCoor [4]*big.Int) *share.PriShare {
-	if targetSession, loaded := d.finSessions.Load(hashPoint(pubKeyCoor)); loaded {
+	if targetSession, loaded := d.finSessions.Load(HashPoint(pubKeyCoor)); loaded {
 		return targetSession.(*DkgSession).partDks.Share
 	}
 	return nil
 }
 
 func (d *P2PDkg) GroupDismiss(pubKeyCoor [4]*big.Int) bool {
-	d.finSessions.Delete(hashPoint(pubKeyCoor))
+	d.finSessions.Delete(HashPoint(pubKeyCoor))
 	length := 0
 	d.finSessions.Range(func(_, _ interface{}) bool {
 		length++
@@ -260,7 +259,7 @@ func (d *P2PDkg) eventLoop() (err error) {
 							content.errc <- errors.New("dkg: decode share public key fail")
 							continue
 						}
-						if _, loaded := d.finSessions.LoadOrStore(hashPoint(pubKeyCoor), content); loaded {
+						if _, loaded := d.finSessions.LoadOrStore(HashPoint(pubKeyCoor), content); loaded {
 							content.errc <- errors.New("dkg: duplicate share public key")
 							continue
 						}
@@ -336,7 +335,7 @@ func decodePubKey(pubKey kyber.Point) (pubKeyCoor [4]*big.Int, err error) {
 	return
 }
 
-func hashPoint(pubKeyCoor [4]*big.Int) string {
+func HashPoint(pubKeyCoor [4]*big.Int) string {
 	var pointBytes []byte
 	for _, coor := range pubKeyCoor {
 		pointBytes = append(pointBytes, coor.Bytes()...)

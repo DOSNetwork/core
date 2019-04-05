@@ -65,7 +65,6 @@ type DOSProxyLogValidationResult struct {
 	Message     []byte
 	Signature   [2]*big.Int
 	PubKey      [4]*big.Int
-	GroupId     *big.Int
 	Pass        bool
 	Version     uint8
 	Tx          string

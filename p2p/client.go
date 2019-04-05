@@ -87,10 +87,10 @@ func NewClient(suite suites.Suite, secKey kyber.Scalar, localPubKey kyber.Point,
 	}
 	client.ctx, client.cancel = context.WithCancel(context.Background())
 	client.sender = make(chan Request, 100)
-
 	//Wait for exchanging ID complete
 	err = client.exchangeID()
 	if err != nil {
+		logger.Error(err)
 		return
 	}
 
@@ -141,7 +141,14 @@ func (c *Client) exchangeID() (err error) {
 	timeout := time.Duration(10) * time.Second
 	select {
 	case <-ch:
+		f := map[string]interface{}{
+			"localID":  c.localID,
+			"remoteID": c.remoteID}
+		logger.Event("exchangeIDSuccess", f)
 	case <-time.After(timeout):
+		f := map[string]interface{}{
+			"localID": c.localID}
+		logger.Event("exchangeIDFail", f)
 	}
 	return
 }
@@ -151,10 +158,12 @@ func (c *Client) receiveID(wg *sync.WaitGroup) (err error) {
 
 	pa := new(Package)
 	if err = proto.Unmarshal(buffer, pa); err != nil {
+		logger.Error(err)
 		return
 	}
 	var ptr ptypes.DynamicAny
 	if err = ptypes.UnmarshalAny(pa.GetAnything(), &ptr); err != nil {
+		logger.Error(err)
 		return
 	}
 	id, ok := ptr.Message.(*ID)
@@ -169,6 +178,7 @@ func (c *Client) receiveID(wg *sync.WaitGroup) (err error) {
 	}
 	pub := c.suite.G2().Point()
 	if err = pub.UnmarshalBinary(id.GetPublicKey()); err != nil {
+		logger.Error(err)
 		return
 	}
 	c.remotePubKey = pub
@@ -176,6 +186,7 @@ func (c *Client) receiveID(wg *sync.WaitGroup) (err error) {
 	var dhBytes []byte
 	dhKey := c.suite.Point().Mul(c.localSecKey, c.remotePubKey)
 	if dhBytes, err = dhKey.MarshalBinary(); err != nil {
+		logger.Error(err)
 		return
 	}
 	c.dhKey = dhBytes[0:32]
@@ -188,6 +199,7 @@ func (c *Client) sendID(wg *sync.WaitGroup) (err error) {
 	var anything *any.Any
 	var bytes, pubKeyBytes []byte
 	if pubKeyBytes, err = c.localPubKey.MarshalBinary(); err != nil {
+		logger.Error(err)
 		return
 	}
 
@@ -197,18 +209,21 @@ func (c *Client) sendID(wg *sync.WaitGroup) (err error) {
 	}
 
 	if anything, err = ptypes.MarshalAny(pID); err != nil {
+		logger.Error(err)
 		return
 	}
 	pa := &Package{
 		Anything: anything,
 	}
 	if bytes, err = proto.Marshal(pa); err != nil {
+		logger.Error(err)
 		return
 	}
 	prefix := make([]byte, 4)
 	binary.BigEndian.PutUint32(prefix, uint32(len(bytes)))
 	bytes = append(prefix, bytes...)
 	if _, E := c.conn.Write(bytes); E != nil {
+		logger.Error(E)
 		return
 	}
 

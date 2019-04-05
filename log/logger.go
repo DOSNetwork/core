@@ -135,9 +135,9 @@ func (l *logger) Event(e string, info map[string]interface{}) {
 		return
 	}
 	if info != nil {
-		l.entry.WithFields(logrus.Fields{"EVENT": e}).WithFields(info).Debug("")
+		l.entry.WithFields(logrus.Fields{"EVENT": e, "Time": time.Now()}).WithFields(info).Debug("")
 	} else {
-		l.entry.WithFields(logrus.Fields{"EVENT": e}).Debug("")
+		l.entry.WithFields(logrus.Fields{"EVENT": e, "Time": time.Now()}).Debug("")
 
 	}
 }

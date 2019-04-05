@@ -55,6 +55,7 @@ func NewAMAUserSession(credentialPath, passphrase, addr string, gethUrls []strin
 		fmt.Println("NewETHProxySession ", err)
 		return
 	}
+	log.Init(key.Address.Bytes()[:])
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	defer cancelFunc()

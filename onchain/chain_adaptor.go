@@ -32,6 +32,7 @@ type ProxyAdapter interface {
 	SubscribeEvent(subscribeType int) (<-chan interface{}, <-chan error)
 	PollLogs(subscribeType int, LogBlockDiff, preBlockBuf uint64) (<-chan interface{}, <-chan error)
 
+	GroupSize() (size uint64, err error)
 	GetWorkingGroupSize() (size uint64, err error)
 	GetGroupToPick() (size uint64, err error)
 	LastUpdatedBlock() (blknum uint64, err error)

@@ -49,14 +49,18 @@ genAMA:
 	rm -r $(USER_CONTRACTS)/lib
 deployAMA:genAMA
 	go run contracts_deploy/deploy.go -credentialPath $(BOOT_CREDENTIAL) -contractPath $(ETH_CONTRACTS) -target deployAMA -configPath $(AMA_CONFIGPATH)
-
+genAll:
+	abigen -sol $(ETH_CONTRACTS)/DOSAddressBridge.sol --pkg dosbridge --out ../$(DOSBRIDGE_GOPATH)/DOSAddressBridge.go
+	go run contracts_deploy/deploy.go -credentialPath $(BOOT_CREDENTIAL) -contractPath $(ETH_CONTRACTS) -target updateBridgeAddrToOtherContract
+	abigen -sol $(ETH_CONTRACTS)/DOSAddressBridge.sol --pkg dosbridge --out ../$(DOSBRIDGE_GOPATH)/DOSAddressBridge.go
+	abigen -sol $(ETH_CONTRACTS)/DOSProxy.sol --pkg dosproxy --out ../$(DOSPROXY_GOPATH)/DOSProxy.go
+	abigen -sol $(ETH_CONTRACTS)/DOSCommitReveal.sol --pkg doscommitreveal --out ../$(DOSCOMMITREVEAL_GOPATH)/DOSCommitReveal.go
 buildAll:deployAll
 	xgo --targets=linux/amd64 -out testEnv/dosclient ../
 	mv testEnv/dosclient-linux-amd64 testEnv/dosclient
 	cp ../config.json testEnv/
 	go build -o testEnv/dos_user dosUser/dos_user.go
 	cp dosUser/ama.json testEnv/
-
 docker-bootnode:
 	cp bootStrapNode/Dockerfile  ../Dockerfile.bootstrap	
 	cd .. && docker build -t bootstrap -f Dockerfile.bootstrap .

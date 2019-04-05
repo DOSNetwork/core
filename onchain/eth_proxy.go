@@ -51,6 +51,7 @@ const (
 	CommitRevealTargetBlk
 	NumPendingGroups
 	PengindNodeSize
+	GroupSize
 )
 
 // TODO: Move constants to some unified places.
@@ -223,7 +224,7 @@ func NewEthAdaptor(credentialPath, passphrase, proxyAddr, commitRevealAddr strin
 		return
 	}
 	adaptor.reqQueue = make(chan interface{})
-	fmt.Println("working eth client ", len(adaptor.clients), "Balance ", adaptor.GetBalance())
+	fmt.Println("working eth http client ", len(adaptor.clients), "Balance ", adaptor.GetBalance())
 
 	adaptor.eCtx, adaptor.eCancelFunc = context.WithCancel(context.Background())
 	syncClients := CheckSync(adaptor.eCtx, adaptor.clients[0], DialToEth(context.Background(), wsUrls, key))
@@ -240,6 +241,7 @@ func NewEthAdaptor(credentialPath, passphrase, proxyAddr, commitRevealAddr strin
 	if len(adaptor.eProxies) == 0 {
 		err = errors.New("No any working eth client for event tracking")
 	}
+	fmt.Println("working eth ws client ", len(adaptor.eClients))
 
 	adaptor.reqLoop()
 
@@ -430,8 +432,7 @@ func (e *EthAdaptor) sendRequest(ctx context.Context, c *ethclient.Client, pre <
 					logger.Error(err)
 					f := map[string]interface{}{
 						"Tx":     tx,
-						"ErrMsg": err.Error(),
-						"Time":   time.Now()}
+						"ErrMsg": err.Error()}
 					logger.Event("TransactionFail", f)
 					fmt.Println("TransactionFail err ", err)
 					//Don't return err to errc to delete the whole sendRequest chain
@@ -535,8 +536,7 @@ func (e *EthAdaptor) RegisterGroupPubKey(ctx context.Context, IdWithPubKeys chan
 				"DispatchedGroup_1": fmt.Sprintf("%x", pubKey[0].Bytes()),
 				"DispatchedGroup_2": fmt.Sprintf("%x", pubKey[1].Bytes()),
 				"DispatchedGroup_3": fmt.Sprintf("%x", pubKey[2].Bytes()),
-				"DispatchedGroup_4": fmt.Sprintf("%x", pubKey[3].Bytes()),
-				"Time":              time.Now()}
+				"DispatchedGroup_4": fmt.Sprintf("%x", pubKey[3].Bytes())}
 			logger.Event("DOS_RegisterGroupPubKey", f)
 			return
 		case <-ctx.Done():
@@ -1088,6 +1088,66 @@ func subscribeEvent(ctx context.Context, proxy *dosproxy.DOSProxy, subscribeType
 				}
 			}
 		}()
+	case SubscribeDOSProxyLogGrouping:
+		go func() {
+			transitChan := make(chan *dosproxy.DOSProxyLogGrouping)
+			defer close(transitChan)
+			defer close(errc)
+			defer close(out)
+			sub, err := proxy.DOSProxyFilterer.WatchLogGrouping(opt, transitChan)
+			if err != nil {
+				return
+			}
+			for {
+				select {
+				case <-ctx.Done():
+					sub.Unsubscribe()
+					return
+				case err := <-sub.Err():
+					errc <- err
+					return
+				case i := <-transitChan:
+					out <- &DOSProxyLogGrouping{
+						GroupId: i.GroupId,
+						NodeId:  i.NodeId,
+						Tx:      i.Raw.TxHash.Hex(),
+						BlockN:  i.Raw.BlockNumber,
+						Removed: i.Raw.Removed,
+						Raw:     i.Raw,
+					}
+				}
+			}
+		}()
+	case SubscribeDOSProxyLogGroupDismiss:
+		go func() {
+			transitChan := make(chan *dosproxy.DOSProxyLogGroupDismiss)
+			defer close(transitChan)
+			defer close(errc)
+			defer close(out)
+			sub, err := proxy.DOSProxyFilterer.WatchLogGroupDismiss(opt, transitChan)
+			if err != nil {
+				return
+			}
+			for {
+				select {
+				case <-ctx.Done():
+					sub.Unsubscribe()
+					return
+				case err := <-sub.Err():
+					errc <- err
+					return
+				case i := <-transitChan:
+					out <- &DOSProxyLogGroupDismiss{
+						PubKey:  i.PubKey,
+						GroupId: i.GroupId,
+						Tx:      i.Raw.TxHash.Hex(),
+						BlockN:  i.Raw.BlockNumber,
+						Removed: i.Raw.Removed,
+						Raw:     i.Raw,
+					}
+				}
+			}
+		}()
 	}
 	return out, errc
 }
@@ -1484,6 +1544,8 @@ func proxyGet(proxy *dosproxy.DOSProxySession, vType int) chan interface{} {
 		switch vType {
 		case LastRandomness:
 			val, err = proxy.LastRandomness()
+		case GroupSize:
+			val, err = proxy.GroupSize()
 		case WorkingGroupSize:
 			val, err = proxy.GetWorkingGroupSize()
 		case PengindNodeSize:
@@ -1494,7 +1556,6 @@ func proxyGet(proxy *dosproxy.DOSProxySession, vType int) chan interface{} {
 			val, err = proxy.GroupToPick()
 		case LastUpdatedBlock:
 			val, err = proxy.LastUpdatedBlock()
-			fmt.Println("LastUpdatedBlock ", val, err)
 		case CommitRevealTargetBlk:
 			val, err = proxy.CommitRevealTargetBlk()
 		}
@@ -1521,7 +1582,30 @@ func (e *EthAdaptor) LastRandomness() (rand *big.Int, err error) {
 		rand, ok = val.(*big.Int)
 		if !ok {
 			err = errors.New("type error")
+			return
 		}
+	case <-ctx.Done():
+		err = errors.New("Timeout")
+	}
+	return
+}
+
+func (e *EthAdaptor) GroupSize() (size uint64, err error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	var valList []chan interface{}
+	for _, proxy := range e.proxies {
+		valList = append(valList, proxyGet(proxy, GroupSize))
+	}
+	out := first(ctx, merge(ctx, valList...))
+	select {
+	case val, ok := <-out:
+		sizeBig, ok := val.(*big.Int)
+		if !ok {
+			err = errors.New("type error")
+			return
+		}
+		size = sizeBig.Uint64()
 	case <-ctx.Done():
 		err = errors.New("Timeout")
 	}
@@ -1537,10 +1621,11 @@ func (e *EthAdaptor) GetWorkingGroupSize() (size uint64, err error) {
 	}
 	out := first(ctx, merge(ctx, valList...))
 	select {
-	case val := <-out:
+	case val, ok := <-out:
 		sizeBig, ok := val.(*big.Int)
 		if !ok {
 			err = errors.New("type error")
+			return
 		}
 		size = sizeBig.Uint64()
 	case <-ctx.Done():
@@ -1562,6 +1647,7 @@ func (e *EthAdaptor) NumPendingGroups() (size uint64, err error) {
 		sizeBig, ok := val.(*big.Int)
 		if !ok {
 			err = errors.New("type error")
+			return
 		}
 		size = sizeBig.Uint64()
 	case <-ctx.Done():
@@ -1583,6 +1669,7 @@ func (e *EthAdaptor) GetPengindNodeSize() (size uint64, err error) {
 		sizeBig, ok := val.(*big.Int)
 		if !ok {
 			err = errors.New("type error")
+			return
 		}
 		size = sizeBig.Uint64()
 	case <-ctx.Done():
@@ -1603,6 +1690,7 @@ func (e *EthAdaptor) CommitRevealTargetBlk() (blk uint64, err error) {
 		s, ok := val.(*big.Int)
 		if !ok {
 			err = errors.New("type error")
+			return
 		}
 		blk = s.Uint64()
 	case <-ctx.Done():
@@ -1623,6 +1711,7 @@ func (e *EthAdaptor) GetGroupToPick() (size uint64, err error) {
 		sizeBig, ok := val.(*big.Int)
 		if !ok {
 			err = errors.New("type error")
+			return
 		}
 		size = sizeBig.Uint64()
 	case <-ctx.Done():
@@ -1645,6 +1734,7 @@ func (e *EthAdaptor) LastUpdatedBlock() (blknum uint64, err error) {
 		blknumBig, ok := val.(*big.Int)
 		if !ok {
 			err = errors.New("type error")
+			return
 		}
 		blknum = blknumBig.Uint64()
 	case <-ctx.Done():

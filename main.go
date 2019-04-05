@@ -13,7 +13,7 @@ import (
 	"syscall"
 
 	"github.com/DOSNetwork/core/dosnode"
-	"github.com/pkg/profile"
+	//"github.com/pkg/profile"
 
 	"github.com/urfave/cli"
 	"golang.org/x/crypto/ssh/terminal"
@@ -49,7 +49,7 @@ func runDos(credentialPath, passphrase string) {
 	signal.Notify(ch, os.Interrupt, os.Kill, syscall.SIGTERM)
 
 	go func() {
-		defer profile.Start().Stop()
+		//defer profile.Start().Stop()
 
 		//defer os.Exit(0)
 		signalType := <-ch
