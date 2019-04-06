@@ -194,13 +194,13 @@ func main() {
 	}
 	var events []<-chan interface{}
 	var errcs []<-chan error
-	event, errc := userTestAdaptor.PollLogs(eth.SubscribeAskMeAnythingQueryResponseReady, LARGELOGBLOCKDIFF, 0)
+	event, errc := userTestAdaptor.SubscribeEvent(eth.SubscribeAskMeAnythingQueryResponseReady)
 	events = append(events, event)
 	errcs = append(errcs, errc)
-	event, errc = userTestAdaptor.PollLogs(eth.SubscribeAskMeAnythingRequestSent, SMALLLOGBLOCKDIFF, 0)
+	event, errc = userTestAdaptor.SubscribeEvent(eth.SubscribeAskMeAnythingRequestSent)
 	events = append(events, event)
 	errcs = append(errcs, errc)
-	event, errc = userTestAdaptor.PollLogs(eth.SubscribeAskMeAnythingRandomReady, LARGELOGBLOCKDIFF, 0)
+	event, errc = userTestAdaptor.SubscribeEvent(eth.SubscribeAskMeAnythingRandomReady)
 	events = append(events, event)
 	errcs = append(errcs, errc)
 	event = eth.MergeEvents(context.Background(), events...)

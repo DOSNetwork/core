@@ -162,7 +162,7 @@ func (e *EthUserAdaptor) PollLogs(subscribeType int, logBlockDiff, preBlockBuf u
 							Start:   targetBlockN,
 							End:     &targetBlockN,
 							Context: ctx,
-						}, []common.Address{e.Address()})
+						})
 						if err != nil {
 							errc <- err
 							continue
@@ -217,6 +217,95 @@ func (e *EthUserAdaptor) PollLogs(subscribeType int, logBlockDiff, preBlockBuf u
 	wg.Wait()
 
 	return e.first(e.ctx, MergeEvents(e.ctx, sinks...)), MergeErrors(e.ctx, errcs...)
+}
+func (e *EthUserAdaptor) SubscribeEvent(subscribeType int) (<-chan interface{}, <-chan error) {
+	var eventList []<-chan interface{}
+	var errcs []<-chan error
+	for i := 0; i < len(e.rProxies); i++ {
+		proxy := e.rProxies[i]
+		if proxy == nil {
+			continue
+		}
+		ctx := e.rCtxs[i]
+		if ctx == nil {
+			continue
+		}
+		out, errc := subscribeEvent(ctx, proxy, subscribeType)
+		eventList = append(eventList, out)
+		errcs = append(errcs, errc)
+	}
+
+	return e.first(e.ctx, MergeEvents(e.ctx, eventList...)), MergeErrors(e.ctx, errcs...)
+}
+func subscribeEvent(ctx context.Context, proxy *dosUser.AskMeAnything, subscribeType int) (<-chan interface{}, <-chan error) {
+	out := make(chan interface{})
+	errc := make(chan error)
+	opt := &bind.WatchOpts{}
+
+	switch subscribeType {
+	case SubscribeAskMeAnythingQueryResponseReady:
+		go func() {
+			transitChan := make(chan *dosUser.AskMeAnythingQueryResponseReady)
+			defer close(transitChan)
+			defer close(errc)
+			defer close(out)
+			sub, err := proxy.AskMeAnythingFilterer.WatchQueryResponseReady(opt, transitChan)
+			if err != nil {
+				return
+			}
+			for {
+				select {
+				case <-ctx.Done():
+					sub.Unsubscribe()
+					return
+				case err := <-sub.Err():
+					errc <- err
+					return
+				case i := <-transitChan:
+					out <- &AskMeAnythingQueryResponseReady{
+						QueryId: i.QueryId,
+						Result:  i.Result,
+						Tx:      i.Raw.TxHash.Hex(),
+						BlockN:  i.Raw.BlockNumber,
+						Removed: i.Raw.Removed,
+						Raw:     i.Raw,
+					}
+				}
+			}
+		}()
+	case SubscribeAskMeAnythingRequestSent:
+		go func() {
+			transitChan := make(chan *dosUser.AskMeAnythingRequestSent)
+			defer close(transitChan)
+			defer close(errc)
+			defer close(out)
+			sub, err := proxy.AskMeAnythingFilterer.WatchRequestSent(opt, transitChan)
+			if err != nil {
+				return
+			}
+			for {
+				select {
+				case <-ctx.Done():
+					sub.Unsubscribe()
+					return
+				case err := <-sub.Err():
+					errc <- err
+					return
+				case i := <-transitChan:
+					out <- &AskMeAnythingRequestSent{
+						InternalSerial: i.InternalSerial,
+						Succ:           i.Succ,
+						RequestId:      i.RequestId,
+						Tx:             i.Raw.TxHash.Hex(),
+						BlockN:         i.Raw.BlockNumber,
+						Removed:        i.Raw.Removed,
+						Raw:            i.Raw,
+					}
+				}
+			}
+		}()
+	}
+	return out, errc
 }
 
 func (e *EthUserAdaptor) first(ctx context.Context, source chan interface{}) <-chan interface{} {
