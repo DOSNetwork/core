@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"strings"
 	"sync"
 	"time"
 
@@ -50,6 +51,17 @@ type EthUserAdaptor struct {
 }
 
 func NewAMAUserSession(credentialPath, passphrase, addr string, gethUrls []string) (adaptor *EthUserAdaptor, err error) {
+	var httpUrls []string
+	var wsUrls []string
+	for _, url := range gethUrls {
+		if strings.Contains(url, "http") {
+			httpUrls = append(httpUrls, url)
+		} else if strings.Contains(url, "ws") {
+			wsUrls = append(wsUrls, url)
+		}
+	}
+	fmt.Println("gethUrls ", httpUrls)
+	fmt.Println("eventUrls ", wsUrls)
 	key, err := onchain.ReadEthKey(credentialPath, passphrase)
 	if err != nil {
 		fmt.Println("NewETHProxySession ", err)
@@ -59,7 +71,7 @@ func NewAMAUserSession(credentialPath, passphrase, addr string, gethUrls []strin
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	defer cancelFunc()
-	clients := onchain.DialToEth(ctx, gethUrls, key)
+	clients := onchain.DialToEth(ctx, httpUrls, key)
 	//Use first client
 	c, ok := <-clients
 	if !ok {
@@ -72,6 +84,7 @@ func NewAMAUserSession(credentialPath, passphrase, addr string, gethUrls []strin
 		fmt.Println("NewAskMeAnything ", err)
 		return
 	}
+
 	adaptor = &EthUserAdaptor{}
 	ctxD, cancelSession := context.WithCancel(context.Background())
 	auth := bind.NewKeyedTransactor(key.PrivateKey)
@@ -87,6 +100,7 @@ func NewAMAUserSession(credentialPath, passphrase, addr string, gethUrls []strin
 	adaptor.cancel = cancelSession
 	adaptor.reqQueue = make(chan interface{})
 
+	clients = onchain.DialToEth(ctx, wsUrls, key)
 	for client := range clients {
 		p, err := dosUser.NewAskMeAnything(common.HexToAddress(addr), client)
 		if err != nil {
