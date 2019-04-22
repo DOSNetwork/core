@@ -1,30 +1,39 @@
 {
     "NodeRole": "BootstrapNode",
-    "BootStrapIp": "127.0.0.1",
+    "BootStrapIp": [
+        "18.236.112.109",
+        "54.200.75.251",
+        "54.245.13.127",
+        "54.202.250.153"
+    ],
     "Port": "9501",
     "ChainConfigs": {
         "ETH": {
             "privateNode": {
-                "DOSProxyAddress": "0x68E0E5EF62bc80309128cbaD087d779822035d57",
-                "DOSAddressBridgeAddress": "0x6E9A8cb8Fb1b24569F4FbF16672c4835eF5C96D9",
+                "DOSProxyAddress": "0x560F79B8DF9C7D3e3db38f2FeB111DF2da8F9375",
+                "DOSAddressBridgeAddress": "0x4adA71eC02e21E6c5088BD48e8302719aC93F4c6",
+                "DOSCommitReveal": "",
                 "RemoteNodeAddressPool": [
+                    "http://163.172.36.173:8080",
                     "ws://163.172.36.173:8546"
                 ]
             },
             "rinkebyInfura": {
                 "DOSProxyAddress": "0x57054466fAD09bFA5fB723c9057f7a16d359656D",
                 "DOSAddressBridgeAddress": "0x09dB4cd7ec4de9A5f4d45C270C01be33E8dC9567",
+                "DOSCommitReveal": "",
                 "RemoteNodeAddressPool": [
                     "https://rinkeby.infura.io/8e609c76fce442f8a1735fbea9999747"
                 ]
             },
             "rinkebyPrivateNode": {
-                "DOSProxyAddress": "0x27969e17F71C93649eCdeF7581Ba2187E55Eb6e3",
-                "DOSAddressBridgeAddress": "0xf657B7090Ca39558f66dCe600889f25c3cA7F5F3",
+                "DOSProxyAddress": "0xA32E9E472C11C794631d223019e873f3fE916598",
+                "DOSAddressBridgeAddress": "0x9c556D308f226b0322C7742F4AbA4d8d3168E5c2",
+                "DOSCommitReveal": "0xf0fAcE4c2fc79A4d170e93652F0e29304b2f24b8",
                 "RemoteNodeAddressPool": [
-                    "https://rinkeby.infura.io/8e609c76fce442f8a1735fbea9999747",
-                    "ws://51.15.0.157:8546",
-                    "ws://51.159.4.51:8546"
+                    "http://51.159.4.51:8545",
+                    "ws://51.159.4.51:8546",
+                    "ws://51.15.0.157:8546"
                 ]
             }
         }

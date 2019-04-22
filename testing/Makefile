@@ -12,6 +12,7 @@ AMA_CONFIGPATH := dosUser/ama.json
 DOSPROXY_GOPATH := onchain/dosproxy
 DOSBRIDGE_GOPATH := onchain/dosbridge
 DOSCOMMITREVEAL_GOPATH := onchain/doscommitreveal
+UNAME_S := $(shell uname)
 clean:
 	cd .. && make clean
 deployAll:
@@ -56,8 +57,13 @@ genAll:
 	abigen -sol $(ETH_CONTRACTS)/DOSProxy.sol --pkg dosproxy --out ../$(DOSPROXY_GOPATH)/DOSProxy.go
 	abigen -sol $(ETH_CONTRACTS)/DOSCommitReveal.sol --pkg doscommitreveal --out ../$(DOSCOMMITREVEAL_GOPATH)/DOSCommitReveal.go
 buildAll:deployAll
+ifeq ($(UNAME_S),Linux)
+	go build -o testEnv/dosclient ../
+endif
+ifeq ($(UNAME_S),Darwin)
 	xgo --targets=linux/amd64 -out testEnv/dosclient ../
 	mv testEnv/dosclient-linux-amd64 testEnv/dosclient
+endif
 	cp ../config.json testEnv/
 	go build -o testEnv/dos_user dosUser/dos_user.go
 	cp dosUser/ama.json testEnv/
