@@ -746,7 +746,7 @@ func (e *EthAdaptor) firstEvent(ctx context.Context, source chan interface{}) <-
 						bytes = append(bytes, content.Raw.Data...)
 						blkNum = content.BlockN
 						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
-					case *DOSProxyLogGroupDismiss:
+					case *DOSProxyLogGroupDissolve:
 						bytes = append(bytes, content.Raw.Data...)
 						blkNum = content.BlockN
 						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
@@ -1120,11 +1120,11 @@ func subscribeEvent(ctx context.Context, proxy *dosproxy.DOSProxy, subscribeType
 		}()
 	case SubscribeDOSProxyLogGroupDismiss:
 		go func() {
-			transitChan := make(chan *dosproxy.DOSProxyLogGroupDismiss)
+			transitChan := make(chan *dosproxy.DOSProxyLogGroupDissolve)
 			defer close(transitChan)
 			defer close(errc)
 			defer close(out)
-			sub, err := proxy.DOSProxyFilterer.WatchLogGroupDismiss(opt, transitChan)
+			sub, err := proxy.DOSProxyFilterer.WatchLogGroupDissolve(opt, transitChan)
 			if err != nil {
 				return
 			}
@@ -1137,7 +1137,7 @@ func subscribeEvent(ctx context.Context, proxy *dosproxy.DOSProxy, subscribeType
 					errc <- err
 					return
 				case i := <-transitChan:
-					out <- &DOSProxyLogGroupDismiss{
+					out <- &DOSProxyLogGroupDissolve{
 						PubKey:  i.PubKey,
 						GroupId: i.GroupId,
 						Tx:      i.Raw.TxHash.Hex(),
@@ -1203,7 +1203,7 @@ func (e *EthAdaptor) PollLogs(subscribeType int, logBlockDiff, preBlockBuf uint6
 							}
 						}
 					case SubscribeDOSProxyLogGroupDismiss:
-						logs, err := proxyFilter.FilterLogGroupDismiss(&bind.FilterOpts{
+						logs, err := proxyFilter.FilterLogGroupDissolve(&bind.FilterOpts{
 							Start:   targetBlockN,
 							End:     &targetBlockN,
 							Context: ctx,
@@ -1213,7 +1213,7 @@ func (e *EthAdaptor) PollLogs(subscribeType int, logBlockDiff, preBlockBuf uint6
 							continue
 						}
 						for logs.Next() {
-							sink <- &DOSProxyLogGroupDismiss{
+							sink <- &DOSProxyLogGroupDissolve{
 								PubKey:  logs.Event.PubKey,
 								GroupId: logs.Event.GroupId,
 								Tx:      logs.Event.Raw.TxHash.Hex(),

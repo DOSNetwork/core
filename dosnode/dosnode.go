@@ -613,7 +613,7 @@ func (d *DosNode) listen() (err error) {
 				if !ok {
 					continue
 				}
-				content, ok := msg.(*onchain.DOSProxyLogGroupDismiss)
+				content, ok := msg.(*onchain.DOSProxyLogGroupDissolve)
 				if !ok {
 					e, ok := msg.(error)
 					if ok {

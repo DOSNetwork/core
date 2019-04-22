@@ -146,7 +146,7 @@ type DOSProxyLogPublicKeyUploaded struct {
 	Raw       types.Log
 }
 
-type DOSProxyLogGroupDismiss struct {
+type DOSProxyLogGroupDissolve struct {
 	GroupId *big.Int
 	PubKey  [4]*big.Int
 	Tx      string
