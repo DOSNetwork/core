@@ -13,6 +13,7 @@ import (
 	"syscall"
 
 	"github.com/DOSNetwork/core/dosnode"
+
 	//"github.com/pkg/profile"
 
 	"github.com/urfave/cli"
@@ -61,6 +62,9 @@ func runDos(credentialPath, passphrase string) {
 		os.Remove(PIDFile)
 
 	}()
+	fErr, err := os.OpenFile("/app-logs/doslog", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0666)
+	syscall.Dup2(int(fErr.Fd()), 1) /* -- stdout */
+	syscall.Dup2(int(fErr.Fd()), 2) /* -- stderr */
 
 	dosclient, err := dosnode.NewDosNode(credentialPath, passphrase)
 	if err != nil {
