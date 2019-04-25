@@ -135,7 +135,7 @@ type DOSProxyLogPublicKeyAccepted struct {
 	Raw              types.Log
 }
 
-type DOSProxyLogPublicKeyUploaded struct {
+type DOSProxyLogPublicKeySuggested struct {
 	GroupId   *big.Int
 	PubKey    [4]*big.Int
 	Count     *big.Int

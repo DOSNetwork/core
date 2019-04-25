@@ -9,7 +9,7 @@ import (
 )
 
 type Network interface {
-	Join(Ip []string) (err error)
+	Join(Ip []string) (num int, err error)
 	Leave()
 	Lookups(id []byte) (addr net.IP)
 	NumPeers() int
@@ -36,8 +36,8 @@ func (s *SerfNet) NumPeers() int {
 	return len(s.serf.Members())
 }
 
-func (s *SerfNet) Join(bootstrapIp []string) (err error) {
-	_, err = s.serf.Join(bootstrapIp, true)
+func (s *SerfNet) Join(bootstrapIp []string) (num int, err error) {
+	num, err = s.serf.Join(bootstrapIp, true)
 	return
 }
 

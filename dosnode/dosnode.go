@@ -135,11 +135,22 @@ func NewDosNode(credentialPath, passphrase string) (dosNode *DosNode, err error)
 
 	//Bootstrapping p2p network
 	fmt.Println("Join :", bootstrapIp)
-	err = p.Join(bootstrapIp)
-	if err != nil {
-		fmt.Println("Join ", err)
-	}
+	retry, num := 0, 0
+	for {
+		num, err = p.Join(bootstrapIp)
+		if err != nil || num == 0 {
+			fmt.Println("Join ", err, num)
 
+			if retry == 10 {
+				return
+			}
+			retry++
+			time.Sleep(5 * time.Second)
+		} else {
+			break
+		}
+	}
+	fmt.Println("Join : num of peer ", num)
 	//Build a p2pDKG
 	suite := suites.MustFind("bn256")
 	p2pDkg, err := dkg.CreateP2PDkg(p, suite)
@@ -181,7 +192,8 @@ func (d *DosNode) Start() (err error) {
 	mux.HandleFunc("/guardian", d.guardian)
 	mux.HandleFunc("/p2p", d.p2p)
 
-	http.ListenAndServe("localhost:8080", mux)
+	//http.ListenAndServe("localhost:8080", mux)
+	http.ListenAndServe(":8080", mux)
 	return
 }
 
@@ -295,12 +307,11 @@ func (d *DosNode) buildPipeline(valueCtx context.Context, pubkey [4]*big.Int, gr
 }
 
 func (d *DosNode) listen() (err error) {
-	keyUploaded := make(chan interface{})
 
 	var errcList []<-chan error
 	eventGrouping, errc := d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogGrouping)
 	errcList = append(errcList, errc)
-	eventGroupDismiss, errc := d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogGroupDismiss)
+	eventGroupDissolve, errc := d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogGroupDissolve)
 	errcList = append(errcList, errc)
 	chUrl, errc := d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogUrl)
 	errcList = append(errcList, errc)
@@ -312,13 +323,16 @@ func (d *DosNode) listen() (err error) {
 	errcList = append(errcList, errc)
 	keyAccepted, errc := d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogPublicKeyAccepted)
 	errcList = append(errcList, errc)
+	keySuggested, errc := d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogPublicKeySuggested)
+	errcList = append(errcList, errc)
 	noworkinggroup, errc := d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogNoWorkingGroup)
 	errcList = append(errcList, errc)
 	/*
 		chInsufficientWG, errc := d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogInsufficientWorkingGroup)
 		errcList = append(errcList, errc)
-		groupInitated, errc := d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogGroupingInitiated)
-		errcList = append(errcList, errc)
+
+			groupInitated, errc := d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogGroupingInitiated)
+			errcList = append(errcList, errc)
 	*/
 	commitRevealStart, errc := d.chain.PollLogs(onchain.SubscribeDOSCommitRevealLogStartCommitReveal, 0, 0)
 	errcList = append(errcList, errc)
@@ -361,7 +375,8 @@ func (d *DosNode) listen() (err error) {
 							d.chain.SignalGroupFormation(context.Background())
 						}
 					}
-
+			*/
+			/*
 				case msg, ok := <-groupInitated:
 					if !ok {
 						continue
@@ -455,7 +470,7 @@ func (d *DosNode) listen() (err error) {
 						}
 						time.Sleep(15 * time.Second)
 					}
-					d.chain.SignalGroupFormation(context.Background())
+					//d.chain.SignalGroupFormation(context.Background())
 				}(content.TargetBlkNum.Uint64(), content.CommitDuration.Uint64(), content.RevealDuration.Uint64())
 
 			case err, ok := <-errc:
@@ -516,12 +531,16 @@ func (d *DosNode) listen() (err error) {
 					"PendingGrouSize":       pendingGrouSize,
 					"Members":               d.p.Members()}
 				logger.Event("DOS_Watchdog", f)
-
-				if len(ids) != 0 {
-					diff := currentBlockNumber - lastUpdatedBlock
-					if diff > SYSRANDOMNTERVAL {
-						ctx, _ := context.WithCancel(context.Background())
-						d.chain.SignalRandom(ctx)
+				fmt.Println("watchdog ", f, " len(ids) ", len(ids))
+				//Let pendingNode be a guardian
+				if len(ids) == 0 {
+					//Signal random if there are enough working groups
+					if workingGroup >= groupToPick {
+						diff := currentBlockNumber - lastUpdatedBlock
+						if diff > SYSRANDOMNTERVAL {
+							ctx, _ := context.WithCancel(context.Background())
+							d.chain.SignalRandom(ctx)
+						}
 					}
 				}
 
@@ -609,7 +628,7 @@ func (d *DosNode) listen() (err error) {
 						go d.waitForGrouping(valueCtx, errc)
 					}
 				}
-			case msg, ok := <-eventGroupDismiss:
+			case msg, ok := <-eventGroupDissolve:
 				if !ok {
 					continue
 				}
@@ -828,11 +847,11 @@ func (d *DosNode) listen() (err error) {
 						"BlockN":         content.BlockN}
 					logger.Event(event, f)
 				}
-			case msg, ok := <-keyUploaded:
+			case msg, ok := <-keySuggested:
 				if !ok {
 					continue
 				}
-				content, ok := msg.(*onchain.DOSProxyLogPublicKeyUploaded)
+				content, ok := msg.(*onchain.DOSProxyLogPublicKeySuggested)
 				if !ok {
 					e, ok := msg.(error)
 					if ok {
@@ -841,14 +860,10 @@ func (d *DosNode) listen() (err error) {
 					continue
 				}
 				if d.isMember(content.PubKey) {
-					logger.TimeTrack(time.Now(), "keyUploaded", map[string]interface{}{
+					logger.TimeTrack(time.Now(), "keySuggested", map[string]interface{}{
 						"SessionID": d.dkg.GetSessionID(content.PubKey),
-						"x0":        fmt.Sprintf("%x", content.PubKey[0]),
-						"x1":        fmt.Sprintf("%x", content.PubKey[1]),
-						"y0":        fmt.Sprintf("%x", content.PubKey[2]),
-						"y1":        fmt.Sprintf("%x", content.PubKey[3]),
-						"Count":     fmt.Sprintf("%d", content.Count),
-						"GroupSize": fmt.Sprintf("%d", content.GroupSize),
+						"GroupSize": content.GroupSize,
+						"Count":     content.Count,
 						"Removed":   content.Removed,
 						"Tx":        content.Tx,
 						"BlockN":    content.BlockN,
@@ -868,6 +883,7 @@ func (d *DosNode) listen() (err error) {
 				}
 				if d.isMember(content.PubKey) {
 					logger.TimeTrack(time.Now(), "keyAccepted", map[string]interface{}{
+						"SessionID":        d.dkg.GetSessionID(content.PubKey),
 						"workingGroupSize": content.WorkingGroupSize,
 						"Removed":          content.Removed,
 						"Tx":               content.Tx,

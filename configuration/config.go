@@ -143,12 +143,11 @@ func (c *Config) overWrite() (err error) {
 		chainNode = "rinkebyPrivateNode"
 	}
 	c.currentNode = chainNode
-
 	if config, loaded := c.ChainConfigs[c.currentType][c.currentNode]; loaded {
-		x := 1
-		for gethIP := os.Getenv("GETHIP" + strconv.Itoa(x)); gethIP != ""; gethIP = os.Getenv("GETHIP" + strconv.Itoa(x)) {
+		gethIP := os.Getenv("GETHIP")
+		if gethIP != "" {
 			config.RemoteNodeAddressPool = append(config.RemoteNodeAddressPool, "ws://"+gethIP+":8546")
-			x++
+			config.RemoteNodeAddressPool = append(config.RemoteNodeAddressPool, "http://"+gethIP+":8545")
 		}
 		c.ChainConfigs[c.currentType][c.currentNode] = config
 	}

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"reflect"
+
 	//	"strings"
 	"time"
 
@@ -68,9 +69,8 @@ type Subscription struct {
 	message   chan P2PMessage
 }
 
-func (n *Server) Join(bootstrapIp []string) (err error) {
-	n.network.Join(bootstrapIp)
-	return
+func (n *Server) Join(bootstrapIp []string) (num int, err error) {
+	return n.network.Join(bootstrapIp)
 }
 
 func (n *Server) Members() int {

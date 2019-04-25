@@ -32,7 +32,7 @@ const (
 	SubscribeDOSProxyLogGrouping
 	SubscribeDOSProxyLogPublicKeyAccepted
 	SubscribeDOSProxyLogPublicKeySuggested
-	SubscribeDOSProxyLogGroupDismiss
+	SubscribeDOSProxyLogGroupDissolve
 	SubscribeDOSProxyLogInsufficientPendingNode
 	SubscribeDOSProxyLogInsufficientWorkingGroup
 	SubscribeDOSProxyLogNoWorkingGroup
@@ -746,6 +746,14 @@ func (e *EthAdaptor) firstEvent(ctx context.Context, source chan interface{}) <-
 						bytes = append(bytes, content.Raw.Data...)
 						blkNum = content.BlockN
 						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
+					case *DOSProxyLogPublicKeyAccepted:
+						bytes = append(bytes, content.Raw.Data...)
+						blkNum = content.BlockN
+						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
+					case *DOSProxyLogPublicKeySuggested:
+						bytes = append(bytes, content.Raw.Data...)
+						blkNum = content.BlockN
+						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
 					case *DOSProxyLogGroupDissolve:
 						bytes = append(bytes, content.Raw.Data...)
 						blkNum = content.BlockN
@@ -1118,7 +1126,70 @@ func subscribeEvent(ctx context.Context, proxy *dosproxy.DOSProxy, subscribeType
 				}
 			}
 		}()
-	case SubscribeDOSProxyLogGroupDismiss:
+	case SubscribeDOSProxyLogPublicKeyAccepted:
+		go func() {
+			transitChan := make(chan *dosproxy.DOSProxyLogPublicKeyAccepted)
+			defer close(transitChan)
+			defer close(errc)
+			defer close(out)
+			sub, err := proxy.DOSProxyFilterer.WatchLogPublicKeyAccepted(opt, transitChan)
+			if err != nil {
+				return
+			}
+			for {
+				select {
+				case <-ctx.Done():
+					sub.Unsubscribe()
+					return
+				case err := <-sub.Err():
+					errc <- err
+					return
+				case i := <-transitChan:
+					out <- &DOSProxyLogPublicKeyAccepted{
+						GroupId:          i.GroupId,
+						PubKey:           i.PubKey,
+						WorkingGroupSize: i.WorkingGroupSize,
+						Tx:               i.Raw.TxHash.Hex(),
+						BlockN:           i.Raw.BlockNumber,
+						Removed:          i.Raw.Removed,
+						Raw:              i.Raw,
+					}
+				}
+			}
+		}()
+	case SubscribeDOSProxyLogPublicKeySuggested:
+		go func() {
+			transitChan := make(chan *dosproxy.DOSProxyLogPublicKeySuggested)
+			defer close(transitChan)
+			defer close(errc)
+			defer close(out)
+			sub, err := proxy.DOSProxyFilterer.WatchLogPublicKeySuggested(opt, transitChan)
+			if err != nil {
+				return
+			}
+			for {
+				select {
+				case <-ctx.Done():
+					sub.Unsubscribe()
+					return
+				case err := <-sub.Err():
+					errc <- err
+					return
+				case i := <-transitChan:
+					out <- &DOSProxyLogPublicKeySuggested{
+						GroupId:   i.GroupId,
+						PubKey:    i.PubKey,
+						Count:     i.Count,
+						GroupSize: i.GroupSize,
+						Tx:        i.Raw.TxHash.Hex(),
+						BlockN:    i.Raw.BlockNumber,
+						Removed:   i.Raw.Removed,
+						Raw:       i.Raw,
+					}
+				}
+			}
+		}()
+	case SubscribeDOSProxyLogGroupDissolve:
 		go func() {
 			transitChan := make(chan *dosproxy.DOSProxyLogGroupDissolve)
 			defer close(transitChan)
@@ -1202,7 +1273,7 @@ func (e *EthAdaptor) PollLogs(subscribeType int, logBlockDiff, preBlockBuf uint6
 								Raw:     logs.Event.Raw,
 							}
 						}
-					case SubscribeDOSProxyLogGroupDismiss:
+					case SubscribeDOSProxyLogGroupDissolve:
 						logs, err := proxyFilter.FilterLogGroupDissolve(&bind.FilterOpts{
 							Start:   targetBlockN,
 							End:     &targetBlockN,

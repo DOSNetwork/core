@@ -55,6 +55,7 @@ func CreateP2PNetwork(id []byte, port string, netType int) (P2PInterface, error)
 
 func GetLocalIP() (ip net.IP, err error) {
 	//FOR DOCKER AWS TESTING
+
 	response, err := http.Get("http://ipconfig.me")
 	if err != nil {
 		return
@@ -96,7 +97,7 @@ type P2PInterface interface {
 	GetID() []byte
 	SetPort(port string)
 	Listen() error
-	Join(bootstrapIp []string) error
+	Join(bootstrapIp []string) (num int, err error)
 	ConnectTo(ip string, id []byte) ([]byte, error)
 	Leave()
 	Request(id []byte, m proto.Message) (msg P2PMessage, err error)

@@ -61,6 +61,11 @@ func (d *DosNode) proxy(w http.ResponseWriter, r *http.Request) {
 	} else {
 		html = html + "commitRevealTargetBlk :" + strconv.FormatUint(commitRevealTargetBlk, 10) + "\n"
 	}
-
+	curBlk, err := d.chain.CurrentBlock()
+	if err != nil {
+		html = html + "CurrentBlock :" + err.Error() + "\n"
+	} else {
+		html = html + "CurrentBlock :" + strconv.FormatUint(curBlk, 10) + "\n"
+	}
 	w.Write([]byte(html))
 }
