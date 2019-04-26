@@ -16,8 +16,8 @@ import (
 
 	"github.com/DOSNetwork/core/configuration"
 	"github.com/DOSNetwork/core/onchain"
+	"github.com/DOSNetwork/core/onchain/commitreveal"
 	"github.com/DOSNetwork/core/onchain/dosbridge"
-	"github.com/DOSNetwork/core/onchain/doscommitreveal"
 	"github.com/DOSNetwork/core/onchain/dosproxy"
 	"github.com/DOSNetwork/core/testing/dosUser/contract"
 	"github.com/DOSNetwork/core/testing/dosUser/eth"
@@ -81,7 +81,7 @@ func updateBridgeAddr(path string, updated string) error {
 	return nil
 }
 
-func updateBridge(client *ethclient.Client, key *keystore.Key, bridgeAddress common.Address, targetType int, target common.Address) (err error) {
+func updateBridge(client *ethclient.Client, key *keystore.Key, bridgeAddress common.Address, target common.Address) (err error) {
 	var auth *bind.TransactOpts
 	fmt.Println("start to update proxy address to bridge...")
 	auth = bind.NewKeyedTransactor(key.PrivateKey)
@@ -92,26 +92,15 @@ func updateBridge(client *ethclient.Client, key *keystore.Key, bridgeAddress com
 		return
 	}
 	var tx *types.Transaction
-	switch targetType {
-	case ProxyAddressType:
+
+	tx, err = bridge.SetProxyAddress(auth, target)
+	for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
+		fmt.Println(err)
+		time.Sleep(time.Second)
+		fmt.Println("transaction retry...")
 		tx, err = bridge.SetProxyAddress(auth, target)
-		for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
-			fmt.Println(err)
-			time.Sleep(time.Second)
-			fmt.Println("transaction retry...")
-			tx, err = bridge.SetProxyAddress(auth, target)
-		}
-	case CommitRevealAddressType:
-		tx, err = bridge.SetCommitRevealAddress(auth, target)
-		for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
-			fmt.Println(err)
-			time.Sleep(time.Second)
-			fmt.Println("transaction retry...")
-			tx, err = bridge.SetCommitRevealAddress(auth, target)
-		}
-	default:
-		return
 	}
+
 	if err != nil {
 		return
 	}
@@ -127,7 +116,77 @@ func updateBridge(client *ethclient.Client, key *keystore.Key, bridgeAddress com
 	return
 }
 
-func deployContract(targetTask, configPath string, config configuration.Config, chainConfig configuration.ChainConfig, client *ethclient.Client, key *keystore.Key) {
+func SetCommitrevealLibToProxy(client *ethclient.Client, key *keystore.Key, proxyAddress common.Address, crAddress common.Address) (err error) {
+	var auth *bind.TransactOpts
+	fmt.Println("start to update proxy address to bridge...")
+	auth = bind.NewKeyedTransactor(key.PrivateKey)
+	auth.GasLimit = uint64(5000000)
+
+	proxy, err := dosproxy.NewDOSProxy(proxyAddress, client)
+	if err != nil {
+		return
+	}
+	var tx *types.Transaction
+
+	tx, err = proxy.SetCommitrevealLib(auth, crAddress)
+	for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
+		fmt.Println(err)
+		time.Sleep(time.Second)
+		fmt.Println("transaction retry...")
+		tx, err = proxy.SetCommitrevealLib(auth, crAddress)
+	}
+
+	if err != nil {
+		return
+	}
+
+	fmt.Println("tx sent: ", tx.Hash().Hex())
+	fmt.Println("proxy address updated in bridge")
+
+	err = onchain.CheckTransaction(client, tx)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	return
+}
+
+func AddProxyToCRWhiteList(client *ethclient.Client, key *keystore.Key, crAddress common.Address, proxyAddress common.Address) (err error) {
+	var auth *bind.TransactOpts
+	fmt.Println("start to update proxy address to bridge...")
+	auth = bind.NewKeyedTransactor(key.PrivateKey)
+	auth.GasLimit = uint64(5000000)
+
+	cr, err := commitreveal.NewCommitReveal(crAddress, client)
+	if err != nil {
+		return
+	}
+	var tx *types.Transaction
+
+	tx, err = cr.AddToWhitelist(auth, crAddress)
+	for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
+		fmt.Println(err)
+		time.Sleep(time.Second)
+		fmt.Println("transaction retry...")
+		tx, err = cr.AddToWhitelist(auth, crAddress)
+	}
+
+	if err != nil {
+		return
+	}
+
+	fmt.Println("tx sent: ", tx.Hash().Hex())
+	fmt.Println("add proxy address to commitReveal whitelist")
+
+	err = onchain.CheckTransaction(client, tx)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	return
+}
+
+func deployContract(contractPath, targetTask, configPath string, config configuration.Config, chainConfig configuration.ChainConfig, client *ethclient.Client, key *keystore.Key) {
 	var tx *types.Transaction
 	var address common.Address
 	auth := bind.NewKeyedTransactor(key.PrivateKey)
@@ -153,14 +212,17 @@ func deployContract(targetTask, configPath string, config configuration.Config, 
 		if err := config.UpdateConfig(chainConfig); err != nil {
 			log.Fatal(err)
 		}
+		if err := updateBridgeAddr(contractPath+"/DOSOnChainSDK.sol", chainConfig.DOSAddressBridgeAddress); err != nil {
+			log.Fatal(err)
+		}
 	} else if targetTask == "deployCommitReveal" {
 		fmt.Println("Starting deploy CommitReveal.sol...")
-		address, tx, _, err = doscommitreveal.DeployDOSCommitReveal(auth, client)
+		address, tx, _, err = commitreveal.DeployCommitReveal(auth, client)
 		for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
 			fmt.Println(err)
 			time.Sleep(time.Second)
 			fmt.Println("transaction retry...")
-			address, tx, _, err = doscommitreveal.DeployDOSCommitReveal(auth, client)
+			address, tx, _, err = commitreveal.DeployCommitReveal(auth, client)
 		}
 		fmt.Println("contract Address: ", address.Hex())
 		fmt.Println("tx sent: ", tx.Hash().Hex())
@@ -173,12 +235,7 @@ func deployContract(targetTask, configPath string, config configuration.Config, 
 		if err := config.UpdateConfig(chainConfig); err != nil {
 			log.Fatal(err)
 		}
-		bridgeAddress := common.HexToAddress(chainConfig.DOSAddressBridgeAddress)
-		crAddress := common.HexToAddress(chainConfig.DOSCommitReveal)
-		err := updateBridge(client, key, bridgeAddress, CommitRevealAddressType, crAddress)
-		if err != nil {
-			log.Fatal(err)
-		}
+
 	} else if targetTask == "deployProxy" {
 		fmt.Println("Starting deploy DOSProxy.sol...")
 		address, tx, _, err = dosproxy.DeployDOSProxy(auth, client)
@@ -199,12 +256,25 @@ func deployContract(targetTask, configPath string, config configuration.Config, 
 		if err := config.UpdateConfig(chainConfig); err != nil {
 			log.Fatal(err)
 		}
+
+	} else if targetTask == "setUpDOSNetwork" {
+
 		bridgeAddress := common.HexToAddress(chainConfig.DOSAddressBridgeAddress)
 		proxyAddress := common.HexToAddress(chainConfig.DOSProxyAddress)
-		err := updateBridge(client, key, bridgeAddress, ProxyAddressType, proxyAddress)
+		crAddress := common.HexToAddress(chainConfig.DOSCommitReveal)
+
+		err := updateBridge(client, key, bridgeAddress, proxyAddress)
 		if err != nil {
 			log.Fatal(err)
 		}
+
+		_ = SetCommitrevealLibToProxy(client, key, proxyAddress, crAddress)
+
+		err = AddProxyToCRWhiteList(client, key, crAddress, proxyAddress)
+		if err != nil {
+			log.Fatal(err)
+		}
+
 	} else if targetTask == "deployAMA" {
 		fmt.Println("Starting deploy AskMeAnyThing.sol...")
 		amaConfig := eth.AMAConfig{}
@@ -269,18 +339,6 @@ func main() {
 	fmt.Println("Use : ", chainConfig)
 	fmt.Println(" address ", chainConfig.RemoteNodeAddressPool[0])
 
-	if target == "updateBridgeAddrToOtherContract" {
-		if err := updateBridgeAddr(contractPath+"/DOSOnChainSDK.sol", chainConfig.DOSAddressBridgeAddress); err != nil {
-			log.Fatal(err)
-		}
-		if err := updateBridgeAddr(contractPath+"/DOSProxy.sol", chainConfig.DOSAddressBridgeAddress); err != nil {
-			log.Fatal(err)
-		}
-		if err := updateBridgeAddr(contractPath+"/DOSCommitReveal.sol", chainConfig.DOSAddressBridgeAddress); err != nil {
-			log.Fatal(err)
-		}
-		return
-	}
 	password := os.Getenv("PASSPHRASE")
 	for password == "" {
 		fmt.Print("Enter Password: ")
@@ -306,5 +364,5 @@ func main() {
 		return
 	}
 
-	deployContract(target, configPath, config, chainConfig, c, key)
+	deployContract(contractPath, target, configPath, config, chainConfig, c, key)
 }

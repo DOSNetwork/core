@@ -62,7 +62,15 @@ func runDos(credentialPath, passphrase string) {
 		os.Remove(PIDFile)
 
 	}()
-	fErr, err := os.OpenFile("/app-logs/doslog", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0666)
+
+	workingDir, err := os.Getwd()
+	if err != nil {
+		return
+	}
+	if workingDir == "/" {
+		workingDir = "."
+	}
+	fErr, err := os.OpenFile(workingDir+"/dos/doslog", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0666)
 	syscall.Dup2(int(fErr.Fd()), 1) /* -- stdout */
 	syscall.Dup2(int(fErr.Fd()), 2) /* -- stderr */
 

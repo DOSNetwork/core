@@ -171,37 +171,38 @@ type DOSProxyUpdateGroupToPick struct {
 	Raw     types.Log
 }
 
-type DOSCommitRevealLogStartCommitReveal struct {
-	Tx             string
-	TargetBlkNum   *big.Int
-	CommitDuration *big.Int
-	RevealDuration *big.Int
-	BlockN         uint64
-	Removed        bool
-	Raw            types.Log
-}
-
-type DOSCommitRevealLogCommit struct {
-	Tx         string
-	From       common.Address
-	Commitment [32]byte
-	BlockN     uint64
-	Removed    bool
-	Raw        types.Log
-}
-
-type DOSCommitRevealLogReveal struct {
+type LogStartCommitReveal struct {
+	Cid     *big.Int
 	Tx      string
-	From    common.Address
-	Secret  *big.Int
 	BlockN  uint64
 	Removed bool
 	Raw     types.Log
 }
 
-type DOSCommitRevealLogRandom struct {
+type LogCommit struct {
+	Cid        *big.Int
+	From       common.Address
+	Commitment [32]byte
+	Tx         string
+	BlockN     uint64
+	Removed    bool
+	Raw        types.Log
+}
+
+type LogReveal struct {
+	Cid     *big.Int
+	From    common.Address
+	Secret  *big.Int
 	Tx      string
+	BlockN  uint64
+	Removed bool
+	Raw     types.Log
+}
+
+type LogRandom struct {
+	Cid     *big.Int
 	Random  *big.Int
+	Tx      string
 	BlockN  uint64
 	Removed bool
 	Raw     types.Log

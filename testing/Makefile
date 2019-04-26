@@ -11,32 +11,31 @@ BOOT_CREDENTIAL := ../testAccounts/bootCredential/fundKey
 AMA_CONFIGPATH := dosUser/ama.json
 DOSPROXY_GOPATH := onchain/dosproxy
 DOSBRIDGE_GOPATH := onchain/dosbridge
-DOSCOMMITREVEAL_GOPATH := onchain/doscommitreveal
+DOSCOMMITREVEAL_GOPATH := onchain/commitreveal
 UNAME_S := $(shell uname)
 clean:
 	cd .. && make clean
-deployAll:
-	$(MAKE) deployBridge
-	go run contracts_deploy/deploy.go -credentialPath $(BOOT_CREDENTIAL) -contractPath $(ETH_CONTRACTS) -target deployProxy
-	go run contracts_deploy/deploy.go -credentialPath $(BOOT_CREDENTIAL) -contractPath $(ETH_CONTRACTS) -target deployCommitReveal
-	$(MAKE) deployAMA
 
 deployBridge:
 	abigen -sol $(ETH_CONTRACTS)/DOSAddressBridge.sol --pkg dosbridge --out ../$(DOSBRIDGE_GOPATH)/DOSAddressBridge.go
 	go run contracts_deploy/deploy.go -credentialPath $(BOOT_CREDENTIAL) -contractPath $(ETH_CONTRACTS) -target deployBridge
-	go run contracts_deploy/deploy.go -credentialPath $(BOOT_CREDENTIAL) -contractPath $(ETH_CONTRACTS) -target updateBridgeAddrToOtherContract
-	abigen -sol $(ETH_CONTRACTS)/DOSAddressBridge.sol --pkg dosbridge --out ../$(DOSBRIDGE_GOPATH)/DOSAddressBridge.go
+	go run contracts_deploy/deploy.go -credentialPath $(BOOT_CREDENTIAL) -contractPath $(ETH_CONTRACTS) -target updateBridgeAddrToSDK
+
+deployProxy:
 	abigen -sol $(ETH_CONTRACTS)/DOSProxy.sol --pkg dosproxy --out ../$(DOSPROXY_GOPATH)/DOSProxy.go
-	abigen -sol $(ETH_CONTRACTS)/DOSCommitReveal.sol --pkg doscommitreveal --out ../$(DOSCOMMITREVEAL_GOPATH)/DOSCommitReveal.go
-genProxy:
-	abigen -sol $(ETH_CONTRACTS)/DOSProxy.sol --pkg dosproxy --out ../$(DOSPROXY_GOPATH)/DOSProxy.go
-deployPoxy:genProxy
 	go run contracts_deploy/deploy.go -credentialPath $(BOOT_CREDENTIAL) -contractPath $(ETH_CONTRACTS) -target deployProxy
 
-genCommitReveal:
-	abigen -sol $(ETH_CONTRACTS)/DOSCommitReveal.sol --pkg doscommitreveal --out ../$(DOSCOMMITREVEAL_GOPATH)/DOSCommitReveal.go
-deployCommitReveal:genCommitReveal
+deployCommitReveal:
+	abigen -sol $(ETH_CONTRACTS)/CommitReveal.sol --pkg commitreveal --out ../$(DOSCOMMITREVEAL_GOPATH)/CommitReveal.go
 	go run contracts_deploy/deploy.go -credentialPath $(BOOT_CREDENTIAL) -contractPath $(ETH_CONTRACTS) -target deployCommitReveal
+
+deployDOSNetwork:
+	$(MAKE) deployBridge
+	$(MAKE) deployProxy
+	$(MAKE) deployCommitReveal
+
+setUpDOSNetwork:
+	go run contracts_deploy/deploy.go -credentialPath $(BOOT_CREDENTIAL) -contractPath $(ETH_CONTRACTS) -target setUpDOSNetwork
 
 genAMA:
 	mkdir -p $(USER_CONTRACTS)
@@ -44,19 +43,28 @@ genAMA:
 	cp $(ETH_CONTRACTS)/Ownable.sol $(USER_CONTRACTS)/
 	mkdir -p $(USER_CONTRACTS)/lib/
 	cp $(ETH_CONTRACTS)/lib/utils.sol $(USER_CONTRACTS)/lib/
-	cp $(REMOTE_USER_CONTRACT)/AskMeAnything.sol $(USER_CONTRACTS)/
+	cp $(REMOTE_USER_CONTRACT)/AskMeAnything.sol $(USER_CONTRACTS)
 	abigen -sol $(USER_CONTRACTS)/AskMeAnything.sol --pkg dosUser --out $(USER_CONTRACTS)/AskMeAnything.go
 	rm $(USER_CONTRACTS)/*.sol
 	rm -r $(USER_CONTRACTS)/lib
-deployAMA:genAMA
+
+deployAMA:
 	go run contracts_deploy/deploy.go -credentialPath $(BOOT_CREDENTIAL) -contractPath $(ETH_CONTRACTS) -target deployAMA -configPath $(AMA_CONFIGPATH)
-genAll:
-	abigen -sol $(ETH_CONTRACTS)/DOSAddressBridge.sol --pkg dosbridge --out ../$(DOSBRIDGE_GOPATH)/DOSAddressBridge.go
-	go run contracts_deploy/deploy.go -credentialPath $(BOOT_CREDENTIAL) -contractPath $(ETH_CONTRACTS) -target updateBridgeAddrToOtherContract
-	abigen -sol $(ETH_CONTRACTS)/DOSAddressBridge.sol --pkg dosbridge --out ../$(DOSBRIDGE_GOPATH)/DOSAddressBridge.go
-	abigen -sol $(ETH_CONTRACTS)/DOSProxy.sol --pkg dosproxy --out ../$(DOSPROXY_GOPATH)/DOSProxy.go
-	abigen -sol $(ETH_CONTRACTS)/DOSCommitReveal.sol --pkg doscommitreveal --out ../$(DOSCOMMITREVEAL_GOPATH)/DOSCommitReveal.go
-buildAll:deployAll
+buildAMA:
+	cp ../config.json dosUser/
+	go build -o dosUser/dos_user dosUser/dos_user.go
+
+deployAll:
+	$(MAKE) deployDOSNetwork
+	$(MAKE) setUpDOSNetwork
+	$(MAKE) genAMA
+	$(MAKE) deployAMA
+
+buildBeta:
+	$(MAKE) deployAll
+	$(MAKE) docker-dosnode
+
+buildLinuxClient:
 ifeq ($(UNAME_S),Linux)
 	go build -o testEnv/dosclient ../
 endif
@@ -64,9 +72,7 @@ ifeq ($(UNAME_S),Darwin)
 	xgo --targets=linux/amd64 -out testEnv/dosclient ../
 	mv testEnv/dosclient-linux-amd64 testEnv/dosclient
 endif
-	cp ../config.json testEnv/
-	go build -o testEnv/dos_user dosUser/dos_user.go
-	cp dosUser/ama.json testEnv/
+
 docker-bootnode:
 	cp bootStrapNode/Dockerfile  ../Dockerfile.bootstrap	
 	cd .. && docker build -t bootstrap -f Dockerfile.bootstrap .

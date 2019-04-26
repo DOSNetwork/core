@@ -15,7 +15,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 
 	"github.com/DOSNetwork/core/log"
-	"github.com/DOSNetwork/core/onchain/doscommitreveal"
+	"github.com/DOSNetwork/core/onchain/commitreveal"
 	"github.com/DOSNetwork/core/onchain/dosproxy"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -39,10 +39,10 @@ const (
 	SubscribeDOSProxyLogGroupingInitiated
 	SubscribeDOSProxyUpdateGroupToPick
 	//For bootstraping
-	SubscribeDOSCommitRevealLogStartCommitReveal
-	SubscribeDOSCommitRevealLogCommit
-	SubscribeDOSCommitRevealLogReveal
-	SubscribeDOSCommitRevealLogRandom
+	SubscribeCommitRevealLogStartCommitReveal
+	SubscribeCommitRevealLogCommit
+	SubscribeCommitRevealLogReveal
+	SubscribeCommitRevealLogRandom
 	LastRandomness
 	WorkingGroupSize
 	LastUpdatedBlock
@@ -84,12 +84,22 @@ type ReqSetInt struct {
 	result    chan Reply
 }
 
-type ReqSetByte32 struct {
-	ctx       context.Context
-	tOpts     *bind.TransactOpts
-	parameter [32]byte
-	f         func([32]byte) (*types.Transaction, error)
-	result    chan Reply
+type ReqCommit struct {
+	ctx        context.Context
+	tOpts      *bind.TransactOpts
+	cid        *big.Int
+	secretHash [32]byte
+	f          func(*big.Int, [32]byte) (*types.Transaction, error)
+	result     chan Reply
+}
+
+type ReqReveal struct {
+	ctx    context.Context
+	tOpts  *bind.TransactOpts
+	cid    *big.Int
+	secret *big.Int
+	f      func(*big.Int, *big.Int) (*types.Transaction, error)
+	result chan Reply
 }
 
 type ReqGrouping struct {
@@ -145,16 +155,16 @@ type EthAdaptor struct {
 	key              *keystore.Key
 	auth             *bind.TransactOpts
 	//rpc connection over http/https
-	proxies       []*dosproxy.DOSProxySession
-	commitReveals []*doscommitreveal.DOSCommitRevealSession
-	clients       []*ethclient.Client
-	ctx           context.Context
-	cancelFunc    context.CancelFunc
-	reqQueue      chan interface{}
+	proxies    []*dosproxy.DOSProxySession
+	crs        []*commitreveal.CommitRevealSession
+	clients    []*ethclient.Client
+	ctx        context.Context
+	cancelFunc context.CancelFunc
+	reqQueue   chan interface{}
 
 	//rpc connection over WebSockets for event notification
-
 	eProxies    []*dosproxy.DOSProxy
+	eCRs        []*commitreveal.CommitReveal
 	eClients    []*ethclient.Client
 	eCtx        context.Context
 	eCancelFunc context.CancelFunc
@@ -186,6 +196,7 @@ func NewEthAdaptor(credentialPath, passphrase, proxyAddr, commitRevealAddr strin
 	}
 	adaptor.key = key
 	debug.FreeOSMemory()
+
 	//Use account address as ID to init log module
 	log.Init(key.Address.Bytes()[:])
 	if logger == nil {
@@ -205,21 +216,21 @@ func NewEthAdaptor(credentialPath, passphrase, proxyAddr, commitRevealAddr strin
 		if e != nil {
 			fmt.Println("NewDOSProxy e ", e)
 			logger.Error(e)
-			err = errors.New("No any working eth client")
+			err = e
 			continue
 		}
-		c, e := doscommitreveal.NewDOSCommitReveal(common.HexToAddress(commitRevealAddr), client)
-		if e == nil {
-			adaptor.commitReveals = append(adaptor.commitReveals, &doscommitreveal.DOSCommitRevealSession{Contract: c, CallOpts: bind.CallOpts{Context: adaptor.ctx}, TransactOpts: *adaptor.auth})
-		} else {
+		c, e := commitreveal.NewCommitReveal(common.HexToAddress(commitRevealAddr), client)
+		if e != nil {
 			logger.Error(e)
+			err = e
+			continue
 		}
 		adaptor.clients = append(adaptor.clients, client)
 		adaptor.proxies = append(adaptor.proxies, &dosproxy.DOSProxySession{Contract: p, CallOpts: bind.CallOpts{Context: adaptor.ctx}, TransactOpts: *adaptor.auth})
+		adaptor.crs = append(adaptor.crs, &commitreveal.CommitRevealSession{Contract: c, CallOpts: bind.CallOpts{Context: adaptor.ctx}, TransactOpts: *adaptor.auth})
 	}
 	if len(adaptor.proxies) == 0 {
 		fmt.Println("No any working eth client ", len(adaptor.clients), len(adaptor.proxies))
-
 		adaptor = nil
 		return
 	}
@@ -235,11 +246,19 @@ func NewEthAdaptor(credentialPath, passphrase, proxyAddr, commitRevealAddr strin
 			logger.Error(err)
 			continue
 		}
+		c, err := commitreveal.NewCommitReveal(common.HexToAddress(commitRevealAddr), client)
+		if err != nil {
+			logger.Error(err)
+			continue
+		}
+		adaptor.eCRs = append(adaptor.eCRs, c)
 		adaptor.eClients = append(adaptor.eClients, client)
 		adaptor.eProxies = append(adaptor.eProxies, p)
 	}
 	if len(adaptor.eProxies) == 0 {
 		err = errors.New("No any working eth client for event tracking")
+		adaptor = nil
+		return
 	}
 	fmt.Println("working eth ws client ", len(adaptor.eClients))
 
@@ -274,7 +293,9 @@ func (e *EthAdaptor) reqLoop() {
 					resultC = content.result
 				case *ReqSetInt:
 					resultC = content.result
-				case *ReqSetByte32:
+				case *ReqCommit:
+					resultC = content.result
+				case *ReqReveal:
 					resultC = content.result
 				case *ReqSetRandomNum:
 					resultC = content.result
@@ -318,9 +339,14 @@ func (e *EthAdaptor) reqLoop() {
 					tx, err = content.f(content.parameter)
 					resultC = content.result
 					ctx = content.ctx
-				case *ReqSetByte32:
+				case *ReqCommit:
 					content.tOpts.Nonce = e.auth.Nonce
-					tx, err = content.f(content.parameter)
+					tx, err = content.f(content.cid, content.secretHash)
+					resultC = content.result
+					ctx = content.ctx
+				case *ReqReveal:
+					content.tOpts.Nonce = e.auth.Nonce
+					tx, err = content.f(content.cid, content.secret)
 					resultC = content.result
 					ctx = content.ctx
 				case *ReqSetRandomNum:
@@ -494,21 +520,21 @@ func (e *EthAdaptor) SignalDissolve(ctx context.Context, idx uint64) (errc <-cha
 	return
 }
 
-func (e *EthAdaptor) Commit(ctx context.Context, commitment [32]byte) (errc <-chan error) {
+func (e *EthAdaptor) Commit(ctx context.Context, cid *big.Int, commitment [32]byte) (errc <-chan error) {
 	defer logger.TimeTrack(time.Now(), "Commit", nil)
 	result := make(chan Reply)
-	for i, cr := range e.commitReveals {
-		request := &ReqSetByte32{ctx, &cr.TransactOpts, commitment, cr.Commit, result}
+	for i, cr := range e.crs {
+		request := &ReqCommit{ctx, &cr.TransactOpts, cid, commitment, cr.Commit, result}
 		errc = e.sendRequest(ctx, e.clients[i], errc, request, result)
 	}
 	return
 }
 
-func (e *EthAdaptor) Reveal(ctx context.Context, secret *big.Int) (errc <-chan error) {
+func (e *EthAdaptor) Reveal(ctx context.Context, cid *big.Int, secret *big.Int) (errc <-chan error) {
 	defer logger.TimeTrack(time.Now(), "Reveal", nil)
 	result := make(chan Reply)
-	for i, cr := range e.commitReveals {
-		request := &ReqSetInt{ctx, &cr.TransactOpts, secret, cr.Reveal, result}
+	for i, cr := range e.crs {
+		request := &ReqReveal{ctx, &cr.TransactOpts, cid, secret, cr.Reveal, result}
 		errc = e.sendRequest(ctx, e.clients[i], errc, request, result)
 	}
 	return
@@ -762,19 +788,19 @@ func (e *EthAdaptor) firstEvent(ctx context.Context, source chan interface{}) <-
 						bytes = append(bytes, content.Raw.Data...)
 						blkNum = content.BlockN
 						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
-					case *DOSCommitRevealLogStartCommitReveal:
+					case *LogStartCommitReveal:
 						bytes = append(bytes, content.Raw.Data...)
 						blkNum = content.BlockN
 						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
-					case *DOSCommitRevealLogCommit:
+					case *LogCommit:
 						bytes = append(bytes, content.Raw.Data...)
 						blkNum = content.BlockN
 						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
-					case *DOSCommitRevealLogReveal:
+					case *LogReveal:
 						bytes = append(bytes, content.Raw.Data...)
 						blkNum = content.BlockN
 						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
-					case *DOSCommitRevealLogRandom:
+					case *LogRandom:
 						bytes = append(bytes, content.Raw.Data...)
 						blkNum = content.BlockN
 						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
@@ -812,24 +838,171 @@ func (e *EthAdaptor) firstEvent(ctx context.Context, source chan interface{}) <-
 func (e *EthAdaptor) SubscribeEvent(subscribeType int) (<-chan interface{}, <-chan error) {
 	var eventList []<-chan interface{}
 	var errcs []<-chan error
-	for i := 0; i < len(e.eProxies); i++ {
-		fmt.Println("SubscribeEvent ", i)
-		proxy := e.eProxies[i]
-		if proxy == nil {
-			continue
+	if subscribeType == SubscribeCommitRevealLogStartCommitReveal ||
+		subscribeType == SubscribeCommitRevealLogCommit ||
+		subscribeType == SubscribeCommitRevealLogReveal ||
+		subscribeType == SubscribeCommitRevealLogRandom {
+		for i := 0; i < len(e.eProxies); i++ {
+			fmt.Println("SubscribeEvent ", i)
+			cr := e.eCRs[i]
+			if cr == nil {
+				continue
+			}
+			ctx := e.eCtx
+			if ctx == nil {
+				continue
+			}
+			out, errc := subscribeCREvent(ctx, cr, subscribeType)
+			eventList = append(eventList, out)
+			errcs = append(errcs, errc)
 		}
-		ctx := e.eCtx
-		if ctx == nil {
-			continue
+	} else {
+		for i := 0; i < len(e.eProxies); i++ {
+			fmt.Println("SubscribeEvent ", i)
+			proxy := e.eProxies[i]
+			if proxy == nil {
+				continue
+			}
+			ctx := e.eCtx
+			if ctx == nil {
+				continue
+			}
+			out, errc := subscribeEvent(ctx, proxy, subscribeType)
+			eventList = append(eventList, out)
+			errcs = append(errcs, errc)
 		}
-		out, errc := subscribeEvent(ctx, proxy, subscribeType)
-		eventList = append(eventList, out)
-		errcs = append(errcs, errc)
 	}
-	//out, errc := e.PollLogs(subscribeType, 0, 0)
-	//eventList = append(eventList, out)
-	//errcs = append(errcs, errc)
 	return e.firstEvent(e.ctx, MergeEvents(e.ctx, eventList...)), MergeErrors(e.ctx, errcs...)
+}
+func subscribeCREvent(ctx context.Context, cr *commitreveal.CommitReveal, subscribeType int) (<-chan interface{}, <-chan error) {
+	out := make(chan interface{})
+	errc := make(chan error)
+	opt := &bind.WatchOpts{}
+
+	switch subscribeType {
+	case SubscribeCommitRevealLogStartCommitReveal:
+		go func() {
+			transitChan := make(chan *commitreveal.CommitRevealLogStartCommitReveal)
+			defer close(transitChan)
+			defer close(errc)
+			defer close(out)
+			sub, err := cr.CommitRevealFilterer.WatchLogStartCommitReveal(opt, transitChan)
+			if err != nil {
+				return
+			}
+			for {
+				select {
+				case <-ctx.Done():
+					sub.Unsubscribe()
+					return
+				case err := <-sub.Err():
+					errc <- err
+					return
+				case i := <-transitChan:
+					out <- &LogStartCommitReveal{
+						Cid:     i.CampaignId,
+						Tx:      i.Raw.TxHash.Hex(),
+						BlockN:  i.Raw.BlockNumber,
+						Removed: i.Raw.Removed,
+						Raw:     i.Raw,
+					}
+				}
+			}
+		}()
+	case SubscribeCommitRevealLogCommit:
+		go func() {
+			transitChan := make(chan *commitreveal.CommitRevealLogCommit)
+			defer close(transitChan)
+			defer close(errc)
+			defer close(out)
+			sub, err := cr.CommitRevealFilterer.WatchLogCommit(opt, transitChan)
+			if err != nil {
+				return
+			}
+			for {
+				select {
+				case <-ctx.Done():
+					sub.Unsubscribe()
+					return
+				case err := <-sub.Err():
+					errc <- err
+					return
+				case i := <-transitChan:
+					out <- &LogCommit{
+						Cid:        i.Cid,
+						From:       i.From,
+						Commitment: i.Commitment,
+						Tx:         i.Raw.TxHash.Hex(),
+						BlockN:     i.Raw.BlockNumber,
+						Removed:    i.Raw.Removed,
+						Raw:        i.Raw,
+					}
+				}
+			}
+		}()
+	case SubscribeCommitRevealLogReveal:
+		go func() {
+			transitChan := make(chan *commitreveal.CommitRevealLogReveal)
+			defer close(transitChan)
+			defer close(errc)
+			defer close(out)
+			sub, err := cr.CommitRevealFilterer.WatchLogReveal(opt, transitChan)
+			if err != nil {
+				return
+			}
+			for {
+				select {
+				case <-ctx.Done():
+					sub.Unsubscribe()
+					return
+				case err := <-sub.Err():
+					errc <- err
+					return
+				case i := <-transitChan:
+					out <- &LogReveal{
+						Cid:     i.Cid,
+						From:    i.From,
+						Secret:  i.Secret,
+						Tx:      i.Raw.TxHash.Hex(),
+						BlockN:  i.Raw.BlockNumber,
+						Removed: i.Raw.Removed,
+						Raw:     i.Raw,
+					}
+				}
+			}
+		}()
+	case SubscribeCommitRevealLogRandom:
+		go func() {
+			transitChan := make(chan *commitreveal.CommitRevealLogRandom)
+			defer close(transitChan)
+			defer close(errc)
+			defer close(out)
+			sub, err := cr.CommitRevealFilterer.WatchLogRandom(opt, transitChan)
+			if err != nil {
+				return
+			}
+			for {
+				select {
+				case <-ctx.Done():
+					sub.Unsubscribe()
+					return
+				case err := <-sub.Err():
+					errc <- err
+					return
+				case i := <-transitChan:
+					out <- &LogRandom{
+						Cid:     i.Cid,
+						Random:  i.Random,
+						Tx:      i.Raw.TxHash.Hex(),
+						BlockN:  i.Raw.BlockNumber,
+						Removed: i.Raw.Removed,
+						Raw:     i.Raw,
+					}
+				}
+			}
+		}()
+	}
+	return out, errc
 }
 
 func subscribeEvent(ctx context.Context, proxy *dosproxy.DOSProxy, subscribeType int) (<-chan interface{}, <-chan error) {
@@ -1476,129 +1649,10 @@ func (e *EthAdaptor) PollLogs(subscribeType int, logBlockDiff, preBlockBuf uint6
 		}
 
 	}
-	multiplexCr := func(client *ethclient.Client, commitFilter *doscommitreveal.DOSCommitRevealFilterer, ctx context.Context) {
-		errc := make(chan error)
-		errcs = append(errcs, errc)
-		sink := make(chan interface{})
-		sinks = append(sinks, sink)
-		wg.Done()
-		defer close(errc)
-		defer close(sink)
-		targetBlockN, err := GetCurrentBlock(client)
-		if err != nil {
-			return
-		}
-		targetBlockN -= preBlockBuf
-		timer := time.NewTimer(LogCheckingInterval * time.Second)
-		for {
-			select {
-			case <-timer.C:
-				currentBlockN, err := GetCurrentBlock(client)
-				if err != nil {
-					timer.Reset(LogCheckingInterval * time.Second)
-					continue
-				}
 
-				for ; currentBlockN-logBlockDiff >= targetBlockN; targetBlockN++ {
-					switch subscribeType {
-					case SubscribeDOSCommitRevealLogStartCommitReveal:
-						logs, err := commitFilter.FilterLogStartCommitReveal(&bind.FilterOpts{
-							Start:   targetBlockN,
-							End:     &targetBlockN,
-							Context: ctx,
-						})
-						if err != nil {
-							errc <- err
-							continue
-						}
-
-						for logs.Next() {
-							sink <- &DOSCommitRevealLogStartCommitReveal{
-								Tx:             logs.Event.Raw.TxHash.Hex(),
-								TargetBlkNum:   logs.Event.TargetBlkNum,
-								CommitDuration: logs.Event.CommitDuration,
-								RevealDuration: logs.Event.RevealDuration,
-								BlockN:         logs.Event.Raw.BlockNumber,
-								Removed:        logs.Event.Raw.Removed,
-								Raw:            logs.Event.Raw,
-							}
-						}
-					case SubscribeDOSCommitRevealLogCommit:
-						logs, err := commitFilter.FilterLogCommit(&bind.FilterOpts{
-							Start:   targetBlockN,
-							End:     &targetBlockN,
-							Context: ctx,
-						})
-						if err != nil {
-							errc <- err
-							continue
-						}
-
-						for logs.Next() {
-							sink <- &DOSCommitRevealLogCommit{
-								Tx:         logs.Event.Raw.TxHash.Hex(),
-								From:       logs.Event.From,
-								Commitment: logs.Event.Commitment,
-								BlockN:     logs.Event.Raw.BlockNumber,
-								Removed:    logs.Event.Raw.Removed,
-								Raw:        logs.Event.Raw,
-							}
-						}
-					case SubscribeDOSCommitRevealLogReveal:
-						logs, err := commitFilter.FilterLogReveal(&bind.FilterOpts{
-							Start:   targetBlockN,
-							End:     &targetBlockN,
-							Context: ctx,
-						})
-						if err != nil {
-							errc <- err
-							continue
-						}
-
-						for logs.Next() {
-							sink <- &DOSCommitRevealLogReveal{
-								Tx:      logs.Event.Raw.TxHash.Hex(),
-								From:    logs.Event.From,
-								Secret:  logs.Event.Secret,
-								BlockN:  logs.Event.Raw.BlockNumber,
-								Removed: logs.Event.Raw.Removed,
-								Raw:     logs.Event.Raw,
-							}
-						}
-					case SubscribeDOSCommitRevealLogRandom:
-						logs, err := commitFilter.FilterLogRandom(&bind.FilterOpts{
-							Start:   targetBlockN,
-							End:     &targetBlockN,
-							Context: ctx,
-						})
-						if err != nil {
-							errc <- err
-							continue
-						}
-
-						for logs.Next() {
-							sink <- &DOSCommitRevealLogRandom{
-								Tx:      logs.Event.Raw.TxHash.Hex(),
-								Random:  logs.Event.Random,
-								BlockN:  logs.Event.Raw.BlockNumber,
-								Removed: logs.Event.Raw.Removed,
-								Raw:     logs.Event.Raw,
-							}
-						}
-					}
-				}
-				timer.Reset(LogCheckingInterval * time.Second)
-			case <-ctx.Done():
-				return
-			}
-		}
-	}
-	wg.Add(len(e.proxies) + len(e.commitReveals))
+	wg.Add(len(e.proxies))
 	for i := 0; i < len(e.clients); i++ {
 		go multiplex(e.clients[i], &e.proxies[i].Contract.DOSProxyFilterer, e.ctx)
-	}
-	for i := 0; i < len(e.commitReveals); i++ {
-		go multiplexCr(e.clients[i], &e.commitReveals[i].Contract.DOSCommitRevealFilterer, e.ctx)
 	}
 	wg.Wait()
 
@@ -1627,8 +1681,6 @@ func proxyGet(proxy *dosproxy.DOSProxySession, vType int) chan interface{} {
 			val, err = proxy.GroupToPick()
 		case LastUpdatedBlock:
 			val, err = proxy.LastUpdatedBlock()
-		case CommitRevealTargetBlk:
-			val, err = proxy.CommitRevealTargetBlk()
 		}
 		if err != nil {
 			logger.Error(err)

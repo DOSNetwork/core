@@ -21,8 +21,8 @@ type ProxyAdapter interface {
 	SetGroupToPick(ctx context.Context, groupToPick uint64) (errc <-chan error)
 	SetGroupSize(ctx context.Context, size uint64) (errc <-chan error)
 	SetGroupMaturityPeriod(ctx context.Context, size uint64) (errc <-chan error)
-	Commit(ctx context.Context, commitment [32]byte) (errc <-chan error)
-	Reveal(ctx context.Context, secret *big.Int) (errc <-chan error)
+	Commit(ctx context.Context, cid *big.Int, commitment [32]byte) (errc <-chan error)
+	Reveal(ctx context.Context, cid *big.Int, secret *big.Int) (errc <-chan error)
 
 	//Guardian node functions
 	SignalRandom(ctx context.Context) (errc <-chan error)

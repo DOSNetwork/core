@@ -334,7 +334,7 @@ func (d *DosNode) listen() (err error) {
 			groupInitated, errc := d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogGroupingInitiated)
 			errcList = append(errcList, errc)
 	*/
-	commitRevealStart, errc := d.chain.PollLogs(onchain.SubscribeDOSCommitRevealLogStartCommitReveal, 0, 0)
+	commitRevealStart, errc := d.chain.PollLogs(onchain.SubscribeCommitRevealLogStartCommitReveal, 0, 0)
 	errcList = append(errcList, errc)
 
 	peerEvent, err := d.p.SubscribeEvent(50, vss.Signature{})
@@ -398,26 +398,24 @@ func (d *DosNode) listen() (err error) {
 				if !ok {
 					continue
 				}
-				content, ok := msg.(*onchain.DOSCommitRevealLogStartCommitReveal)
+				content, ok := msg.(*onchain.LogStartCommitReveal)
 				if !ok {
 					log.Error(err)
 					continue
 				}
-				go func(blkNumUint uint64, commitDurUint uint64, revealDurUint uint64) {
+				go func(cid *big.Int) {
 					f := map[string]interface{}{
-						"blkNumUint":    blkNumUint,
-						"commitDurUint": commitDurUint,
-						"revealDurUint": revealDurUint}
+						"cid": cid.Uint64()}
 					logger.Event("commitRevealStart", f)
-					var hash *[32]byte
 
+					var hash *[32]byte
+					_ = hash
 					var prime1 *big.Int
 					// Generate random numbers in range [0..prime1]
 					prime1, ok = new(big.Int).SetString("21888242871839275222246405745257275088548364400416034343698204186575808495617", 10)
 					if !ok {
 						return
 					}
-					// Don't use this code to generate secret keys that protect important stuff!
 					sec, err := rand.Int(rand.Reader, prime1)
 					if err != nil {
 						sec.SetInt64(0)
@@ -428,50 +426,53 @@ func (d *DosNode) listen() (err error) {
 					h.Write(abi.U256(sec))
 					b := h.Sum(nil)
 					hash = byte32(b)
-					for {
-						cur, err := d.chain.CurrentBlock()
+					/*
+						for {
+							cur, err := d.chain.CurrentBlock()
+							if err != nil {
+								logger.Error(err)
+								return
+							}
+							fmt.Println("Waiting for commit ", cur, blkNumUint-revealDurUint-commitDurUint)
+							if cur >= blkNumUint-revealDurUint-commitDurUint {
+								break
+							}
+							time.Sleep(15 * time.Second)
+						}
+
+						errc := d.chain.Commit(context.Background(), *hash)
+						err = <-errc
 						if err != nil {
-							logger.Error(err)
 							return
 						}
-						fmt.Println("Waiting for commit ", cur, blkNumUint-revealDurUint-commitDurUint)
-						if cur >= blkNumUint-revealDurUint-commitDurUint {
-							break
+						for {
+							cur, err := d.chain.CurrentBlock()
+							if err != nil {
+								logger.Error(err)
+								return
+							}
+							fmt.Println("Waiting for Reveal ", cur, blkNumUint-revealDurUint)
+							if cur > blkNumUint-revealDurUint {
+								break
+							}
+							time.Sleep(15 * time.Second)
 						}
-						time.Sleep(15 * time.Second)
-					}
-					errc := d.chain.Commit(context.Background(), *hash)
-					err = <-errc
-					if err != nil {
-						return
-					}
-					for {
-						cur, err := d.chain.CurrentBlock()
-						if err != nil {
-							logger.Error(err)
-							return
+						d.chain.Reveal(context.Background(), sec)
+						for {
+							cur, err := d.chain.CurrentBlock()
+							if err != nil {
+								logger.Error(err)
+								return
+							}
+							fmt.Println("Waiting for random ", cur, blkNumUint)
+							if cur > blkNumUint {
+								break
+							}
+							time.Sleep(15 * time.Second)
 						}
-						fmt.Println("Waiting for Reveal ", cur, blkNumUint-revealDurUint)
-						if cur > blkNumUint-revealDurUint {
-							break
-						}
-						time.Sleep(15 * time.Second)
-					}
-					d.chain.Reveal(context.Background(), sec)
-					for {
-						cur, err := d.chain.CurrentBlock()
-						if err != nil {
-							logger.Error(err)
-							return
-						}
-						fmt.Println("Waiting for random ", cur, blkNumUint)
-						if cur > blkNumUint {
-							break
-						}
-						time.Sleep(15 * time.Second)
-					}
-					//d.chain.SignalGroupFormation(context.Background())
-				}(content.TargetBlkNum.Uint64(), content.CommitDuration.Uint64(), content.RevealDuration.Uint64())
+						//d.chain.SignalGroupFormation(context.Background())
+					*/
+				}(content.Cid)
 
 			case err, ok := <-errc:
 				if ok && err.Error() == "EOF" {
