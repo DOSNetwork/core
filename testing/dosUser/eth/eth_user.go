@@ -88,7 +88,7 @@ func NewAMAUserSession(credentialPath, passphrase, addr string, gethUrls []strin
 	adaptor = &EthUserAdaptor{}
 	ctxD, cancelSession := context.WithCancel(context.Background())
 	auth := bind.NewKeyedTransactor(key.PrivateKey)
-	auth.GasLimit = uint64(3000000)
+	auth.GasLimit = uint64(5000000)
 	auth.Context = ctxD
 	//nonce, _ := c.PendingNonceAt(ctxD, key.Address)
 	//auth.Nonce = big.NewInt(0)
@@ -257,8 +257,41 @@ func subscribeEvent(ctx context.Context, proxy *dosUser.AskMeAnything, subscribe
 	opt := &bind.WatchOpts{}
 
 	switch subscribeType {
+	case SubscribeAskMeAnythingRandomReady:
+		go func() {
+			fmt.Println("AskMeAnythingRandomReady")
+
+			transitChan := make(chan *dosUser.AskMeAnythingRandomReady)
+			defer close(transitChan)
+			defer close(errc)
+			defer close(out)
+			sub, err := proxy.AskMeAnythingFilterer.WatchRandomReady(opt, transitChan)
+			if err != nil {
+				return
+			}
+			for {
+				select {
+				case <-ctx.Done():
+					sub.Unsubscribe()
+					return
+				case err := <-sub.Err():
+					errc <- err
+					return
+				case i := <-transitChan:
+					out <- &AskMeAnythingRandomReady{
+						GeneratedRandom: i.GeneratedRandom,
+						RequestId:       i.RequestId,
+						Tx:              i.Raw.TxHash.Hex(),
+						BlockN:          i.Raw.BlockNumber,
+						Removed:         i.Raw.Removed,
+						Raw:             i.Raw,
+					}
+				}
+			}
+		}()
 	case SubscribeAskMeAnythingQueryResponseReady:
 		go func() {
+
 			transitChan := make(chan *dosUser.AskMeAnythingQueryResponseReady)
 			defer close(transitChan)
 			defer close(errc)
@@ -295,6 +328,7 @@ func subscribeEvent(ctx context.Context, proxy *dosUser.AskMeAnything, subscribe
 			defer close(out)
 			sub, err := proxy.AskMeAnythingFilterer.WatchRequestSent(opt, transitChan)
 			if err != nil {
+				fmt.Println("SubscribeAskMeAnythingRequestSent err ", err)
 				return
 			}
 			for {
@@ -303,6 +337,8 @@ func subscribeEvent(ctx context.Context, proxy *dosUser.AskMeAnything, subscribe
 					sub.Unsubscribe()
 					return
 				case err := <-sub.Err():
+					fmt.Println("SubscribeAskMeAnythingRequestSent err ", err)
+
 					errc <- err
 					return
 				case i := <-transitChan:
