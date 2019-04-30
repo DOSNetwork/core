@@ -147,7 +147,7 @@ func (c *Config) overWrite() (err error) {
 		gethIP := os.Getenv("GETHIP")
 		if gethIP != "" {
 			config.RemoteNodeAddressPool = append(config.RemoteNodeAddressPool, "ws://"+gethIP+":8546")
-			config.RemoteNodeAddressPool = append(config.RemoteNodeAddressPool, "http://"+gethIP+":8545")
+			//config.RemoteNodeAddressPool = append(config.RemoteNodeAddressPool, "http://"+gethIP+":8545")
 		}
 		c.ChainConfigs[c.currentType][c.currentNode] = config
 	}
