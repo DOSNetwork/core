@@ -20,7 +20,12 @@ dep:
 	dep ensure -vendor-only
 
 client: gen
-	go build -o client
+ifeq ($(UNAME_S),Linux)
+        go build -o client
+endif
+ifeq ($(UNAME_S),Darwin)
+        xgo --targets=linux/amd64 -out client .
+endif
 
 client-docker:
 	docker build -t dosnode -f Dockerfile .

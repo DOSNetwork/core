@@ -13,31 +13,54 @@ DOSPROXY_GOPATH := onchain/dosproxy
 DOSBRIDGE_GOPATH := onchain/dosbridge
 DOSCOMMITREVEAL_GOPATH := onchain/commitreveal
 UNAME_S := $(shell uname)
+
 clean:
 	cd .. && make clean
 
-deployBridge:
+deploy-bridge:
 	abigen -sol $(ETH_CONTRACTS)/DOSAddressBridge.sol --pkg dosbridge --out ../$(DOSBRIDGE_GOPATH)/DOSAddressBridge.go
 	go run contracts_deploy/deploy.go -credentialPath $(BOOT_CREDENTIAL) -contractPath $(ETH_CONTRACTS) -target deployBridge
 	go run contracts_deploy/deploy.go -credentialPath $(BOOT_CREDENTIAL) -contractPath $(ETH_CONTRACTS) -target updateBridgeAddrToSDK
 
-deployProxy:
+deploy-proxy:
 	abigen -sol $(ETH_CONTRACTS)/DOSProxy.sol --pkg dosproxy --out ../$(DOSPROXY_GOPATH)/DOSProxy.go
 	go run contracts_deploy/deploy.go -credentialPath $(BOOT_CREDENTIAL) -contractPath $(ETH_CONTRACTS) -target deployProxy
 
-deployCommitReveal:
+deploy-cr:
 	abigen -sol $(ETH_CONTRACTS)/CommitReveal.sol --pkg commitreveal --out ../$(DOSCOMMITREVEAL_GOPATH)/CommitReveal.go
 	go run contracts_deploy/deploy.go -credentialPath $(BOOT_CREDENTIAL) -contractPath $(ETH_CONTRACTS) -target deployCommitReveal
 
-deployDOSNetwork:
-	$(MAKE) deployBridge
-	$(MAKE) deployProxy
-	$(MAKE) deployCommitReveal
-
-setUpDOSNetwork:
+setup-dos:
 	go run contracts_deploy/deploy.go -credentialPath $(BOOT_CREDENTIAL) -contractPath $(ETH_CONTRACTS) -target setUpDOSNetwork
 
-genAMA:
+deploy-dos:
+	$(MAKE) deploy-bridge
+	$(MAKE) deploy-proxy
+	$(MAKE) deploy-cr
+	$(MAKE) setup-dos
+
+build-client:
+ifeq ($(UNAME_S),Linux)
+	go build -o client ../
+	cp ../config.json .
+endif
+ifeq ($(UNAME_S),Darwin)
+	xgo --targets=linux/amd64 -out client ../
+	mv client-linux-amd64 client
+	cp ../config.json .
+endif
+
+build-client-docker:
+	cd .. && make client-docker
+	docker tag dosnode dosnetwork/dosnode:latest
+	docker push dosnetwork/dosnode:latest
+
+dos-all:
+	$(MAKE) deploy-dos
+	$(MAKE) build-client
+	$(MAKE) build-client-docker
+
+gen-dosuser:
 	mkdir -p $(USER_CONTRACTS)
 	cp $(ETH_CONTRACTS)/DOSOnChainSDK.sol $(USER_CONTRACTS)/
 	cp $(ETH_CONTRACTS)/Ownable.sol $(USER_CONTRACTS)/
@@ -48,38 +71,29 @@ genAMA:
 	rm $(USER_CONTRACTS)/*.sol
 	rm -r $(USER_CONTRACTS)/lib
 
-deployAMA:
+deploy-dosuser:
 	go run contracts_deploy/deploy.go -credentialPath $(BOOT_CREDENTIAL) -contractPath $(ETH_CONTRACTS) -target deployAMA -configPath $(AMA_CONFIGPATH)
-buildAMA:
+
+build-dosuser:
 	cp ../config.json dosUser/
 	go build -o dosUser/dos_user dosUser/dos_user.go
 
-deployAll:
-	$(MAKE) deployDOSNetwork
-	$(MAKE) setUpDOSNetwork
-	$(MAKE) genAMA
-	$(MAKE) deployAMA
+dosuser-all:
+	$(MAKE) gen-dosuser
+	$(MAKE) deploy-dosuser
+	$(MAKE) build-dosuser
 
-buildBeta:
-	$(MAKE) deployAll
-	$(MAKE) docker-dosnode
-
-buildLinuxClient:
-ifeq ($(UNAME_S),Linux)
-	go build -o testEnv/dosclient ../
-endif
-ifeq ($(UNAME_S),Darwin)
-	xgo --targets=linux/amd64 -out testEnv/dosclient ../
-	mv testEnv/dosclient-linux-amd64 testEnv/dosclient
-endif
+update-dosenv:
+	-docker rmi dosenv
+	-docker rmi dosnetwork/dosenv
+	cd .. && docker build -t dosenv -f Dockerfile.env .
+	docker tag dosenv dosnetwork/dosenv:latest
+	docker push dosnetwork/dosenv:latest
 
 docker-bootnode:
 	cp bootStrapNode/Dockerfile  ../Dockerfile.bootstrap	
 	cd .. && docker build -t bootstrap -f Dockerfile.bootstrap .
 	rm ../Dockerfile.bootstrap
-
-docker-dosnode:
-	cd .. && make client-docker
 
 docker-usernode:
 	cp dosUser/Dockerfile ../Dockerfile.usernode
@@ -108,10 +122,3 @@ docker-aws: docker-bootnode docker-dosnode docker-usernode docker-banker
 	docker push dosnetwork/banker:latest
 	docker push dosnetwork/bootstrap:latest
 	docker push dosnetwork/dosnode:latest
-
-update-dosenv:
-	-docker rmi dosenv
-	-docker rmi dosnetwork/dosenv
-	cd .. && docker build -t dosenv -f Dockerfile.env .
-	docker tag dosenv dosnetwork/dosenv:latest
-	docker push dosnetwork/dosenv:latest
