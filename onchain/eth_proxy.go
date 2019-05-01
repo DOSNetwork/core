@@ -48,7 +48,6 @@ const (
 	LastUpdatedBlock
 	PendingNonce
 	GroupToPick
-	CommitRevealTargetBlk
 	NumPendingGroups
 	PengindNodeSize
 	GroupSize
@@ -520,6 +519,18 @@ func (e *EthAdaptor) SignalDissolve(ctx context.Context, idx uint64) (errc <-cha
 	return
 }
 
+func (e *EthAdaptor) SignalBootstrap(ctx context.Context, cid uint64) (errc <-chan error) {
+	defer logger.TimeTrack(time.Now(), "SignalDissolve", nil)
+	result := make(chan Reply)
+	x := new(big.Int)
+	x.SetUint64(cid)
+	for i, proxy := range e.proxies {
+		request := &ReqSetInt{ctx, &proxy.TransactOpts, x, proxy.SignalBootstrap, result}
+		errc = e.sendRequest(ctx, e.clients[i], errc, request, result)
+	}
+	return
+}
+
 func (e *EthAdaptor) Commit(ctx context.Context, cid *big.Int, commitment [32]byte) (errc <-chan error) {
 	defer logger.TimeTrack(time.Now(), "Commit", nil)
 	result := make(chan Reply)
@@ -900,11 +911,15 @@ func subscribeCREvent(ctx context.Context, cr *commitreveal.CommitReveal, subscr
 					return
 				case i := <-transitChan:
 					out <- &LogStartCommitReveal{
-						Cid:     i.CampaignId,
-						Tx:      i.Raw.TxHash.Hex(),
-						BlockN:  i.Raw.BlockNumber,
-						Removed: i.Raw.Removed,
-						Raw:     i.Raw,
+						Cid:             i.Cid,
+						StartBlock:      i.StartBlock,
+						CommitDuration:  i.CommitDuration,
+						RevealDuration:  i.RevealDuration,
+						RevealThreshold: i.RevealThreshold,
+						Tx:              i.Raw.TxHash.Hex(),
+						BlockN:          i.Raw.BlockNumber,
+						Removed:         i.Raw.Removed,
+						Raw:             i.Raw,
 					}
 				}
 			}
@@ -1800,27 +1815,7 @@ func (e *EthAdaptor) GetPengindNodeSize() (size uint64, err error) {
 	}
 	return
 }
-func (e *EthAdaptor) CommitRevealTargetBlk() (blk uint64, err error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-	defer cancel()
-	var valList []chan interface{}
-	for _, proxy := range e.proxies {
-		valList = append(valList, proxyGet(proxy, CommitRevealTargetBlk))
-	}
-	out := first(ctx, merge(ctx, valList...))
-	select {
-	case val := <-out:
-		s, ok := val.(*big.Int)
-		if !ok {
-			err = errors.New("type error")
-			return
-		}
-		blk = s.Uint64()
-	case <-ctx.Done():
-		err = errors.New("Timeout")
-	}
-	return
-}
+
 func (e *EthAdaptor) GetGroupToPick() (size uint64, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()

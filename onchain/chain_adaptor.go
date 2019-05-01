@@ -28,6 +28,7 @@ type ProxyAdapter interface {
 	SignalRandom(ctx context.Context) (errc <-chan error)
 	SignalGroupFormation(ctx context.Context) (errc <-chan error)
 	SignalDissolve(ctx context.Context, idx uint64) (errc <-chan error)
+	SignalBootstrap(ctx context.Context, cid uint64) (errc <-chan error)
 
 	SubscribeEvent(subscribeType int) (<-chan interface{}, <-chan error)
 	PollLogs(subscribeType int, LogBlockDiff, preBlockBuf uint64) (<-chan interface{}, <-chan error)
@@ -36,7 +37,6 @@ type ProxyAdapter interface {
 	GetWorkingGroupSize() (size uint64, err error)
 	GetGroupToPick() (size uint64, err error)
 	LastUpdatedBlock() (blknum uint64, err error)
-	CommitRevealTargetBlk() (blk uint64, err error)
 	NumPendingGroups() (size uint64, err error)
 	GetPengindNodeSize() (size uint64, err error)
 	GetBalance() (balance *big.Float)

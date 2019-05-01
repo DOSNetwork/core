@@ -172,11 +172,15 @@ type DOSProxyUpdateGroupToPick struct {
 }
 
 type LogStartCommitReveal struct {
-	Cid     *big.Int
-	Tx      string
-	BlockN  uint64
-	Removed bool
-	Raw     types.Log
+	Cid             *big.Int
+	StartBlock      *big.Int
+	CommitDuration  *big.Int
+	RevealDuration  *big.Int
+	RevealThreshold *big.Int
+	Tx              string
+	BlockN          uint64
+	Removed         bool
+	Raw             types.Log
 }
 
 type LogCommit struct {

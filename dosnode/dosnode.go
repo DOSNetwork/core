@@ -168,7 +168,7 @@ func NewDosNode(credentialPath, passphrase string) (dosNode *DosNode, err error)
 		chain:        chainConn,
 		dkg:          p2pDkg,
 		done:         make(chan interface{}),
-		cSignToPeer:  make(chan *vss.Signature, 50),
+		cSignToPeer:  make(chan *vss.Signature, 21),
 		cRequestDone: make(chan [4]*big.Int),
 		id:           id,
 	}
@@ -334,7 +334,7 @@ func (d *DosNode) listen() (err error) {
 			groupInitated, errc := d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogGroupingInitiated)
 			errcList = append(errcList, errc)
 	*/
-	commitRevealStart, errc := d.chain.PollLogs(onchain.SubscribeCommitRevealLogStartCommitReveal, 0, 0)
+	commitRevealStart, errc := d.chain.SubscribeEvent(onchain.SubscribeCommitRevealLogStartCommitReveal)
 	errcList = append(errcList, errc)
 
 	peerEvent, err := d.p.SubscribeEvent(50, vss.Signature{})
@@ -403,7 +403,7 @@ func (d *DosNode) listen() (err error) {
 					log.Error(err)
 					continue
 				}
-				go func(cid *big.Int) {
+				go func(cid, StartBlock, CommitDuration, RevealDuration, RevealThreshold *big.Int) {
 					f := map[string]interface{}{
 						"cid": cid.Uint64()}
 					logger.Event("commitRevealStart", f)
@@ -426,53 +426,55 @@ func (d *DosNode) listen() (err error) {
 					h.Write(abi.U256(sec))
 					b := h.Sum(nil)
 					hash = byte32(b)
-					/*
-						for {
-							cur, err := d.chain.CurrentBlock()
-							if err != nil {
-								logger.Error(err)
-								return
-							}
-							fmt.Println("Waiting for commit ", cur, blkNumUint-revealDurUint-commitDurUint)
-							if cur >= blkNumUint-revealDurUint-commitDurUint {
-								break
-							}
-							time.Sleep(15 * time.Second)
-						}
-
-						errc := d.chain.Commit(context.Background(), *hash)
-						err = <-errc
+					startBlock := StartBlock.Uint64()
+					commitDur := CommitDuration.Uint64()
+					revealDur := RevealDuration.Uint64()
+					fmt.Println("startBlock ", startBlock, " commitDur ", commitDur, "revealDur", revealDur)
+					for {
+						cur, err := d.chain.CurrentBlock()
 						if err != nil {
+							logger.Error(err)
 							return
 						}
-						for {
-							cur, err := d.chain.CurrentBlock()
-							if err != nil {
-								logger.Error(err)
-								return
-							}
-							fmt.Println("Waiting for Reveal ", cur, blkNumUint-revealDurUint)
-							if cur > blkNumUint-revealDurUint {
-								break
-							}
-							time.Sleep(15 * time.Second)
+						fmt.Println("Waiting for commit ", cur, startBlock)
+						if cur >= startBlock {
+							break
 						}
-						d.chain.Reveal(context.Background(), sec)
-						for {
-							cur, err := d.chain.CurrentBlock()
-							if err != nil {
-								logger.Error(err)
-								return
-							}
-							fmt.Println("Waiting for random ", cur, blkNumUint)
-							if cur > blkNumUint {
-								break
-							}
-							time.Sleep(15 * time.Second)
+						time.Sleep(15 * time.Second)
+					}
+
+					errc := d.chain.Commit(context.Background(), cid, *hash)
+					err = <-errc
+					if err != nil {
+						return
+					}
+					for {
+						cur, err := d.chain.CurrentBlock()
+						if err != nil {
+							logger.Error(err)
+							return
 						}
-						//d.chain.SignalGroupFormation(context.Background())
-					*/
-				}(content.Cid)
+						fmt.Println("Waiting for Reveal ", cur, startBlock+commitDur)
+						if cur > startBlock+commitDur {
+							break
+						}
+						time.Sleep(15 * time.Second)
+					}
+					d.chain.Reveal(context.Background(), cid, sec)
+					for {
+						cur, err := d.chain.CurrentBlock()
+						if err != nil {
+							logger.Error(err)
+							return
+						}
+						fmt.Println("Waiting for random ", cur, startBlock+commitDur+revealDur)
+						if cur > startBlock+commitDur+revealDur {
+							break
+						}
+						time.Sleep(15 * time.Second)
+					}
+					d.chain.SignalBootstrap(context.Background(), cid.Uint64())
+				}(content.Cid, content.StartBlock, content.CommitDuration, content.RevealDuration, content.RevealThreshold)
 
 			case err, ok := <-errc:
 				if ok && err.Error() == "EOF" {
@@ -496,10 +498,6 @@ func (d *DosNode) listen() (err error) {
 				if err != nil {
 					continue
 				}
-				commitRevealTargetBlk, err := d.chain.CommitRevealTargetBlk()
-				if err != nil {
-					continue
-				}
 				pendingNodeSize, err := d.chain.GetPengindNodeSize()
 				if err != nil {
 					continue
@@ -517,20 +515,19 @@ func (d *DosNode) listen() (err error) {
 					logger.Error(err)
 					continue
 				}
-				groupSize, err := d.chain.GroupSize()
-				if err != nil {
-					logger.Error(err)
-					continue
-				}
+				//groupSize, err := d.chain.GroupSize()
+				//if err != nil {
+				//	logger.Error(err)
+				//	continue
+				//}
 
 				f := map[string]interface{}{
-					"WorkingGroupSize":      workingGroup,
-					"GroupToPick":           groupToPick,
-					"currentBlockNumber":    currentBlockNumber,
-					"commitRevealTargetBlk": commitRevealTargetBlk,
-					"PendingNodeSize":       pendingNodeSize,
-					"PendingGrouSize":       pendingGrouSize,
-					"Members":               d.p.Members()}
+					"WorkingGroupSize":   workingGroup,
+					"GroupToPick":        groupToPick,
+					"currentBlockNumber": currentBlockNumber,
+					"PendingNodeSize":    pendingNodeSize,
+					"PendingGrouSize":    pendingGrouSize,
+					"Members":            d.p.Members()}
 				logger.Event("DOS_Watchdog", f)
 				fmt.Println("watchdog ", f, " len(ids) ", len(ids))
 				//Let pendingNode be a guardian
@@ -545,11 +542,9 @@ func (d *DosNode) listen() (err error) {
 					}
 				}
 
-				if pendingNodeSize >= groupSize+(groupSize/2) {
-					if currentBlockNumber > commitRevealTargetBlk {
-						d.chain.SignalGroupFormation(context.Background())
-					}
-				}
+				//if pendingNodeSize >= groupSize+(groupSize/2) {
+				//	d.chain.SignalGroupFormation(context.Background())
+				//}
 				//}
 			case pubkey := <-d.cRequestDone:
 				gID := dkg.HashPoint(pubkey)
@@ -557,7 +552,20 @@ func (d *DosNode) listen() (err error) {
 				requestTracking[gID]["count"]--
 				if requestTracking[gID]["count"] == 0 &&
 					requestTracking[gID]["status"] == GROUPDELETED {
+					f := map[string]interface{}{
+						"DispatchedGroup_1": fmt.Sprintf("%x", pubkey[0].Bytes()),
+						"DispatchedGroup_2": fmt.Sprintf("%x", pubkey[1].Bytes()),
+						"DispatchedGroup_3": fmt.Sprintf("%x", pubkey[2].Bytes()),
+						"DispatchedGroup_4": fmt.Sprintf("%x", pubkey[3].Bytes()),
+					}
+					logger.Event("DOS_GroupDeleted", f)
 					if d.dkg.GroupDismiss(pubkey) {
+						ids := d.dkg.GetGroupIDs(pubkey)
+						for _, id := range ids {
+							if r := bytes.Compare(d.id, id); r != 0 {
+								d.p.DisConnectTo(id)
+							}
+						}
 						ctx, _ := context.WithCancel(context.Background())
 						go func() {
 							errc := d.chain.RegisterNewNode(ctx)
@@ -648,7 +656,7 @@ func (d *DosNode) listen() (err error) {
 					}
 					gID := dkg.HashPoint(content.PubKey)
 					fmt.Println("eventGroupDismiss ", []byte(gID), requestTracking[gID]["count"])
-					requestTracking[gID]["status"] = GROUPDELETED
+
 					f := map[string]interface{}{
 						"SessionID":         fmt.Sprintf("%x", content.GroupId),
 						"DispatchedGroup_1": fmt.Sprintf("%x", content.PubKey[0].Bytes()),
@@ -672,6 +680,8 @@ func (d *DosNode) listen() (err error) {
 								}
 							}()
 						}
+					} else {
+						requestTracking[gID]["status"] = GROUPDELETED
 					}
 				}
 			case msg, ok := <-chRandom:

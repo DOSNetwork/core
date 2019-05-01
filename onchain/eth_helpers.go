@@ -99,30 +99,36 @@ func DialToEth(ctx context.Context, urlPool []string, key *keystore.Key) (out ch
 	var wg sync.WaitGroup
 	connTemp := 1
 	multiplex := func(url string) {
+		//defer logger.TimeTrack(time.Now(), "DialToEth", map[string]interface{}{"URL": url})
+
 		var e error
 		var client *ethclient.Client
 		defer wg.Done()
 		client, e = ethclient.Dial(url)
-
+		if e != nil {
+			fmt.Println("DialToEth err ", e)
+		}
 		for connTemp < RETRYLIMIT && e != nil && strings.Contains(e.Error(), "no such host") {
 			client, e = ethclient.Dial(url)
+			if e != nil {
+				fmt.Println("DialToEth err ", e)
+			}
 			connTemp++
 			time.Sleep(time.Second * time.Duration(REDIALINTERVAL))
 		}
-		retry := 10
+		//retry := 100
 		if key != nil {
 			//Read balance to make sure client is working
 			for {
 				b := GetBalance(client, key)
 				if b != nil {
 					fmt.Println("balance ", b)
-
 					break
 				}
-				if retry == 0 {
-					return
-				}
-				retry--
+				//if retry == 0 {
+				//	return
+				//}
+				//retry--
 				time.Sleep(15 * time.Second)
 				fmt.Println("Retry to get balance")
 			}
@@ -164,6 +170,8 @@ func CheckSync(ctx context.Context, mClient *ethclient.Client, cs chan *ethclien
 	for client := range cs {
 		size++
 		go func(client *ethclient.Client) {
+			//defer logger.TimeTrack(time.Now(), "CheckSync", nil)
+
 			defer wg.Done()
 			ticker := time.NewTicker(time.Second * time.Duration(CHECKSYNCINTERVAL))
 			for _ = range ticker.C {

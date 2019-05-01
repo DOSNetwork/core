@@ -55,12 +55,7 @@ func (d *DosNode) proxy(w http.ResponseWriter, r *http.Request) {
 	} else {
 		html = html + "PendingNodeSize :" + strconv.FormatUint(pendingNodeNum, 10) + "\n"
 	}
-	commitRevealTargetBlk, err := d.chain.CommitRevealTargetBlk()
-	if err != nil {
-		html = html + "commitRevealTargetBlk :" + err.Error() + "\n"
-	} else {
-		html = html + "commitRevealTargetBlk :" + strconv.FormatUint(commitRevealTargetBlk, 10) + "\n"
-	}
+
 	curBlk, err := d.chain.CurrentBlock()
 	if err != nil {
 		html = html + "CurrentBlock :" + err.Error() + "\n"
