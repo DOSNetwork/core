@@ -80,9 +80,7 @@ gen-dosuser:
 	cp $(ETH_CONTRACTS)/Ownable.sol $(USER_CONTRACTS)/
 	mkdir -p $(USER_CONTRACTS)/lib/
 	cp $(ETH_CONTRACTS)/lib/utils.sol $(USER_CONTRACTS)/lib/
-	cp $(REMOTE_USER_CONTRACT)/AskMeAnything.sol $(USER_CONTRACTS)
 	abigen -sol $(USER_CONTRACTS)/AskMeAnything.sol --pkg dosUser --out $(USER_CONTRACTS)/AskMeAnything.go
-	rm $(USER_CONTRACTS)/*.sol
 	rm -r $(USER_CONTRACTS)/lib
 
 deploy-dosuser:
