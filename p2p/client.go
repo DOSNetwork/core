@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net"
 	"os"
+	"strconv"
 	"sync"
 	"time"
 	//	"github.com/DOSNetwork/core/log"
@@ -20,6 +21,12 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes"
 	"github.com/golang/protobuf/ptypes/any"
+)
+
+const (
+	MAXMESSAGESIZE = 1024 * 1024
+	BUFFERSIZE     = 1024
+	HEADERSIZE     = 4
 )
 
 type Client struct {
@@ -86,9 +93,13 @@ func NewClient(suite suites.Suite, secKey kyber.Scalar, localPubKey kyber.Point,
 		incomingConn: incomingConn,
 	}
 	client.ctx, client.cancel = context.WithCancel(context.Background())
-	client.sender = make(chan Request, 100)
+	client.sender = make(chan Request, 21)
 	//Wait for exchanging ID complete
 	err = client.exchangeID()
+	if client.remoteID == nil {
+		err = errors.New("exchangeID failed")
+		return
+	}
 	if err != nil {
 		logger.Error(err)
 		return
@@ -144,7 +155,9 @@ func (c *Client) exchangeID() (err error) {
 		f := map[string]interface{}{
 			"localID":  c.localID,
 			"remoteID": c.remoteID}
-		logger.Event("exchangeIDSuccess", f)
+		if logger != nil {
+			logger.Event("exchangeIDSuccess", f)
+		}
 	case <-time.After(timeout):
 		f := map[string]interface{}{
 			"localID": c.localID}
@@ -152,15 +165,55 @@ func (c *Client) exchangeID() (err error) {
 	}
 	return
 }
+
 func (c *Client) receiveID(wg *sync.WaitGroup) (err error) {
 	defer wg.Done()
-	buffer, err := readConn(c.conn, c.localID, c.remoteID, c.incomingConn)
+	// Read until all header bytes have been read.
+	header := make([]byte, HEADERSIZE)
+	// Read until all header bytes have been read.
+	bytesRead, totalBytesRead := 0, 0
+	for totalBytesRead < HEADERSIZE && err == nil {
+		if bytesRead, err = c.conn.Read(header[totalBytesRead:]); err != nil {
+			if err.Error() == "EOF" {
+				c.Close()
+			}
+			return
+		}
+		totalBytesRead += bytesRead
+	}
 
+	// Decode message size.
+	size := binary.BigEndian.Uint32(header)
+	f := map[string]interface{}{
+		"size": size}
+	if logger != nil {
+		logger.Event("receiveID", f)
+	}
+	header = nil
+	if size > MAXMESSAGESIZE {
+		err = errors.New("p2p message size is too big " + strconv.Itoa(int(size)))
+		return
+	}
+	// Read until all message bytes have been read.
+	buffer := make([]byte, size)
+	if size == 0 {
+		return
+	}
+	bytesRead, totalBytesRead = 0, 0
+
+	for totalBytesRead < int(size) && err == nil {
+		if bytesRead, err = c.conn.Read(buffer[totalBytesRead:]); err != nil {
+			return
+		}
+		totalBytesRead += bytesRead
+	}
 	pa := new(Package)
 	if err = proto.Unmarshal(buffer, pa); err != nil {
 		logger.Error(err)
 		return
 	}
+	buffer = nil
+
 	var ptr ptypes.DynamicAny
 	if err = ptypes.UnmarshalAny(pa.GetAnything(), &ptr); err != nil {
 		logger.Error(err)
@@ -219,12 +272,26 @@ func (c *Client) sendID(wg *sync.WaitGroup) (err error) {
 		logger.Error(err)
 		return
 	}
-	prefix := make([]byte, 4)
-	binary.BigEndian.PutUint32(prefix, uint32(len(bytes)))
-	bytes = append(prefix, bytes...)
-	if _, E := c.conn.Write(bytes); E != nil {
-		logger.Error(E)
+	if len(bytes) > MAXMESSAGESIZE {
+		err = errors.New("p2p message size is too big " + strconv.Itoa(int(len(bytes))))
 		return
+	}
+	prefix := make([]byte, HEADERSIZE)
+	binary.BigEndian.PutUint32(prefix, uint32(len(bytes)))
+	f := map[string]interface{}{
+		"size": len(bytes)}
+	if logger != nil {
+		logger.Event("sendID", f)
+	}
+	bytes = append(prefix, bytes...)
+
+	bytesRead, totalBytesRead := 0, 0
+	for totalBytesRead < HEADERSIZE && err == nil {
+		if bytesRead, err = c.conn.Write(bytes); err != nil {
+			c.Close()
+			return
+		}
+		totalBytesRead += bytesRead
 	}
 
 	return
@@ -332,8 +399,8 @@ func decrypt(ctx context.Context, dhKey, dhNonce []byte, ciphertext chan []byte)
 }
 
 func dispatch(localID, remoteID []byte, incomingConn bool, ctx context.Context, suite suites.Suite, pub kyber.Point, Id []byte, sendMsg chan Request, receiveBytes chan []byte) (chan interface{}, chan []byte, chan error) {
-	receiver := make(chan interface{}, 100)
-	sender := make(chan []byte, 100)
+	receiver := make(chan interface{}, 21)
+	sender := make(chan []byte, 21)
 	errc := make(chan error)
 	requests := make(map[uint64]Request)
 	var nonce uint64
@@ -451,6 +518,7 @@ func dispatch(localID, remoteID []byte, incomingConn bool, ctx context.Context, 
 
 func sendBytes(ctx context.Context, c net.Conn, bytesC chan []byte, localID, remoteID []byte, incomingConn bool) chan error {
 	errc := make(chan error)
+	prefix := make([]byte, HEADERSIZE)
 	go func() {
 		for {
 			select {
@@ -458,16 +526,25 @@ func sendBytes(ctx context.Context, c net.Conn, bytesC chan []byte, localID, rem
 				if !ok {
 					return
 				}
-
-				prefix := make([]byte, 4)
-				binary.BigEndian.PutUint32(prefix, uint32(len(bytes)))
+				var err error
+				bytesWrite, totalBytesWrtie := 0, 0
+				f := map[string]interface{}{
+					"size": len(bytes)}
+				if logger != nil {
+					logger.Event("sendBytes", f)
+				}
+				size := uint32(len(bytes))
+				binary.BigEndian.PutUint32(prefix, size)
 				bytes = append(prefix, bytes...)
-				if _, err := c.Write(bytes); err != nil {
-					select {
-					case errc <- err:
-					case <-ctx.Done():
-						return
+				for totalBytesWrtie < len(bytes) && err == nil {
+					if bytesWrite, err = c.Write(bytes[totalBytesWrtie:]); err != nil {
+						select {
+						case errc <- err:
+						case <-ctx.Done():
+							return
+						}
 					}
+					totalBytesWrtie += bytesWrite
 				}
 			case <-ctx.Done():
 
@@ -478,45 +555,11 @@ func sendBytes(ctx context.Context, c net.Conn, bytesC chan []byte, localID, rem
 	return errc
 }
 
-func readConn(c net.Conn, localID, remoteID []byte, incomingConn bool) (buffer []byte, err error) {
-	// Read until all header bytes have been read.
-	header := make([]byte, 4)
-	// Read until all header bytes have been read.
-	bytesRead, totalBytesRead := 0, 0
-	for totalBytesRead < 4 && err == nil {
-		if bytesRead, err = c.Read(header[totalBytesRead:]); err != nil {
-			if err.Error() == "EOF" {
-				c.Close()
-			}
-			return
-		}
-		totalBytesRead += bytesRead
-	}
-
-	// Decode message size.
-	size := binary.BigEndian.Uint32(header)
-
-	// Read until all message bytes have been read.
-	buffer = make([]byte, size)
-	if size == 0 {
-		return
-	}
-	bytesRead, totalBytesRead = 0, 0
-
-	for totalBytesRead < int(size) && err == nil {
-		if bytesRead, err = c.Read(buffer[totalBytesRead:]); err != nil {
-			return
-		}
-		totalBytesRead += bytesRead
-	}
-
-	return
-}
-
 func readBytes(ctx context.Context, c net.Conn, localID, remoteID []byte, incomingConn bool) (chan []byte, chan error) {
 	out := make(chan []byte, 10)
 	errc := make(chan error)
-
+	header := make([]byte, HEADERSIZE)
+	buffer := make([]byte, BUFFERSIZE)
 	go func() {
 		defer close(out)
 		defer close(errc)
@@ -526,19 +569,58 @@ func readBytes(ctx context.Context, c net.Conn, localID, remoteID []byte, incomi
 			case <-ctx.Done():
 				return
 			default:
+				var err error
 				// Read until all header bytes have been read.
-				buffer, err := readConn(c, localID, remoteID, incomingConn)
-				if err != nil {
+				bytesRead, totalBytesRead := 0, 0
+				for totalBytesRead < HEADERSIZE && err == nil {
+					if bytesRead, err = c.Read(header[totalBytesRead:]); err != nil {
+						if err.Error() == "EOF" {
+							c.Close()
+						}
+						return
+					}
+					totalBytesRead += bytesRead
+				}
+
+				// Decode message size and check size to avoid OOM
+				size := binary.BigEndian.Uint32(header)
+				f := map[string]interface{}{
+					"size": size}
+				if logger != nil {
+					logger.Event("readBytes", f)
+				}
+				if size > MAXMESSAGESIZE {
+					err = errors.New("p2p message size is too big " + strconv.Itoa(int(size)))
 					select {
 					case errc <- err:
 					case <-ctx.Done():
 					}
-				} else {
-					select {
-					case out <- buffer:
-					case <-ctx.Done():
-					}
+					return
 				}
+				if size == 0 {
+					return
+				}
+
+				// Read until all message bytes have been read.
+				var result []byte
+				bytesRead, totalBytesRead = 0, 0
+				for totalBytesRead < int(size) && err == nil {
+					if bytesRead, err = c.Read(buffer[0:]); err != nil {
+						select {
+						case errc <- err:
+						case <-ctx.Done():
+						}
+						return
+					}
+					totalBytesRead += bytesRead
+					result = append(result, buffer[0:bytesRead]...)
+				}
+				select {
+				case out <- result:
+				case <-ctx.Done():
+				}
+				result = nil
+
 			}
 		}
 	}()

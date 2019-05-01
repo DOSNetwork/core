@@ -34,11 +34,12 @@ type Server struct {
 	listener net.Listener
 
 	//Client lookup
-	network   network.Network
-	calling   chan Request
-	replying  chan Request
-	incoming  chan *Client
-	registerC chan *Client
+	network     network.Network
+	calling     chan Request
+	replying    chan Request
+	incoming    chan *Client
+	registerC   chan *Client
+	deRegisterC chan []byte
 
 	//Event
 	messages  chan P2PMessage
@@ -207,7 +208,7 @@ func (n *Server) Listen() (err error) {
 	return nil
 }
 func (n *Server) receiveHandler() {
-	n.incoming = make(chan *Client, 100)
+	n.incoming = make(chan *Client, 21)
 	n.replying = make(chan Request)
 	clients := make(map[string]*Client)
 
@@ -254,13 +255,14 @@ func (n *Server) receiveHandler() {
 	}()
 }
 func (n *Server) callHandler() {
-	n.calling = make(chan Request, 100)
+	n.calling = make(chan Request, 21)
 	hangup := make(chan string)
 	addrToid := make(map[string][]byte)
 	idTostatus := make(map[string][]byte)
 
 	clients := make(map[string]*Client)
 	n.registerC = make(chan *Client)
+	n.deRegisterC = make(chan []byte)
 	go func() {
 		for {
 			select {
@@ -433,6 +435,15 @@ func (n *Server) callHandler() {
 					"remoteID":   client.remoteID,
 					"RemoteAddr": client.conn.RemoteAddr().String()}
 				logger.Event("registerClient", f)
+			case id, ok := <-n.deRegisterC:
+				if !ok {
+					return
+				}
+				client := clients[string(id)]
+				if client != nil {
+					//delete(addrToid, client.conn.RemoteAddr().String())
+					client.Close()
+				}
 			case _, _ = <-hangup:
 			}
 		}
@@ -450,6 +461,11 @@ func (n *Server) Leave() {
 		n.network.Leave()
 	}
 
+	return
+}
+
+func (n *Server) DisConnectTo(id []byte) (err error) {
+	n.deRegisterC <- id
 	return
 }
 

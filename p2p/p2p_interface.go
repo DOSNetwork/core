@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"runtime"
 
 	"github.com/DOSNetwork/core/log"
 	"github.com/DOSNetwork/core/p2p/network"
@@ -22,6 +23,19 @@ const (
 	NONE = iota // 0
 	SWIM
 )
+
+func bToMb(b uint64) uint64 {
+	return b / 1024 / 1024
+}
+func PrintMemUsage() {
+	var m runtime.MemStats
+	runtime.ReadMemStats(&m)
+	// For info on each, see: https://golang.org/pkg/runtime/#MemStats
+	fmt.Printf("Alloc = %v MiB", bToMb(m.Alloc))
+	fmt.Printf("\tTotalAlloc = %v MiB", bToMb(m.TotalAlloc))
+	fmt.Printf("\tSys = %v MiB", bToMb(m.Sys))
+	fmt.Printf("\tNumGC = %v\n", m.NumGC)
+}
 
 func CreateP2PNetwork(id []byte, port string, netType int) (P2PInterface, error) {
 	suite := suites.MustFind("bn256")
@@ -99,6 +113,7 @@ type P2PInterface interface {
 	Listen() error
 	Join(bootstrapIp []string) (num int, err error)
 	ConnectTo(ip string, id []byte) ([]byte, error)
+	DisConnectTo(id []byte) error
 	Leave()
 	Request(id []byte, m proto.Message) (msg P2PMessage, err error)
 	Reply(id []byte, nonce uint64, m proto.Message) (err error)
