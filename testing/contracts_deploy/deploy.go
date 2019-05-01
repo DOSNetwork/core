@@ -163,7 +163,7 @@ func AddProxyToCRWhiteList(client *ethclient.Client, key *keystore.Key, crAddres
 	}
 	var tx *types.Transaction
 
-	tx, err = cr.AddToWhitelist(auth, crAddress)
+	tx, err = cr.AddToWhitelist(auth, proxyAddress)
 	for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
 		fmt.Println(err)
 		time.Sleep(time.Second)
