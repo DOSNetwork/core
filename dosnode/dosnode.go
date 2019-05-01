@@ -111,7 +111,7 @@ func NewDosNode(credentialPath, passphrase string) (dosNode *DosNode, err error)
 	}
 
 	//Set up an onchain adapter
-	chainConn, err := onchain.NewProxyAdapter(config.GetCurrentType(), credentialPath, passphrase, chainConfig.DOSProxyAddress, chainConfig.DOSCommitReveal, chainConfig.RemoteNodeAddressPool)
+	chainConn, err := onchain.NewProxyAdapter(config.GetCurrentType(), credentialPath, passphrase, chainConfig.DOSProxyAddress, chainConfig.CommitReveal, chainConfig.RemoteNodeAddressPool)
 	if err != nil {
 		if err.Error() != "No any working eth client for event tracking" {
 			fmt.Println("NewDosNode failed ", err)
@@ -299,7 +299,7 @@ func (d *DosNode) buildPipeline(valueCtx context.Context, pubkey [4]*big.Int, gr
 	default:
 		cErr = d.chain.DataReturn(valueCtx, cSign)
 	}
-	errcList = append(errcList, cErr)
+	//errcList = append(errcList, cErr)
 	errc := mergeErrors(valueCtx, errcList...)
 
 	go d.waitForRequestDone(valueCtx, pubkey, errc)
@@ -309,32 +309,32 @@ func (d *DosNode) buildPipeline(valueCtx context.Context, pubkey [4]*big.Int, gr
 func (d *DosNode) listen() (err error) {
 
 	var errcList []<-chan error
-	eventGrouping, errc := d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogGrouping)
+	eventGrouping, errc := d.chain.SubscribeEvent(onchain.SubscribeDosproxyLogGrouping)
 	errcList = append(errcList, errc)
-	eventGroupDissolve, errc := d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogGroupDissolve)
+	eventGroupDissolve, errc := d.chain.SubscribeEvent(onchain.SubscribeDosproxyLogGroupDissolve)
 	errcList = append(errcList, errc)
-	chUrl, errc := d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogUrl)
+	chUrl, errc := d.chain.SubscribeEvent(onchain.SubscribeDosproxyLogUrl)
 	errcList = append(errcList, errc)
-	chRandom, errc := d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogUpdateRandom)
+	chRandom, errc := d.chain.SubscribeEvent(onchain.SubscribeDosproxyLogUpdateRandom)
 	errcList = append(errcList, errc)
-	chUsrRandom, errc := d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogRequestUserRandom)
+	chUsrRandom, errc := d.chain.SubscribeEvent(onchain.SubscribeDosproxyLogRequestUserRandom)
 	errcList = append(errcList, errc)
-	eventValidation, errc := d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogValidationResult)
+	eventValidation, errc := d.chain.SubscribeEvent(onchain.SubscribeDosproxyLogValidationResult)
 	errcList = append(errcList, errc)
-	keyAccepted, errc := d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogPublicKeyAccepted)
+	keyAccepted, errc := d.chain.SubscribeEvent(onchain.SubscribeDosproxyLogPublicKeyAccepted)
 	errcList = append(errcList, errc)
-	keySuggested, errc := d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogPublicKeySuggested)
+	keySuggested, errc := d.chain.SubscribeEvent(onchain.SubscribeDosproxyLogPublicKeySuggested)
 	errcList = append(errcList, errc)
-	noworkinggroup, errc := d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogNoWorkingGroup)
+	noworkinggroup, errc := d.chain.SubscribeEvent(onchain.SubscribeDosproxyLogNoWorkingGroup)
 	errcList = append(errcList, errc)
 	/*
-		chInsufficientWG, errc := d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogInsufficientWorkingGroup)
+		chInsufficientWG, errc := d.chain.SubscribeEvent(onchain.SubscribeDosproxyLogInsufficientWorkingGroup)
 		errcList = append(errcList, errc)
 
-			groupInitated, errc := d.chain.SubscribeEvent(onchain.SubscribeDOSProxyLogGroupingInitiated)
+			groupInitated, errc := d.chain.SubscribeEvent(onchain.SubscribeDosproxyLogGroupingInitiated)
 			errcList = append(errcList, errc)
 	*/
-	commitRevealStart, errc := d.chain.SubscribeEvent(onchain.SubscribeCommitRevealLogStartCommitReveal)
+	commitRevealStart, errc := d.chain.SubscribeEvent(onchain.SubscribeCommitrevealLogStartCommitreveal)
 	errcList = append(errcList, errc)
 
 	peerEvent, err := d.p.SubscribeEvent(50, vss.Signature{})
@@ -381,7 +381,7 @@ func (d *DosNode) listen() (err error) {
 					if !ok {
 						continue
 					}
-					content, ok := msg.(*onchain.DOSProxyLogGroupingInitiated)
+					content, ok := msg.(*onchain.DosproxyLogGroupingInitiated)
 					if !ok {
 						log.Error(err)
 						continue
@@ -515,11 +515,11 @@ func (d *DosNode) listen() (err error) {
 					logger.Error(err)
 					continue
 				}
-				//groupSize, err := d.chain.GroupSize()
-				//if err != nil {
-				//	logger.Error(err)
-				//	continue
-				//}
+				groupSize, err := d.chain.GroupSize()
+				if err != nil {
+					logger.Error(err)
+					continue
+				}
 
 				f := map[string]interface{}{
 					"WorkingGroupSize":   workingGroup,
@@ -542,10 +542,10 @@ func (d *DosNode) listen() (err error) {
 					}
 				}
 
-				//if pendingNodeSize >= groupSize+(groupSize/2) {
-				//	d.chain.SignalGroupFormation(context.Background())
-				//}
-				//}
+				if pendingNodeSize >= groupSize+(groupSize/2) {
+					d.chain.SignalGroupFormation(context.Background())
+				}
+
 			case pubkey := <-d.cRequestDone:
 				gID := dkg.HashPoint(pubkey)
 				fmt.Println("cRequestDone ", []byte(gID), requestTracking[gID]["count"])
@@ -593,7 +593,7 @@ func (d *DosNode) listen() (err error) {
 				if !ok {
 					continue
 				}
-				content, ok := msg.(*onchain.DOSProxyLogGrouping)
+				content, ok := msg.(*onchain.DosproxyLogGrouping)
 				if !ok {
 					log.Error(err)
 					continue
@@ -641,7 +641,7 @@ func (d *DosNode) listen() (err error) {
 				if !ok {
 					continue
 				}
-				content, ok := msg.(*onchain.DOSProxyLogGroupDissolve)
+				content, ok := msg.(*onchain.DosproxyLogGroupDissolve)
 				if !ok {
 					e, ok := msg.(error)
 					if ok {
@@ -688,7 +688,7 @@ func (d *DosNode) listen() (err error) {
 				if !ok {
 					continue
 				}
-				content, ok := msg.(*onchain.DOSProxyLogUpdateRandom)
+				content, ok := msg.(*onchain.DosproxyLogUpdateRandom)
 				if !ok {
 					log.Error(err)
 				}
@@ -731,7 +731,7 @@ func (d *DosNode) listen() (err error) {
 				if !ok {
 					continue
 				}
-				content, ok := msg.(*onchain.DOSProxyLogRequestUserRandom)
+				content, ok := msg.(*onchain.DosproxyLogRequestUserRandom)
 				if !ok {
 					log.Error(err)
 					continue
@@ -776,7 +776,7 @@ func (d *DosNode) listen() (err error) {
 				if !ok {
 					continue
 				}
-				content, ok := msg.(*onchain.DOSProxyLogUrl)
+				content, ok := msg.(*onchain.DosproxyLogUrl)
 				if !ok {
 					log.Error(err)
 					continue
@@ -824,7 +824,7 @@ func (d *DosNode) listen() (err error) {
 				if !ok {
 					continue
 				}
-				content, ok := msg.(*onchain.DOSProxyLogValidationResult)
+				content, ok := msg.(*onchain.DosproxyLogValidationResult)
 				if !ok {
 					log.Error(err)
 					continue
@@ -862,7 +862,7 @@ func (d *DosNode) listen() (err error) {
 				if !ok {
 					continue
 				}
-				content, ok := msg.(*onchain.DOSProxyLogPublicKeySuggested)
+				content, ok := msg.(*onchain.DosproxyLogPublicKeySuggested)
 				if !ok {
 					e, ok := msg.(error)
 					if ok {
@@ -884,7 +884,7 @@ func (d *DosNode) listen() (err error) {
 				if !ok {
 					continue
 				}
-				content, ok := msg.(*onchain.DOSProxyLogPublicKeyAccepted)
+				content, ok := msg.(*onchain.DosproxyLogPublicKeyAccepted)
 				if !ok {
 					e, ok := msg.(error)
 					if ok {
@@ -909,7 +909,7 @@ func (d *DosNode) listen() (err error) {
 				if err != nil {
 					logger.Error(err)
 				}
-				content, ok := msg.(*onchain.DOSProxyLogNoWorkingGroup)
+				content, ok := msg.(*onchain.DosproxyLogNoWorkingGroup)
 				if !ok {
 					e, ok := msg.(error)
 					if ok {

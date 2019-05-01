@@ -36,8 +36,9 @@ type Config struct {
 
 type ChainConfig struct {
 	DOSProxyAddress         string
+	DOSPaymentAddress       string
 	DOSAddressBridgeAddress string
-	DOSCommitReveal         string
+	CommitReveal            string
 	RemoteNodeAddressPool   []string
 }
 
@@ -146,7 +147,7 @@ func (c *Config) overWrite() (err error) {
 	if config, loaded := c.ChainConfigs[c.currentType][c.currentNode]; loaded {
 		gethIP := os.Getenv("GETHIP")
 		if gethIP != "" {
-			config.RemoteNodeAddressPool = append(config.RemoteNodeAddressPool, "ws://"+gethIP+":8546")
+			//config.RemoteNodeAddressPool = append(config.RemoteNodeAddressPool, "ws://"+gethIP+":8546")
 			//config.RemoteNodeAddressPool = append(config.RemoteNodeAddressPool, "http://"+gethIP+":8545")
 		}
 		c.ChainConfigs[c.currentType][c.currentNode] = config

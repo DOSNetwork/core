@@ -9,7 +9,8 @@ import (
 
 //TODO: MAKE IT A UNIVERSAL INTERFACE FOR ALL KIND OF CHAINS IN FUTURE
 //TODO: NEED TO MOVE IT DIRECTLY INSIDE BLOCKCHAIN FOLDER
-type DOSProxyLogUrl struct {
+
+type DosproxyLogUrl struct {
 	QueryId           *big.Int
 	Timeout           *big.Int
 	DataSource        string
@@ -23,7 +24,7 @@ type DOSProxyLogUrl struct {
 	Raw               types.Log
 }
 
-type DOSProxyLogRequestUserRandom struct {
+type DosproxyLogRequestUserRandom struct {
 	RequestId            *big.Int
 	LastSystemRandomness *big.Int
 	UserSeed             *big.Int
@@ -35,21 +36,21 @@ type DOSProxyLogRequestUserRandom struct {
 	Raw                  types.Log
 }
 
-type DOSProxyLogNonSupportedType struct {
+type DosproxyLogNonSupportedType struct {
 	InvalidSelector string
 }
 
-type DOSProxyLogNonContractCall struct {
+type DosproxyLogNonContractCall struct {
 	From common.Address
 }
 
-type DOSProxyLogCallbackTriggeredFor struct {
+type DosproxyLogCallbackTriggeredFor struct {
 	CallbackAddr common.Address
 }
 
-type DOSProxyLogRequestFromNonExistentUC struct{}
+type DosproxyLogRequestFromNonExistentUC struct{}
 
-type DOSProxyLogUpdateRandom struct {
+type DosproxyLogUpdateRandom struct {
 	LastRandomness    *big.Int
 	DispatchedGroupId *big.Int
 	DispatchedGroup   [4]*big.Int
@@ -59,7 +60,7 @@ type DOSProxyLogUpdateRandom struct {
 	Raw               types.Log
 }
 
-type DOSProxyLogValidationResult struct {
+type DosproxyLogValidationResult struct {
 	TrafficType uint8
 	TrafficId   *big.Int
 	Message     []byte
@@ -73,7 +74,7 @@ type DOSProxyLogValidationResult struct {
 	Raw         types.Log
 }
 
-type DOSProxyLogGroupingInitiated struct {
+type DosproxyLogGroupingInitiated struct {
 	NumPendingNodes   *big.Int
 	GroupSize         *big.Int
 	GroupingThreshold *big.Int
@@ -83,7 +84,7 @@ type DOSProxyLogGroupingInitiated struct {
 	Raw               types.Log
 }
 
-type DOSProxyLogInsufficientWorkingGroup struct {
+type DosproxyLogInsufficientWorkingGroup struct {
 	NumWorkingGroups *big.Int
 	Tx               string
 	BlockN           uint64
@@ -91,7 +92,7 @@ type DOSProxyLogInsufficientWorkingGroup struct {
 	Raw              types.Log
 }
 
-type DOSProxyLogInsufficientPendingNode struct {
+type DosproxyLogInsufficientPendingNode struct {
 	NumPendingNodes *big.Int
 	Tx              string
 	BlockN          uint64
@@ -99,7 +100,7 @@ type DOSProxyLogInsufficientPendingNode struct {
 	Raw             types.Log
 }
 
-type DOSProxyLogGrouping struct {
+type DosproxyLogGrouping struct {
 	GroupId *big.Int
 	NodeId  []common.Address
 	Tx      string
@@ -108,7 +109,7 @@ type DOSProxyLogGrouping struct {
 	Raw     types.Log
 }
 
-type DOSProxyLogDuplicatePubKey struct {
+type DosproxyLogDuplicatePubKey struct {
 	GroupId *big.Int
 	PubKey  [4]*big.Int
 	BlockN  uint64
@@ -116,7 +117,7 @@ type DOSProxyLogDuplicatePubKey struct {
 	Raw     types.Log
 }
 
-type DOSProxyLogAddressNotFound struct {
+type DosproxyLogAddressNotFound struct {
 	GroupId *big.Int
 	PubKey  [4]*big.Int
 	Tx      string
@@ -125,7 +126,7 @@ type DOSProxyLogAddressNotFound struct {
 	Raw     types.Log
 }
 
-type DOSProxyLogPublicKeyAccepted struct {
+type DosproxyLogPublicKeyAccepted struct {
 	GroupId          *big.Int
 	PubKey           [4]*big.Int
 	WorkingGroupSize *big.Int
@@ -135,7 +136,7 @@ type DOSProxyLogPublicKeyAccepted struct {
 	Raw              types.Log
 }
 
-type DOSProxyLogPublicKeySuggested struct {
+type DosproxyLogPublicKeySuggested struct {
 	GroupId   *big.Int
 	PubKey    [4]*big.Int
 	Count     *big.Int
@@ -146,7 +147,7 @@ type DOSProxyLogPublicKeySuggested struct {
 	Raw       types.Log
 }
 
-type DOSProxyLogGroupDissolve struct {
+type DosproxyLogGroupDissolve struct {
 	GroupId *big.Int
 	PubKey  [4]*big.Int
 	Tx      string
@@ -155,14 +156,14 @@ type DOSProxyLogGroupDissolve struct {
 	Raw     types.Log
 }
 
-type DOSProxyLogNoWorkingGroup struct {
+type DosproxyLogNoWorkingGroup struct {
 	Raw     types.Log
 	Removed bool
 	BlockN  uint64
 	Tx      string
 }
 
-type DOSProxyUpdateGroupToPick struct {
+type DosproxyUpdateGroupToPick struct {
 	OldNum  *big.Int
 	NewNum  *big.Int
 	Tx      string

@@ -1,18 +1,20 @@
 {
     "NodeRole": "BootstrapNode",
     "BootStrapIp": [
-        "18.236.112.109",
-        "54.200.75.251",
-        "54.245.13.127",
-        "54.202.250.153"
+        "18.236.117.126",
+        "18.236.199.131",
+        "18.236.80.51",
+        "18.237.0.120",
+        "18.237.179.193"
     ],
     "Port": "9501",
     "ChainConfigs": {
         "ETH": {
             "privateNode": {
                 "DOSProxyAddress": "0x560F79B8DF9C7D3e3db38f2FeB111DF2da8F9375",
+                "DOSPaymentAddress": "",
                 "DOSAddressBridgeAddress": "0x4adA71eC02e21E6c5088BD48e8302719aC93F4c6",
-                "DOSCommitReveal": "",
+                "CommitReveal": "",
                 "RemoteNodeAddressPool": [
                     "http://163.172.36.173:8080",
                     "ws://163.172.36.173:8546"
@@ -20,18 +22,20 @@
             },
             "rinkebyInfura": {
                 "DOSProxyAddress": "0x57054466fAD09bFA5fB723c9057f7a16d359656D",
+                "DOSPaymentAddress": "",
                 "DOSAddressBridgeAddress": "0x09dB4cd7ec4de9A5f4d45C270C01be33E8dC9567",
-                "DOSCommitReveal": "",
+                "CommitReveal": "",
                 "RemoteNodeAddressPool": [
                     "https://rinkeby.infura.io/8e609c76fce442f8a1735fbea9999747"
                 ]
             },
             "rinkebyPrivateNode": {
-                "DOSProxyAddress": "0xA32E9E472C11C794631d223019e873f3fE916598",
-                "DOSAddressBridgeAddress": "0x9c556D308f226b0322C7742F4AbA4d8d3168E5c2",
-                "DOSCommitReveal": "0xf0fAcE4c2fc79A4d170e93652F0e29304b2f24b8",
+                "DOSProxyAddress": "0x38DA524b0FebB612aBA5F38C39eF5C4352f27c16",
+                "DOSPaymentAddress": "0x8d000595EeF8ab7187a89652CFc7cA47391A1f8e",
+                "DOSAddressBridgeAddress": "0xD082e768F63ba0919366bB09e1553593150b6D7F",
+                "CommitReveal": "0x2d090657f1322F93A1092ABAEAb113ee6B561632",
                 "RemoteNodeAddressPool": [
-                    "http://51.159.4.51:8545",
+                    "https://rinkeby.infura.io/db19cf9028054762865cb9ce883c6ab8",
                     "ws://51.159.4.51:8546",
                     "ws://51.15.0.157:8546"
                 ]

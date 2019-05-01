@@ -10,24 +10,37 @@ USER_CONTRACTS := dosUser/contract
 BOOT_CREDENTIAL := ../testAccounts/bootCredential/fundKey
 AMA_CONFIGPATH := dosUser/ama.json
 DOSPROXY_GOPATH := onchain/dosproxy
+DOSPAYMENT_GOPATH := onchain/dospayment
 DOSBRIDGE_GOPATH := onchain/dosbridge
-DOSCOMMITREVEAL_GOPATH := onchain/commitreveal
+COMMITREVEAL_GOPATH := onchain/commitreveal
 UNAME_S := $(shell uname)
 
 clean:
 	cd .. && make clean
 
 deploy-bridge:
-	abigen -sol $(ETH_CONTRACTS)/DOSAddressBridge.sol --pkg dosbridge --out ../$(DOSBRIDGE_GOPATH)/DOSAddressBridge.go
+	rm ../$(DOSBRIDGE_GOPATH)/*
+	solc --optimize --abi --bin $(ETH_CONTRACTS)/DOSAddressBridge.sol -o ../$(DOSBRIDGE_GOPATH)
+	abigen --abi="../$(DOSBRIDGE_GOPATH)/DOSAddressBridge.abi" --bin="../$(DOSBRIDGE_GOPATH)/DOSAddressBridge.bin" --pkg dosbridge --out ../$(DOSBRIDGE_GOPATH)/DOSAddressBridge.go
 	go run contracts_deploy/deploy.go -credentialPath $(BOOT_CREDENTIAL) -contractPath $(ETH_CONTRACTS) -target deployBridge
 	go run contracts_deploy/deploy.go -credentialPath $(BOOT_CREDENTIAL) -contractPath $(ETH_CONTRACTS) -target updateBridgeAddrToSDK
 
+deploy-payment:
+	rm ../$(DOSPAYMENT_GOPATH)/*
+	solc --optimize --abi --bin $(ETH_CONTRACTS)/DOSPayment.sol -o ../$(DOSPAYMENT_GOPATH)
+	abigen --abi="../$(DOSPAYMENT_GOPATH)/DOSPayment.abi" --bin="../$(DOSPAYMENT_GOPATH)/DOSPayment.bin" --pkg dospayment --out ../$(DOSPAYMENT_GOPATH)/DOSPayment.go
+	go run contracts_deploy/deploy.go -credentialPath $(BOOT_CREDENTIAL) -contractPath $(ETH_CONTRACTS) -target deployPayment
+
 deploy-proxy:
-	abigen -sol $(ETH_CONTRACTS)/DOSProxy.sol --pkg dosproxy --out ../$(DOSPROXY_GOPATH)/DOSProxy.go
+	rm ../$(DOSPROXY_GOPATH)/*
+	solc --optimize --abi --bin $(ETH_CONTRACTS)/DOSProxy.sol -o ../$(DOSPROXY_GOPATH)
+	abigen --abi="../$(DOSPROXY_GOPATH)/DOSProxy.abi" --bin="../$(DOSPROXY_GOPATH)/DOSProxy.bin" --pkg dosproxy --out ../$(DOSPROXY_GOPATH)/DOSProxy.go 
 	go run contracts_deploy/deploy.go -credentialPath $(BOOT_CREDENTIAL) -contractPath $(ETH_CONTRACTS) -target deployProxy
 
 deploy-cr:
-	abigen -sol $(ETH_CONTRACTS)/CommitReveal.sol --pkg commitreveal --out ../$(DOSCOMMITREVEAL_GOPATH)/CommitReveal.go
+	rm ../$(COMMITREVEAL_GOPATH)/*
+	solc --optimize --abi --bin $(ETH_CONTRACTS)/CommitReveal.sol -o ../$(COMMITREVEAL_GOPATH)
+	abigen --abi="../$(COMMITREVEAL_GOPATH)/CommitReveal.abi" --bin="../$(COMMITREVEAL_GOPATH)/CommitReveal.bin" --pkg commitreveal --out ../$(COMMITREVEAL_GOPATH)/CommitReveal.go
 	go run contracts_deploy/deploy.go -credentialPath $(BOOT_CREDENTIAL) -contractPath $(ETH_CONTRACTS) -target deployCommitReveal
 
 setup-dos:
@@ -35,6 +48,7 @@ setup-dos:
 
 deploy-dos:
 	$(MAKE) deploy-bridge
+	$(MAKE) deploy-payment
 	$(MAKE) deploy-proxy
 	$(MAKE) deploy-cr
 	$(MAKE) setup-dos

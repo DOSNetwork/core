@@ -18,6 +18,7 @@ import (
 	"github.com/DOSNetwork/core/onchain"
 	"github.com/DOSNetwork/core/onchain/commitreveal"
 	"github.com/DOSNetwork/core/onchain/dosbridge"
+	"github.com/DOSNetwork/core/onchain/dospayment"
 	"github.com/DOSNetwork/core/onchain/dosproxy"
 	"github.com/DOSNetwork/core/testing/dosUser/contract"
 	"github.com/DOSNetwork/core/testing/dosUser/eth"
@@ -31,7 +32,7 @@ import (
 
 const (
 	ProxyAddressType = iota
-	CommitRevealAddressType
+	CommitrevealAddressType
 )
 
 func between(value string, a string, b string) string {
@@ -81,24 +82,24 @@ func updateBridgeAddr(path string, updated string) error {
 	return nil
 }
 
-func updateBridge(client *ethclient.Client, key *keystore.Key, bridgeAddress common.Address, target common.Address) (err error) {
+func updateBridge(client *ethclient.Client, key *keystore.Key, bridgeAddress, proxyAddress, paymentAddress, crAddress common.Address) (err error) {
 	var auth *bind.TransactOpts
 	fmt.Println("start to update proxy address to bridge...")
 	auth = bind.NewKeyedTransactor(key.PrivateKey)
 	auth.GasLimit = uint64(5000000)
 
-	bridge, err := dosbridge.NewDOSAddressBridge(bridgeAddress, client)
+	bridge, err := dosbridge.NewDosbridge(bridgeAddress, client)
 	if err != nil {
 		return
 	}
 	var tx *types.Transaction
 
-	tx, err = bridge.SetProxyAddress(auth, target)
+	tx, err = bridge.SetProxyAddress(auth, proxyAddress)
 	for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
 		fmt.Println(err)
 		time.Sleep(time.Second)
 		fmt.Println("transaction retry...")
-		tx, err = bridge.SetProxyAddress(auth, target)
+		tx, err = bridge.SetProxyAddress(auth, proxyAddress)
 	}
 
 	if err != nil {
@@ -113,27 +114,12 @@ func updateBridge(client *ethclient.Client, key *keystore.Key, bridgeAddress com
 		fmt.Println(err)
 	}
 
-	return
-}
-
-func SetCommitrevealLibToProxy(client *ethclient.Client, key *keystore.Key, proxyAddress common.Address, crAddress common.Address) (err error) {
-	var auth *bind.TransactOpts
-	fmt.Println("start to update proxy address to bridge...")
-	auth = bind.NewKeyedTransactor(key.PrivateKey)
-	auth.GasLimit = uint64(5000000)
-
-	proxy, err := dosproxy.NewDOSProxy(proxyAddress, client)
-	if err != nil {
-		return
-	}
-	var tx *types.Transaction
-
-	tx, err = proxy.SetCommitrevealLib(auth, crAddress)
+	tx, err = bridge.SetPaymentAddress(auth, paymentAddress)
 	for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
 		fmt.Println(err)
 		time.Sleep(time.Second)
 		fmt.Println("transaction retry...")
-		tx, err = proxy.SetCommitrevealLib(auth, crAddress)
+		tx, err = bridge.SetPaymentAddress(auth, paymentAddress)
 	}
 
 	if err != nil {
@@ -141,7 +127,27 @@ func SetCommitrevealLibToProxy(client *ethclient.Client, key *keystore.Key, prox
 	}
 
 	fmt.Println("tx sent: ", tx.Hash().Hex())
-	fmt.Println("proxy address updated in bridge")
+	fmt.Println("payment address updated in bridge")
+
+	err = onchain.CheckTransaction(client, tx)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	tx, err = bridge.SetCommitRevealAddress(auth, crAddress)
+	for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
+		fmt.Println(err)
+		time.Sleep(time.Second)
+		fmt.Println("transaction retry...")
+		tx, err = bridge.SetCommitRevealAddress(auth, crAddress)
+	}
+
+	if err != nil {
+		return
+	}
+
+	fmt.Println("tx sent: ", tx.Hash().Hex())
+	fmt.Println("commitReveal address updated in bridge")
 
 	err = onchain.CheckTransaction(client, tx)
 	if err != nil {
@@ -157,7 +163,7 @@ func AddProxyToCRWhiteList(client *ethclient.Client, key *keystore.Key, crAddres
 	auth = bind.NewKeyedTransactor(key.PrivateKey)
 	auth.GasLimit = uint64(5000000)
 
-	cr, err := commitreveal.NewCommitReveal(crAddress, client)
+	cr, err := commitreveal.NewCommitreveal(crAddress, client)
 	if err != nil {
 		return
 	}
@@ -190,16 +196,16 @@ func deployContract(contractPath, targetTask, configPath string, config configur
 	var tx *types.Transaction
 	var address common.Address
 	auth := bind.NewKeyedTransactor(key.PrivateKey)
-	auth.GasLimit = uint64(5000000)
+	auth.GasLimit = uint64(6000000)
 	var err error
 	if targetTask == "deployBridge" {
 		fmt.Println("Starting deploy DOSAddressBridge.sol...")
-		address, tx, _, err = dosbridge.DeployDOSAddressBridge(auth, client)
+		address, tx, _, err = dosbridge.DeployDosbridge(auth, client)
 		for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
 			fmt.Println(err)
 			time.Sleep(time.Second)
 			fmt.Println("transaction retry...")
-			address, tx, _, err = dosbridge.DeployDOSAddressBridge(auth, client)
+			address, tx, _, err = dosbridge.DeployDosbridge(auth, client)
 		}
 		fmt.Println("contract Address: ", address.Hex())
 		fmt.Println("tx sent: ", tx.Hash().Hex())
@@ -215,14 +221,17 @@ func deployContract(contractPath, targetTask, configPath string, config configur
 		if err := updateBridgeAddr(contractPath+"/DOSOnChainSDK.sol", chainConfig.DOSAddressBridgeAddress); err != nil {
 			log.Fatal(err)
 		}
-	} else if targetTask == "deployCommitReveal" {
-		fmt.Println("Starting deploy CommitReveal.sol...")
-		address, tx, _, err = commitreveal.DeployCommitReveal(auth, client)
+		if err := updateBridgeAddr(contractPath+"/DOSProxy.sol", chainConfig.DOSAddressBridgeAddress); err != nil {
+			log.Fatal(err)
+		}
+	} else if targetTask == "deployPayment" {
+		fmt.Println("Starting deploy DOSPayment.sol...")
+		address, tx, _, err = dospayment.DeployDospayment(auth, client)
 		for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
 			fmt.Println(err)
 			time.Sleep(time.Second)
 			fmt.Println("transaction retry...")
-			address, tx, _, err = commitreveal.DeployCommitReveal(auth, client)
+			address, tx, _, err = dospayment.DeployDospayment(auth, client)
 		}
 		fmt.Println("contract Address: ", address.Hex())
 		fmt.Println("tx sent: ", tx.Hash().Hex())
@@ -231,19 +240,40 @@ func deployContract(contractPath, targetTask, configPath string, config configur
 		if err != nil {
 			fmt.Println(err)
 		}
-		chainConfig.DOSCommitReveal = address.Hex()
+		chainConfig.DOSPaymentAddress = address.Hex()
+		if err := config.UpdateConfig(chainConfig); err != nil {
+			log.Fatal(err)
+		}
+
+	} else if targetTask == "deployCommitReveal" {
+		fmt.Println("Starting deploy Commitreveal.sol...")
+		address, tx, _, err = commitreveal.DeployCommitreveal(auth, client)
+		for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
+			fmt.Println(err)
+			time.Sleep(time.Second)
+			fmt.Println("transaction retry...")
+			address, tx, _, err = commitreveal.DeployCommitreveal(auth, client)
+		}
+		fmt.Println("contract Address: ", address.Hex())
+		fmt.Println("tx sent: ", tx.Hash().Hex())
+		fmt.Println("contract deployed, waiting for confirmation...")
+		err = onchain.CheckTransaction(client, tx)
+		if err != nil {
+			fmt.Println(err)
+		}
+		chainConfig.CommitReveal = address.Hex()
 		if err := config.UpdateConfig(chainConfig); err != nil {
 			log.Fatal(err)
 		}
 
 	} else if targetTask == "deployProxy" {
 		fmt.Println("Starting deploy DOSProxy.sol...")
-		address, tx, _, err = dosproxy.DeployDOSProxy(auth, client)
+		address, tx, _, err = dosproxy.DeployDosproxy(auth, client)
 		for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
 			fmt.Println(err)
 			time.Sleep(time.Second)
 			fmt.Println("transaction retry...")
-			address, tx, _, err = dosproxy.DeployDOSProxy(auth, client)
+			address, tx, _, err = dosproxy.DeployDosproxy(auth, client)
 		}
 		fmt.Println("contract Address: ", address.Hex())
 		fmt.Println("tx sent: ", tx.Hash().Hex())
@@ -260,15 +290,14 @@ func deployContract(contractPath, targetTask, configPath string, config configur
 	} else if targetTask == "setUpDOSNetwork" {
 
 		bridgeAddress := common.HexToAddress(chainConfig.DOSAddressBridgeAddress)
+		paymentAddress := common.HexToAddress(chainConfig.DOSPaymentAddress)
 		proxyAddress := common.HexToAddress(chainConfig.DOSProxyAddress)
-		crAddress := common.HexToAddress(chainConfig.DOSCommitReveal)
+		crAddress := common.HexToAddress(chainConfig.CommitReveal)
 
-		err := updateBridge(client, key, bridgeAddress, proxyAddress)
+		err := updateBridge(client, key, bridgeAddress, proxyAddress, paymentAddress, crAddress)
 		if err != nil {
 			log.Fatal(err)
 		}
-
-		_ = SetCommitrevealLibToProxy(client, key, proxyAddress, crAddress)
 
 		err = AddProxyToCRWhiteList(client, key, crAddress, proxyAddress)
 		if err != nil {
