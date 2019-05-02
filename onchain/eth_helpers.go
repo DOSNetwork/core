@@ -73,13 +73,9 @@ func merge(ctx context.Context, cs ...chan interface{}) <-chan interface{} {
 }
 
 func ReadEthKey(credentialPath, passphrase string) (key *keystore.Key, err error) {
-	fmt.Println("credentialPath: ", credentialPath)
 	newKeyStore := keystore.NewKeyStore(credentialPath, keystore.StandardScryptN, keystore.StandardScryptP)
 	if len(newKeyStore.Accounts()) < 1 {
-		_, err = newKeyStore.NewAccount(passphrase)
-		if err != nil {
-			return
-		}
+		return nil, errors.New("No Account")
 	}
 
 	usrKeyPath := newKeyStore.Accounts()[0].URL.Path
