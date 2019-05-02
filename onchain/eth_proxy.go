@@ -520,7 +520,7 @@ func (e *EthAdaptor) SignalDissolve(ctx context.Context, idx uint64) (errc <-cha
 }
 
 func (e *EthAdaptor) SignalBootstrap(ctx context.Context, cid uint64) (errc <-chan error) {
-	defer logger.TimeTrack(time.Now(), "SignalDissolve", nil)
+	defer logger.TimeTrack(time.Now(), "SignalBootstrap", nil)
 	result := make(chan Reply)
 	x := new(big.Int)
 	x.SetUint64(cid)
@@ -1689,7 +1689,7 @@ func proxyGet(proxy *dosproxy.DosproxySession, vType int) chan interface{} {
 		case WorkingGroupSize:
 			val, err = proxy.GetWorkingGroupSize()
 		case PengindNodeSize:
-			val, err = proxy.GetPengindNodeSize()
+			val, err = proxy.PendingNodeNum()
 		case NumPendingGroups:
 			val, err = proxy.NumPendingGroups()
 		case GroupToPick:
