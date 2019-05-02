@@ -34,6 +34,39 @@
 	- `$ make clean` before commit
 - Note that Changing `github.com/DOSNetwork/eth-contracts` instead of modifying locally cloned submodules, and using `$ git submodule update --remote --merge` to checkout latest changes.
 
+### Running a DOS Client on a VPS (Ubuntu 16.04 LTS):
+#### Requirements
+- A Ubuntu 16.04 LTS VPS with a public IP
+- Opening 7946,8545,8546 and 9501 port in the VPS
+- A ssh private key file for the VPS
+- A ETH keystore
+
+#### 1) Using a docker
+- Download vps_docker.sh and setup the following setting in vps_docker.sh
+	- USER : VPS user name
+	- VPSIP : VPS public IP
+	- VPSKEY : ssh private key for VPS  ( [Ex:Amazon Lightsail...](https://lightsail.aws.amazon.com/ls/docs/en_us/articles/lightsail-how-to-set-up-ssh))
+	- ETHKEY : Ethereum keystore file ( [Create a geth keystore by geth ](https://github.com/ethereum/go-ethereum/wiki/Managing-your-accounts))
+- Download config.json and setup the following setting in config.sh
+	- RemoteNodeAddressPool : geth RPC address
+		
+			"RemoteNodeAddressPool": [
+			    "https://rinkeby.infura.io/projectid",
+			    "ws://xxx.xxx.xxx.xxx:8546",
+			    "ws://xxx.xxx.xxx.xxx:8546"
+			]
+			
+- Download geth.service
+- Put vps_docker.sh,config.json and geth.service under the same directory
+- Install Geth Light Node : `$ bash vps_docker.sh install_lightnode`
+- Install docker : `$ bash vps_docker.sh install_docker`
+- Install client : `$ bash vps_docker.sh install_client`
+- Run the client : `$ bash vps_docker.sh run_client`
+- Show the client status : `$ bash vps_docker.sh show_status`
+- Stop the client : `$ bash vps_docker.sh run_client`
+
+#### 2) Build a binary 
+
 
 ### Trouble shooting and Deploy
 - Run `$ dep ensure -update` when it complains about missing dependencies/packages, and commits updated Gopkg.lock file.
