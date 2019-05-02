@@ -1,0 +1,12 @@
+[Unit]
+Description=Geth Node
+After=network-online.target
+Wants=network-online.target
+[Service]
+WorkingDirectory=/home/ubuntu
+User=ubuntu
+ExecStart=/usr/bin/geth --syncmode "light" --rpc --rpcport "8545" --rpcaddr "0.0.0.0" --rpccorsdomain "*" --datadir /home/ubuntu --ws --wsaddr 0.0.0.0 --wsorigins '*' --rinkeby     
+Restart=always
+RestartSec=5s
+[Install]
+WantedBy=multi-user.target
