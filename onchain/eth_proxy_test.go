@@ -14,7 +14,7 @@ const (
 )
 
 var (
-	urls           = []string{""}
+	urls           = []string{}
 	proxyAddr      = ""
 	credentialPath = ""
 	passphrase     = ""
@@ -68,7 +68,7 @@ func TestConcurrentSend(t *testing.T) {
 	}
 
 	var errcList []<-chan error
-	sink, errc := adaptor.SubscribeEvent(SubscribeDOSProxyUpdateGroupToPick)
+	sink, errc := adaptor.SubscribeEvent(SubscribeDosproxyUpdateGroupToPick)
 	errcList = append(errcList, errc)
 
 	ctx, _ := context.WithCancel(context.Background())
@@ -85,7 +85,7 @@ L:
 		select {
 		case event := <-sink:
 			switch content := event.(type) {
-			case *DOSProxyUpdateGroupToPick:
+			case *DosproxyUpdateGroupToPick:
 				fmt.Println("DOSProxyUpdateGroupToPick ", int(content.NewNum.Uint64()), content.Removed)
 				if content.Removed != true {
 					result = result + int(content.NewNum.Uint64())
@@ -112,7 +112,7 @@ func TestSendRequest(t *testing.T) {
 	}
 
 	var errcList []<-chan error
-	sink, errc := adaptor.PollLogs(SubscribeDOSProxyUpdateGroupToPick, 0, 0)
+	sink, errc := adaptor.PollLogs(SubscribeDosproxyUpdateGroupToPick, 0, 0)
 	errcList = append(errcList, errc)
 
 	fmt.Println("!!!!!!!!stop geth")
@@ -132,7 +132,7 @@ L:
 		select {
 		case event := <-sink:
 			switch content := event.(type) {
-			case *DOSProxyUpdateGroupToPick:
+			case *DosproxyUpdateGroupToPick:
 				fmt.Println("DOSProxyUpdateGroupToPick ", int(content.NewNum.Uint64()), content.Removed, result)
 				if content.Removed != true {
 					result = result + int(content.NewNum.Uint64())

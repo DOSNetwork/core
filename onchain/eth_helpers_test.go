@@ -88,16 +88,23 @@ func TestDialToEthDeadline(t *testing.T) {
 }
 
 func TestDialToEthErrHandling(t *testing.T) {
+	var tUrls []string
+	//It doesn't cause any error when dialing
+	tUrls = append(tUrls, "http://123.123.123.123")
+	//It cause an error (dial unix: missing address)
+	tUrls = append(tUrls, "")
+	//It cause an error (dial unix: missing address)
+	tUrls = append(tUrls, "ws://123.123.123.123")
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	defer cancelFunc()
-	clients := DialToEth(ctx, urls, nil)
+	clients := DialToEth(ctx, tUrls, nil)
 	time.Sleep(2 * time.Second)
 
 	count := 0
 	for _ = range clients {
 		count++
 	}
-	if count > 1 {
+	if count != 1 {
 		t.Errorf("Dial success count, got: %d, want: %d.", count, 1)
 	}
 }
