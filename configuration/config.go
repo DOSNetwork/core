@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"strconv"
+	"strings"
 )
 
 const (
@@ -108,7 +109,6 @@ func (c *Config) overWrite() (err error) {
 		if bootStrapIP != "" {
 			c.BootStrapIp = bootStrapIP
 		}*/
-
 	envSize := os.Getenv(ENVGROUPSIZE)
 	if envSize != "" {
 		var size int
@@ -141,14 +141,16 @@ func (c *Config) overWrite() (err error) {
 	chainNode := os.Getenv(ENVCHAINNODE)
 	if chainNode == "" {
 		fmt.Println("No CHAINNODE Environment variable.")
-		chainNode = "rinkebyPrivateNode"
+		chainNode = "rinkeby"
 	}
 	c.currentNode = chainNode
 	if config, loaded := c.ChainConfigs[c.currentType][c.currentNode]; loaded {
-		gethIP := os.Getenv("GETHIP")
+		gethIP := os.Getenv("GETHPOOL")
 		if gethIP != "" {
-			//config.RemoteNodeAddressPool = append(config.RemoteNodeAddressPool, "ws://"+gethIP+":8546")
-			//config.RemoteNodeAddressPool = append(config.RemoteNodeAddressPool, "http://"+gethIP+":8545")
+			ipPool := strings.Split(gethIP, ";")
+			for _, ip := range ipPool {
+				config.RemoteNodeAddressPool = append(config.RemoteNodeAddressPool, ip)
+			}
 		}
 		c.ChainConfigs[c.currentType][c.currentNode] = config
 	}

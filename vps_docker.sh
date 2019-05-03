@@ -1,8 +1,12 @@
 #/bin/bash
+CONFIGPATH="./config.json"
+DOSIMAGE="dosnetwork/dosnode:latest"
+
 USER=""
 VPSIP=""
 VPSKEY=""
 KEYPATH=""
+GETHPOOL=""
 
 install_lightnode(){
   ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'yes | sudo apt-get update'
@@ -25,12 +29,14 @@ install_client(){
 	ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'mkdir -p dos'
 	ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'mkdir -p credential'
 	scp -i $VPSKEY $KEYPATH $USER@$VPSIP:~/credential/
+	scp -i $VPSKEY $CONFIGPATH $USER@$VPSIP:~/dos/
 }
 
 run_client(){
     DIR="/home/"$USER
 	ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'sudo rm dos/doslog'
-	ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'docker pull dosnetwork/dosnode:latest'
+	ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'docker pull '$DOSIMAGE
+	echo -n Password:;read -s password ;
 	ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'docker run -it -d \
 -p 7946:7946 \
 -p 8080:8080 \
@@ -39,11 +45,13 @@ run_client(){
 --mount type=bind,source='$DIR'/credential,target=/credential  \
 --mount type=bind,source='$DIR'/dos,target=/dos  \
 -e LOGIP=163.172.36.173:9500  \
--e CHAINNODE=rinkebyPrivateNode  \
--e PASSPHRASE=123  \
+-e CONFIGPATH=/dos  \
+-e GETHPOOL="'$GETHPOOL'" \
+-e PASSPHRASE='$password'  \
+-e CHAINNODE=rinkeby  \
 -e APPSESSION=Beta  \
 -e APPNAME=DosNode  \
-dosnetwork/dosnode:latest'
+'$DOSIMAGE
 }
 
 stop_client(){

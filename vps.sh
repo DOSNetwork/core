@@ -1,8 +1,8 @@
 #/bin/bash
-USER="ubuntu"
-VPSIP="52.12.7.248"
-VPSKEY="LightsailDefaultKey-us-west-2.pem"
-KEYPATH="credential/usrKey"
+USER=""
+VPSIP=""
+VPSKEY=""
+KEYPATH=""
 
 install_lightnode(){
   ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'yes | sudo apt-get update'

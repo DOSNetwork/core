@@ -1,5 +1,4 @@
 {
-    "NodeRole": "BootstrapNode",
     "BootStrapIp": [
         "18.236.117.126",
         "18.236.199.131",
@@ -10,35 +9,11 @@
     "Port": "9501",
     "ChainConfigs": {
         "ETH": {
-            "privateNode": {
-                "DOSProxyAddress": "0x560F79B8DF9C7D3e3db38f2FeB111DF2da8F9375",
-                "DOSPaymentAddress": "",
-                "DOSAddressBridgeAddress": "0x4adA71eC02e21E6c5088BD48e8302719aC93F4c6",
-                "CommitReveal": "",
-                "RemoteNodeAddressPool": [
-                    "http://163.172.36.173:8080",
-                    "ws://163.172.36.173:8546"
-                ]
-            },
-            "rinkebyInfura": {
-                "DOSProxyAddress": "0x57054466fAD09bFA5fB723c9057f7a16d359656D",
-                "DOSPaymentAddress": "",
-                "DOSAddressBridgeAddress": "0x09dB4cd7ec4de9A5f4d45C270C01be33E8dC9567",
-                "CommitReveal": "",
-                "RemoteNodeAddressPool": [
-                    "https://rinkeby.infura.io/8e609c76fce442f8a1735fbea9999747"
-                ]
-            },
-            "rinkebyPrivateNode": {
-                "DOSProxyAddress": "0x38DA524b0FebB612aBA5F38C39eF5C4352f27c16",
-                "DOSPaymentAddress": "0x8d000595EeF8ab7187a89652CFc7cA47391A1f8e",
-                "DOSAddressBridgeAddress": "0xD082e768F63ba0919366bB09e1553593150b6D7F",
-                "CommitReveal": "0x2d090657f1322F93A1092ABAEAb113ee6B561632",
-                "RemoteNodeAddressPool": [
-                    "https://rinkeby.infura.io/db19cf9028054762865cb9ce883c6ab8",
-                    "ws://51.159.4.51:8546",
-                    "ws://51.15.0.157:8546"
-                ]
+            "rinkeby": {
+                "DOSProxyAddress": "0x8F7d3388D2751bbFB33748a21cAB43f777445CB1",
+                "DOSPaymentAddress": "0x0B32E99A1b1b721d74AfCb817F5a0d676D308d28",
+                "DOSAddressBridgeAddress": "0x30a631f9A817F68ab2586fA073c8e03C6d3832E2",
+                "CommitReveal": "0x1DEbeB7a4a11A7FD6aEe9FF988569F7EcC8106C7"
             }
         }
     }
