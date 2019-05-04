@@ -45,6 +45,12 @@ type DosNode struct {
 	cSignToPeer  chan *vss.Signature
 	cRequestDone chan [4]*big.Int
 	id           []byte
+	//For REST API
+	startTime         time.Time
+	state             string
+	totalQuery        int
+	fulfilledQuery    int
+	numOfworkingGroup int
 }
 
 func NewDosNode(credentialPath, passphrase string) (dosNode *DosNode, err error) {
@@ -163,14 +169,19 @@ func NewDosNode(credentialPath, passphrase string) (dosNode *DosNode, err error)
 		logger = log.New("module", "dosclient")
 	}
 	dosNode = &DosNode{
-		suite:        suite,
-		p:            p,
-		chain:        chainConn,
-		dkg:          p2pDkg,
-		done:         make(chan interface{}),
-		cSignToPeer:  make(chan *vss.Signature, 21),
-		cRequestDone: make(chan [4]*big.Int),
-		id:           id,
+		suite:             suite,
+		p:                 p,
+		chain:             chainConn,
+		dkg:               p2pDkg,
+		done:              make(chan interface{}),
+		cSignToPeer:       make(chan *vss.Signature, 21),
+		cRequestDone:      make(chan [4]*big.Int),
+		id:                id,
+		startTime:         time.Now(),
+		state:             "Init Done",
+		totalQuery:        0,
+		fulfilledQuery:    0,
+		numOfworkingGroup: 0,
 	}
 	return dosNode, nil
 }
@@ -194,6 +205,8 @@ func (d *DosNode) Start() (err error) {
 
 	//http.ListenAndServe("localhost:8080", mux)
 	http.ListenAndServe(":8080", mux)
+	d.state = "connecting and syncing geth node"
+	d.chain.AddEventNode()
 	return
 }
 
@@ -224,6 +237,7 @@ func (d *DosNode) waitForRequestDone(ctx context.Context, pubKey [4]*big.Int, er
 
 func (d *DosNode) buildPipeline(valueCtx context.Context, pubkey [4]*big.Int, groupID, requestID, lastRand, useSeed *big.Int, url, selector string, pType uint32) {
 	defer logger.TimeTrack(time.Now(), "BuildPipeline", map[string]interface{}{"RequestId": valueCtx.Value("RequestID")})
+	d.totalQuery++
 	var signShares []<-chan *vss.Signature
 	var errcList []<-chan error
 	var cSubmitter []chan []byte
@@ -842,7 +856,9 @@ func (d *DosNode) listen() (err error) {
 					} else if content.TrafficType == onchain.TrafficSystemRandom {
 						event = "DOS_SysRandomResult"
 					}
-
+					if content.Pass {
+						d.fulfilledQuery++
+					}
 					f := map[string]interface{}{
 						"RequestId":      fmt.Sprintf("%x", content.TrafficId),
 						"ValidationPass": content.Pass,

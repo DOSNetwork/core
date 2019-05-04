@@ -7,7 +7,15 @@ import (
 )
 
 func (d *DosNode) status(w http.ResponseWriter, r *http.Request) {
-	html := "Dos Client is working "
+	html := "=================================================" + "\n|"
+	html = html + "StartTime      :" + d.startTime.Format("2006-01-02T15:04:05.999999-07:00") + "\n|"
+	html = html + "Balance        : " + d.chain.GetBalance().String() + "\n|"
+	html = html + "State          : " + d.state + "\n|"
+	html = html + "TotalQuery     : " + strconv.Itoa(d.totalQuery) + "\n|"
+	html = html + "FulfilledQuery : " + strconv.Itoa(d.fulfilledQuery) + "\n|"
+	html = html + "Group Number   : " + strconv.Itoa(d.numOfworkingGroup) + "\n|"
+	html = html + "Group Number   : " + strconv.Itoa(d.numOfworkingGroup) + "\n"
+	html = html + "=================================================" + "\n"
 	w.Write([]byte(html))
 }
 
@@ -34,33 +42,34 @@ func (d *DosNode) p2p(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(html))
 }
 func (d *DosNode) proxy(w http.ResponseWriter, r *http.Request) {
-	html := ""
-
+	html := "=================================================" + "\n|"
 	//	result := d.dkg.GetGroupNumber()
 	workingGroupNum, err := d.chain.GetWorkingGroupSize()
 	if err != nil {
-		html = html + "WorkingGroupSize :" + err.Error() + "\n"
+		html = html + "WorkingGroupSize :" + err.Error() + "\n|"
 	} else {
-		html = html + "WorkingGroupSize :" + strconv.FormatUint(workingGroupNum, 10) + "\n"
+		html = html + "WorkingGroupSize :" + strconv.FormatUint(workingGroupNum, 10) + "\n|"
 	}
 	pendingGroupNum, err := d.chain.NumPendingGroups()
 	if err != nil {
-		html = html + "PendingGroupSize :" + err.Error() + "\n"
+		html = html + "PendingGroupSize :" + err.Error() + "\n|"
 	} else {
-		html = html + "PendingGroupSize :" + strconv.FormatUint(pendingGroupNum, 10) + "\n"
+		html = html + "PendingGroupSize :" + strconv.FormatUint(pendingGroupNum, 10) + "\n|"
 	}
 	pendingNodeNum, err := d.chain.GetPengindNodeSize()
 	if err != nil {
-		html = html + "PendingNodeSize :" + err.Error() + "\n"
+		html = html + "PendingNodeSize  :" + err.Error() + "\n|"
 	} else {
-		html = html + "PendingNodeSize :" + strconv.FormatUint(pendingNodeNum, 10) + "\n"
+		html = html + "PendingNodeSize  :" + strconv.FormatUint(pendingNodeNum, 10) + "\n|"
 	}
 
 	curBlk, err := d.chain.CurrentBlock()
 	if err != nil {
-		html = html + "CurrentBlock :" + err.Error() + "\n"
+		html = html + "CurrentBlock     :" + err.Error() + "\n"
 	} else {
-		html = html + "CurrentBlock :" + strconv.FormatUint(curBlk, 10) + "\n"
+		html = html + "CurrentBlock     :" + strconv.FormatUint(curBlk, 10) + "\n"
 	}
+	html = html + "=================================================" + "\n"
+
 	w.Write([]byte(html))
 }

@@ -181,7 +181,7 @@ func NewEthAdaptor(credentialPath, passphrase, proxyAddr, commitRevealAddr strin
 	}
 	fmt.Println("gethUrls ", httpUrls)
 	fmt.Println("eventUrls ", wsUrls)
-
+	fmt.Println("credentialPath ", credentialPath)
 	adaptor = &EthAdaptor{}
 	adaptor.gethUrls = httpUrls
 	adaptor.eventUrls = wsUrls
@@ -189,8 +189,8 @@ func NewEthAdaptor(credentialPath, passphrase, proxyAddr, commitRevealAddr strin
 
 	//Read Ethereum keystore
 	key, err := ReadEthKey(credentialPath, passphrase)
+	fmt.Println(err)
 	if err != nil {
-		logger.Error(err)
 		return
 	}
 	adaptor.key = key
@@ -236,33 +236,34 @@ func NewEthAdaptor(credentialPath, passphrase, proxyAddr, commitRevealAddr strin
 	adaptor.reqQueue = make(chan interface{})
 	fmt.Println("working eth http client ", len(adaptor.clients), "Balance ", adaptor.GetBalance())
 
-	adaptor.eCtx, adaptor.eCancelFunc = context.WithCancel(context.Background())
-	syncClients := CheckSync(adaptor.eCtx, adaptor.clients[0], DialToEth(context.Background(), wsUrls, key))
-	for client := range syncClients {
-		fmt.Println("syncClients")
-		p, err := dosproxy.NewDosproxy(common.HexToAddress(proxyAddr), client)
-		if err != nil {
-			logger.Error(err)
-			continue
-		}
-		c, err := commitreveal.NewCommitreveal(common.HexToAddress(commitRevealAddr), client)
-		if err != nil {
-			logger.Error(err)
-			continue
-		}
-		adaptor.eCRs = append(adaptor.eCRs, c)
-		adaptor.eClients = append(adaptor.eClients, client)
-		adaptor.eProxies = append(adaptor.eProxies, p)
-	}
-	if len(adaptor.eProxies) == 0 {
-		err = errors.New("No any working eth client for event tracking")
-		adaptor = nil
-		return
-	}
-	fmt.Println("working eth ws client ", len(adaptor.eClients))
-
 	adaptor.reqLoop()
 
+	return
+}
+
+func (e *EthAdaptor) AddEventNode() (err error) {
+	e.eCtx, e.eCancelFunc = context.WithCancel(context.Background())
+	syncClients := CheckSync(e.eCtx, e.clients[0], DialToEth(context.Background(), e.eventUrls, e.key))
+	for client := range syncClients {
+		fmt.Println("syncClients")
+		p, err := dosproxy.NewDosproxy(common.HexToAddress(e.proxyAddr), client)
+		if err != nil {
+			logger.Error(err)
+			continue
+		}
+		c, err := commitreveal.NewCommitreveal(common.HexToAddress(e.commitRevealAddr), client)
+		if err != nil {
+			logger.Error(err)
+			continue
+		}
+		e.eCRs = append(e.eCRs, c)
+		e.eClients = append(e.eClients, client)
+		e.eProxies = append(e.eProxies, p)
+	}
+	if len(e.eProxies) == 0 {
+		err = errors.New("No any working eth client for event tracking")
+	}
+	fmt.Println("working eth ws client ", len(e.eClients))
 	return
 }
 
@@ -1689,7 +1690,7 @@ func proxyGet(proxy *dosproxy.DosproxySession, vType int) chan interface{} {
 		case WorkingGroupSize:
 			val, err = proxy.GetWorkingGroupSize()
 		case PengindNodeSize:
-			val, err = proxy.PendingNodeNum()
+			val, err = proxy.NumPendingNodes()
 		case NumPendingGroups:
 			val, err = proxy.NumPendingGroups()
 		case GroupToPick:

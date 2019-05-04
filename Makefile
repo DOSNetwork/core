@@ -14,6 +14,7 @@ TEST_CONTRACTS_GOPATH := testing/dosUser/contract
 GENERATED_FILES := $(shell find $(DOSPROXY_GOPATH) $(DOSBRIDGE_GOPATH) $(TEST_CONTRACTS_GOPATH) -name '*.go')
 ETH_CONTRACTS := onchain/eth/contracts
 BOOT_CREDENTIAL := testAccounts/bootCredential
+UNAME_S := $(shell uname)
 
 build: dep client
 
@@ -22,7 +23,7 @@ dep:
 
 client: gen
 ifeq ($(UNAME_S),Linux)
-        go build -o client
+	go build -o client
 endif
 ifeq ($(UNAME_S),Darwin)
         xgo --targets=linux/amd64 -out client .

@@ -114,7 +114,7 @@ func (n *Server) Listen() (err error) {
 	n.callHandler()
 	go n.messageDispatch(context.Background())
 
-	if ip, err = GetLocalIP(); err != nil {
+	if ip, err = GetPublicIP(); err != nil {
 		//fmt.Println("GetLocalIP err", err)
 
 		logger.Error(err)

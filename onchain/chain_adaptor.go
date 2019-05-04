@@ -14,6 +14,7 @@ const (
 
 type ProxyAdapter interface {
 	RegisterNewNode(ctx context.Context) (errc <-chan error)
+	AddEventNode() (err error)
 	RegisterGroupPubKey(ctx context.Context, IdWithPubKeys chan [5]*big.Int) (errc <-chan error)
 	SetRandomNum(ctx context.Context, signatures <-chan *vss.Signature) (errc <-chan error)
 	DataReturn(ctx context.Context, signatures <-chan *vss.Signature) (errc <-chan error)

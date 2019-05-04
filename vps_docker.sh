@@ -1,38 +1,59 @@
 #/bin/bash
-CONFIGPATH="./config.json"
-DOSIMAGE="dosnetwork/dosnode:latest"
 
-USER=""
-VPSIP=""
-VPSKEY=""
-KEYPATH=""
-GETHPOOL=""
+setting="./dos.setting"
+# If file exists 
+if [[ -f "$setting" ]]
+then
+    source $setting
+	if [ -z "$DOSIMAGE" ]; 
+	then 
+		echo "Please assign a value to DOSIMAGE in dos.setting"
+		exit
+	fi
+	if [ -z "$USER" ]; 
+	then 
+		echo "Please assign a value to USER in dos.setting"
+		exit
+	fi
+	if [ -z "$VPSIP" ]; 
+	then 
+		echo "Please assign a value to VPSIP in dos.setting"
+		exit
+	fi
+	if [ -z "$VPSKEY" ]; 
+	then 
+		echo "Please assign a value to VPSKEY in dos.setting"
+		exit
+	fi
+	if [ -z "$KEYSTORE" ]; 
+	then 
+		echo "Please assign a value to KEYSTORE in dos.setting"
+		exit
+	fi
+	if [ -z "$GETHPOOL" ]; 
+	then 
+		echo "Please assign a value to GETHPOOL in dos.setting"
+		exit
+	fi
+else
+    echo "Can't find dos.setting"
+	exit
+fi
 
-install_lightnode(){
+installAll(){
   ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'yes | sudo apt-get update'
-  ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'yes | sudo add-apt-repository -y ppa:ethereum/ethereum'
-  ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'yes | sudo apt-get update'
-  ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'yes | sudo apt-get install ethereum'
-  scp -i $VPSKEY geth.service  $USER@$VPSIP:~/
-  ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'yes | sudo chmod 322 geth.service'
-  ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'yes | sudo mv geth.service /lib/systemd/system/geth.service'
-  ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'yes | sudo systemctl enable geth'
-  ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'yes | sudo systemctl start geth'
-}
-
-install_docker(){
   ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'yes | sudo apt-get install docker.io'
   ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'sudo usermod -a -G docker $USER'
+  ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'mkdir -p dos'
+  ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'mkdir -p credential'
+  scp -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i $VPSKEY $KEYSTORE $USER@$VPSIP:~/credential/
 }
 
-install_client(){
-	ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'mkdir -p dos'
-	ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'mkdir -p credential'
-	scp -i $VPSKEY $KEYPATH $USER@$VPSIP:~/credential/
-	scp -i $VPSKEY $CONFIGPATH $USER@$VPSIP:~/dos/
-}
-
-run_client(){
+run(){
+	result=$(ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP docker container ls | awk '(index($2, "dos") != 0) {print $2}')
+	newlog="doslog_$VPSIP"
+	if [ -z "$result" ]; 
+	then
     DIR="/home/"$USER
 	ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'sudo rm dos/doslog'
 	ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'docker pull '$DOSIMAGE
@@ -41,80 +62,83 @@ run_client(){
 -p 7946:7946 \
 -p 8080:8080 \
 -p 9501:9501 \
--p 80:80 \
 --mount type=bind,source='$DIR'/credential,target=/credential  \
 --mount type=bind,source='$DIR'/dos,target=/dos  \
--e LOGIP=163.172.36.173:9500  \
--e CONFIGPATH=/dos  \
+-e PUBLICIP="'$VPSIP'" \
 -e GETHPOOL="'$GETHPOOL'" \
 -e PASSPHRASE='$password'  \
 -e CHAINNODE=rinkeby  \
--e APPSESSION=Beta  \
--e APPNAME=DosNode  \
+-e APPSESSION="'$DOSVERSION'" \
+-e APPNAME=DosClient  \
 '$DOSIMAGE
+	else echo "client is running";
+	fi
 }
 
-stop_client(){
-	ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP  'docker stop $(docker ps -a -q)'
-	ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP  'docker rm $(docker ps -a -q)'
-}
-
-show_proxy(){
-	ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'curl http://localhost:8080/proxy'
-}
-
-trigger_guardian(){
-	ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'curl http://localhost:8080/guardian'
-}
-
-check_client(){
+stop(){
 	result=$(ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP docker container ls | awk '(index($2, "dos") != 0) {print $2}')
 	newlog="doslog_$VPSIP"
-	if [ -z "$result" ]; 
+	if [ -z "$result" ];
+	then echo "client is not running"
+	else
+	    ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP  'docker stop $(docker ps -a -q)'
+		ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP  'docker rm $(docker ps -a -q)'
+	fi
+}
+
+check(){
+	result=$(ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP docker container ls | awk '(index($2, "dos") != 0) {print $2}')
+	newlog="doslog_$VPSIP"
+	if [ -z "$result" ];
 	then scp -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i $VPSKEY $USER@$VPSIP:~/dos/doslog $newlog;
 	else echo "client is running";
 	fi
 }
 
+proxyInfo(){
+	ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'curl http://localhost:8080/proxy'
+}
+
+clientInfo(){
+	ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'curl http://localhost:8080/status'
+}
+
+guardian(){
+	ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'curl http://localhost:8080/guardian'
+}
+
 case "$1" in
-  "install_lightnode")
-    install_lightnode
+  "install")
+    installAll
     ;;
-  "install_docker")
-    install_docker
+  "run")
+    run
     ;;
-  "install_client")
-    install_client
+  "stop")
+    stop
     ;;
-  "update_config")
-    update_config
+  "check")
+    check
     ;;
-  "run_client")
-    run_client
+  "proxyInfo")
+    proxyInfo
     ;;
-  "stop_client")
-    stop_client
+  "clientInfo")
+    clientInfo
     ;;
-  "show_proxy")
-    show_proxy
-    ;;
-  "trigger_guardian")
-    trigger_guardian
-    ;;
-  "check_client")
-    check_client
+  "guardian")
+    guardian
     ;;
   *)
     echo "Usage: bash vps_docker.sh [OPTION]"
 	echo "OPTION:"
-	echo "  install_lightnode"
-	echo "  install_docker"
-	echo "  install_client"
-	echo "  run_client"
-	echo "  stop_client"
-	echo "  show_proxy"
-	echo "  trigger_guardian"
-	echo "  check_client"
+	echo "  install       Install Docker and setup directory for client"
+	echo "  run           Run the client from Docker Hub"
+	echo "  stop          Stop the client"
+	echo "  check         Check to see if client is running; Download log if client is not running"
+	echo "  proxyInfo     Print proxy information"
+	echo "  clientInfo    Print client information"
+	echo "  guardian      Trigger guardian"
     exit 1
     ;;
 esac

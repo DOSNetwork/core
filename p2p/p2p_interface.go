@@ -2,11 +2,10 @@ package p2p
 
 import (
 	"context"
-	//	"errors"
+	"errors"
 	"fmt"
-	"io/ioutil"
 	"net"
-	"net/http"
+	"os"
 	"runtime"
 
 	"github.com/DOSNetwork/core/log"
@@ -51,7 +50,7 @@ func CreateP2PNetwork(id []byte, port string, netType int) (P2PInterface, error)
 	p.secKey = suite.Scalar().Pick(suite.RandomStream())
 	p.pubKey = suite.Point().Mul(p.secKey, nil)
 	p.id = id
-	ip, err := GetLocalIP()
+	ip, err := GetPublicIP()
 	if err != nil {
 		fmt.Println(err)
 		return nil, err
@@ -67,20 +66,29 @@ func CreateP2PNetwork(id []byte, port string, netType int) (P2PInterface, error)
 	return p, nil
 }
 
-func GetLocalIP() (ip net.IP, err error) {
-	//FOR DOCKER AWS TESTING
-
-	response, err := http.Get("http://ipconfig.me")
-	if err != nil {
-		return
+func GetPublicIP() (ip net.IP, err error) {
+	ipString := os.Getenv("PUBLICIP")
+	if ipString != "" {
+		ip = net.ParseIP(ipString)
+	} else {
+		err = errors.New("No Public IP")
 	}
+	return
+	/*
+		//FOR DOCKER AWS TESTING
 
-	ipBytes, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		return
-	}
-	ipString := string(ipBytes)
-	ip = net.ParseIP(ipString)
+		response, err := http.Get("http://ipconfig.me")
+		if err != nil {
+			return
+		}
+
+		ipBytes, err := ioutil.ReadAll(response.Body)
+		if err != nil {
+			return
+		}
+		ipString := string(ipBytes)
+		ip = net.ParseIP(ipString)
+	*/
 	//fmt.Println(ip)
 	//////////////////////////////
 	/*

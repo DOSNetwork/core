@@ -1,0 +1,6 @@
+DOSIMAGE=dosnetwork/dosnode:beta
+USER=
+VPSIP=
+VPSKEY=
+KEYSTORE=
+GETHPOOL=""
