@@ -37,33 +37,41 @@
 ### Running a DOS Client on a VPS (Ubuntu 16.04 LTS):
 #### Requirements
 - A Ubuntu 16.04 LTS VPS with a public IP
-- Opening 7946,8545,8546 and 9501 port in the VPS
+- Opening 7946,and 9501 port in the VPS
 - A ssh private key file for the VPS
 - A ETH keystore
 
 #### 1) Using a docker
-- Download vps_docker.sh and setup the following setting in vps_docker.sh
+- Download the [vps_docker.sh](https://raw.githubusercontent.com/DOSNetwork/core/Beta/vps_docker.sh) and setup the following setting in the [dos.setting](https://raw.githubusercontent.com/DOSNetwork/core/Beta/dos.setting)
+	- DOSIMAGE : Client Docker image
 	- USER : VPS user name
 	- VPSIP : VPS public IP
 	- VPSKEY : ssh private key for VPS  ( [Ex:Amazon Lightsail...](https://lightsail.aws.amazon.com/ls/docs/en_us/articles/lightsail-how-to-set-up-ssh))
-	- ETHKEY : Ethereum keystore file ( [Create a geth keystore by geth ](https://github.com/ethereum/go-ethereum/wiki/Managing-your-accounts))
-- Download config.json and setup the following setting in config.sh
-	- RemoteNodeAddressPool : geth RPC address
+	- KEYSTORE : Ethereum keystore file ( [Create a geth keystore by geth ](https://github.com/ethereum/go-ethereum/wiki/Managing-your-accounts))
+	- GETHPOOL : urls to access geth nodes.Please at least assign a RPC url for sending transcation and a WebSocket url for event tracking. Assign more URL can improve performance and reliability
 		
-			"RemoteNodeAddressPool": [
-			    "https://rinkeby.infura.io/projectid",
-			    "ws://xxx.xxx.xxx.xxx:8546",
-			    "ws://xxx.xxx.xxx.xxx:8546"
-			]
+			DOSIMAGE=dosnetwork/dosnode:beta
+			USER=tester
+			VPSIP=xxx.xxx.xxx.xxx
+			KEYSTORE=xxx
+			GETHPOOL="https://rinkeby.infura.io/projectid;ws://ooo.ooo.ooo.ooo:8546;ws://xxx.xxx.xxx.xxx:8546"
 			
-- Download geth.service
-- Put vps_docker.sh,config.json and geth.service under the same directory
-- Install Geth Light Node : `$ bash vps_docker.sh install_lightnode`
-- Install docker : `$ bash vps_docker.sh install_docker`
-- Install client : `$ bash vps_docker.sh install_client`
-- Run the client : `$ bash vps_docker.sh run_client`
-- Show the client status : `$ bash vps_docker.sh show_status`
-- Stop the client : `$ bash vps_docker.sh run_client`
+- Install docker and setup directorys for client
+```sh
+$ bash vps_docker.sh install
+```
+- Run the client
+```sh
+$ bash vps_docker.sh run
+```
+- Stop the client
+```sh
+$ bash vps_docker.sh stop
+```
+- Show the client status
+```sh
+$ bash vps_docker.sh clientInfo
+```
 
 #### 2) Build a binary 
 
