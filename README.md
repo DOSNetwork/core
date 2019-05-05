@@ -42,20 +42,29 @@
 - A ETH keystore
 
 #### 1) Using a docker
-- Download the [vps_docker.sh](https://raw.githubusercontent.com/DOSNetwork/core/Beta/vps_docker.sh) and setup the following setting in the [dos.setting](https://raw.githubusercontent.com/DOSNetwork/core/Beta/dos.setting)
-	- DOSIMAGE : Client Docker image
+- Download [vps_docker.sh](https://raw.githubusercontent.com/DOSNetwork/core/Beta/vps_docker.sh),[dos.setting](https://raw.githubusercontent.com/DOSNetwork/core/Beta/dos.setting),[static-nodes.json](https://raw.githubusercontent.com/DOSNetwork/core/Beta/static-nodes.json) and [geth.service](https://raw.githubusercontent.com/DOSNetwork/core/Beta/geth.service)
+- setup the following setting in the [dos.setting](https://raw.githubusercontent.com/DOSNetwork/core/Beta/dos.setting)
 	- USER : VPS user name
 	- VPSIP : VPS public IP
 	- VPSKEY : ssh private key for VPS  ( [Ex:Amazon Lightsail...](https://lightsail.aws.amazon.com/ls/docs/en_us/articles/lightsail-how-to-set-up-ssh))
 	- KEYSTORE : Ethereum keystore file ( [Create a geth keystore by geth ](https://github.com/ethereum/go-ethereum/wiki/Managing-your-accounts))
-	- GETHPOOL : urls to access geth nodes.Please at least assign a RPC url for sending transcation and a WebSocket url for event tracking. Assign more URL can improve performance and reliability
 		
 			DOSIMAGE=dosnetwork/dosnode:beta
 			USER=tester
 			VPSIP=xxx.xxx.xxx.xxx
 			KEYSTORE=xxx
 			GETHPOOL="https://rinkeby.infura.io/projectid;ws://ooo.ooo.ooo.ooo:8546;ws://xxx.xxx.xxx.xxx:8546"
-			
+
+- change the following setting in the [geth.service](https://raw.githubusercontent.com/DOSNetwork/core/Beta/geth.service)
+	- WorkingDirectory : 
+	- User : VPS user name
+	- datadir :
+		
+			[Service]
+			WorkingDirectory=/home/tester
+			User=tester
+			ExecStart=/usr/bin/geth --datadir /home/tester/.ethereum ...
+
 - Install docker and setup directorys for client
 ```sh
 $ bash vps_docker.sh install
