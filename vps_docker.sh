@@ -39,22 +39,54 @@ else
     echo "Can't find dos.setting"
 	exit
 fi
+GETHPOOL=$GETHPOOL";ws://"$VPSIP":8546"
+DIR="/home/"$USER
 
-installAll(){
+install_lightnode(){
+  ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'yes | sudo apt-get update'
+  ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'yes | sudo add-apt-repository -y ppa:ethereum/ethereum'
+  ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'yes | sudo apt-get update'
+  ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'yes | sudo apt-get install ethereum'
+  scp -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i $VPSKEY rinkeby.json $USER@$VPSIP:~/
+  ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'geth --datadir='$DIR'/.ethereum init rinkeby.json'
+  scp -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i $VPSKEY static-nodes.json $USER@$VPSIP:$DIR/.ethereum/geth/static-nodes.json
+  scp -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i $VPSKEY geth.service  $USER@$VPSIP:~/
+  ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'yes | sudo chmod 322 geth.service'
+  ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'yes | sudo mv geth.service /lib/systemd/system/geth.service'
+  ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'yes | sudo systemctl enable geth'
+  ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'yes | sudo systemctl start geth'
+}
+
+start_lightnode(){
+  echo "start_lightnode"
+  ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'ps cax | grep geth > /dev/null'
+  if [ $? -eq 0 ]
+  then
+	echo "Geth Process is running."
+  else
+	ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'yes | sudo systemctl start geth'
+  fi
+}
+
+install_docker(){
   ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'yes | sudo apt-get update'
   ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'yes | sudo apt-get install docker.io'
   ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'sudo usermod -a -G docker $USER'
-  ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'mkdir -p dos'
-  ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'mkdir -p credential'
-  scp -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i $VPSKEY $KEYSTORE $USER@$VPSIP:~/credential/
+}
+
+install_dos(){
+  ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'mkdir -p '$DIR'/dos'
+  ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'mkdir -p '$DIR'/credential'
+  echo $KEYSTORE
+  scp -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i $VPSKEY $KEYSTORE $USER@$VPSIP:$DIR'/credential/'
 }
 
 run(){
+    start_lightnode
 	result=$(ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP docker container ls | awk '(index($2, "dos") != 0) {print $2}')
 	newlog="doslog_$VPSIP"
 	if [ -z "$result" ]; 
 	then
-    DIR="/home/"$USER
 	ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'sudo rm dos/doslog'
 	ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'docker pull '$DOSIMAGE
 	echo -n Password:;read -s password ;
@@ -109,7 +141,9 @@ guardian(){
 
 case "$1" in
   "install")
-    installAll
+    install_lightnode
+	install_docker
+	install_dos
     ;;
   "run")
     run
