@@ -597,7 +597,7 @@ func (e *EthAdaptor) RegisterGroupPubKey(ctx context.Context, IdWithPubKeys chan
 			}
 
 			f := map[string]interface{}{
-				"DispatchedGroupId": fmt.Sprintf("%x", groupId.Bytes()),
+				"SessionID":         fmt.Sprintf("%x", groupId.Bytes()),
 				"DispatchedGroup_1": fmt.Sprintf("%x", pubKey[0].Bytes()),
 				"DispatchedGroup_2": fmt.Sprintf("%x", pubKey[1].Bytes()),
 				"DispatchedGroup_3": fmt.Sprintf("%x", pubKey[2].Bytes()),

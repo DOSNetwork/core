@@ -622,7 +622,7 @@ func (d *DosNode) listen() (err error) {
 				}
 				groupIds = append(groupIds, id)
 			}
-
+			//sessionId ,groupIds[][]byte
 			if isMember {
 				currentBlockNumber, err := d.chain.CurrentBlock()
 				if err != nil {
@@ -631,17 +631,18 @@ func (d *DosNode) listen() (err error) {
 				sessionId := fmt.Sprintf("%x", content.GroupId)
 
 				if !content.Removed {
+
+					fmt.Println("eventGrouping groupid ", content.GroupId.String())
+
+					ctx, cancelFunc := context.WithCancel(context.Background())
+					valueCtx := context.WithValue(ctx, "SessionID", sessionId)
 					f := map[string]interface{}{
-						"SessionID": sessionId,
+						"SessionID": valueCtx.Value("SessionID"),
 						"Removed":   content.Removed,
 						"Tx":        content.Tx,
 						"CurBlkN":   currentBlockNumber,
 						"BlockN":    content.BlockN}
 					logger.Event("DOS_Grouping", f)
-					fmt.Println("eventGrouping groupid ", content.GroupId.String())
-
-					ctx, cancelFunc := context.WithCancel(context.Background())
-					valueCtx := context.WithValue(ctx, "SessionID", sessionId)
 					pipeCancel[sessionId] = cancelFunc
 					var errcList []<-chan error
 					outFromDkg, errc := d.dkg.Start(valueCtx, groupIds, sessionId)

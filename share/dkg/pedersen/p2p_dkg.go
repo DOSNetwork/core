@@ -92,7 +92,7 @@ func (d *P2PDkg) Start(ctx context.Context, groupIds [][]byte, sessionId string)
 		ctx:            ctx,
 		errc:           make(chan error),
 	}
-	d.logger.Event("DKGStart", nil)
+	d.logger.Event("DKGStart", map[string]interface{}{"SessionID": newSession.ctx.Value("SessionID")})
 	for i := 0; i < len(groupIds); i++ {
 		start := time.Now()
 		if !bytes.Equal((*d.network).GetID(), groupIds[i]) {
