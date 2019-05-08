@@ -214,10 +214,10 @@ func genSign(
 	ctx context.Context,
 	contentc <-chan []byte,
 	cSignToPeer chan *vss.Signature,
-	dkg dkg.P2PDkgInterface,
+	dkg dkg.PDKGInterface,
 	suite suites.Suite,
 	nodeID []byte,
-	pubkey [4]*big.Int,
+	groupID string,
 	requestId []byte,
 	index uint32,
 	nonce []byte) (<-chan *vss.Signature, <-chan error) {
@@ -239,7 +239,7 @@ func genSign(
 			content = value
 			submitter = content[len(content)-20:]
 
-			sig, err := tbls.Sign(suite, dkg.GetShareSecurity(pubkey), content)
+			sig, err := tbls.Sign(suite, dkg.GetShareSecurity(groupID), content)
 			if err != nil {
 				logger.Error(err)
 				select {

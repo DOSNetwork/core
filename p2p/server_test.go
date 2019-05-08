@@ -1,6 +1,7 @@
 package p2p
 
 import (
+	"os"
 	"strconv"
 	"sync"
 	"testing"
@@ -11,7 +12,7 @@ import (
 
 func TestServer(t *testing.T) {
 	listener := []byte("9")
-
+	os.Setenv("PUBLICIP", "0.0.0.0")
 	log.Init(listener[:])
 
 	pListener, _ := CreateP2PNetwork(listener, "9905", NONE)

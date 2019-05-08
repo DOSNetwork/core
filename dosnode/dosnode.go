@@ -39,7 +39,7 @@ var logger log.Logger
 type DosNode struct {
 	suite        suites.Suite
 	chain        onchain.ProxyAdapter
-	dkg          dkg.P2PDkgInterface
+	dkg          dkg.PDKGInterface
 	p            p2p.P2PInterface
 	done         chan interface{}
 	cSignToPeer  chan *vss.Signature
@@ -159,11 +159,7 @@ func NewDosNode(credentialPath, passphrase string) (dosNode *DosNode, err error)
 	fmt.Println("Join : num of peer ", num)
 	//Build a p2pDKG
 	suite := suites.MustFind("bn256")
-	p2pDkg, err := dkg.CreateP2PDkg(p, suite)
-	if err != nil {
-		fmt.Println("p2pDKG ", err)
-		return
-	}
+	p2pDkg := dkg.NewPDKG(p, suite)
 
 	if logger == nil {
 		logger = log.New("module", "dosclient")
@@ -226,18 +222,18 @@ func (d *DosNode) waitForGrouping(ctx context.Context, errc <-chan error) {
 	}
 }
 
-func (d *DosNode) waitForRequestDone(ctx context.Context, pubKey [4]*big.Int, errc <-chan error) {
+func (d *DosNode) waitForRequestDone(ctx context.Context, groupID string, errc <-chan error) {
 	defer logger.TimeTrack(time.Now(), "WaitForRequestDone", map[string]interface{}{"RequestId": ctx.Value("RequestID")})
 	for err := range errc {
 		if err != nil {
 			logger.Error(err)
 		}
 	}
-	d.cRequestDone <- pubKey
+	//d.cRequestDone <- pubKey
 
 }
 
-func (d *DosNode) buildPipeline(valueCtx context.Context, pubkey [4]*big.Int, groupID, requestID, lastRand, useSeed *big.Int, url, selector string, pType uint32) {
+func (d *DosNode) buildPipeline(valueCtx context.Context, groupID string, requestID, lastRand, useSeed *big.Int, url, selector string, pType uint32) {
 	defer logger.TimeTrack(time.Now(), "BuildPipeline", map[string]interface{}{"RequestId": valueCtx.Value("RequestID")})
 	d.totalQuery++
 	var signShares []<-chan *vss.Signature
@@ -247,21 +243,21 @@ func (d *DosNode) buildPipeline(valueCtx context.Context, pubkey [4]*big.Int, gr
 	var cSign <-chan *vss.Signature
 	var cContent <-chan []byte
 	var nonce []byte
-	ids := d.dkg.GetGroupIDs(pubkey)
-	pubPoly := d.dkg.GetGroupPublicPoly(pubkey)
+	ids := d.dkg.GetGroupIDs(groupID)
+	pubPoly := d.dkg.GetGroupPublicPoly(groupID)
 
 	//Generate an unique id
 	switch pType {
 	case onchain.TrafficSystemRandom:
 		var bytes []byte
-		bytes = append(bytes, groupID.Bytes()...)
+		bytes = append(bytes, []byte(groupID)...)
 		bytes = append(bytes, requestID.Bytes()...)
 		bytes = append(bytes, lastRand.Bytes()...)
 		nHash := sha256.Sum256(bytes)
 		nonce = nHash[:]
 	case onchain.TrafficUserRandom:
 		var bytes []byte
-		bytes = append(bytes, groupID.Bytes()...)
+		bytes = append(bytes, []byte(groupID)...)
 		bytes = append(bytes, requestID.Bytes()...)
 		bytes = append(bytes, lastRand.Bytes()...)
 		bytes = append(bytes, useSeed.Bytes()...)
@@ -269,7 +265,7 @@ func (d *DosNode) buildPipeline(valueCtx context.Context, pubkey [4]*big.Int, gr
 		nonce = nHash[:]
 	case onchain.TrafficUserQuery:
 		var bytes []byte
-		bytes = append(bytes, groupID.Bytes()...)
+		bytes = append(bytes, []byte(groupID)...)
 		bytes = append(bytes, requestID.Bytes()...)
 		bytes = append(bytes, lastRand.Bytes()...)
 		bytes = append(bytes, []byte(url)...)
@@ -292,7 +288,7 @@ func (d *DosNode) buildPipeline(valueCtx context.Context, pubkey [4]*big.Int, gr
 		errcList = append(errcList, cErr)
 	}
 
-	cSign, cErr = genSign(valueCtx, cContent, d.cSignToPeer, d.dkg, d.suite, d.id, pubkey, requestID.Bytes(), pType, nonce)
+	cSign, cErr = genSign(valueCtx, cContent, d.cSignToPeer, d.dkg, d.suite, d.id, groupID, requestID.Bytes(), pType, nonce)
 	errcList = append(errcList, cErr)
 
 	signShares = append(signShares, cSign)
@@ -318,7 +314,7 @@ func (d *DosNode) buildPipeline(valueCtx context.Context, pubkey [4]*big.Int, gr
 	//errcList = append(errcList, cErr)
 	errc := mergeErrors(valueCtx, errcList...)
 
-	go d.waitForRequestDone(valueCtx, pubkey, errc)
+	go d.waitForRequestDone(valueCtx, groupID, errc)
 
 }
 
@@ -343,13 +339,6 @@ func (d *DosNode) listen() (err error) {
 	errcList = append(errcList, errc)
 	noworkinggroup, errc := d.chain.SubscribeEvent(onchain.SubscribeDosproxyLogNoWorkingGroup)
 	errcList = append(errcList, errc)
-	/*
-		chInsufficientWG, errc := d.chain.SubscribeEvent(onchain.SubscribeDosproxyLogInsufficientWorkingGroup)
-		errcList = append(errcList, errc)
-
-			groupInitated, errc := d.chain.SubscribeEvent(onchain.SubscribeDosproxyLogGroupingInitiated)
-			errcList = append(errcList, errc)
-	*/
 	commitRevealStart, errc := d.chain.SubscribeEvent(onchain.SubscribeCommitrevealLogStartCommitreveal)
 	errcList = append(errcList, errc)
 
@@ -360,55 +349,12 @@ func (d *DosNode) listen() (err error) {
 	pipeCancel := make(map[string]context.CancelFunc)
 	peerSignMap := make(map[string]*vss.Signature)
 	watchdog := time.NewTicker(WATCHDOGINTERVAL * time.Minute)
-	requestTracking := map[string]map[string]int{}
 
 	defer watchdog.Stop()
 	defer d.p.UnSubscribeEvent(vss.Signature{})
 
 	for {
-
 		select {
-		/*
-			case _, ok := <-chInsufficientWG:
-				if !ok {
-					continue
-				}
-
-				if d.dkg.GetGroupNumber() == 0 {
-					currentBlockNumber, err := d.chain.CurrentBlock()
-					if err != nil {
-						logger.Error(err)
-					}
-					commitRevealTargetBlk, err := d.chain.CommitRevealTargetBlk()
-					if err != nil {
-						continue
-					}
-					if currentBlockNumber > commitRevealTargetBlk {
-						f := map[string]interface{}{
-							"Time": time.Now()}
-						logger.Event("InsufficientWorkingGroup", f)
-						d.chain.SignalGroupFormation(context.Background())
-					}
-				}
-		*/
-		/*
-			case msg, ok := <-groupInitated:
-				if !ok {
-					continue
-				}
-				content, ok := msg.(*onchain.DosproxyLogGroupingInitiated)
-				if !ok {
-					log.Error(err)
-					continue
-				}
-				if d.dkg.GetGroupNumber() == 0 {
-					f := map[string]interface{}{
-						"NumPendingNodes":   content.NumPendingNodes,
-						"GroupSize":         content.GroupSize,
-						"GroupingThreshold": content.GroupingThreshold,
-						"Time":              time.Now()}
-					logger.Event("GroupingInitiated", f)
-				}*/
 		case msg, ok := <-commitRevealStart:
 			if !ok {
 				continue
@@ -504,7 +450,6 @@ func (d *DosNode) listen() (err error) {
 			//Let pending node as a guardian
 			//if d.dkg.GetGroupNumber() == 0 {
 			fmt.Println("watchdog")
-			ids := d.dkg.GetAnyGroupIDs()
 			workingGroup, err := d.chain.GetWorkingGroupSize()
 			if err != nil {
 				continue
@@ -544,52 +489,18 @@ func (d *DosNode) listen() (err error) {
 				"PendingGrouSize":    pendingGrouSize,
 				"Members":            d.p.Members()}
 			logger.Event("DOS_Watchdog", f)
-			fmt.Println("watchdog ", f, " len(ids) ", len(ids))
 			//Let pendingNode be a guardian
-			if len(ids) == 0 {
-				//Signal random if there are enough working groups
-				if workingGroup >= groupToPick {
-					diff := currentBlockNumber - lastUpdatedBlock
-					if diff > SYSRANDOMNTERVAL {
-						ctx, _ := context.WithCancel(context.Background())
-						d.chain.SignalRandom(ctx)
-					}
+			//Signal random if there are enough working groups
+			if workingGroup >= groupToPick {
+				diff := currentBlockNumber - lastUpdatedBlock
+				if diff > SYSRANDOMNTERVAL {
+					ctx, _ := context.WithCancel(context.Background())
+					d.chain.SignalRandom(ctx)
 				}
 			}
 
 			if pendingNodeSize >= groupSize+(groupSize/2) {
 				d.chain.SignalGroupFormation(context.Background())
-			}
-
-		case pubkey := <-d.cRequestDone:
-			gID := dkg.HashPoint(pubkey)
-			fmt.Println("cRequestDone ", []byte(gID), requestTracking[gID]["count"])
-			requestTracking[gID]["count"]--
-			if requestTracking[gID]["count"] == 0 &&
-				requestTracking[gID]["status"] == GROUPDELETED {
-				f := map[string]interface{}{
-					"DispatchedGroup_1": fmt.Sprintf("%x", pubkey[0].Bytes()),
-					"DispatchedGroup_2": fmt.Sprintf("%x", pubkey[1].Bytes()),
-					"DispatchedGroup_3": fmt.Sprintf("%x", pubkey[2].Bytes()),
-					"DispatchedGroup_4": fmt.Sprintf("%x", pubkey[3].Bytes()),
-				}
-				logger.Event("DOS_GroupDeleted", f)
-				if d.dkg.GroupDismiss(pubkey) {
-					ids := d.dkg.GetGroupIDs(pubkey)
-					for _, id := range ids {
-						if r := bytes.Compare(d.id, id); r != 0 {
-							d.p.DisConnectTo(id)
-						}
-					}
-					ctx, _ := context.WithCancel(context.Background())
-					go func() {
-						errc := d.chain.RegisterNewNode(ctx)
-						err := <-errc
-						if err != nil {
-							fmt.Println("RegisterNewNode err ", err)
-						}
-					}()
-				}
 			}
 		case msg, ok := <-d.cSignToPeer:
 			if !ok {
@@ -614,38 +525,38 @@ func (d *DosNode) listen() (err error) {
 				continue
 			}
 			isMember := false
-			var groupIds [][]byte
-			for _, node := range content.NodeId {
-				id := node.Bytes()
+			var participants [][]byte
+			for _, p := range content.NodeId {
+				id := p.Bytes()
 				if r := bytes.Compare(d.id, id); r == 0 {
 					isMember = true
 				}
-				groupIds = append(groupIds, id)
+				participants = append(participants, id)
 			}
-			//sessionId ,groupIds[][]byte
 			if isMember {
 				currentBlockNumber, err := d.chain.CurrentBlock()
 				if err != nil {
 					logger.Error(err)
 				}
-				sessionId := fmt.Sprintf("%x", content.GroupId)
-
+				groupID := fmt.Sprintf("%x", content.GroupId)
 				if !content.Removed {
-
-					fmt.Println("eventGrouping groupid ", content.GroupId.String())
-
 					ctx, cancelFunc := context.WithCancel(context.Background())
-					valueCtx := context.WithValue(ctx, "SessionID", sessionId)
+					valueCtx := context.WithValue(ctx, "GroupID", groupID)
 					f := map[string]interface{}{
-						"SessionID": valueCtx.Value("SessionID"),
-						"Removed":   content.Removed,
-						"Tx":        content.Tx,
-						"CurBlkN":   currentBlockNumber,
-						"BlockN":    content.BlockN}
+						"GroupID": groupID,
+						"Removed": content.Removed,
+						"Tx":      content.Tx,
+						"CurBlkN": currentBlockNumber,
+						"BlockN":  content.BlockN}
 					logger.Event("DOS_Grouping", f)
-					pipeCancel[sessionId] = cancelFunc
+					pipeCancel[groupID] = cancelFunc
+
 					var errcList []<-chan error
-					outFromDkg, errc := d.dkg.Start(valueCtx, groupIds, sessionId)
+					outFromDkg, errc, err := d.dkg.Grouping(valueCtx, groupID, participants)
+					if err != nil {
+						logger.Error(err)
+						continue
+					}
 					errcList = append(errcList, errc)
 					errc = d.chain.RegisterGroupPubKey(valueCtx, outFromDkg)
 					errcList = append(errcList, errc)
@@ -665,40 +576,27 @@ func (d *DosNode) listen() (err error) {
 				}
 				continue
 			}
-			if d.isMember(content.PubKey) {
+			groupID := fmt.Sprintf("%x", content.GroupId)
+			if d.isMember(groupID) {
 				currentBlockNumber, err := d.chain.CurrentBlock()
 				if err != nil {
 					logger.Error(err)
 				}
-				gID := dkg.HashPoint(content.PubKey)
-				fmt.Println("eventGroupDismiss ", []byte(gID), requestTracking[gID]["count"])
-
+				/*
+					gID := dkg.HashPoint(content.PubKey)
+					fmt.Println("eventGroupDismiss ", []byte(gID), requestTracking[gID]["count"])
+				*/
 				f := map[string]interface{}{
-					"SessionID":         fmt.Sprintf("%x", content.GroupId),
+					"GroupID":           fmt.Sprintf("%x", content.GroupId),
 					"DispatchedGroup_1": fmt.Sprintf("%x", content.PubKey[0].Bytes()),
 					"DispatchedGroup_2": fmt.Sprintf("%x", content.PubKey[1].Bytes()),
 					"DispatchedGroup_3": fmt.Sprintf("%x", content.PubKey[2].Bytes()),
 					"DispatchedGroup_4": fmt.Sprintf("%x", content.PubKey[3].Bytes()),
-					"ReuqestCount":      requestTracking[gID]["count"],
 					"Removed":           content.Removed,
 					"Tx":                content.Tx,
 					"CurBlkN":           currentBlockNumber,
 					"BlockN":            content.BlockN}
 				logger.Event("DOS_GroupDismiss", f)
-				if requestTracking[gID]["count"] == 0 {
-					if d.dkg.GroupDismiss(content.PubKey) {
-						ctx, _ := context.WithCancel(context.Background())
-						go func() {
-							errc := d.chain.RegisterNewNode(ctx)
-							err := <-errc
-							if err != nil {
-								fmt.Println("RegisterNewNode err ", err)
-							}
-						}()
-					}
-				} else {
-					requestTracking[gID]["status"] = GROUPDELETED
-				}
 			}
 		case msg, ok := <-chRandom:
 			if !ok {
@@ -708,39 +606,32 @@ func (d *DosNode) listen() (err error) {
 			if !ok {
 				log.Error(err)
 			}
-			if d.isMember(content.DispatchedGroup) {
-				if !content.Removed {
-					gID := dkg.HashPoint(content.DispatchedGroup)
-					if requestTracking[gID] == nil {
-						requestTracking[gID] = map[string]int{}
-						requestTracking[gID]["status"] = GROUPINITIATED
-						requestTracking[gID]["count"] = 0
-					}
-					requestTracking[gID]["count"]++
-					fmt.Println("chRandom ", []byte(gID), requestTracking[gID]["count"])
 
+			if d.isMember(fmt.Sprintf("%x", content.DispatchedGroupId.Bytes())) {
+				if !content.Removed {
 					currentBlockNumber, err := d.chain.CurrentBlock()
 					if err != nil {
 						logger.Error(err)
 					}
+					requestID := fmt.Sprintf("%x", content.LastRandomness.String())
+					groupID := fmt.Sprintf("%x", content.DispatchedGroupId)
 					f := map[string]interface{}{
+						"RequestId":            requestID,
+						"GroupID":              groupID,
 						"LastSystemRandomness": fmt.Sprintf("%x", content.LastRandomness),
-						"DispatchedGroupId":    fmt.Sprintf("%x", content.DispatchedGroupId.Bytes()),
 						"DispatchedGroup_1":    fmt.Sprintf("%x", content.DispatchedGroup[0].Bytes()),
 						"DispatchedGroup_2":    fmt.Sprintf("%x", content.DispatchedGroup[1].Bytes()),
 						"DispatchedGroup_3":    fmt.Sprintf("%x", content.DispatchedGroup[2].Bytes()),
 						"DispatchedGroup_4":    fmt.Sprintf("%x", content.DispatchedGroup[3].Bytes()),
-						"ReuqestCount":         requestTracking[gID]["count"],
 						"Tx":                   content.Tx,
 						"CurBlkN":              currentBlockNumber,
 						"BlockN":               content.BlockN}
 					logger.Event("DOS_QuerySysRandom", f)
 
-					requestID := content.LastRandomness.String()
 					ctx, cancelFunc := context.WithCancel(context.Background())
 					valueCtx := context.WithValue(ctx, "RequestID", fmt.Sprintf("%x", content.LastRandomness))
 					pipeCancel[requestID] = cancelFunc
-					d.buildPipeline(valueCtx, content.DispatchedGroup, content.DispatchedGroupId, content.LastRandomness, content.LastRandomness, nil, "", "", uint32(onchain.TrafficSystemRandom))
+					d.buildPipeline(valueCtx, groupID, content.LastRandomness, content.LastRandomness, nil, "", "", uint32(onchain.TrafficSystemRandom))
 				}
 			}
 		case msg, ok := <-chUsrRandom:
@@ -752,40 +643,28 @@ func (d *DosNode) listen() (err error) {
 				log.Error(err)
 				continue
 			}
-			if d.isMember(content.DispatchedGroup) {
+			if d.isMember(fmt.Sprintf("%x", content.DispatchedGroupId)) {
 				if !content.Removed {
-					gID := dkg.HashPoint(content.DispatchedGroup)
-					fmt.Println("chUsrRandom ", []byte(gID))
-					if requestTracking[gID] == nil {
-						requestTracking[gID] = map[string]int{}
-						requestTracking[gID]["status"] = GROUPINITIATED
-						requestTracking[gID]["count"] = 0
-					}
-					requestTracking[gID]["count"]++
-					fmt.Println("chUsrRandom ", []byte(gID), requestTracking[gID]["count"])
-
 					currentBlockNumber, err := d.chain.CurrentBlock()
 					if err != nil {
 						logger.Error(err)
 					}
+					groupID := fmt.Sprintf("%x", content.DispatchedGroupId.Bytes())
 					f := map[string]interface{}{
-						"RequestId":            fmt.Sprintf("%x", content.RequestId),
-						"LastSystemRandomness": fmt.Sprintf("%x", content.LastSystemRandomness),
-						"DispatchedGroupId":    fmt.Sprintf("%x", content.DispatchedGroupId),
+						"RequestId":            fmt.Sprintf("%x", content.RequestId.Bytes()),
+						"GroupID":              fmt.Sprintf("%x", content.DispatchedGroupId.Bytes()),
+						"LastSystemRandomness": fmt.Sprintf("%x", content.LastSystemRandomness.Bytes()),
 						"DispatchedGroup_1":    fmt.Sprintf("%x", content.DispatchedGroup[0].Bytes()),
 						"DispatchedGroup_2":    fmt.Sprintf("%x", content.DispatchedGroup[1].Bytes()),
 						"DispatchedGroup_3":    fmt.Sprintf("%x", content.DispatchedGroup[2].Bytes()),
 						"DispatchedGroup_4":    fmt.Sprintf("%x", content.DispatchedGroup[3].Bytes()),
-						"ReuqestCount":         requestTracking[gID]["count"],
 						"Tx":                   content.Tx,
 						"CurBlkN":              currentBlockNumber,
 						"BlockN":               content.BlockN}
 					logger.Event("DOS_QueryUserRandom", f)
-					requestID := content.RequestId.String()
-					ctx, cancelFunc := context.WithCancel(context.Background())
+					ctx, _ := context.WithCancel(context.Background())
 					valueCtx := context.WithValue(ctx, "RequestID", fmt.Sprintf("%x", content.RequestId))
-					pipeCancel[requestID] = cancelFunc
-					d.buildPipeline(valueCtx, content.DispatchedGroup, content.DispatchedGroupId, content.RequestId, content.LastSystemRandomness, content.UserSeed, "", "", uint32(onchain.TrafficUserRandom))
+					d.buildPipeline(valueCtx, groupID, content.RequestId, content.LastSystemRandomness, content.UserSeed, "", "", uint32(onchain.TrafficUserRandom))
 				}
 			}
 		case msg, ok := <-chUrl:
@@ -797,18 +676,8 @@ func (d *DosNode) listen() (err error) {
 				log.Error(err)
 				continue
 			}
-			if d.isMember(content.DispatchedGroup) {
+			if d.isMember(fmt.Sprintf("%x", content.DispatchedGroupId)) {
 				if !content.Removed {
-					gID := dkg.HashPoint(content.DispatchedGroup)
-					fmt.Println("chUrl ", []byte(gID))
-					if requestTracking[gID] == nil {
-						requestTracking[gID] = map[string]int{}
-						requestTracking[gID]["status"] = GROUPINITIATED
-						requestTracking[gID]["count"] = 0
-					}
-					requestTracking[gID]["count"]++
-					fmt.Println("chUrl ", []byte(gID), requestTracking[gID]["count"])
-
 					currentBlockNumber, err := d.chain.CurrentBlock()
 					if err != nil {
 						logger.Error(err)
@@ -816,65 +685,27 @@ func (d *DosNode) listen() (err error) {
 					startTime := time.Now()
 					fmt.Println("set up time ", startTime)
 					f := map[string]interface{}{
-						"RequestId":         fmt.Sprintf("%x", content.QueryId),
-						"Randomness":        fmt.Sprintf("%x", content.Randomness),
-						"DataSource":        fmt.Sprintf("%x", content.DataSource),
-						"DispatchedGroupId": fmt.Sprintf("%x", content.DispatchedGroupId),
+						"RequestId":         fmt.Sprintf("%x", content.QueryId.Bytes()),
+						"Randomness":        fmt.Sprintf("%x", content.Randomness.Bytes()),
+						"DataSource":        content.DataSource,
+						"GroupID":           fmt.Sprintf("%x", content.DispatchedGroupId.Bytes()),
 						"DispatchedGroup_1": fmt.Sprintf("%x", content.DispatchedGroup[0].Bytes()),
 						"DispatchedGroup_2": fmt.Sprintf("%x", content.DispatchedGroup[1].Bytes()),
 						"DispatchedGroup_3": fmt.Sprintf("%x", content.DispatchedGroup[2].Bytes()),
 						"DispatchedGroup_4": fmt.Sprintf("%x", content.DispatchedGroup[3].Bytes()),
-						"ReuqestCount":      requestTracking[gID]["count"],
 						"Tx":                content.Tx,
 						"CurBlkN":           currentBlockNumber,
 						"BlockN":            content.BlockN}
 					logger.Event("DOS_QueryURL", f)
-					requestID := content.QueryId.String()
-					ctx, cancelFunc := context.WithCancel(context.Background())
+					groupID := fmt.Sprintf("%x", content.DispatchedGroupId.Bytes())
+					ctx, _ := context.WithCancel(context.Background())
 					valueCtx := context.WithValue(ctx, "RequestID", fmt.Sprintf("%x", content.QueryId))
-					pipeCancel[requestID] = cancelFunc
-					d.buildPipeline(valueCtx, content.DispatchedGroup, content.DispatchedGroupId, content.QueryId, content.Randomness, nil, content.DataSource, content.Selector, uint32(onchain.TrafficUserQuery))
+					d.buildPipeline(valueCtx, groupID, content.QueryId, content.Randomness, nil, content.DataSource, content.Selector, uint32(onchain.TrafficUserQuery))
 				}
 			}
-		case msg, ok := <-eventValidation:
+		case _, ok := <-eventValidation:
 			if !ok {
 				continue
-			}
-			content, ok := msg.(*onchain.DosproxyLogValidationResult)
-			if !ok {
-				log.Error(err)
-				continue
-			}
-			if d.isMember(content.PubKey) {
-				currentBlockNumber, err := d.chain.CurrentBlock()
-				if err != nil {
-					logger.Error(err)
-				}
-				event := ""
-				if content.TrafficType == onchain.TrafficUserQuery {
-					event = "DOS_UrlResult"
-				} else if content.TrafficType == onchain.TrafficUserRandom {
-					event = "DOS_UserRandomResult"
-				} else if content.TrafficType == onchain.TrafficSystemRandom {
-					event = "DOS_SysRandomResult"
-				}
-				if content.Pass {
-					d.fulfilledQuery++
-				}
-				f := map[string]interface{}{
-					"RequestId":      fmt.Sprintf("%x", content.TrafficId),
-					"ValidationPass": content.Pass,
-					"Message":        fmt.Sprintf("%x", content.Message),
-					"Signature_1":    fmt.Sprintf("%x", content.Signature[0].Bytes()),
-					"Signature_2":    fmt.Sprintf("%x", content.Signature[1].Bytes()),
-					"PubKey_1":       fmt.Sprintf("%x", content.PubKey[0].Bytes()),
-					"PubKey_2":       fmt.Sprintf("%x", content.PubKey[1].Bytes()),
-					"PubKey_3":       fmt.Sprintf("%x", content.PubKey[2].Bytes()),
-					"PubKey_4":       fmt.Sprintf("%x", content.PubKey[3].Bytes()),
-					"Tx":             content.Tx,
-					"CurBlkN":        currentBlockNumber,
-					"BlockN":         content.BlockN}
-				logger.Event(event, f)
 			}
 		case msg, ok := <-keySuggested:
 			if !ok {
@@ -888,14 +719,13 @@ func (d *DosNode) listen() (err error) {
 				}
 				continue
 			}
-			if d.isMember(content.PubKey) {
+			if d.isMember(fmt.Sprintf("%x", content.GroupId)) {
 				logger.TimeTrack(time.Now(), "keySuggested", map[string]interface{}{
-					"SessionID": d.dkg.GetSessionID(content.PubKey),
-					"GroupSize": content.GroupSize,
-					"Count":     content.Count,
-					"Removed":   content.Removed,
-					"Tx":        content.Tx,
-					"BlockN":    content.BlockN,
+					"GroupID": fmt.Sprintf("%x", content.GroupId.Bytes()),
+					"Count":   content.Count,
+					"Removed": content.Removed,
+					"Tx":      content.Tx,
+					"BlockN":  content.BlockN,
 				})
 			}
 		case msg, ok := <-keyAccepted:
@@ -910,9 +740,9 @@ func (d *DosNode) listen() (err error) {
 				}
 				continue
 			}
-			if d.isMember(content.PubKey) {
+			if d.isMember(fmt.Sprintf("%x", content.GroupId)) {
 				logger.TimeTrack(time.Now(), "keyAccepted", map[string]interface{}{
-					"SessionID":        d.dkg.GetSessionID(content.PubKey),
+					"GroupId":          fmt.Sprintf("%x", content.GroupId.Bytes()),
 					"workingGroupSize": content.WorkingGroupSize,
 					"Removed":          content.Removed,
 					"Tx":               content.Tx,
@@ -948,8 +778,8 @@ func (d *DosNode) listen() (err error) {
 	return
 }
 
-func (d *DosNode) isMember(pubkey [4]*big.Int) bool {
-	return d.dkg.GetShareSecurity(pubkey) != nil
+func (d *DosNode) isMember(groupID string) bool {
+	return d.dkg.GetShareSecurity(groupID) != nil
 }
 
 func byte32(s []byte) (a *[32]byte) {

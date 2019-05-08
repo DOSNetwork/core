@@ -218,8 +218,8 @@ func TestPDKG(t *testing.T) {
 	pdkg2 := NewPDKG(p2, suite)
 	pdkg3 := NewPDKG(p3, suite)
 	var wg sync.WaitGroup
-	wg.Add(2)
-	for i := 0; i < 2; i++ {
+	wg.Add(5)
+	for i := 0; i < 5; i++ {
 		go func(groupID string) {
 			defer wg.Done()
 			ctx := context.Background()

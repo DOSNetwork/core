@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
 	//	"github.com/DOSNetwork/core/log"
 	"github.com/DOSNetwork/core/sign/bls"
 	"github.com/DOSNetwork/core/suites"
@@ -310,6 +311,7 @@ func encrypt(ctx context.Context, dhKey, dhNonce []byte, plaintext chan []byte) 
 				if !ok {
 					return
 				}
+
 				var err error
 				var block cipher.Block
 				var aesgcm cipher.AEAD
@@ -474,6 +476,7 @@ func dispatch(localID, remoteID []byte, incomingConn bool, ctx context.Context, 
 				if pa.GetReplyFlag() {
 					request := requests[pa.RequestNonce]
 					if request.ctx == nil {
+
 						continue
 					}
 					delete(requests, pa.RequestNonce)
@@ -484,6 +487,7 @@ func dispatch(localID, remoteID []byte, incomingConn bool, ctx context.Context, 
 				}
 				if pub != nil {
 					if err := bls.Verify(suite, pub, pa.GetAnything().Value, pa.GetSignature()); err != nil {
+
 						select {
 						case replyErrc <- err:
 						case <-replyCtx.Done():
@@ -494,19 +498,20 @@ func dispatch(localID, remoteID []byte, incomingConn bool, ctx context.Context, 
 
 				var ptr ptypes.DynamicAny
 				if err := ptypes.UnmarshalAny(pa.GetAnything(), &ptr); err != nil {
+
 					select {
 					case replyErrc <- err:
 					case <-replyCtx.Done():
 					}
 					continue
 				}
-
 				msg := P2PMessage{Msg: ptr, Sender: pa.GetSender(), RequestNonce: pa.GetRequestNonce()}
 
 				select {
 				case replyRecivier <- msg:
 				case <-replyCtx.Done():
 				}
+
 				continue
 			case <-ctx.Done():
 				continue
@@ -526,6 +531,7 @@ func sendBytes(ctx context.Context, c net.Conn, bytesC chan []byte, localID, rem
 				if !ok {
 					return
 				}
+
 				var err error
 				bytesWrite, totalBytesWrtie := 0, 0
 				f := map[string]interface{}{
@@ -559,7 +565,6 @@ func readBytes(ctx context.Context, c net.Conn, localID, remoteID []byte, incomi
 	out := make(chan []byte, 10)
 	errc := make(chan error)
 	header := make([]byte, HEADERSIZE)
-	buffer := make([]byte, BUFFERSIZE)
 	go func() {
 		defer close(out)
 		defer close(errc)
@@ -577,6 +582,7 @@ func readBytes(ctx context.Context, c net.Conn, localID, remoteID []byte, incomi
 						if err.Error() == "EOF" {
 							c.Close()
 						}
+
 						return
 					}
 					totalBytesRead += bytesRead
@@ -589,6 +595,7 @@ func readBytes(ctx context.Context, c net.Conn, localID, remoteID []byte, incomi
 				if logger != nil {
 					logger.Event("readBytes", f)
 				}
+
 				if size > MAXMESSAGESIZE {
 					err = errors.New("p2p message size is too big " + strconv.Itoa(int(size)))
 					select {
@@ -602,10 +609,10 @@ func readBytes(ctx context.Context, c net.Conn, localID, remoteID []byte, incomi
 				}
 
 				// Read until all message bytes have been read.
-				var result []byte
+				buffer := make([]byte, size)
 				bytesRead, totalBytesRead = 0, 0
 				for totalBytesRead < int(size) && err == nil {
-					if bytesRead, err = c.Read(buffer[0:]); err != nil {
+					if bytesRead, err = c.Read(buffer[totalBytesRead:]); err != nil {
 						select {
 						case errc <- err:
 						case <-ctx.Done():
@@ -613,13 +620,13 @@ func readBytes(ctx context.Context, c net.Conn, localID, remoteID []byte, incomi
 						return
 					}
 					totalBytesRead += bytesRead
-					result = append(result, buffer[0:bytesRead]...)
 				}
 				select {
-				case out <- result:
+				case out <- buffer:
 				case <-ctx.Done():
 				}
-				result = nil
+
+				buffer = nil
 
 			}
 		}

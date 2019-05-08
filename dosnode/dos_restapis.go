@@ -28,8 +28,7 @@ func (d *DosNode) balance(w http.ResponseWriter, r *http.Request) {
 
 func (d *DosNode) groupSize(w http.ResponseWriter, r *http.Request) {
 	html := "Group Size :"
-	result := d.dkg.GetGroupNumber()
-	html = html + strconv.Itoa(result)
+
 	w.Write([]byte(html))
 }
 

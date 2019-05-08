@@ -597,7 +597,7 @@ func (e *EthAdaptor) RegisterGroupPubKey(ctx context.Context, IdWithPubKeys chan
 			}
 
 			f := map[string]interface{}{
-				"SessionID":         fmt.Sprintf("%x", groupId.Bytes()),
+				"GroupID":           fmt.Sprintf("%x", pubKey[0]),
 				"DispatchedGroup_1": fmt.Sprintf("%x", pubKey[0].Bytes()),
 				"DispatchedGroup_2": fmt.Sprintf("%x", pubKey[1].Bytes()),
 				"DispatchedGroup_3": fmt.Sprintf("%x", pubKey[2].Bytes()),
@@ -1076,7 +1076,6 @@ func subscribeEvent(ctx context.Context, proxy *dosproxy.Dosproxy, subscribeType
 					out <- &DosproxyLogUpdateRandom{
 						LastRandomness:    i.LastRandomness,
 						DispatchedGroupId: i.DispatchedGroupId,
-						DispatchedGroup:   i.DispatchedGroup,
 						Tx:                i.Raw.TxHash.Hex(),
 						BlockN:            i.Raw.BlockNumber,
 						Removed:           i.Raw.Removed,
@@ -1112,7 +1111,6 @@ func subscribeEvent(ctx context.Context, proxy *dosproxy.Dosproxy, subscribeType
 						Selector:          i.Selector,
 						Randomness:        i.Randomness,
 						DispatchedGroupId: i.DispatchedGroupId,
-						DispatchedGroup:   i.DispatchedGroup,
 						Tx:                i.Raw.TxHash.Hex(),
 						BlockN:            i.Raw.BlockNumber,
 						Removed:           i.Raw.Removed,
@@ -1146,7 +1144,6 @@ func subscribeEvent(ctx context.Context, proxy *dosproxy.Dosproxy, subscribeType
 						LastSystemRandomness: i.LastSystemRandomness,
 						UserSeed:             i.UserSeed,
 						DispatchedGroupId:    i.DispatchedGroupId,
-						DispatchedGroup:      i.DispatchedGroup,
 						Tx:                   i.Raw.TxHash.Hex(),
 						BlockN:               i.Raw.BlockNumber,
 						Removed:              i.Raw.Removed,
@@ -1364,7 +1361,7 @@ func subscribeEvent(ctx context.Context, proxy *dosproxy.Dosproxy, subscribeType
 					out <- &DosproxyLogPublicKeyAccepted{
 						GroupId:          i.GroupId,
 						PubKey:           i.PubKey,
-						WorkingGroupSize: i.WorkingGroupSize,
+						WorkingGroupSize: i.NumWorkingGroups,
 						Tx:               i.Raw.TxHash.Hex(),
 						BlockN:           i.Raw.BlockNumber,
 						Removed:          i.Raw.Removed,
@@ -1393,14 +1390,12 @@ func subscribeEvent(ctx context.Context, proxy *dosproxy.Dosproxy, subscribeType
 					return
 				case i := <-transitChan:
 					out <- &DosproxyLogPublicKeySuggested{
-						GroupId:   i.GroupId,
-						PubKey:    i.PubKey,
-						Count:     i.Count,
-						GroupSize: i.GroupSize,
-						Tx:        i.Raw.TxHash.Hex(),
-						BlockN:    i.Raw.BlockNumber,
-						Removed:   i.Raw.Removed,
-						Raw:       i.Raw,
+						GroupId: i.GroupId,
+						Count:   i.Count,
+						Tx:      i.Raw.TxHash.Hex(),
+						BlockN:  i.Raw.BlockNumber,
+						Removed: i.Raw.Removed,
+						Raw:     i.Raw,
 					}
 				}
 			}
@@ -1425,7 +1420,6 @@ func subscribeEvent(ctx context.Context, proxy *dosproxy.Dosproxy, subscribeType
 					return
 				case i := <-transitChan:
 					out <- &DosproxyLogGroupDissolve{
-						PubKey:  i.PubKey,
 						GroupId: i.GroupId,
 						Tx:      i.Raw.TxHash.Hex(),
 						BlockN:  i.Raw.BlockNumber,
@@ -1501,7 +1495,6 @@ func (e *EthAdaptor) PollLogs(subscribeType int, logBlockDiff, preBlockBuf uint6
 						}
 						for logs.Next() {
 							sink <- &DosproxyLogGroupDissolve{
-								PubKey:  logs.Event.PubKey,
 								GroupId: logs.Event.GroupId,
 								Tx:      logs.Event.Raw.TxHash.Hex(),
 								BlockN:  logs.Event.Raw.BlockNumber,
@@ -1523,7 +1516,6 @@ func (e *EthAdaptor) PollLogs(subscribeType int, logBlockDiff, preBlockBuf uint6
 							sink <- &DosproxyLogUpdateRandom{
 								LastRandomness:    logs.Event.LastRandomness,
 								DispatchedGroupId: logs.Event.DispatchedGroupId,
-								DispatchedGroup:   logs.Event.DispatchedGroup,
 								Tx:                logs.Event.Raw.TxHash.Hex(),
 								BlockN:            logs.Event.Raw.BlockNumber,
 								Removed:           logs.Event.Raw.Removed,
@@ -1546,7 +1538,6 @@ func (e *EthAdaptor) PollLogs(subscribeType int, logBlockDiff, preBlockBuf uint6
 								LastSystemRandomness: logs.Event.LastSystemRandomness,
 								UserSeed:             logs.Event.UserSeed,
 								DispatchedGroupId:    logs.Event.DispatchedGroupId,
-								DispatchedGroup:      logs.Event.DispatchedGroup,
 								Tx:                   logs.Event.Raw.TxHash.Hex(),
 								BlockN:               logs.Event.Raw.BlockNumber,
 								Removed:              logs.Event.Raw.Removed,
@@ -1571,7 +1562,6 @@ func (e *EthAdaptor) PollLogs(subscribeType int, logBlockDiff, preBlockBuf uint6
 								Selector:          logs.Event.Selector,
 								Randomness:        logs.Event.Randomness,
 								DispatchedGroupId: logs.Event.DispatchedGroupId,
-								DispatchedGroup:   logs.Event.DispatchedGroup,
 								Tx:                logs.Event.Raw.TxHash.Hex(),
 								BlockN:            logs.Event.Raw.BlockNumber,
 								Removed:           logs.Event.Raw.Removed,
