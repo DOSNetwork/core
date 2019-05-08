@@ -1,28 +1,26 @@
 syntax = "proto3";
 package dkg;
 import "github.com/DOSNetwork/core/share/vss/pedersen/vss.proto";
+
+message PublicKey {
+    string sessionId = 1;
+    uint32 index = 2;
+    vss.PublicKey publickey =3;
+}
+
 message Deal {
-    uint32 index = 1;
-    vss.EncryptedDeal deal = 2;
+    string sessionId = 1;
+    uint32 index = 2;
+    vss.EncryptedDeal deal = 3;
 }
 
 message Response {
-    uint32 index = 1;
-    vss.Response response = 2;
+    string sessionId = 1;
+    uint32 index = 2;
+    vss.Response response = 3;
 }
 
 message Responses{
-    repeated Response response = 1;
-}
-
-message ReqPublicKey {
     string sessionId = 1;
-}
-
-message ReqDeal {
-    string sessionId = 1;
-}
-
-message ReqResponses {
-    string sessionId = 1;
+    repeated Response response = 2;
 }
