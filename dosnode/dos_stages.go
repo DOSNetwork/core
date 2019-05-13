@@ -101,7 +101,7 @@ func choseSubmitter(ctx context.Context, chain onchain.ProxyAdapter, lastSysRand
 		outs = append(outs, make(chan []byte, 1))
 	}
 	go func() {
-		defer logger.TimeTrack(time.Now(), "ChoseSubmitter", map[string]interface{}{"RequestId": ctx.Value("RequestID")})
+		defer logger.TimeTrack(time.Now(), "ChoseSubmitter", map[string]interface{}{"GroupID": ctx.Value("GroupID"), "RequestID": ctx.Value("RequestID")})
 
 		defer close(errc)
 
@@ -170,7 +170,7 @@ func requestSign(
 			if r := bytes.Compare(nodeId, submitter); r != 0 {
 				return
 			}
-			defer logger.TimeTrack(time.Now(), "RequestSign", map[string]interface{}{"RequestId": ctx.Value("RequestID")})
+			defer logger.TimeTrack(time.Now(), "RequestSign", map[string]interface{}{"GroupID": ctx.Value("GroupID"), "RequestID": ctx.Value("RequestID")})
 			fmt.Println("requestSign nonce ", nonce)
 			sign := &vss.Signature{
 				Index:     trafficType,
@@ -233,7 +233,7 @@ func genSign(
 			if !ok {
 				return
 			}
-			defer logger.TimeTrack(time.Now(), "GenSign", map[string]interface{}{"RequestId": ctx.Value("RequestID")})
+			defer logger.TimeTrack(time.Now(), "GenSign", map[string]interface{}{"GroupID": ctx.Value("GroupID"), "RequestID": ctx.Value("RequestID")})
 
 			content = value
 			submitter = content[len(content)-20:]
@@ -290,7 +290,7 @@ func genUserRandom(
 			if !ok {
 				return
 			}
-			defer logger.TimeTrack(time.Now(), "GenUserRandom", map[string]interface{}{"RequestId": ctx.Value("RequestID")})
+			defer logger.TimeTrack(time.Now(), "GenUserRandom", map[string]interface{}{"GroupID": ctx.Value("GroupID"), "RequestID": ctx.Value("RequestID")})
 
 			// signed message: concat(requestId, lastSystemRandom, userSeed, submitter address)
 			random := append(requestId, lastSysRand...)
@@ -323,7 +323,7 @@ func genSysRandom(
 			if !ok {
 				return
 			}
-			defer logger.TimeTrack(time.Now(), "GenSysRandom", map[string]interface{}{"RequestId": ctx.Value("RequestID")})
+			defer logger.TimeTrack(time.Now(), "GenSysRandom", map[string]interface{}{"GroupID": ctx.Value("GroupID"), "RequestID": ctx.Value("RequestID")})
 
 			// signed message: concat(lastSystemRandom, submitter address)
 			paddedLastSysRand := padOrTrim(lastSysRand, RANDOMNUMBERSIZE)
@@ -406,13 +406,13 @@ func genQueryResult(ctx context.Context, submitterc chan []byte, url string, pat
 			errc <- err
 			return
 		}
-		logger.TimeTrack(startTime, "TFetch", map[string]interface{}{"RequestId": ctx.Value("RequestID")})
+		logger.TimeTrack(startTime, "TFetch", map[string]interface{}{"GroupID": ctx.Value("GroupID"), "RequestID": ctx.Value("RequestID")})
 		select {
 		case submitter, ok := <-submitterc:
 			if !ok {
 				return
 			}
-			defer logger.TimeTrack(time.Now(), "GenQueryResult", map[string]interface{}{"RequestId": ctx.Value("RequestID")})
+			defer logger.TimeTrack(time.Now(), "GenQueryResult", map[string]interface{}{"RequestID": ctx.Value("RequestID")})
 
 			// signed message = concat(msgReturn, submitter address)
 			msgReturn = append(msgReturn, submitter...)
@@ -443,7 +443,7 @@ func recoverSign(ctx context.Context, signc <-chan *vss.Signature, suite suites.
 					return
 				}
 				if len(signShares) == 0 {
-					defer logger.TimeTrack(time.Now(), "RecoverSign", map[string]interface{}{"RequestId": ctx.Value("RequestID")})
+					defer logger.TimeTrack(time.Now(), "RecoverSign", map[string]interface{}{"GroupID": ctx.Value("GroupID"), "RequestID": ctx.Value("RequestID")})
 				}
 
 				signShares = append(signShares, sign.Signature)

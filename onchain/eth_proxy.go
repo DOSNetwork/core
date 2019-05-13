@@ -484,10 +484,20 @@ func (e *EthAdaptor) sendRequest(ctx context.Context, c *ethclient.Client, pre <
 						continue
 					}
 					logger.Error(err)
-					f := map[string]interface{}{
-						"Tx":     tx,
-						"ErrMsg": err.Error()}
-					logger.Event("TransactionFail", f)
+					if ctx.Value("GroupID") != nil && ctx.Value("RequestID") != nil {
+						f := map[string]interface{}{
+							"Tx":        fmt.Sprintf("%x", tx.Hash()),
+							"GroupID":   ctx.Value("GroupID"),
+							"RequestID": ctx.Value("RequestID"),
+							"ErrMsg":    err.Error()}
+						logger.Event("TransactionFail", f)
+					} else {
+						f := map[string]interface{}{
+							"Tx":     fmt.Sprintf("%x", tx.Hash()),
+							"ErrMsg": err.Error()}
+						logger.Event("TransactionFail", f)
+					}
+
 					fmt.Println("TransactionFail err ", err)
 					//Don't return err to errc to delete the whole sendRequest chain
 					select {
@@ -495,6 +505,17 @@ func (e *EthAdaptor) sendRequest(ctx context.Context, c *ethclient.Client, pre <
 					case <-ctx.Done():
 					}
 					return
+				}
+				if ctx.Value("GroupID") != nil && ctx.Value("RequestID") != nil {
+					f := map[string]interface{}{
+						"Tx":        tx,
+						"GroupID":   ctx.Value("GroupID"),
+						"RequestID": ctx.Value("RequestID")}
+					logger.Event("TransactionSucc", f)
+				} else {
+					f := map[string]interface{}{
+						"Tx": tx}
+					logger.Event("TransactionSucc", f)
 				}
 				return
 			case <-ctx.Done():
