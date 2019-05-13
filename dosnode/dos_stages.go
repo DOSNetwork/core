@@ -16,7 +16,6 @@ import (
 	"github.com/DOSNetwork/core/onchain"
 	"github.com/DOSNetwork/core/p2p"
 	"github.com/DOSNetwork/core/share"
-	"github.com/DOSNetwork/core/share/dkg/pedersen"
 	"github.com/DOSNetwork/core/share/vss/pedersen"
 	"github.com/DOSNetwork/core/sign/bls"
 	"github.com/DOSNetwork/core/sign/tbls"
@@ -214,7 +213,7 @@ func genSign(
 	ctx context.Context,
 	contentc <-chan []byte,
 	cSignToPeer chan *vss.Signature,
-	dkg dkg.PDKGInterface,
+	sec *share.PriShare,
 	suite suites.Suite,
 	nodeID []byte,
 	groupID string,
@@ -239,7 +238,7 @@ func genSign(
 			content = value
 			submitter = content[len(content)-20:]
 
-			sig, err := tbls.Sign(suite, dkg.GetShareSecurity(groupID), content)
+			sig, err := tbls.Sign(suite, sec, content)
 			if err != nil {
 				logger.Error(err)
 				select {

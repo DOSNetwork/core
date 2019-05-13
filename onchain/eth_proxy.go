@@ -205,6 +205,7 @@ func NewEthAdaptor(credentialPath, passphrase, proxyAddr, commitRevealAddr strin
 
 	adaptor.ctx, adaptor.cancelFunc = context.WithCancel(context.Background())
 	adaptor.auth = bind.NewKeyedTransactor(key.PrivateKey)
+	//adaptor.auth.GasPrice = big.NewInt(30)
 	adaptor.auth.GasLimit = uint64(GASLIMIT)
 	adaptor.auth.Context = adaptor.ctx
 
@@ -341,13 +342,13 @@ func (e *EthAdaptor) reqLoop() {
 					resultC <- reply
 					continue
 				}
-
 				nonceBig := new(big.Int).SetUint64(nonce)
 				if e.auth.Nonce == nil {
 					e.auth.Nonce = nonceBig
 				} else if e.auth.Nonce.Cmp(nonceBig) == -1 {
 					e.auth.Nonce = nonceBig
 				}
+
 				fmt.Println("Got a request nonce , ", e.auth.Nonce)
 
 				switch content := req.(type) {
@@ -586,23 +587,17 @@ func (e *EthAdaptor) RegisterGroupPubKey(ctx context.Context, IdWithPubKeys chan
 			if !ok {
 				return
 			}
+
 			result := make(chan Reply)
 			groupId := IdWithPubKey[0]
 			var pubKey [4]*big.Int
 			copy(pubKey[:], IdWithPubKey[1:])
-
+			defer logger.TimeTrack(time.Now(), "RegisterGroupPubKey", map[string]interface{}{"GroupID": ctx.Value("GroupID")})
 			for i, proxy := range e.proxies {
 				request := &ReqSetPublicKey{ctx, &proxy.TransactOpts, groupId, pubKey, proxy.RegisterGroupPubKey, result}
 				errc = e.sendRequest(ctx, e.clients[i], errc, request, result)
 			}
 
-			f := map[string]interface{}{
-				"GroupID":           fmt.Sprintf("%x", pubKey[0]),
-				"DispatchedGroup_1": fmt.Sprintf("%x", pubKey[0].Bytes()),
-				"DispatchedGroup_2": fmt.Sprintf("%x", pubKey[1].Bytes()),
-				"DispatchedGroup_3": fmt.Sprintf("%x", pubKey[2].Bytes()),
-				"DispatchedGroup_4": fmt.Sprintf("%x", pubKey[3].Bytes())}
-			logger.Event("DOS_RegisterGroupPubKey", f)
 			return
 		case <-ctx.Done():
 			return
@@ -618,6 +613,8 @@ func (e *EthAdaptor) SetRandomNum(ctx context.Context, signatures <-chan *vss.Si
 			if !ok {
 				return
 			}
+			defer logger.TimeTrack(time.Now(), "SetRandomNum", map[string]interface{}{"GroupID": ctx.Value("GroupID"), "RequestID": ctx.Value("RequestID")})
+
 			x, y := DecodeSig(signature.Signature)
 			result := make(chan Reply)
 			for i, proxy := range e.proxies {
@@ -639,7 +636,7 @@ func (e *EthAdaptor) DataReturn(ctx context.Context, signatures <-chan *vss.Sign
 			if !ok {
 				return
 			}
-			defer logger.TimeTrack(time.Now(), "DataReturn", map[string]interface{}{"RequestId": ctx.Value("RequestID")})
+			defer logger.TimeTrack(time.Now(), "DataReturn", map[string]interface{}{"GroupID": ctx.Value("GroupID"), "RequestID": ctx.Value("RequestID")})
 
 			x, y := DecodeSig(signature.Signature)
 			requestId := new(big.Int).SetBytes(signature.RequestId)
@@ -1328,6 +1325,10 @@ func subscribeEvent(ctx context.Context, proxy *dosproxy.Dosproxy, subscribeType
 					errc <- err
 					return
 				case i := <-transitChan:
+					f := map[string]interface{}{
+						"GroupId": fmt.Sprintf("%x", i.GroupId),
+						"Tx":      i.Raw.TxHash.Hex()}
+					logger.Event("ETHGrouping", f)
 					out <- &DosproxyLogGrouping{
 						GroupId: i.GroupId,
 						NodeId:  i.NodeId,
@@ -1360,7 +1361,6 @@ func subscribeEvent(ctx context.Context, proxy *dosproxy.Dosproxy, subscribeType
 				case i := <-transitChan:
 					out <- &DosproxyLogPublicKeyAccepted{
 						GroupId:          i.GroupId,
-						PubKey:           i.PubKey,
 						WorkingGroupSize: i.NumWorkingGroups,
 						Tx:               i.Raw.TxHash.Hex(),
 						BlockN:           i.Raw.BlockNumber,

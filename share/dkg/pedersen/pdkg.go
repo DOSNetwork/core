@@ -44,6 +44,7 @@ type PDKGInterface interface {
 	GetGroupPublicPoly(groupId string) *share.PubPoly
 	GetShareSecurity(groupId string) *share.PriShare
 	GetGroupIDs(groupId string) [][]byte
+	GetGroupNumber() int
 	Grouping(ctx context.Context, groupId string, Participants [][]byte) (chan [5]*big.Int, <-chan error, error)
 	GroupDissolve(groupId string)
 }
@@ -91,7 +92,13 @@ func (d *PDKG) GetShareSecurity(groupId string) (secShare *share.PriShare) {
 func (d *PDKG) GetGroupIDs(groupId string) (participants [][]byte) {
 	if group, loaded := d.groups.Load(groupId); loaded {
 		participants = group.(*Group).Participants
+		logger.Event("GetGroupIDsSucc", map[string]interface{}{"GroupID": groupId, "GroupNumber": d.GetGroupNumber()})
+
+	} else {
+		logger.Event("GetGroupIDsFail", map[string]interface{}{"GroupID": groupId, "GroupNumber": d.GetGroupNumber()})
+
 	}
+
 	return
 }
 
@@ -107,11 +114,18 @@ func (d *PDKG) Grouping(ctx context.Context, groupId string, participants [][]by
 	}
 }
 
+func (d *PDKG) GetGroupNumber() int {
+	length := 0
+	d.groups.Range(func(_, _ interface{}) bool {
+		length++
+		return true
+	})
+	return length
+}
+
 func (d *PDKG) GroupDissolve(groupId string) {
-	//	for _, id := range d.dkgs[groupId].Participants {
-	//		d.p.DisConnectTo(id)
-	//	}
-	//	d.dkgs[groupId] = nil
+	d.groups.Delete(groupId)
+	logger.Event("GroupDissolve", map[string]interface{}{"GroupID": groupId, "GroupNumber": d.GetGroupNumber()})
 }
 
 func (d *PDKG) Listen() {
@@ -271,6 +285,8 @@ func exchangePub(ctx context.Context, suite suites.Suite, bufToNode chan interfa
 	out := make(chan *DistKeyGenerator)
 	errc := make(chan error)
 	go func() {
+		defer logger.TimeTrack(time.Now(), "exchangePub", map[string]interface{}{"GroupID": sessionID})
+
 		defer close(out)
 		defer close(errc)
 		//Generate secret and public key
@@ -375,6 +391,7 @@ func processDeal(ctx context.Context, dkgc <-chan *DistKeyGenerator, bufToNode c
 	go func() {
 		defer close(out)
 		defer close(errc)
+		defer logger.TimeTrack(time.Now(), "processDeal", map[string]interface{}{"GroupID": sessionID})
 
 		var dkg *DistKeyGenerator
 		var ok bool

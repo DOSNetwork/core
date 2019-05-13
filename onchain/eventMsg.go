@@ -17,7 +17,6 @@ type DosproxyLogUrl struct {
 	Selector          string
 	Randomness        *big.Int
 	DispatchedGroupId *big.Int
-	DispatchedGroup   [4]*big.Int
 	Tx                string
 	BlockN            uint64
 	Removed           bool
@@ -29,7 +28,6 @@ type DosproxyLogRequestUserRandom struct {
 	LastSystemRandomness *big.Int
 	UserSeed             *big.Int
 	DispatchedGroupId    *big.Int
-	DispatchedGroup      [4]*big.Int
 	Tx                   string
 	BlockN               uint64
 	Removed              bool
@@ -53,7 +51,6 @@ type DosproxyLogRequestFromNonExistentUC struct{}
 type DosproxyLogUpdateRandom struct {
 	LastRandomness    *big.Int
 	DispatchedGroupId *big.Int
-	DispatchedGroup   [4]*big.Int
 	Tx                string
 	BlockN            uint64
 	Removed           bool
@@ -111,7 +108,6 @@ type DosproxyLogGrouping struct {
 
 type DosproxyLogDuplicatePubKey struct {
 	GroupId *big.Int
-	PubKey  [4]*big.Int
 	BlockN  uint64
 	Removed bool
 	Raw     types.Log
@@ -119,7 +115,6 @@ type DosproxyLogDuplicatePubKey struct {
 
 type DosproxyLogAddressNotFound struct {
 	GroupId *big.Int
-	PubKey  [4]*big.Int
 	Tx      string
 	BlockN  uint64
 	Removed bool
@@ -128,7 +123,6 @@ type DosproxyLogAddressNotFound struct {
 
 type DosproxyLogPublicKeyAccepted struct {
 	GroupId          *big.Int
-	PubKey           [4]*big.Int
 	WorkingGroupSize *big.Int
 	Tx               string
 	BlockN           uint64
@@ -138,7 +132,6 @@ type DosproxyLogPublicKeyAccepted struct {
 
 type DosproxyLogPublicKeySuggested struct {
 	GroupId   *big.Int
-	PubKey    [4]*big.Int
 	Count     *big.Int
 	GroupSize *big.Int
 	Tx        string
@@ -149,7 +142,6 @@ type DosproxyLogPublicKeySuggested struct {
 
 type DosproxyLogGroupDissolve struct {
 	GroupId *big.Int
-	PubKey  [4]*big.Int
 	Tx      string
 	BlockN  uint64
 	Removed bool

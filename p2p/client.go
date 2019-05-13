@@ -4,12 +4,12 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"net"
 	"os"
 	"strconv"
 	"sync"
 	"time"
-
 	//	"github.com/DOSNetwork/core/log"
 	"github.com/DOSNetwork/core/sign/bls"
 	"github.com/DOSNetwork/core/suites"
@@ -185,11 +185,7 @@ func (c *Client) receiveID(wg *sync.WaitGroup) (err error) {
 
 	// Decode message size.
 	size := binary.BigEndian.Uint32(header)
-	f := map[string]interface{}{
-		"size": size}
-	if logger != nil {
-		logger.Event("receiveID", f)
-	}
+
 	header = nil
 	if size > MAXMESSAGESIZE {
 		err = errors.New("p2p message size is too big " + strconv.Itoa(int(size)))
@@ -279,11 +275,7 @@ func (c *Client) sendID(wg *sync.WaitGroup) (err error) {
 	}
 	prefix := make([]byte, HEADERSIZE)
 	binary.BigEndian.PutUint32(prefix, uint32(len(bytes)))
-	f := map[string]interface{}{
-		"size": len(bytes)}
-	if logger != nil {
-		logger.Event("sendID", f)
-	}
+
 	bytes = append(prefix, bytes...)
 
 	bytesRead, totalBytesRead := 0, 0
@@ -534,11 +526,7 @@ func sendBytes(ctx context.Context, c net.Conn, bytesC chan []byte, localID, rem
 
 				var err error
 				bytesWrite, totalBytesWrtie := 0, 0
-				f := map[string]interface{}{
-					"size": len(bytes)}
-				if logger != nil {
-					logger.Event("sendBytes", f)
-				}
+
 				size := uint32(len(bytes))
 				binary.BigEndian.PutUint32(prefix, size)
 				bytes = append(prefix, bytes...)
@@ -579,6 +567,7 @@ func readBytes(ctx context.Context, c net.Conn, localID, remoteID []byte, incomi
 				bytesRead, totalBytesRead := 0, 0
 				for totalBytesRead < HEADERSIZE && err == nil {
 					if bytesRead, err = c.Read(header[totalBytesRead:]); err != nil {
+						fmt.Println("readBytes err ", err)
 						if err.Error() == "EOF" {
 							c.Close()
 						}
@@ -590,11 +579,6 @@ func readBytes(ctx context.Context, c net.Conn, localID, remoteID []byte, incomi
 
 				// Decode message size and check size to avoid OOM
 				size := binary.BigEndian.Uint32(header)
-				f := map[string]interface{}{
-					"size": size}
-				if logger != nil {
-					logger.Event("readBytes", f)
-				}
 
 				if size > MAXMESSAGESIZE {
 					err = errors.New("p2p message size is too big " + strconv.Itoa(int(size)))
