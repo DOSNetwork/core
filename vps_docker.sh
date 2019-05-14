@@ -48,8 +48,8 @@ install_lightnode(){
   ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'yes | sudo apt-get update'
   ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'yes | sudo apt-get install ethereum'
   scp -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i $VPSKEY rinkeby.json $USER@$VPSIP:~/
-  ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'geth --datadir='$DIR'/.ethereum init rinkeby.json'
-  scp -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i $VPSKEY static-nodes.json $USER@$VPSIP:$DIR/.ethereum/geth/static-nodes.json
+  ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'geth --datadir='$DIR'/.rinkeby init rinkeby.json'
+  scp -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i $VPSKEY static-nodes.json $USER@$VPSIP:$DIR/.rinkeby/geth/static-nodes.json
   scp -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i $VPSKEY geth.service  $USER@$VPSIP:~/
   ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'yes | sudo chmod 322 geth.service'
   ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'yes | sudo mv geth.service /lib/systemd/system/geth.service'
