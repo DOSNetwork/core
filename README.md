@@ -34,14 +34,16 @@
 	- `$ make clean` before commit
 - Note that Changing `github.com/DOSNetwork/eth-contracts` instead of modifying locally cloned submodules, and using `$ git submodule update --remote --merge` to checkout latest changes.
 
-### Running a DOS Client on a VPS (Ubuntu 16.04 LTS):
+### Running a Beta DOS Client on a VPS (Ubuntu 16.04 LTS):
 #### Requirements
 - A Ubuntu 16.04 LTS VPS with a public IP
-- Opening 7946,and 9501 port in the VPS
+- Open 7946,8545,8546 and 9501 ports
 - A ssh private key file for the VPS
-- A ETH keystore
+- An Ethereum keystore file
+- [Rinkeby Ether](https://faucet.rinkeby.io/)
+- DOS Token
 
-#### 1) Using a docker
+#### 1) Using docker
 - Download [vps_docker.sh](https://raw.githubusercontent.com/DOSNetwork/core/Beta/vps_docker.sh),[dos.setting](https://raw.githubusercontent.com/DOSNetwork/core/Beta/dos.setting),[static-nodes.json](https://raw.githubusercontent.com/DOSNetwork/core/Beta/static-nodes.json) and [geth.service](https://raw.githubusercontent.com/DOSNetwork/core/Beta/geth.service)
 - setup the following setting in the [dos.setting](https://raw.githubusercontent.com/DOSNetwork/core/Beta/dos.setting)
 	- USER : VPS user name
@@ -82,8 +84,9 @@ $ bash vps_docker.sh stop
 $ bash vps_docker.sh clientInfo
 ```
 
-#### 2) Build a binary 
-
+#### 2) Build the client locally and run the client on a VPS
+- Follow the section [DEV setup and workflow] to build client
+- 
 
 ### Trouble shooting and Deploy
 - Run `$ dep ensure -update` when it complains about missing dependencies/packages, and commits updated Gopkg.lock file.
