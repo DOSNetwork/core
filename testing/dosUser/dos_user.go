@@ -230,6 +230,7 @@ func main() {
 					}
 				case *eth.AskMeAnythingRequestSent:
 					requestId := fmt.Sprintf("%x", i.RequestId)
+					fmt.Println("RequestID ", requestId)
 					f := map[string]interface{}{
 						"RequestId": requestId,
 						"Removed":   i.Removed}

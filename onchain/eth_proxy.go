@@ -186,7 +186,7 @@ func NewEthAdaptor(credentialPath, passphrase, proxyAddr, commitRevealAddr strin
 	adaptor.gethUrls = httpUrls
 	adaptor.eventUrls = wsUrls
 	adaptor.proxyAddr = proxyAddr
-
+	debug.FreeOSMemory()
 	//Read Ethereum keystore
 	key, err := ReadEthKey(credentialPath, passphrase)
 	if err != nil {
@@ -403,6 +403,11 @@ func (e *EthAdaptor) reqLoop() {
 					resultC <- reply
 					continue
 				}
+				f := map[string]interface{}{
+					"Tx":        fmt.Sprintf("%x", tx.Hash()),
+					"GroupID":   ctx.Value("GroupID"),
+					"RequestID": ctx.Value("RequestID")}
+				logger.Event("SendToEth", f)
 
 				reply.tx = tx
 				reply.nonce = e.auth.Nonce.Uint64()
