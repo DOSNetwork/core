@@ -562,13 +562,11 @@ func (e *EthAdaptor) SignalGroupFormation(ctx context.Context) (errc <-chan erro
 	return
 }
 
-func (e *EthAdaptor) SignalDissolve(ctx context.Context, idx uint64) (errc <-chan error) {
+func (e *EthAdaptor) SignalDissolve(ctx context.Context) (errc <-chan error) {
 	defer logger.TimeTrack(time.Now(), "SignalDissolve", nil)
 	result := make(chan Reply)
-	x := new(big.Int)
-	x.SetUint64(idx)
 	for i, proxy := range e.proxies {
-		request := &ReqSetInt{ctx, &proxy.TransactOpts, x, proxy.SignalDissolve, result}
+		request := &Request{ctx, &proxy.TransactOpts, proxy.SignalDissolve, result}
 		errc = e.sendRequest(ctx, e.clients[i], errc, request, result)
 	}
 	return
@@ -1417,7 +1415,7 @@ func subscribeEvent(ctx context.Context, proxy *dosproxy.Dosproxy, subscribeType
 				case i := <-transitChan:
 					out <- &DosproxyLogPublicKeySuggested{
 						GroupId: i.GroupId,
-						Count:   i.Count,
+						Count:   i.PubKeyCount,
 						Tx:      i.Raw.TxHash.Hex(),
 						BlockN:  i.Raw.BlockNumber,
 						Removed: i.Raw.Removed,

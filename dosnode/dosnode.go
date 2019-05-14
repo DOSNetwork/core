@@ -518,6 +518,7 @@ func (d *DosNode) listen() (err error) {
 				if pendingNodeSize >= groupSize+(groupSize/2) {
 					d.chain.SignalGroupFormation(context.Background())
 				}
+				d.chain.SignalDissolve(context.Background())
 			}
 		case msg, ok := <-d.cSignToPeer:
 			if !ok {

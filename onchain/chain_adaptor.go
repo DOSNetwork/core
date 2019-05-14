@@ -28,7 +28,7 @@ type ProxyAdapter interface {
 	//Guardian node functions
 	SignalRandom(ctx context.Context) (errc <-chan error)
 	SignalGroupFormation(ctx context.Context) (errc <-chan error)
-	SignalDissolve(ctx context.Context, idx uint64) (errc <-chan error)
+	SignalDissolve(ctx context.Context) (errc <-chan error)
 	SignalBootstrap(ctx context.Context, cid uint64) (errc <-chan error)
 
 	SubscribeEvent(subscribeType int) (<-chan interface{}, <-chan error)
