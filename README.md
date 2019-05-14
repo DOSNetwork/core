@@ -36,26 +36,30 @@
 
 ### Running a Beta DOS Client on a VPS (Ubuntu 16.04 LTS):
 #### Requirements
-- A Ubuntu 16.04 LTS VPS with a public IP
+1) A Ubuntu 16.04 LTS VPS
+- A public IP
 - Open 7946,8545,8546 and 9501 ports
-- A ssh private key file for the VPS
-- An Ethereum keystore file
-- [Rinkeby Ether](https://faucet.rinkeby.io/)
-- DOS Token
+- A ssh private key file for the VPS ( [How to set up ssh for Amazon Lightsail...](https://lightsail.aws.amazon.com/ls/docs/en_us/articles/lightsail-how-to-set-up-ssh))
+2) An Ethereum wallet with enough ether and DOS token.
+- An Ethereum keystore file ( [Create a keystore by geth ](https://github.com/ethereum/go-ethereum/wiki/Managing-your-accounts) or [Export a keystore through MyEtherwWllet Extension](https://bitcointalk.org/index.php?topic=3014688.0)])
+- [Get Rinkeby test Ether from faucet](https://faucet.rinkeby.io/)
+- DOS Token 
 
 #### 1) Using docker
 - Download [vps_docker.sh](https://raw.githubusercontent.com/DOSNetwork/core/Beta/vps_docker.sh),[dos.setting](https://raw.githubusercontent.com/DOSNetwork/core/Beta/dos.setting),[static-nodes.json](https://raw.githubusercontent.com/DOSNetwork/core/Beta/static-nodes.json) and [geth.service](https://raw.githubusercontent.com/DOSNetwork/core/Beta/geth.service)
 - setup the following setting in the [dos.setting](https://raw.githubusercontent.com/DOSNetwork/core/Beta/dos.setting)
 	- USER : VPS user name
 	- VPSIP : VPS public IP
-	- VPSKEY : ssh private key for VPS  ( [Ex:Amazon Lightsail...](https://lightsail.aws.amazon.com/ls/docs/en_us/articles/lightsail-how-to-set-up-ssh))
-	- KEYSTORE : Ethereum keystore file ( [Create a geth keystore by geth ](https://github.com/ethereum/go-ethereum/wiki/Managing-your-accounts))
+	- VPSKEY : VPS ssh private key location
+	- KEYSTORE : Ethereum keystore file location
+	- GETHPOOL : User can add his own geth full node here.More geth node could improve performance and stability of DOS.
+	             Please note that ws is only for eveny subsciption.DOS need at least one valid geth http url.
 		
 			DOSIMAGE=dosnetwork/dosnode:beta
 			USER=tester
 			VPSIP=xxx.xxx.xxx.xxx
 			KEYSTORE=xxx
-			GETHPOOL="https://rinkeby.infura.io/projectid;ws://ooo.ooo.ooo.ooo:8546;ws://xxx.xxx.xxx.xxx:8546"
+			GETHPOOL="https://rinkeby.infura.io/projectid;ws://xxx.xxx.xxx.xxx:8546"
 
 - change the following setting in the [geth.service](https://raw.githubusercontent.com/DOSNetwork/core/Beta/geth.service)
 	- WorkingDirectory : 
@@ -65,7 +69,7 @@
 			[Service]
 			WorkingDirectory=/home/tester
 			User=tester
-			ExecStart=/usr/bin/geth --datadir /home/tester/.ethereum ...
+			ExecStart=/usr/bin/geth --datadir /home/tester/.rinkeby ...
 
 - Install docker and setup directorys for client
 ```sh
