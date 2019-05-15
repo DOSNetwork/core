@@ -45,8 +45,8 @@
 - [Get Rinkeby test Ether from faucet](https://faucet.rinkeby.io/)
 - DOS Token 
 
-#### 1) Using docker
-- Download [vps_docker.sh](https://raw.githubusercontent.com/DOSNetwork/core/Beta/vps_docker.sh),[dos.setting](https://raw.githubusercontent.com/DOSNetwork/core/Beta/dos.setting),[static-nodes.json](https://raw.githubusercontent.com/DOSNetwork/core/Beta/static-nodes.json) and [geth.service](https://raw.githubusercontent.com/DOSNetwork/core/Beta/geth.service)
+#### 1) Prepare the environment
+- Download [vps_docker.sh](https://raw.githubusercontent.com/DOSNetwork/core/Beta/vps_docker.sh) or [vps.sh](https://raw.githubusercontent.com/DOSNetwork/core/Beta/vps.sh),[dos.setting](https://raw.githubusercontent.com/DOSNetwork/core/Beta/dos.setting),[static-nodes.json](https://raw.githubusercontent.com/DOSNetwork/core/Beta/static-nodes.json),[config.json](https://raw.githubusercontent.com/DOSNetwork/core/Beta/config.json),[rinkeby.json](https://www.rinkeby.io/rinkeby.json) and [geth.service](https://raw.githubusercontent.com/DOSNetwork/core/Beta/geth.service)
 - setup the following setting in the [dos.setting](https://raw.githubusercontent.com/DOSNetwork/core/Beta/dos.setting)
 	- USER : VPS user name
 	- VPSIP : VPS public IP
@@ -70,22 +70,30 @@
 			WorkingDirectory=/home/tester
 			User=tester
 			ExecStart=/usr/bin/geth --datadir /home/tester/.rinkeby ...
-
-- Install docker and setup directorys for client
+#### 2) Install and run the client (Docker or Binary)
+- Install and setup directorys for client
 ```sh
 $ bash vps_docker.sh install
+or
+$ bash vps.sh install
 ```
 - Run the client
 ```sh
 $ bash vps_docker.sh run
+or
+$ bash vps.sh run
 ```
 - Stop the client
 ```sh
 $ bash vps_docker.sh stop
+or
+$ bash vps.sh stop
 ```
 - Show the client status
 ```sh
 $ bash vps_docker.sh clientInfo
+or
+$ bash vps.sh clientInfo
 ```
 
 #### 2) Build the client locally and run the client on a VPS
