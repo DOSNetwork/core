@@ -1,38 +1,36 @@
-## <img align="left" width=30 src="media/logo-white.jpg"> Core libraries
+## <img align="left" width=30 src="media/logo-white.jpg"> DOS Client and Core Libraries
 
 
-### Components and file structure (TODO)
-- Shamir's secret sharing 
-- Pedersen's DKG approach
+### Beta includes following components
+- Secret Sharing 
+- Distributed Key Generation (Pedersen's DKG approach)
 - Paring Library and BLS Signature
-- DHT & Gossip implementation
+- Gossip & DHT Implementation
 - P2P NAT Support
-- On-chain Verification Contracts
-- Json / xml / html parser
-- .
+- Json / Xml / Html Parser
+- Integration with Ethereum On-chain [System Contracts](https://github.com/DOSNetwork/eth-contracts)
+- Dockerize and Deployment Script
 
 
-### DEV setup and workflow:
-- Install Go [recommended version 1.10 and above](https://blog.golang.org/go1.10) and [setup golang workingspace](https://golang.org/doc/install), specifically environment variables like GOPATH, GOROOT, et al.
-- [How to go-get from a private repo](https://blog.wilianto.com/go-get-from-private-repository.html)
+### Development setup:
+- Install Go [recommended version 1.10 and above](https://blog.golang.org/go1.10) and [setup golang workingspace](https://golang.org/doc/install), specifically environment variables like GOPATH.
 - Install [dep](https://golang.github.io/dep/docs/daily-dep.html#key-takeaways) to manage package dependencies and versions.
+  - Run `$ dep ensure` to update missing dependencies/packages.
   - [Visualize package dependencies](https://golang.github.io/dep/docs/daily-dep.html#visualizing-dependencies)
-- Download: `$ go get -d github.com/DOSNetwork/core/...` or `git clone git@github.com:DOSNetwork/core.git`
-- Build: `$ make build`
-- Local Test workflow: `$ make build && cd testing && make deploy && make buildDockers && cd ../ && docker-compose up --scale dosnode=3`    
-- before commit,you should do:
-	- vi .git/config 
-	- add 	
-		
-			[alias]
-			ignore = update-index --assume-unchanged
-			unignore = update-index --no-assume-unchanged
-			ignored = !git ls-files -v | grep "^[[:lower:]]"
-			
-	- `git ignore onChain.json offChain.json testing/dosUser/ama.json`. If you want to change these file. exec `git unignore *.json`
-	- Use `$ go fmt .`; or plugin before commit.
-	- `$ make clean` before commit
-- Note that Changing `github.com/DOSNetwork/eth-contracts` instead of modifying locally cloned submodules, and using `$ git submodule update --remote --merge` to checkout latest changes.
+- Download:
+  - `$ go get -d github.com/DOSNetwork/core/...` or
+  - `$ git clone git@github.com:DOSNetwork/core.git`
+- Build:
+  - `$ make` or `$ make client` to build release version client.
+  - `$ make devClient` to build develoment version client.
+  - `$ make updateSubmodule` to fetch latest system contracts from [repo](https://github.com/DOSNetwork/eth-contracts), instead of making contract modifications locally.
+  - `$ make gen` to generate binding files for system contracts.
+- Dev:
+  - `$ go fmt .` for indentation and basic coding styles.
+  - `$ make clean` to remove binaries or unnecessary generated files.
+  - `$ make build && cd testing && make deploy && make buildDockers && cd ../ && docker-compose up --scale dosnode=3` to do local tests.
+
+
 
 ### Running a Beta DOS Client on a VPS (Ubuntu 16.04 LTS):
 #### Requirements
@@ -99,7 +97,3 @@ $ bash vps.sh clientInfo
 #### 2) Build the client locally and run the client on a VPS
 - Follow the section [DEV setup and workflow] to build client
 - 
-
-### Trouble shooting and Deploy
-- Run `$ dep ensure -update` when it complains about missing dependencies/packages, and commits updated Gopkg.lock file.
-- Dockerize ... (TODO)
