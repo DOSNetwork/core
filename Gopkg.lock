@@ -37,6 +37,14 @@
   revision = "aa2a42e13be68c4a95fe9e58003adaf63fe6476f"
 
 [[projects]]
+  branch = "master"
+  digest = "1:a6a3ce6ff165f9a640e57773c90eb594d68974edc877500649707daddae7fd39"
+  name = "github.com/armon/go-metrics"
+  packages = ["."]
+  pruneopts = ""
+  revision = "ec5e00d3c878b2a97bbe0884ef45ffd1b4f669f5"
+
+[[projects]]
   digest = "1:4193e2871b655bdfc423d23d309bf45a97ff75399c2fe923e79cb15eefb985d7"
   name = "github.com/bshuster-repo/logrus-logstash-hook"
   packages = ["."]
@@ -113,6 +121,7 @@
     "accounts/abi/bind",
     "accounts/keystore",
     "common",
+    "common/bitutil",
     "common/hexutil",
     "common/math",
     "common/mclock",
@@ -133,6 +142,7 @@
     "ethclient",
     "ethdb",
     "event",
+    "light",
     "log",
     "metrics",
     "p2p/netutil",
@@ -176,6 +186,14 @@
   revision = "2e65f85255dbc3072edf28d6b5b8efc472979f5a"
 
 [[projects]]
+  digest = "1:1e5b1e14524ed08301977b7b8e10c719ed853cbf3f24ecb66fae783a46f207a6"
+  name = "github.com/google/btree"
+  packages = ["."]
+  pruneopts = ""
+  revision = "4030bb1f1f0c35b30ca7009e9ebd06849dd45306"
+  version = "v1.0.0"
+
+[[projects]]
   digest = "1:a25a2c5ae694b01713fb6cd03c3b1ac1ccc1902b9f0a922680a88ec254f968e1"
   name = "github.com/google/uuid"
   packages = ["."]
@@ -200,6 +218,46 @@
   version = "v1.6.2"
 
 [[projects]]
+  digest = "1:8e3bd93036b4a925fe2250d3e4f38f21cadb8ef623561cd80c3c50c114b13201"
+  name = "github.com/hashicorp/errwrap"
+  packages = ["."]
+  pruneopts = ""
+  revision = "8a6fb523712970c966eefc6b39ed2c5e74880354"
+  version = "v1.0.0"
+
+[[projects]]
+  digest = "1:c5466dfad4c14bf8e52a34b0eb98f1301acc1e304e0f0ff2c51c356ca1b86747"
+  name = "github.com/hashicorp/go-immutable-radix"
+  packages = ["."]
+  pruneopts = ""
+  revision = "27df80928bb34bb1b0d6d0e01b9e679902e7a6b5"
+  version = "v1.0.0"
+
+[[projects]]
+  digest = "1:2c758fb475e2a3d141c779dfa694baf252e255031666a8c1ad28b147223a2b28"
+  name = "github.com/hashicorp/go-msgpack"
+  packages = ["codec"]
+  pruneopts = ""
+  revision = "ad60660ecf9c5a1eae0ca32182ed72bab5807961"
+  version = "v0.5.5"
+
+[[projects]]
+  digest = "1:72308fdd6d5ef61106a95be7ca72349a5565809042b6426a3cfb61d99483b824"
+  name = "github.com/hashicorp/go-multierror"
+  packages = ["."]
+  pruneopts = ""
+  revision = "886a7fbe3eb1c874d46f623bfa70af45f425b3d1"
+  version = "v1.0.0"
+
+[[projects]]
+  digest = "1:24ee99da0190535baad44a5df2710ca2e116d615fcaaffcf3b79b476450af917"
+  name = "github.com/hashicorp/go-sockaddr"
+  packages = ["."]
+  pruneopts = ""
+  revision = "c7188e74f6acae5a989bdc959aa779f8b9f42faf"
+  version = "v1.0.2"
+
+[[projects]]
   digest = "1:3313a63031ae281e5f6fd7b0bbca733dfa04d2429df86519e3b4d4c016ccb836"
   name = "github.com/hashicorp/golang-lru"
   packages = [
@@ -209,6 +267,25 @@
   pruneopts = ""
   revision = "20f1fb78b0740ba8c3cb143a61e86ba5c8669768"
   version = "v0.5.0"
+
+[[projects]]
+  digest = "1:02a4a395fac980e3b9145ede43adfc8deb8247acdcd2084791be96557c5b8b60"
+  name = "github.com/hashicorp/memberlist"
+  packages = ["."]
+  pruneopts = ""
+  revision = "e1138a6a4d8a6eaec6c919aeae5efbe4d69b1ece"
+  version = "v0.1.4"
+
+[[projects]]
+  digest = "1:4d298692efc058ff814677015c8db92b1ac63baffa8e238382babd77e1c5fcd4"
+  name = "github.com/hashicorp/serf"
+  packages = [
+    "coordinate",
+    "serf",
+  ]
+  pruneopts = ""
+  revision = "15cfd05de3dffb3664aa37b06e91f970b825e380"
+  version = "v0.8.3"
 
 [[projects]]
   branch = "master"
@@ -251,12 +328,12 @@
   version = "v1.0.1"
 
 [[projects]]
-  branch = "master"
-  digest = "1:915c56ca290fa3512d4bdc6cc958e5da5c8be0f3f5ca87f98a5f520c122ed3c6"
-  name = "github.com/looplab/fsm"
+  digest = "1:fe5c46307cbb2fd38045ddfebb50860ca396599f1f166a46e53206c64c69ea50"
+  name = "github.com/miekg/dns"
   packages = ["."]
   pruneopts = ""
-  revision = "f980bdb68a8962823200eafe6c0aa99e917be0d7"
+  revision = "8aa92d4e02c501ba21e26fb92cf2fb9f23f56917"
+  version = "v1.1.9"
 
 [[projects]]
   branch = "master"
@@ -273,6 +350,14 @@
   pruneopts = ""
   revision = "adf5a7427709b9deb95d29d3fa8a2bf9cfd388f1"
   version = "v1.2"
+
+[[projects]]
+  branch = "master"
+  digest = "1:5f0faa008e8ff4221b55a1a5057c8b02cb2fd68da6a65c9e31c82b72cbc836d0"
+  name = "github.com/petar/GoLLRB"
+  packages = ["llrb"]
+  pruneopts = ""
+  revision = "33fb24c13b99c46c93183c291836c573ac382536"
 
 [[projects]]
   digest = "1:256484dbbcd271f9ecebc6795b2df8cad4c458dd0f5fd82a8c2fa0c29f233411"
@@ -297,6 +382,14 @@
   pruneopts = ""
   revision = "9a47f48565a795472d43519dd49aac781f3034fb"
   version = "v1.6.0"
+
+[[projects]]
+  branch = "master"
+  digest = "1:6ee36f2cea425916d81fdaaf983469fc18f91b3cf090cfe90fa0a9d85b8bfab7"
+  name = "github.com/sean-/seed"
+  packages = ["."]
+  pruneopts = ""
+  revision = "e2103e2c35297fb7e17febb81e49b312087a2372"
 
 [[projects]]
   digest = "1:9d57e200ef5ccc4217fe0a34287308bac652435e7c6513f6263e0493d2245c56"
@@ -339,15 +432,26 @@
   revision = "b001fa50d6b27f3f0bb175a87d0cb55426d0a0ae"
 
 [[projects]]
+  digest = "1:e85837cb04b78f61688c6eba93ea9d14f60d611e2aaf8319999b1a60d2dafbfa"
+  name = "github.com/urfave/cli"
+  packages = ["."]
+  pruneopts = ""
+  revision = "cfb38830724cc34fedffe9a2a29fb54fa9169cd1"
+  version = "v1.20.0"
+
+[[projects]]
   branch = "master"
   digest = "1:887074c37fcefc2f49b5ae9c6f9f36107341aec23185613d0e9f1ee81db7f94a"
   name = "golang.org/x/crypto"
   packages = [
     "blake2b",
+    "ed25519",
+    "ed25519/internal/edwards25519",
     "hkdf",
     "pbkdf2",
     "ripemd160",
     "scrypt",
+    "sha3",
     "ssh/terminal",
   ]
   pruneopts = ""
@@ -358,9 +462,14 @@
   digest = "1:6728b48c3404cbbebd73186cb2de79bf03395e8c3a8e5fe2079367f2c3fa85b0"
   name = "golang.org/x/net"
   packages = [
+    "bpf",
     "html",
     "html/atom",
     "html/charset",
+    "internal/iana",
+    "internal/socket",
+    "ipv4",
+    "ipv6",
     "websocket",
   ]
   pruneopts = ""
@@ -431,6 +540,7 @@
     "github.com/dedis/kyber/xof/blake2xb",
     "github.com/dedis/protobuf",
     "github.com/ethereum/go-ethereum",
+    "github.com/ethereum/go-ethereum/accounts/abi",
     "github.com/ethereum/go-ethereum/accounts/abi/bind",
     "github.com/ethereum/go-ethereum/accounts/keystore",
     "github.com/ethereum/go-ethereum/common",
@@ -439,23 +549,30 @@
     "github.com/ethereum/go-ethereum/crypto/bn256",
     "github.com/ethereum/go-ethereum/crypto/sha3",
     "github.com/ethereum/go-ethereum/ethclient",
+    "github.com/ethereum/go-ethereum/event",
+    "github.com/ethereum/go-ethereum/light",
     "github.com/ethereum/go-ethereum/p2p/netutil",
+    "github.com/go-stack/stack",
     "github.com/golang/protobuf/proto",
     "github.com/golang/protobuf/ptypes",
     "github.com/golang/protobuf/ptypes/any",
+    "github.com/google/uuid",
     "github.com/gorilla/mux",
+    "github.com/hashicorp/serf/serf",
     "github.com/huin/goupnp",
     "github.com/huin/goupnp/dcps/internetgateway1",
     "github.com/huin/goupnp/dcps/internetgateway2",
     "github.com/jackpal/gateway",
     "github.com/jackpal/go-nat-pmp",
-    "github.com/looplab/fsm",
     "github.com/oliveagle/jsonpath",
     "github.com/sirupsen/logrus",
     "github.com/stretchr/testify/assert",
     "github.com/stretchr/testify/require",
+    "github.com/urfave/cli",
     "golang.org/x/crypto/blake2b",
     "golang.org/x/crypto/hkdf",
+    "golang.org/x/crypto/sha3",
+    "golang.org/x/crypto/ssh/terminal",
     "golang.org/x/sys/cpu",
   ]
   solver-name = "gps-cdcl"

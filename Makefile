@@ -2,7 +2,7 @@
 # $ make == $ make build
 # $ make install
 
-.PHONY: dep build client install clean gen
+.PHONY: dep build client devClient install clean gen
 
 .DEFAULT_GOAL := build
 DOSPROXY_PATH := onchain/eth/contracts/DOSProxy.sol
@@ -11,33 +11,41 @@ DOSPAYMENT_GOPATH := onchain/dospayment
 DOSBRIDGE_GOPATH := onchain/dosbridge
 COMMITREVEAL_GOPATH := onchain/commitreveal
 TEST_CONTRACTS_GOPATH := testing/dosUser/contract
-GENERATED_FILES := $(shell find $(DOSPROXY_GOPATH) $(DOSBRIDGE_GOPATH) $(TEST_CONTRACTS_GOPATH) -name '*.go')
+GENERATED_FILES := $(shell find $(DOSPROXY_GOPATH) $(DOSBRIDGE_GOPATH) $(DOSPAYMENT_GOPATH) $(COMMITREVEAL_GOPATH) $(TEST_CONTRACTS_GOPATH) -name '*.go')
 ETH_CONTRACTS := onchain/eth/contracts
 BOOT_CREDENTIAL := testAccounts/bootCredential
-UNAME_S := $(uname -s)
+UNAME_S := $(shell uname -s)
+
 
 build: dep client
+
 
 dep:
 	dep ensure -vendor-only
 
-client: gen
-ifeq ($(UNAME_S),Linux)
+
+# Build a development version client node
+devClient: gen
+	go build -o client.dev
+
+
+# Build a prod/release version client node
+client:
 	go build -o client
-endif
-ifeq ($(UNAME_S),Darwin)
-        xgo --targets=linux/amd64 -out client .
-endif
+
 
 client-docker:
 	docker build -t dosnode -f Dockerfile .
 
+
 install: dep client
 	go install
+
 
 updateSubmodule:
 	test -f $(DOSPROXY_PATH) || git submodule update --init --recursive
 	git submodule update --remote
+
 
 gen: updateSubmodule
 	solc --optimize --overwrite --abi  --bin $(ETH_CONTRACTS)/DOSAddressBridge.sol -o $(DOSBRIDGE_GOPATH)
@@ -48,7 +56,8 @@ gen: updateSubmodule
 	abigen --abi="$(DOSPAYMENT_GOPATH)/DOSPayment.abi" --bin="$(DOSPAYMENT_GOPATH)/DOSPayment.bin" --pkg dospayment --out $(DOSPAYMENT_GOPATH)/DOSPayment.go
 	solc --optimize --overwrite --abi  --bin $(ETH_CONTRACTS)/CommitReveal.sol -o $(COMMITREVEAL_GOPATH)
 	abigen --abi="$(COMMITREVEAL_GOPATH)/CommitReveal.abi" --bin="$(COMMITREVEAL_GOPATH)/CommitReveal.bin" --pkg commitreveal --out $(COMMITREVEAL_GOPATH)/CommitReveal.go
-	
+
+
 clean:
-	rm -f client
-	rm -f $(GENERATED_FILES)
+	rm -f client*
+	# rm -f $(GENERATED_FILES)
