@@ -7,10 +7,17 @@ import (
 )
 
 func (d *DosNode) status(w http.ResponseWriter, r *http.Request) {
+	isPendingNode, err := d.chain.IsPendingNode(d.id)
+	if err != nil {
+		html := "err" + err.Error() + "\n|"
+		w.Write([]byte(html))
+		return
+	}
 	html := "=================================================" + "\n|"
 	html = html + "StartTime      :" + d.startTime.Format("2006-01-02T15:04:05.999999-07:00") + "\n|"
 	html = html + "Balance        : " + d.chain.GetBalance().String() + "\n|"
 	html = html + "State          : " + d.state + "\n|"
+	html = html + "IsPendingnNode : " + strconv.FormatBool(isPendingNode) + "\n|"
 	html = html + "TotalQuery     : " + strconv.Itoa(d.totalQuery) + "\n|"
 	html = html + "FulfilledQuery : " + strconv.Itoa(d.fulfilledQuery) + "\n|"
 	html = html + "Group Number   : " + strconv.Itoa(d.numOfworkingGroup) + "\n|"
@@ -34,6 +41,7 @@ func (d *DosNode) groupSize(w http.ResponseWriter, r *http.Request) {
 
 func (d *DosNode) guardian(w http.ResponseWriter, r *http.Request) {
 	d.chain.SignalGroupFormation(context.Background())
+	d.chain.SignalDissolve(context.Background())
 }
 func (d *DosNode) signalRandom(w http.ResponseWriter, r *http.Request) {
 	d.chain.SignalRandom(context.Background())
@@ -51,6 +59,12 @@ func (d *DosNode) proxy(w http.ResponseWriter, r *http.Request) {
 		html = html + "WorkingGroupSize :" + err.Error() + "\n|"
 	} else {
 		html = html + "WorkingGroupSize :" + strconv.FormatUint(workingGroupNum, 10) + "\n|"
+	}
+	expiredGroupNum, err := d.chain.GetExpiredWorkingGroupSize()
+	if err != nil {
+		html = html + "ExpiredGroupSize :" + err.Error() + "\n|"
+	} else {
+		html = html + "ExpiredGroupSize :" + strconv.FormatUint(expiredGroupNum, 10) + "\n|"
 	}
 	pendingGroupNum, err := d.chain.NumPendingGroups()
 	if err != nil {

@@ -101,15 +101,52 @@ func (d *PDKG) GetGroupIDs(groupId string) (participants [][]byte) {
 
 	return
 }
-
+func mergeErrors(ctx context.Context, cs ...<-chan error) <-chan error {
+	var wg sync.WaitGroup
+	// We must ensure that the output channel has the capacity to
+	// hold as many errors
+	// as there are error channels.
+	// This will ensure that it never blocks, even
+	// if WaitForPipeline returns early.
+	out := make(chan error, len(cs))
+	// Start an output goroutine for each input channel in cs.  output
+	// copies values from c to out until c is closed, then calls
+	// wg.Done.
+	output := func(c <-chan error) {
+		for n := range c {
+			select {
+			case <-ctx.Done():
+				return
+			case out <- n:
+			}
+		}
+		wg.Done()
+	}
+	wg.Add(len(cs))
+	for _, c := range cs {
+		go output(c)
+	}
+	// Start a goroutine to close out once all the output goroutines
+	// are done.  This must start after the wg.Add call.
+	go func() {
+		wg.Wait()
+		close(out)
+	}()
+	return out
+}
 func (d *PDKG) Grouping(ctx context.Context, groupId string, participants [][]byte) (chan [5]*big.Int, <-chan error, error) {
 	group := &Group{Participants: participants}
+	var errcList []<-chan error
 	if _, loaded := d.groups.LoadOrStore(groupId, group); loaded {
 		return nil, nil, errors.New("dkg: duplicate share public key")
 	} else {
-		dkgc, _ := exchangePub(ctx, d.suite, d.bufToNode, participants, d.p, groupId)
-		dkgCetifiedc, _ := processDeal(ctx, dkgc, d.bufToNode, participants, d.p, groupId)
+		dkgc, errc := exchangePub(ctx, d.suite, d.bufToNode, participants, d.p, groupId)
+		errcList = append(errcList, errc)
+		dkgCetifiedc, errc := processDeal(ctx, dkgc, d.bufToNode, participants, d.p, groupId)
+		errcList = append(errcList, errc)
 		outc, errc := genPubKey(ctx, group, d.suite, dkgCetifiedc, groupId)
+		errcList = append(errcList, errc)
+		errc = mergeErrors(ctx, errcList...)
 		return outc, errc, nil
 	}
 }
@@ -224,11 +261,11 @@ func genPubKey(ctx context.Context, group *Group, suite suites.Suite, dkgc <-cha
 	out := make(chan [5]*big.Int)
 	errc := make(chan error)
 	go func() {
-		defer logger.TimeTrack(time.Now(), "genPubKey", map[string]interface{}{"GroupID": sessionID})
+		defer logger.TimeTrack(time.Now(), "genPubKeyDone", map[string]interface{}{"GroupID": sessionID})
 
 		defer close(out)
 		defer close(errc)
-
+		logger.Event("genPubKey", map[string]interface{}{"GroupID": sessionID})
 		var dkg *DistKeyGenerator
 		var ok bool
 		select {
@@ -241,12 +278,15 @@ func genPubKey(ctx context.Context, group *Group, suite suites.Suite, dkgc <-cha
 		}
 
 		if !dkg.Certified() {
-			errc <- errors.New("!dkg.Certified")
+			err := errors.New("!dkg.Certified")
+			logger.Error(err)
+			errc <- err
 			return
 		}
 		var err error
 		group.SecShare, err = dkg.DistKeyShare()
 		if err != nil {
+			logger.Error(err)
 			errc <- err
 			return
 		}
@@ -258,6 +298,7 @@ func genPubKey(ctx context.Context, group *Group, suite suites.Suite, dkgc <-cha
 			case <-ctx.Done():
 				return
 			case errc <- err:
+				logger.Error(err)
 			}
 			return
 		}
@@ -267,6 +308,7 @@ func genPubKey(ctx context.Context, group *Group, suite suites.Suite, dkgc <-cha
 			case <-ctx.Done():
 				return
 			case errc <- err:
+				logger.Error(err)
 			}
 			return
 		}
@@ -285,16 +327,18 @@ func exchangePub(ctx context.Context, suite suites.Suite, bufToNode chan interfa
 	out := make(chan *DistKeyGenerator)
 	errc := make(chan error)
 	go func() {
-		defer logger.TimeTrack(time.Now(), "exchangePub", map[string]interface{}{"GroupID": sessionID})
-
+		defer logger.TimeTrack(time.Now(), "exchangePubDone", map[string]interface{}{"GroupID": sessionID})
 		defer close(out)
 		defer close(errc)
+		logger.Event("exchangePub", map[string]interface{}{"GroupID": sessionID})
+
 		//Generate secret and public key
 		sec := suite.Scalar().Pick(suite.RandomStream())
 		pub := suite.Point().Mul(sec, nil)
 		bin, err := pub.MarshalBinary()
 		if err != nil {
 			fmt.Println(err)
+			logger.Error(err)
 			return
 		}
 		//Index pub key
@@ -323,6 +367,7 @@ func exchangePub(ctx context.Context, suite suites.Suite, bufToNode chan interfa
 						case <-ctx.Done():
 							return
 						case errc <- err:
+							logger.Error(err)
 						}
 						return
 					}
@@ -334,7 +379,7 @@ func exchangePub(ctx context.Context, suite suites.Suite, bufToNode chan interfa
 
 		select {
 		case err := <-errc:
-			fmt.Println("Err ", err)
+			logger.Error(err)
 			return
 		default:
 		}
@@ -364,6 +409,7 @@ func exchangePub(ctx context.Context, suite suites.Suite, bufToNode chan interfa
 					case <-ctx.Done():
 						return
 					case errc <- err:
+						logger.Error(err)
 					}
 					return
 				}
@@ -373,12 +419,14 @@ func exchangePub(ctx context.Context, suite suites.Suite, bufToNode chan interfa
 			dkg, err := NewDistKeyGenerator(suite, sec, pubPoints, len(groupIds)/2+1)
 			if err != nil {
 				fmt.Println("NewDistKeyGenerator err ", err)
+				logger.Error(err)
 				errc <- err
 				return
 			}
 			pubPoints = nil
 			out <- dkg
 		} else {
+			logger.Error(err)
 			errc <- err
 		}
 	}()
@@ -391,7 +439,8 @@ func processDeal(ctx context.Context, dkgc <-chan *DistKeyGenerator, bufToNode c
 	go func() {
 		defer close(out)
 		defer close(errc)
-		defer logger.TimeTrack(time.Now(), "processDeal", map[string]interface{}{"GroupID": sessionID})
+		defer logger.TimeTrack(time.Now(), "processDealDone", map[string]interface{}{"GroupID": sessionID})
+		logger.Event("processDeal", map[string]interface{}{"GroupID": sessionID})
 
 		var dkg *DistKeyGenerator
 		var ok bool
@@ -406,6 +455,7 @@ func processDeal(ctx context.Context, dkgc <-chan *DistKeyGenerator, bufToNode c
 
 		deals, err := dkg.Deals()
 		if err != nil {
+			logger.Error(err)
 			select {
 			case <-ctx.Done():
 				return
@@ -420,6 +470,7 @@ func processDeal(ctx context.Context, dkgc <-chan *DistKeyGenerator, bufToNode c
 				defer wg.Done()
 				_, err := p.Request(id, d)
 				if err != nil {
+					logger.Error(err)
 					select {
 					case <-ctx.Done():
 						return
@@ -447,13 +498,16 @@ func processDeal(ctx context.Context, dkgc <-chan *DistKeyGenerator, bufToNode c
 				resp, err := dkg.ProcessDeal(d)
 				resp.SessionId = sessionID
 				if err != nil {
+					logger.Error(err)
 					return
 				}
 				if vss.StatusApproval != resp.Response.Status {
+					var err = errors.New("resp StatusNotApproval")
+					logger.Error(err)
 					select {
 					case <-ctx.Done():
 						return
-					case errc <- errors.New("resp StatusNotApproval"):
+					case errc <- err:
 						return
 					}
 				}
@@ -468,6 +522,7 @@ func processDeal(ctx context.Context, dkgc <-chan *DistKeyGenerator, bufToNode c
 					defer wg.Done()
 					_, err := p.Request(id, &Responses{SessionId: sessionID, Response: resps})
 					if err != nil {
+						logger.Error(err)
 						select {
 						case <-ctx.Done():
 							return
@@ -494,6 +549,7 @@ func processDeal(ctx context.Context, dkgc <-chan *DistKeyGenerator, bufToNode c
 			for _, r := range resps {
 				_, err := dkg.ProcessResponse(r)
 				if err != nil {
+					logger.Error(err)
 					fmt.Println("ProcessResponse err ", err)
 				}
 			}
@@ -505,10 +561,12 @@ func processDeal(ctx context.Context, dkgc <-chan *DistKeyGenerator, bufToNode c
 			case out <- dkg:
 			}
 		} else {
+			err = errors.New("dkg not cetified")
+			logger.Error(err)
 			select {
 			case <-ctx.Done():
 				return
-			case errc <- errors.New("dkg not cetified"):
+			case errc <- err:
 			}
 		}
 	}()

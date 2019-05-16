@@ -34,6 +34,7 @@ type ProxyAdapter interface {
 	SubscribeEvent(subscribeType int) (<-chan interface{}, <-chan error)
 	PollLogs(subscribeType int, LogBlockDiff, preBlockBuf uint64) (<-chan interface{}, <-chan error)
 
+	GetExpiredWorkingGroupSize() (size uint64, err error)
 	GroupSize() (size uint64, err error)
 	GetWorkingGroupSize() (size uint64, err error)
 	GetGroupToPick() (size uint64, err error)
@@ -45,6 +46,7 @@ type ProxyAdapter interface {
 	CurrentBlock() (blknum uint64, err error)
 	PendingNonce() (nonce uint64, err error)
 	GroupPubKey(idx int) (groupPubKeys [4]*big.Int, err error)
+	IsPendingNode(id []byte) (bool, error)
 }
 
 func NewProxyAdapter(ChainType, credentialPath, passphrase, proxyAddr, crAddress string, urls []string) (ProxyAdapter, error) {

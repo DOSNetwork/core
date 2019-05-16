@@ -51,6 +51,8 @@ const (
 	NumPendingGroups
 	PengindNodeSize
 	GroupSize
+	PendingNodeList
+	GetExpiredWorkingGroupSize
 )
 
 // TODO: Move constants to some unified places.
@@ -403,11 +405,6 @@ func (e *EthAdaptor) reqLoop() {
 					resultC <- reply
 					continue
 				}
-				f := map[string]interface{}{
-					"Tx":        fmt.Sprintf("%x", tx.Hash()),
-					"GroupID":   ctx.Value("GroupID"),
-					"RequestID": ctx.Value("RequestID")}
-				logger.Event("SendToEth", f)
 
 				reply.tx = tx
 				reply.nonce = e.auth.Nonce.Uint64()
@@ -513,14 +510,15 @@ func (e *EthAdaptor) sendRequest(ctx context.Context, c *ethclient.Client, pre <
 				}
 				if ctx.Value("GroupID") != nil && ctx.Value("RequestID") != nil {
 					f := map[string]interface{}{
-						"Tx":        tx,
+						"Tx":        fmt.Sprintf("%x", tx.Hash()),
 						"GroupID":   ctx.Value("GroupID"),
 						"RequestID": ctx.Value("RequestID")}
 					logger.Event("TransactionSucc", f)
 				} else {
 					f := map[string]interface{}{
-						"Tx": tx}
+						"Tx": fmt.Sprintf("%x", tx.Hash())}
 					logger.Event("TransactionSucc", f)
+
 				}
 				return
 			case <-ctx.Done():
@@ -804,6 +802,7 @@ func (e *EthAdaptor) firstEvent(ctx context.Context, source chan interface{}) <-
 			var blkNum uint64
 			var event interface{}
 			var ok bool
+			var removed bool
 			select {
 			case event, ok = <-source:
 				if ok {
@@ -811,70 +810,83 @@ func (e *EthAdaptor) firstEvent(ctx context.Context, source chan interface{}) <-
 					case *DosproxyLogUpdateRandom:
 						bytes = append(bytes, content.Raw.Data...)
 						blkNum = content.BlockN
+						removed = content.Removed
 						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
 					case *DosproxyLogRequestUserRandom:
 						bytes = append(bytes, content.Raw.Data...)
 						blkNum = content.BlockN
+						removed = content.Removed
 						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
 					case *DosproxyLogUrl:
 						bytes = append(bytes, content.Raw.Data...)
 						blkNum = content.BlockN
+						removed = content.Removed
 						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
 					case *DosproxyLogValidationResult:
 						bytes = append(bytes, content.Raw.Data...)
 						blkNum = content.BlockN
+						removed = content.Removed
 						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
 					case *DosproxyLogNoWorkingGroup:
 						bytes = append(bytes, content.Raw.Data...)
 						blkNum = content.BlockN
+						removed = content.Removed
 						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
 					case *DosproxyLogGrouping:
 						bytes = append(bytes, content.Raw.Data...)
 						blkNum = content.BlockN
+						removed = content.Removed
 						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
 					case *DosproxyLogPublicKeyAccepted:
 						bytes = append(bytes, content.Raw.Data...)
 						blkNum = content.BlockN
+						removed = content.Removed
 						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
 					case *DosproxyLogPublicKeySuggested:
 						bytes = append(bytes, content.Raw.Data...)
 						blkNum = content.BlockN
+						removed = content.Removed
 						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
 					case *DosproxyLogGroupDissolve:
 						bytes = append(bytes, content.Raw.Data...)
 						blkNum = content.BlockN
+						removed = content.Removed
 						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
 					case *DosproxyUpdateGroupToPick:
 						bytes = append(bytes, content.Raw.Data...)
 						blkNum = content.BlockN
+						removed = content.Removed
 						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
 					case *LogStartCommitReveal:
 						bytes = append(bytes, content.Raw.Data...)
 						blkNum = content.BlockN
+						removed = content.Removed
 						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
 					case *LogCommit:
 						bytes = append(bytes, content.Raw.Data...)
 						blkNum = content.BlockN
+						removed = content.Removed
 						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
 					case *LogReveal:
 						bytes = append(bytes, content.Raw.Data...)
 						blkNum = content.BlockN
+						removed = content.Removed
 						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
 					case *LogRandom:
 						bytes = append(bytes, content.Raw.Data...)
 						blkNum = content.BlockN
+						removed = content.Removed
 						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
 					}
 				} else {
 					return
 				}
 			}
-			nHash := sha256.Sum256(bytes)
-			identity := string(nHash[:])
-			curBlk, err := e.CurrentBlock()
-			if err != nil {
+			if removed {
 				continue
 			}
+			nHash := sha256.Sum256(bytes)
+			identity := string(nHash[:])
 
 			if visited[identity] == 0 {
 				visited[identity] = blkNum
@@ -883,6 +895,10 @@ func (e *EthAdaptor) firstEvent(ctx context.Context, source chan interface{}) <-
 				case <-ctx.Done():
 				}
 			} else {
+				curBlk, err := e.CurrentBlock()
+				if err != nil {
+					continue
+				}
 				for k, blkN := range visited {
 					if curBlk >= blkN+100 {
 						delete(visited, k)
@@ -1716,7 +1732,7 @@ func (e *EthAdaptor) PollLogs(subscribeType int, logBlockDiff, preBlockBuf uint6
 	return e.firstEvent(e.ctx, MergeEvents(e.ctx, sinks...)), MergeErrors(e.ctx, errcs...)
 }
 
-func proxyGet(proxy *dosproxy.DosproxySession, vType int) chan interface{} {
+func proxyGet(proxy *dosproxy.DosproxySession, vType int, p interface{}) chan interface{} {
 	out := make(chan interface{})
 
 	go func() {
@@ -1738,6 +1754,19 @@ func proxyGet(proxy *dosproxy.DosproxySession, vType int) chan interface{} {
 			val, err = proxy.GroupToPick()
 		case LastUpdatedBlock:
 			val, err = proxy.LastUpdatedBlock()
+		case GetExpiredWorkingGroupSize:
+			val, err = proxy.GetExpiredWorkingGroupSize()
+		case PendingNodeList:
+			id, ok := p.(common.Address)
+			if ok {
+				result, err := proxy.PendingNodeList(id)
+				if err != nil {
+					logger.Error(err)
+					return
+				}
+				out <- result
+				return
+			}
 		}
 		if err != nil {
 			logger.Error(err)
@@ -1753,7 +1782,7 @@ func (e *EthAdaptor) LastRandomness() (rand *big.Int, err error) {
 	defer cancel()
 	var valList []chan interface{}
 	for _, proxy := range e.proxies {
-		valList = append(valList, proxyGet(proxy, LastRandomness))
+		valList = append(valList, proxyGet(proxy, LastRandomness, nil))
 	}
 	out := first(ctx, merge(ctx, valList...))
 	select {
@@ -1775,7 +1804,7 @@ func (e *EthAdaptor) GroupSize() (size uint64, err error) {
 	defer cancel()
 	var valList []chan interface{}
 	for _, proxy := range e.proxies {
-		valList = append(valList, proxyGet(proxy, GroupSize))
+		valList = append(valList, proxyGet(proxy, GroupSize, nil))
 	}
 	out := first(ctx, merge(ctx, valList...))
 	select {
@@ -1797,7 +1826,7 @@ func (e *EthAdaptor) GetWorkingGroupSize() (size uint64, err error) {
 	defer cancel()
 	var valList []chan interface{}
 	for _, proxy := range e.proxies {
-		valList = append(valList, proxyGet(proxy, WorkingGroupSize))
+		valList = append(valList, proxyGet(proxy, WorkingGroupSize, nil))
 	}
 	out := first(ctx, merge(ctx, valList...))
 	select {
@@ -1819,7 +1848,7 @@ func (e *EthAdaptor) NumPendingGroups() (size uint64, err error) {
 	defer cancel()
 	var valList []chan interface{}
 	for _, proxy := range e.proxies {
-		valList = append(valList, proxyGet(proxy, NumPendingGroups))
+		valList = append(valList, proxyGet(proxy, NumPendingGroups, nil))
 	}
 	out := first(ctx, merge(ctx, valList...))
 	select {
@@ -1841,7 +1870,49 @@ func (e *EthAdaptor) GetPengindNodeSize() (size uint64, err error) {
 	defer cancel()
 	var valList []chan interface{}
 	for _, proxy := range e.proxies {
-		valList = append(valList, proxyGet(proxy, PengindNodeSize))
+		valList = append(valList, proxyGet(proxy, PengindNodeSize, nil))
+	}
+	out := first(ctx, merge(ctx, valList...))
+	select {
+	case val := <-out:
+		sizeBig, ok := val.(*big.Int)
+		if !ok {
+			err = errors.New("type error")
+			return
+		}
+		size = sizeBig.Uint64()
+	case <-ctx.Done():
+		err = errors.New("Timeout")
+	}
+	return
+}
+func (e *EthAdaptor) GetExpiredWorkingGroupSize() (size uint64, err error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	var valList []chan interface{}
+	for _, proxy := range e.proxies {
+		valList = append(valList, proxyGet(proxy, GetExpiredWorkingGroupSize, nil))
+	}
+	out := first(ctx, merge(ctx, valList...))
+	select {
+	case val := <-out:
+		sizeBig, ok := val.(*big.Int)
+		if !ok {
+			err = errors.New("type error")
+			return
+		}
+		size = sizeBig.Uint64()
+	case <-ctx.Done():
+		err = errors.New("Timeout")
+	}
+	return
+}
+func (e *EthAdaptor) GetGroupToPick() (size uint64, err error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	var valList []chan interface{}
+	for _, proxy := range e.proxies {
+		valList = append(valList, proxyGet(proxy, GroupToPick, nil))
 	}
 	out := first(ctx, merge(ctx, valList...))
 	select {
@@ -1858,22 +1929,28 @@ func (e *EthAdaptor) GetPengindNodeSize() (size uint64, err error) {
 	return
 }
 
-func (e *EthAdaptor) GetGroupToPick() (size uint64, err error) {
+func (e *EthAdaptor) IsPendingNode(id []byte) (result bool, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 	var valList []chan interface{}
+	addr := common.BytesToAddress(id)
 	for _, proxy := range e.proxies {
-		valList = append(valList, proxyGet(proxy, GroupToPick))
+		valList = append(valList, proxyGet(proxy, PendingNodeList, addr))
 	}
 	out := first(ctx, merge(ctx, valList...))
 	select {
 	case val := <-out:
-		sizeBig, ok := val.(*big.Int)
+		id, ok := val.(common.Address)
 		if !ok {
 			err = errors.New("type error")
 			return
 		}
-		size = sizeBig.Uint64()
+		if id.Big().Cmp(big.NewInt(0)) == 0 {
+			result = false
+		} else {
+			result = true
+		}
+		return
 	case <-ctx.Done():
 		err = errors.New("Timeout")
 	}
@@ -1886,7 +1963,7 @@ func (e *EthAdaptor) LastUpdatedBlock() (blknum uint64, err error) {
 
 	var valList []chan interface{}
 	for _, proxy := range e.proxies {
-		valList = append(valList, proxyGet(proxy, LastUpdatedBlock))
+		valList = append(valList, proxyGet(proxy, LastUpdatedBlock, nil))
 	}
 	out := first(ctx, merge(ctx, valList...))
 	select {
