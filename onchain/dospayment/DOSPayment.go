@@ -28,10 +28,10 @@ var (
 )
 
 // DospaymentABI is the input ABI used to generate the binding from.
-const DospaymentABI = "[{\"constant\":false,\"inputs\":[{\"name\":\"addr\",\"type\":\"address\"}],\"name\":\"setNetworkToken\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"minStake\",\"outputs\":[{\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"droplockToken\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"networkToken\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[],\"name\":\"renounceOwnership\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"droplockMaxQuota\",\"outputs\":[{\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"isOwner\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"addr\",\"type\":\"address\"}],\"name\":\"setDroplockToken\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"node\",\"type\":\"address\"}],\"name\":\"fromValidStakingNode\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"quo\",\"type\":\"uint256\"}],\"name\":\"setDroplockMaxQuota\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"oldAddress\",\"type\":\"address\"},{\"indexed\":false,\"name\":\"newAddress\",\"type\":\"address\"}],\"name\":\"UpdateNetworkTokenAddress\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"oldAddress\",\"type\":\"address\"},{\"indexed\":false,\"name\":\"newAddress\",\"type\":\"address\"}],\"name\":\"UpdateDroplockTokenAddress\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"oldQuota\",\"type\":\"uint256\"},{\"indexed\":false,\"name\":\"newQuota\",\"type\":\"uint256\"}],\"name\":\"UpdateDroplockMaxQuota\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"previousOwner\",\"type\":\"address\"}],\"name\":\"OwnershipRenounced\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"previousOwner\",\"type\":\"address\"},{\"indexed\":true,\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"}]"
+const DospaymentABI = "[{\"constant\":false,\"inputs\":[{\"name\":\"addr\",\"type\":\"address\"}],\"name\":\"setNetworkToken\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"minStake\",\"outputs\":[{\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"quo\",\"type\":\"uint256\"}],\"name\":\"setDropBurnMaxQuota\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"networkToken\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[],\"name\":\"renounceOwnership\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"isOwner\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"dropburnToken\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"node\",\"type\":\"address\"}],\"name\":\"fromValidStakingNode\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"dropburnMaxQuota\",\"outputs\":[{\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"addr\",\"type\":\"address\"}],\"name\":\"setDropBurnToken\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"oldAddress\",\"type\":\"address\"},{\"indexed\":false,\"name\":\"newAddress\",\"type\":\"address\"}],\"name\":\"UpdateNetworkTokenAddress\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"oldAddress\",\"type\":\"address\"},{\"indexed\":false,\"name\":\"newAddress\",\"type\":\"address\"}],\"name\":\"UpdateDropBurnTokenAddress\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"oldQuota\",\"type\":\"uint256\"},{\"indexed\":false,\"name\":\"newQuota\",\"type\":\"uint256\"}],\"name\":\"UpdateDropBurnMaxQuota\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"previousOwner\",\"type\":\"address\"}],\"name\":\"OwnershipRenounced\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"previousOwner\",\"type\":\"address\"},{\"indexed\":true,\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"}]"
 
 // DospaymentBin is the compiled bytecode used for deploying new contracts.
-const DospaymentBin = `608060405260018054600160a060020a031990811673214e79c85744cd2ebbc64ddc0047131496871bee1790915561c3506003908155600455600080549091163317905561081e806100526000396000f3fe608060405234801561001057600080fd5b50600436106100d1576000357c0100000000000000000000000000000000000000000000000000000000900480638da5cb5b1161008e5780638da5cb5b146101545780638f32d59b1461015c5780639cebe97b14610178578063c7e6a9bc1461019e578063e13c7e44146101c4578063f2fde38b146101e1576100d1565b806317107c49146100d6578063375b3c0a146100fe57806353212c46146101185780636ca95a4e1461013c578063715018a6146101445780637bfe52931461014c575b600080fd5b6100fc600480360360208110156100ec57600080fd5b5035600160a060020a0316610207565b005b610106610291565b60408051918252519081900360200190f35b610120610297565b60408051600160a060020a039092168252519081900360200190f35b6101206102a6565b6100fc6102b5565b61010661031d565b610120610323565b610164610332565b604080519115158252519081900360200190f35b6100fc6004803603602081101561018e57600080fd5b5035600160a060020a0316610343565b610164600480360360208110156101b457600080fd5b5035600160a060020a03166103cd565b6100fc600480360360208110156101da57600080fd5b5035610674565b6100fc600480360360208110156101f757600080fd5b5035600160a060020a0316610732565b61020f610332565b151561021a57600080fd5b60015460408051600160a060020a039283168152918316602083015280517f4d27a2adceae86b92fb74fb7e8f96dc902d917e243fbff389b5a793c9040dafe9281900390910190a16001805473ffffffffffffffffffffffffffffffffffffffff1916600160a060020a0392909216919091179055565b60035481565b600254600160a060020a031681565b600154600160a060020a031681565b6102bd610332565b15156102c857600080fd5b60008054604051600160a060020a03909116917ff8df31144d9c2f0f6b59d69b8b98abd5459d07f2742c4df920b25aae33c6482091a26000805473ffffffffffffffffffffffffffffffffffffffff19169055565b60045481565b600054600160a060020a031690565b600054600160a060020a0316331490565b61034b610332565b151561035657600080fd5b60025460408051600160a060020a039283168152918316602083015280517f26d12c8278b5711a05f4e96bd6e91cac2e75b4143b3d1edd6a1af194d30bceef9281900390910190a16002805473ffffffffffffffffffffffffffffffffffffffff1916600160a060020a0392909216919091179055565b600154604080517f70a08231000000000000000000000000000000000000000000000000000000008152600160a060020a0384811660048301529151600093849316916370a08231916024808301926020929190829003018186803b15801561043557600080fd5b505afa158015610449573d6000803e3d6000fd5b505050506040513d602081101561045f57600080fd5b5051600154604080517f313ce5670000000000000000000000000000000000000000000000000000000081529051929350600092600160a060020a039092169163313ce56791600480820192602092909190829003018186803b1580156104c557600080fd5b505afa1580156104d9573d6000803e3d6000fd5b505050506040513d60208110156104ef57600080fd5b50516003549091508102821061050a5760019250505061066f565b600254600160a060020a031615156105275760009250505061066f565b600254604080517f313ce5670000000000000000000000000000000000000000000000000000000081529051600092600160a060020a03169163313ce567916004808301926020929190829003018186803b15801561058557600080fd5b505afa158015610599573d6000803e3d6000fd5b505050506040513d60208110156105af57600080fd5b5051600254604080517f70a08231000000000000000000000000000000000000000000000000000000008152600160a060020a038981166004830152915191909216916370a08231916024808301926020929190829003018186803b15801561061757600080fd5b505afa15801561062b573d6000803e3d6000fd5b505050506040513d602081101561064157600080fd5b505181151561064c57fe5b04905060045481111561065e57506004545b600354600a92029082030204111590505b919050565b61067c610332565b151561068757600080fd5b60045481141580156106995750600a81105b15156106f0576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260248152602001806107cf6024913960400191505060405180910390fd5b600454604080519182526020820183905280517f53714c2a9a4391f82767aa3e422fba28700b1e85a8f283b94d609b313e417c559281900390910190a1600455565b61073a610332565b151561074557600080fd5b61074e81610751565b50565b600160a060020a038116151561076657600080fd5b60008054604051600160a060020a03808516939216917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e091a36000805473ffffffffffffffffffffffffffffffffffffffff1916600160a060020a039290921691909117905556fe56616c69642064726f706c6f636b4d617851756f74612077697468696e203020746f2039a165627a7a723058205e26e836097940de28f0a819a01f925b630231a0d0dbc387c178ddf74ef3d7880029`
+const DospaymentBin = `6080604052600180546001600160a01b031990811673214e79c85744cd2ebbc64ddc0047131496871bee17909155600280548216739bfe8f5749d90eb4049ad94cc4de9b6c4c31f82217905561c3506003908155600455600080549091163317905561075b806100706000396000f3fe608060405234801561001057600080fd5b50600436106100b45760003560e01c80638f32d59b116100715780638f32d59b1461014c578063b26584b814610168578063c7e6a9bc14610170578063e8c3470c14610196578063eac051f91461019e578063f2fde38b146101c4576100b4565b806317107c49146100b9578063375b3c0a146100e15780633f3381e1146100fb5780636ca95a4e14610118578063715018a61461013c5780638da5cb5b14610144575b600080fd5b6100df600480360360208110156100cf57600080fd5b50356001600160a01b03166101ea565b005b6100e9610265565b60408051918252519081900360200190f35b6100df6004803603602081101561011157600080fd5b503561026b565b61012061030e565b604080516001600160a01b039092168252519081900360200190f35b6100df61031d565b610120610376565b610154610385565b604080519115158252519081900360200190f35b610120610396565b6101546004803603602081101561018657600080fd5b50356001600160a01b03166103a5565b6100e96105ff565b6100df600480360360208110156101b457600080fd5b50356001600160a01b0316610605565b6100df600480360360208110156101da57600080fd5b50356001600160a01b0316610680565b6101f2610385565b6101fb57600080fd5b600154604080516001600160a01b039283168152918316602083015280517f4d27a2adceae86b92fb74fb7e8f96dc902d917e243fbff389b5a793c9040dafe9281900390910190a1600180546001600160a01b0319166001600160a01b0392909216919091179055565b60035481565b610273610385565b61027c57600080fd5b600454811415801561028e5750600a81105b6102cc57604051600160e51b62461bcd02815260040180806020018281038252602481526020018061070c6024913960400191505060405180910390fd5b600454604080519182526020820183905280517f0aee95cca46da64ee373e28dee5994361b4002c54035d92932c9825b76382e999281900390910190a1600455565b6001546001600160a01b031681565b610325610385565b61032e57600080fd5b600080546040516001600160a01b03909116917ff8df31144d9c2f0f6b59d69b8b98abd5459d07f2742c4df920b25aae33c6482091a2600080546001600160a01b0319169055565b6000546001600160a01b031690565b6000546001600160a01b0316331490565b6002546001600160a01b031681565b60015460408051600160e01b6370a082310281526001600160a01b0384811660048301529151600093849316916370a08231916024808301926020929190829003018186803b1580156103f757600080fd5b505afa15801561040b573d6000803e3d6000fd5b505050506040513d602081101561042157600080fd5b505160015460408051600160e01b63313ce56702815290519293506000926001600160a01b039092169163313ce56791600480820192602092909190829003018186803b15801561047157600080fd5b505afa158015610485573d6000803e3d6000fd5b505050506040513d602081101561049b57600080fd5b5051600354909150600a82900a028083106104bc57600193505050506105fa565b6002546001600160a01b03166104d857600093505050506105fa565b60025460408051600160e01b63313ce56702815290516000926001600160a01b03169163313ce567916004808301926020929190829003018186803b15801561052057600080fd5b505afa158015610534573d6000803e3d6000fd5b505050506040513d602081101561054a57600080fd5b505160025460408051600160e01b6370a082310281526001600160a01b038a811660048301529151600a9490940a9391909216916370a08231916024808301926020929190829003018186803b1580156105a357600080fd5b505afa1580156105b7573d6000803e3d6000fd5b505050506040513d60208110156105cd57600080fd5b5051816105d657fe5b0490506004548111156105e857506004545b600a8181038302048410159450505050505b919050565b60045481565b61060d610385565b61061657600080fd5b600254604080516001600160a01b039283168152918316602083015280517ffc8013dfb0c8d38f3bcab9239bd5712457c48919b272cdb109488549199a01739281900390910190a1600280546001600160a01b0319166001600160a01b0392909216919091179055565b610688610385565b61069157600080fd5b61069a8161069d565b50565b6001600160a01b0381166106b057600080fd5b600080546040516001600160a01b03808516939216917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e091a3600080546001600160a01b0319166001600160a01b039290921691909117905556fe56616c69642064726f706275726e4d617851756f74612077697468696e203020746f2039a165627a7a72305820953b1b36df1be5bd66438a63edc565ce78b5152d1d2a299bac3bf2cd6a4a3c490029`
 
 // DeployDospayment deploys a new Ethereum contract, binding an instance of Dospayment to it.
 func DeployDospayment(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *Dospayment, error) {
@@ -188,56 +188,56 @@ func (_Dospayment *DospaymentTransactorRaw) Transact(opts *bind.TransactOpts, me
 	return _Dospayment.Contract.contract.Transact(opts, method, params...)
 }
 
-// DroplockMaxQuota is a free data retrieval call binding the contract method 0x7bfe5293.
+// DropburnMaxQuota is a free data retrieval call binding the contract method 0xe8c3470c.
 //
-// Solidity: function droplockMaxQuota() constant returns(uint256)
-func (_Dospayment *DospaymentCaller) DroplockMaxQuota(opts *bind.CallOpts) (*big.Int, error) {
+// Solidity: function dropburnMaxQuota() constant returns(uint256)
+func (_Dospayment *DospaymentCaller) DropburnMaxQuota(opts *bind.CallOpts) (*big.Int, error) {
 	var (
 		ret0 = new(*big.Int)
 	)
 	out := ret0
-	err := _Dospayment.contract.Call(opts, out, "droplockMaxQuota")
+	err := _Dospayment.contract.Call(opts, out, "dropburnMaxQuota")
 	return *ret0, err
 }
 
-// DroplockMaxQuota is a free data retrieval call binding the contract method 0x7bfe5293.
+// DropburnMaxQuota is a free data retrieval call binding the contract method 0xe8c3470c.
 //
-// Solidity: function droplockMaxQuota() constant returns(uint256)
-func (_Dospayment *DospaymentSession) DroplockMaxQuota() (*big.Int, error) {
-	return _Dospayment.Contract.DroplockMaxQuota(&_Dospayment.CallOpts)
+// Solidity: function dropburnMaxQuota() constant returns(uint256)
+func (_Dospayment *DospaymentSession) DropburnMaxQuota() (*big.Int, error) {
+	return _Dospayment.Contract.DropburnMaxQuota(&_Dospayment.CallOpts)
 }
 
-// DroplockMaxQuota is a free data retrieval call binding the contract method 0x7bfe5293.
+// DropburnMaxQuota is a free data retrieval call binding the contract method 0xe8c3470c.
 //
-// Solidity: function droplockMaxQuota() constant returns(uint256)
-func (_Dospayment *DospaymentCallerSession) DroplockMaxQuota() (*big.Int, error) {
-	return _Dospayment.Contract.DroplockMaxQuota(&_Dospayment.CallOpts)
+// Solidity: function dropburnMaxQuota() constant returns(uint256)
+func (_Dospayment *DospaymentCallerSession) DropburnMaxQuota() (*big.Int, error) {
+	return _Dospayment.Contract.DropburnMaxQuota(&_Dospayment.CallOpts)
 }
 
-// DroplockToken is a free data retrieval call binding the contract method 0x53212c46.
+// DropburnToken is a free data retrieval call binding the contract method 0xb26584b8.
 //
-// Solidity: function droplockToken() constant returns(address)
-func (_Dospayment *DospaymentCaller) DroplockToken(opts *bind.CallOpts) (common.Address, error) {
+// Solidity: function dropburnToken() constant returns(address)
+func (_Dospayment *DospaymentCaller) DropburnToken(opts *bind.CallOpts) (common.Address, error) {
 	var (
 		ret0 = new(common.Address)
 	)
 	out := ret0
-	err := _Dospayment.contract.Call(opts, out, "droplockToken")
+	err := _Dospayment.contract.Call(opts, out, "dropburnToken")
 	return *ret0, err
 }
 
-// DroplockToken is a free data retrieval call binding the contract method 0x53212c46.
+// DropburnToken is a free data retrieval call binding the contract method 0xb26584b8.
 //
-// Solidity: function droplockToken() constant returns(address)
-func (_Dospayment *DospaymentSession) DroplockToken() (common.Address, error) {
-	return _Dospayment.Contract.DroplockToken(&_Dospayment.CallOpts)
+// Solidity: function dropburnToken() constant returns(address)
+func (_Dospayment *DospaymentSession) DropburnToken() (common.Address, error) {
+	return _Dospayment.Contract.DropburnToken(&_Dospayment.CallOpts)
 }
 
-// DroplockToken is a free data retrieval call binding the contract method 0x53212c46.
+// DropburnToken is a free data retrieval call binding the contract method 0xb26584b8.
 //
-// Solidity: function droplockToken() constant returns(address)
-func (_Dospayment *DospaymentCallerSession) DroplockToken() (common.Address, error) {
-	return _Dospayment.Contract.DroplockToken(&_Dospayment.CallOpts)
+// Solidity: function dropburnToken() constant returns(address)
+func (_Dospayment *DospaymentCallerSession) DropburnToken() (common.Address, error) {
+	return _Dospayment.Contract.DropburnToken(&_Dospayment.CallOpts)
 }
 
 // FromValidStakingNode is a free data retrieval call binding the contract method 0xc7e6a9bc.
@@ -391,46 +391,46 @@ func (_Dospayment *DospaymentTransactorSession) RenounceOwnership() (*types.Tran
 	return _Dospayment.Contract.RenounceOwnership(&_Dospayment.TransactOpts)
 }
 
-// SetDroplockMaxQuota is a paid mutator transaction binding the contract method 0xe13c7e44.
+// SetDropBurnMaxQuota is a paid mutator transaction binding the contract method 0x3f3381e1.
 //
-// Solidity: function setDroplockMaxQuota(uint256 quo) returns()
-func (_Dospayment *DospaymentTransactor) SetDroplockMaxQuota(opts *bind.TransactOpts, quo *big.Int) (*types.Transaction, error) {
-	return _Dospayment.contract.Transact(opts, "setDroplockMaxQuota", quo)
+// Solidity: function setDropBurnMaxQuota(uint256 quo) returns()
+func (_Dospayment *DospaymentTransactor) SetDropBurnMaxQuota(opts *bind.TransactOpts, quo *big.Int) (*types.Transaction, error) {
+	return _Dospayment.contract.Transact(opts, "setDropBurnMaxQuota", quo)
 }
 
-// SetDroplockMaxQuota is a paid mutator transaction binding the contract method 0xe13c7e44.
+// SetDropBurnMaxQuota is a paid mutator transaction binding the contract method 0x3f3381e1.
 //
-// Solidity: function setDroplockMaxQuota(uint256 quo) returns()
-func (_Dospayment *DospaymentSession) SetDroplockMaxQuota(quo *big.Int) (*types.Transaction, error) {
-	return _Dospayment.Contract.SetDroplockMaxQuota(&_Dospayment.TransactOpts, quo)
+// Solidity: function setDropBurnMaxQuota(uint256 quo) returns()
+func (_Dospayment *DospaymentSession) SetDropBurnMaxQuota(quo *big.Int) (*types.Transaction, error) {
+	return _Dospayment.Contract.SetDropBurnMaxQuota(&_Dospayment.TransactOpts, quo)
 }
 
-// SetDroplockMaxQuota is a paid mutator transaction binding the contract method 0xe13c7e44.
+// SetDropBurnMaxQuota is a paid mutator transaction binding the contract method 0x3f3381e1.
 //
-// Solidity: function setDroplockMaxQuota(uint256 quo) returns()
-func (_Dospayment *DospaymentTransactorSession) SetDroplockMaxQuota(quo *big.Int) (*types.Transaction, error) {
-	return _Dospayment.Contract.SetDroplockMaxQuota(&_Dospayment.TransactOpts, quo)
+// Solidity: function setDropBurnMaxQuota(uint256 quo) returns()
+func (_Dospayment *DospaymentTransactorSession) SetDropBurnMaxQuota(quo *big.Int) (*types.Transaction, error) {
+	return _Dospayment.Contract.SetDropBurnMaxQuota(&_Dospayment.TransactOpts, quo)
 }
 
-// SetDroplockToken is a paid mutator transaction binding the contract method 0x9cebe97b.
+// SetDropBurnToken is a paid mutator transaction binding the contract method 0xeac051f9.
 //
-// Solidity: function setDroplockToken(address addr) returns()
-func (_Dospayment *DospaymentTransactor) SetDroplockToken(opts *bind.TransactOpts, addr common.Address) (*types.Transaction, error) {
-	return _Dospayment.contract.Transact(opts, "setDroplockToken", addr)
+// Solidity: function setDropBurnToken(address addr) returns()
+func (_Dospayment *DospaymentTransactor) SetDropBurnToken(opts *bind.TransactOpts, addr common.Address) (*types.Transaction, error) {
+	return _Dospayment.contract.Transact(opts, "setDropBurnToken", addr)
 }
 
-// SetDroplockToken is a paid mutator transaction binding the contract method 0x9cebe97b.
+// SetDropBurnToken is a paid mutator transaction binding the contract method 0xeac051f9.
 //
-// Solidity: function setDroplockToken(address addr) returns()
-func (_Dospayment *DospaymentSession) SetDroplockToken(addr common.Address) (*types.Transaction, error) {
-	return _Dospayment.Contract.SetDroplockToken(&_Dospayment.TransactOpts, addr)
+// Solidity: function setDropBurnToken(address addr) returns()
+func (_Dospayment *DospaymentSession) SetDropBurnToken(addr common.Address) (*types.Transaction, error) {
+	return _Dospayment.Contract.SetDropBurnToken(&_Dospayment.TransactOpts, addr)
 }
 
-// SetDroplockToken is a paid mutator transaction binding the contract method 0x9cebe97b.
+// SetDropBurnToken is a paid mutator transaction binding the contract method 0xeac051f9.
 //
-// Solidity: function setDroplockToken(address addr) returns()
-func (_Dospayment *DospaymentTransactorSession) SetDroplockToken(addr common.Address) (*types.Transaction, error) {
-	return _Dospayment.Contract.SetDroplockToken(&_Dospayment.TransactOpts, addr)
+// Solidity: function setDropBurnToken(address addr) returns()
+func (_Dospayment *DospaymentTransactorSession) SetDropBurnToken(addr common.Address) (*types.Transaction, error) {
+	return _Dospayment.Contract.SetDropBurnToken(&_Dospayment.TransactOpts, addr)
 }
 
 // SetNetworkToken is a paid mutator transaction binding the contract method 0x17107c49.
@@ -748,9 +748,9 @@ func (_Dospayment *DospaymentFilterer) WatchOwnershipTransferred(opts *bind.Watc
 	}), nil
 }
 
-// DospaymentUpdateDroplockMaxQuotaIterator is returned from FilterUpdateDroplockMaxQuota and is used to iterate over the raw logs and unpacked data for UpdateDroplockMaxQuota events raised by the Dospayment contract.
-type DospaymentUpdateDroplockMaxQuotaIterator struct {
-	Event *DospaymentUpdateDroplockMaxQuota // Event containing the contract specifics and raw log
+// DospaymentUpdateDropBurnMaxQuotaIterator is returned from FilterUpdateDropBurnMaxQuota and is used to iterate over the raw logs and unpacked data for UpdateDropBurnMaxQuota events raised by the Dospayment contract.
+type DospaymentUpdateDropBurnMaxQuotaIterator struct {
+	Event *DospaymentUpdateDropBurnMaxQuota // Event containing the contract specifics and raw log
 
 	contract *bind.BoundContract // Generic contract to use for unpacking event data
 	event    string              // Event name to use for unpacking event data
@@ -764,7 +764,7 @@ type DospaymentUpdateDroplockMaxQuotaIterator struct {
 // Next advances the iterator to the subsequent event, returning whether there
 // are any more events found. In case of a retrieval or parsing error, false is
 // returned and Error() can be queried for the exact failure.
-func (it *DospaymentUpdateDroplockMaxQuotaIterator) Next() bool {
+func (it *DospaymentUpdateDropBurnMaxQuotaIterator) Next() bool {
 	// If the iterator failed, stop iterating
 	if it.fail != nil {
 		return false
@@ -773,7 +773,7 @@ func (it *DospaymentUpdateDroplockMaxQuotaIterator) Next() bool {
 	if it.done {
 		select {
 		case log := <-it.logs:
-			it.Event = new(DospaymentUpdateDroplockMaxQuota)
+			it.Event = new(DospaymentUpdateDropBurnMaxQuota)
 			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 				it.fail = err
 				return false
@@ -788,7 +788,7 @@ func (it *DospaymentUpdateDroplockMaxQuotaIterator) Next() bool {
 	// Iterator still in progress, wait for either a data or an error event
 	select {
 	case log := <-it.logs:
-		it.Event = new(DospaymentUpdateDroplockMaxQuota)
+		it.Event = new(DospaymentUpdateDropBurnMaxQuota)
 		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 			it.fail = err
 			return false
@@ -804,42 +804,42 @@ func (it *DospaymentUpdateDroplockMaxQuotaIterator) Next() bool {
 }
 
 // Error returns any retrieval or parsing error occurred during filtering.
-func (it *DospaymentUpdateDroplockMaxQuotaIterator) Error() error {
+func (it *DospaymentUpdateDropBurnMaxQuotaIterator) Error() error {
 	return it.fail
 }
 
 // Close terminates the iteration process, releasing any pending underlying
 // resources.
-func (it *DospaymentUpdateDroplockMaxQuotaIterator) Close() error {
+func (it *DospaymentUpdateDropBurnMaxQuotaIterator) Close() error {
 	it.sub.Unsubscribe()
 	return nil
 }
 
-// DospaymentUpdateDroplockMaxQuota represents a UpdateDroplockMaxQuota event raised by the Dospayment contract.
-type DospaymentUpdateDroplockMaxQuota struct {
+// DospaymentUpdateDropBurnMaxQuota represents a UpdateDropBurnMaxQuota event raised by the Dospayment contract.
+type DospaymentUpdateDropBurnMaxQuota struct {
 	OldQuota *big.Int
 	NewQuota *big.Int
 	Raw      types.Log // Blockchain specific contextual infos
 }
 
-// FilterUpdateDroplockMaxQuota is a free log retrieval operation binding the contract event 0x53714c2a9a4391f82767aa3e422fba28700b1e85a8f283b94d609b313e417c55.
+// FilterUpdateDropBurnMaxQuota is a free log retrieval operation binding the contract event 0x0aee95cca46da64ee373e28dee5994361b4002c54035d92932c9825b76382e99.
 //
-// Solidity: event UpdateDroplockMaxQuota(uint256 oldQuota, uint256 newQuota)
-func (_Dospayment *DospaymentFilterer) FilterUpdateDroplockMaxQuota(opts *bind.FilterOpts) (*DospaymentUpdateDroplockMaxQuotaIterator, error) {
+// Solidity: event UpdateDropBurnMaxQuota(uint256 oldQuota, uint256 newQuota)
+func (_Dospayment *DospaymentFilterer) FilterUpdateDropBurnMaxQuota(opts *bind.FilterOpts) (*DospaymentUpdateDropBurnMaxQuotaIterator, error) {
 
-	logs, sub, err := _Dospayment.contract.FilterLogs(opts, "UpdateDroplockMaxQuota")
+	logs, sub, err := _Dospayment.contract.FilterLogs(opts, "UpdateDropBurnMaxQuota")
 	if err != nil {
 		return nil, err
 	}
-	return &DospaymentUpdateDroplockMaxQuotaIterator{contract: _Dospayment.contract, event: "UpdateDroplockMaxQuota", logs: logs, sub: sub}, nil
+	return &DospaymentUpdateDropBurnMaxQuotaIterator{contract: _Dospayment.contract, event: "UpdateDropBurnMaxQuota", logs: logs, sub: sub}, nil
 }
 
-// WatchUpdateDroplockMaxQuota is a free log subscription operation binding the contract event 0x53714c2a9a4391f82767aa3e422fba28700b1e85a8f283b94d609b313e417c55.
+// WatchUpdateDropBurnMaxQuota is a free log subscription operation binding the contract event 0x0aee95cca46da64ee373e28dee5994361b4002c54035d92932c9825b76382e99.
 //
-// Solidity: event UpdateDroplockMaxQuota(uint256 oldQuota, uint256 newQuota)
-func (_Dospayment *DospaymentFilterer) WatchUpdateDroplockMaxQuota(opts *bind.WatchOpts, sink chan<- *DospaymentUpdateDroplockMaxQuota) (event.Subscription, error) {
+// Solidity: event UpdateDropBurnMaxQuota(uint256 oldQuota, uint256 newQuota)
+func (_Dospayment *DospaymentFilterer) WatchUpdateDropBurnMaxQuota(opts *bind.WatchOpts, sink chan<- *DospaymentUpdateDropBurnMaxQuota) (event.Subscription, error) {
 
-	logs, sub, err := _Dospayment.contract.WatchLogs(opts, "UpdateDroplockMaxQuota")
+	logs, sub, err := _Dospayment.contract.WatchLogs(opts, "UpdateDropBurnMaxQuota")
 	if err != nil {
 		return nil, err
 	}
@@ -849,8 +849,8 @@ func (_Dospayment *DospaymentFilterer) WatchUpdateDroplockMaxQuota(opts *bind.Wa
 			select {
 			case log := <-logs:
 				// New log arrived, parse the event and forward to the user
-				event := new(DospaymentUpdateDroplockMaxQuota)
-				if err := _Dospayment.contract.UnpackLog(event, "UpdateDroplockMaxQuota", log); err != nil {
+				event := new(DospaymentUpdateDropBurnMaxQuota)
+				if err := _Dospayment.contract.UnpackLog(event, "UpdateDropBurnMaxQuota", log); err != nil {
 					return err
 				}
 				event.Raw = log
@@ -871,9 +871,9 @@ func (_Dospayment *DospaymentFilterer) WatchUpdateDroplockMaxQuota(opts *bind.Wa
 	}), nil
 }
 
-// DospaymentUpdateDroplockTokenAddressIterator is returned from FilterUpdateDroplockTokenAddress and is used to iterate over the raw logs and unpacked data for UpdateDroplockTokenAddress events raised by the Dospayment contract.
-type DospaymentUpdateDroplockTokenAddressIterator struct {
-	Event *DospaymentUpdateDroplockTokenAddress // Event containing the contract specifics and raw log
+// DospaymentUpdateDropBurnTokenAddressIterator is returned from FilterUpdateDropBurnTokenAddress and is used to iterate over the raw logs and unpacked data for UpdateDropBurnTokenAddress events raised by the Dospayment contract.
+type DospaymentUpdateDropBurnTokenAddressIterator struct {
+	Event *DospaymentUpdateDropBurnTokenAddress // Event containing the contract specifics and raw log
 
 	contract *bind.BoundContract // Generic contract to use for unpacking event data
 	event    string              // Event name to use for unpacking event data
@@ -887,7 +887,7 @@ type DospaymentUpdateDroplockTokenAddressIterator struct {
 // Next advances the iterator to the subsequent event, returning whether there
 // are any more events found. In case of a retrieval or parsing error, false is
 // returned and Error() can be queried for the exact failure.
-func (it *DospaymentUpdateDroplockTokenAddressIterator) Next() bool {
+func (it *DospaymentUpdateDropBurnTokenAddressIterator) Next() bool {
 	// If the iterator failed, stop iterating
 	if it.fail != nil {
 		return false
@@ -896,7 +896,7 @@ func (it *DospaymentUpdateDroplockTokenAddressIterator) Next() bool {
 	if it.done {
 		select {
 		case log := <-it.logs:
-			it.Event = new(DospaymentUpdateDroplockTokenAddress)
+			it.Event = new(DospaymentUpdateDropBurnTokenAddress)
 			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 				it.fail = err
 				return false
@@ -911,7 +911,7 @@ func (it *DospaymentUpdateDroplockTokenAddressIterator) Next() bool {
 	// Iterator still in progress, wait for either a data or an error event
 	select {
 	case log := <-it.logs:
-		it.Event = new(DospaymentUpdateDroplockTokenAddress)
+		it.Event = new(DospaymentUpdateDropBurnTokenAddress)
 		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
 			it.fail = err
 			return false
@@ -927,42 +927,42 @@ func (it *DospaymentUpdateDroplockTokenAddressIterator) Next() bool {
 }
 
 // Error returns any retrieval or parsing error occurred during filtering.
-func (it *DospaymentUpdateDroplockTokenAddressIterator) Error() error {
+func (it *DospaymentUpdateDropBurnTokenAddressIterator) Error() error {
 	return it.fail
 }
 
 // Close terminates the iteration process, releasing any pending underlying
 // resources.
-func (it *DospaymentUpdateDroplockTokenAddressIterator) Close() error {
+func (it *DospaymentUpdateDropBurnTokenAddressIterator) Close() error {
 	it.sub.Unsubscribe()
 	return nil
 }
 
-// DospaymentUpdateDroplockTokenAddress represents a UpdateDroplockTokenAddress event raised by the Dospayment contract.
-type DospaymentUpdateDroplockTokenAddress struct {
+// DospaymentUpdateDropBurnTokenAddress represents a UpdateDropBurnTokenAddress event raised by the Dospayment contract.
+type DospaymentUpdateDropBurnTokenAddress struct {
 	OldAddress common.Address
 	NewAddress common.Address
 	Raw        types.Log // Blockchain specific contextual infos
 }
 
-// FilterUpdateDroplockTokenAddress is a free log retrieval operation binding the contract event 0x26d12c8278b5711a05f4e96bd6e91cac2e75b4143b3d1edd6a1af194d30bceef.
+// FilterUpdateDropBurnTokenAddress is a free log retrieval operation binding the contract event 0xfc8013dfb0c8d38f3bcab9239bd5712457c48919b272cdb109488549199a0173.
 //
-// Solidity: event UpdateDroplockTokenAddress(address oldAddress, address newAddress)
-func (_Dospayment *DospaymentFilterer) FilterUpdateDroplockTokenAddress(opts *bind.FilterOpts) (*DospaymentUpdateDroplockTokenAddressIterator, error) {
+// Solidity: event UpdateDropBurnTokenAddress(address oldAddress, address newAddress)
+func (_Dospayment *DospaymentFilterer) FilterUpdateDropBurnTokenAddress(opts *bind.FilterOpts) (*DospaymentUpdateDropBurnTokenAddressIterator, error) {
 
-	logs, sub, err := _Dospayment.contract.FilterLogs(opts, "UpdateDroplockTokenAddress")
+	logs, sub, err := _Dospayment.contract.FilterLogs(opts, "UpdateDropBurnTokenAddress")
 	if err != nil {
 		return nil, err
 	}
-	return &DospaymentUpdateDroplockTokenAddressIterator{contract: _Dospayment.contract, event: "UpdateDroplockTokenAddress", logs: logs, sub: sub}, nil
+	return &DospaymentUpdateDropBurnTokenAddressIterator{contract: _Dospayment.contract, event: "UpdateDropBurnTokenAddress", logs: logs, sub: sub}, nil
 }
 
-// WatchUpdateDroplockTokenAddress is a free log subscription operation binding the contract event 0x26d12c8278b5711a05f4e96bd6e91cac2e75b4143b3d1edd6a1af194d30bceef.
+// WatchUpdateDropBurnTokenAddress is a free log subscription operation binding the contract event 0xfc8013dfb0c8d38f3bcab9239bd5712457c48919b272cdb109488549199a0173.
 //
-// Solidity: event UpdateDroplockTokenAddress(address oldAddress, address newAddress)
-func (_Dospayment *DospaymentFilterer) WatchUpdateDroplockTokenAddress(opts *bind.WatchOpts, sink chan<- *DospaymentUpdateDroplockTokenAddress) (event.Subscription, error) {
+// Solidity: event UpdateDropBurnTokenAddress(address oldAddress, address newAddress)
+func (_Dospayment *DospaymentFilterer) WatchUpdateDropBurnTokenAddress(opts *bind.WatchOpts, sink chan<- *DospaymentUpdateDropBurnTokenAddress) (event.Subscription, error) {
 
-	logs, sub, err := _Dospayment.contract.WatchLogs(opts, "UpdateDroplockTokenAddress")
+	logs, sub, err := _Dospayment.contract.WatchLogs(opts, "UpdateDropBurnTokenAddress")
 	if err != nil {
 		return nil, err
 	}
@@ -972,8 +972,8 @@ func (_Dospayment *DospaymentFilterer) WatchUpdateDroplockTokenAddress(opts *bin
 			select {
 			case log := <-logs:
 				// New log arrived, parse the event and forward to the user
-				event := new(DospaymentUpdateDroplockTokenAddress)
-				if err := _Dospayment.contract.UnpackLog(event, "UpdateDroplockTokenAddress", log); err != nil {
+				event := new(DospaymentUpdateDropBurnTokenAddress)
+				if err := _Dospayment.contract.UnpackLog(event, "UpdateDropBurnTokenAddress", log); err != nil {
 					return err
 				}
 				event.Raw = log
