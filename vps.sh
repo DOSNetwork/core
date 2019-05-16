@@ -1,37 +1,94 @@
 #/bin/bash
-USER=""
-VPSIP=""
-VPSKEY=""
-KEYPATH=""
+
+setting="./dos.setting"
+# If file exists
+if [[ -f "$setting" ]]
+then
+    source $setting
+	if [ -z "$DOSIMAGE" ];
+	then
+		echo "Please assign a value to DOSIMAGE in dos.setting"
+		exit
+	fi
+	if [ -z "$USER" ];
+	then
+		echo "Please assign a value to USER in dos.setting"
+		exit
+	fi
+	if [ -z "$VPSIP" ];
+	then
+		echo "Please assign a value to VPSIP in dos.setting"
+		exit
+	fi
+	if [ -z "$VPSKEY" ];
+	then
+		echo "Please assign a value to VPSKEY in dos.setting"
+		exit
+	fi
+	if [ -z "$KEYSTORE" ];
+	then
+		echo "Please assign a value to KEYSTORE in dos.setting"
+		exit
+	fi
+	if [ -z "$GETHPOOL" ];
+	then
+		echo "Please assign a value to GETHPOOL in dos.setting"
+		exit
+	fi
+else
+    echo "Can't find dos.setting"
+	exit
+fi
+GETHPOOL=$GETHPOOL";ws://"$VPSIP":8546"
+DIR="/home/"$USER
 
 install_lightnode(){
-  ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'yes | sudo apt-get update'
-  ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'yes | sudo add-apt-repository -y ppa:ethereum/ethereum'
-  ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'yes | sudo apt-get update'
-  ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'yes | sudo apt-get install ethereum'
-  scp -i $VPSKEY geth.service  $USER@$VPSIP:~/
-  ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'yes | sudo chmod 322 geth.service'
-  ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'yes | sudo mv geth.service /lib/systemd/system/geth.service'
-  ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'yes | sudo systemctl enable geth'
-  ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'yes | sudo systemctl start geth'
+  ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'ps cax | grep geth > /dev/null'
+  if [ $? -eq 0 ]
+  then
+	echo "Geth Process is running."
+  else
+	ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'yes | sudo apt-get update'
+	ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'yes | sudo add-apt-repository -y ppa:ethereum/ethereum'
+	ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'yes | sudo apt-get update'
+	ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'yes | sudo apt-get install ethereum'
+	scp -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i $VPSKEY rinkeby.json $USER@$VPSIP:~/
+	ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'geth --datadir='$DIR'/.rinkeby init rinkeby.json'
+	scp -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i $VPSKEY static-nodes.json $USER@$VPSIP:$DIR/.rinkeby/geth/static-nodes.json
+	scp -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i $VPSKEY geth.service  $USER@$VPSIP:~/
+	ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'yes | sudo chmod 322 geth.service'
+	ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'yes | sudo mv geth.service /lib/systemd/system/geth.service'
+	ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'yes | sudo systemctl enable geth'
+	ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'yes | sudo systemctl start geth'
+  fi
+}
+
+start_lightnode(){
+  echo "start_lightnode"
+  ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'ps cax | grep geth > /dev/null'
+  if [ $? -eq 0 ]
+  then
+	echo "Geth Process is running."
+  else
+	ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'yes | sudo systemctl start geth'
+  fi
 }
 
 install_client(){
-  ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'yes | [ -f "client" ] && rm client'
-  scp -i $VPSKEY client  $USER@$VPSIP:~/
-  update_config
+	ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'yes | [ -f "client" ] && rm client'
+	scp -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i $VPSKEY client  $USER@$VPSIP:$DIR/
+	update_config
 }
 
 update_config(){
-	ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'mkdir -p dos'
-	ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'mkdir -p credential'
-	scp -i $VPSKEY .dosenv $USER@$VPSIP:~/
-	scp -i $VPSKEY config.json $USER@$VPSIP:~/
-	scp -i $VPSKEY $KEYPATH $USER@$VPSIP:~/credential/
+	ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'mkdir -p '$DIR'/dos'
+	ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'mkdir -p '$DIR'/credential'
+	scp -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i $VPSKEY config.json $USER@$VPSIP:~/
+	scp -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i $VPSKEY $KEYSTORE $USER@$VPSIP:$DIR'/credential/'
 }
 
 run_client(){
-	ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'source ~/.dosenv; echo -n Password:;read -s password ;export PASSPHRASE=$password ;setsid ./client start >dos/dos.log 2>&1'
+	ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP 'export GETHPOOL="'$GETHPOOL'";export PUBLICIP='$VPSIP'; echo -n Password:;read -s password ;export PASSPHRASE=$password ;setsid ./client start >dos/doslog 2>&1'
 }
 
 stop_client(){
@@ -42,6 +99,10 @@ stop_client(){
 
 show_proxy(){
 	ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP './client cmd showProxyStatus'
+}
+
+clientInfo(){
+	ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $VPSKEY $USER@$VPSIP './client cmd showStatus'
 }
 
 trigger_guardian(){
@@ -58,41 +119,39 @@ check_client(){
 }
 
 case "$1" in
-  "install_lightnode")
-    install_lightnode
+  "install")
+	install_lightnode
+	install_client
+	;;
+  "run")
+	run_client
+	;;
+  "stop")
+	stop_client
+	;;
+  "check")
+	check_client
     ;;
-  "install_client")
-    install_client
-    ;;
-  "update_config")
-    update_config
-    ;;
-  "run_client")
-    run_client
-    ;;
-  "stop_client")
-    stop_client
-    ;;
-  "show_proxy")
-    show_proxy
-    ;;
-  "trigger_guardian")
-    trigger_guardian
-    ;;
-  "check_client")
-    check_client
-    ;;
+  "proxyInfo")
+	show_proxy
+	;;
+  "clientInfo")
+	clientInfo
+	;;
+  "guardian")
+	guardian
+	;;
   *)
     echo "Usage: bash vps.sh [OPTION]"
 	echo "OPTION:"
-	echo "  install_lightnode"
-	echo "  install_client"
-	echo "  run_client"
-	echo "  stop_client"
-	echo "  show_proxy"
-	echo "  trigger_guardian"
-	echo "  check_client"
-	echo "  update_config"
+	echo "  install       Install lightnode and dos client"
+	echo "  run           Run the client"
+	echo "  stop          Stop the client"
+	echo "  check         Check to see if client is running; Download log if client is not running"
+	echo "  proxyInfo     Print proxy information"
+	echo "  clientInfo    Print client information"
+	echo "  guardian      Trigger guardian"
     exit 1
     ;;
 esac
+
