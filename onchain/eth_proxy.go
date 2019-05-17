@@ -207,7 +207,7 @@ func NewEthAdaptor(credentialPath, passphrase, proxyAddr, commitRevealAddr strin
 
 	adaptor.ctx, adaptor.cancelFunc = context.WithCancel(context.Background())
 	adaptor.auth = bind.NewKeyedTransactor(key.PrivateKey)
-	//adaptor.auth.GasPrice = big.NewInt(30)
+	adaptor.auth.GasPrice = big.NewInt(2000000000)
 	adaptor.auth.GasLimit = uint64(GASLIMIT)
 	adaptor.auth.Context = adaptor.ctx
 
