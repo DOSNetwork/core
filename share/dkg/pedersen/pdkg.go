@@ -3,6 +3,7 @@ package dkg
 import (
 	"bytes"
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
@@ -15,6 +16,7 @@ import (
 	"github.com/DOSNetwork/core/share/vss/pedersen"
 	"github.com/DOSNetwork/core/suites"
 	"github.com/dedis/kyber"
+	"golang.org/x/crypto/sha3"
 )
 
 var logger log.Logger
@@ -53,7 +55,7 @@ func NewPDKG(p p2p.P2PInterface, suite suites.Suite) PDKGInterface {
 	logger = log.New("module", "dkg")
 	pdkg := &PDKG{
 		p:         p,
-		bufToNode: make(chan interface{}, 10),
+		bufToNode: make(chan interface{}, 50),
 		register:  make(chan *Group),
 		suite:     suite,
 	}
@@ -180,12 +182,17 @@ func (d *PDKG) Listen() {
 				switch content := msg.Msg.Message.(type) {
 				case *PublicKey:
 					sessionPubKeys[content.SessionId] = append(sessionPubKeys[content.SessionId], content)
+					logger.Event("PublicKeyFromPeer", map[string]interface{}{"GroupID": content.SessionId})
+
 					go func() { d.p.Reply(msg.Sender, msg.RequestNonce, &PublicKey{}) }()
 				case *Deal:
 					sessionDeals[content.SessionId] = append(sessionDeals[content.SessionId], content)
+					logger.Event("DealsFromPeer", map[string]interface{}{"GroupID": content.SessionId})
+
 					go func() { d.p.Reply(msg.Sender, msg.RequestNonce, &Deal{}) }()
 				case *Responses:
 					sessionResps[content.SessionId] = append(sessionResps[content.SessionId], content.Response...)
+					logger.Event("ResponsesFromPeer", map[string]interface{}{"GroupID": content.SessionId})
 					go func() { d.p.Reply(msg.Sender, msg.RequestNonce, &Responses{}) }()
 				}
 			case msg, ok := <-d.bufToNode:
@@ -323,6 +330,26 @@ func genPubKey(ctx context.Context, group *Group, suite suites.Suite, dkgc <-cha
 	}()
 	return out, errc
 }
+func ByteTohex(a []byte) string {
+	unchecksummed := hex.EncodeToString(a[:])
+	sha := sha3.NewLegacyKeccak256()
+	sha.Write([]byte(unchecksummed))
+	hash := sha.Sum(nil)
+
+	result := []byte(unchecksummed)
+	for i := 0; i < len(result); i++ {
+		hashByte := hash[i/2]
+		if i%2 == 0 {
+			hashByte = hashByte >> 4
+		} else {
+			hashByte &= 0xf
+		}
+		if result[i] > '9' && hashByte > 7 {
+			result[i] -= 32
+		}
+	}
+	return "0x" + string(result)
+}
 func exchangePub(ctx context.Context, suite suites.Suite, bufToNode chan interface{}, groupIds [][]byte, p p2p.P2PInterface, sessionID string) (<-chan *DistKeyGenerator, <-chan error) {
 	out := make(chan *DistKeyGenerator)
 	errc := make(chan error)
@@ -331,6 +358,37 @@ func exchangePub(ctx context.Context, suite suites.Suite, bufToNode chan interfa
 		defer close(out)
 		defer close(errc)
 		logger.Event("exchangePub", map[string]interface{}{"GroupID": sessionID})
+
+		for i := 0; i < len(groupIds); i++ {
+			start := time.Now()
+			if !bytes.Equal(p.GetID(), groupIds[i]) {
+				retry := 0
+				for {
+					if retry >= 10 {
+						break
+					}
+					if _, err := p.ConnectTo("", groupIds[i]); err != nil {
+						fmt.Println("ConnectTo done retry=", retry, err)
+						retry++
+						time.Sleep(1 * time.Second)
+					} else {
+						break
+					}
+				}
+
+				f := map[string]interface{}{
+					"GroupID":  sessionID,
+					"retry":    retry,
+					"costTime": time.Since(start).Nanoseconds() / 1000,
+					"From":     ByteTohex(p.GetID()),
+					"To":       ByteTohex(groupIds[i])}
+				if retry >= 10 {
+					logger.Event("DKGConnectToFaile", f)
+				} else {
+					logger.Event("DKGConnectToSuccess", f)
+				}
+			}
+		}
 
 		//Generate secret and public key
 		sec := suite.Scalar().Pick(suite.RandomStream())

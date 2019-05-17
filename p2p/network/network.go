@@ -21,6 +21,7 @@ func NewSerfNet(Addr net.IP, id []byte) (n Network, err error) {
 	conf := serf.DefaultConfig()
 	conf.Init()
 	conf.LogOutput = ioutil.Discard
+	conf.MemberlistConfig.LogOutput = ioutil.Discard
 	conf.MemberlistConfig.AdvertiseAddr = Addr.String()
 	conf.NodeName = string(id)
 	serfNet.serf, err = serf.Create(conf)
