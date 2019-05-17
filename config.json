@@ -1,4 +1,5 @@
 {
+    "NodeRole": "",
     "BootStrapIp": [
         "18.236.117.126",
         "18.236.199.131",
@@ -10,10 +11,12 @@
     "ChainConfigs": {
         "ETH": {
             "rinkeby": {
-                "DOSProxyAddress": "0x8F7d3388D2751bbFB33748a21cAB43f777445CB1",
-                "DOSPaymentAddress": "0x0B32E99A1b1b721d74AfCb817F5a0d676D308d28",
-                "DOSAddressBridgeAddress": "0x30a631f9A817F68ab2586fA073c8e03C6d3832E2",
-                "CommitReveal": "0x1DEbeB7a4a11A7FD6aEe9FF988569F7EcC8106C7"
+                "DOSProxyAddress": "0xf3d1F14620eCAFF7DF9f917c1A3eC21a40B87B7F",
+                "DOSPaymentAddress": "0x9FDf523e39F023B510128c15bb214b063bf90adA",
+                "DOSAddressBridgeAddress": "0x6DDf7C941106E875a96747e785c19dFd408d5117",
+                "CommitReveal": "0xA956D5B0a1161fA1b00A2AF3267CF418338F5E6e",
+                "RemoteNodeAddressPool": [
+                ]
             }
         }
     }

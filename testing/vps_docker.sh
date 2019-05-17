@@ -45,16 +45,16 @@ update_dos_config(){
 }
 
 run_dos(){
-	ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i "" ubuntu@${ips[$i]} 'docker pull dosnetwork/dosnode:latest'
+	ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i "" ubuntu@${ips[$i]} 'docker pull dosnetwork/dosnode:beta'
 	ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i "" ubuntu@${ips[$i]} 'docker run -it -d \
 --mount type=bind,source=/home/ubuntu/credential,target=/credential  \
 --mount type=bind,source=/home/ubuntu/credential,target=/app-logs  \
 -e LOGIP=  \
--e CHAINNODE=rinkebyPrivateNode  \
+-e CHAINNODE=rinkeby  \
 -e PASSPHRASE=  \
--e APPSESSION=Beta  \
+-e APPSESSION=BETA  \
 -e APPNAME=DosNode  \
-dosnetwork/dosnode:latest'
+dosnetwork/dosnode:beta'
 }
 
 dos_log(){
