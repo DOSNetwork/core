@@ -1,19 +1,8 @@
-## <img align="left" width=30 src="media/logo-white.jpg"> DOS Client and Core Libraries
+# <img align="left" width=30 src="media/logo-white.jpg"> DOS Client and Core Libraries
 
 
-### Beta includes following components
-- Secret Sharing 
-- Distributed Key Generation (Pedersen's DKG approach)
-- Paring Library and BLS Signature
-- Gossip & DHT Implementation
-- P2P NAT Support
-- Json / Xml / Html Parser
-- Integration with Ethereum On-chain [System Contracts](https://github.com/DOSNetwork/eth-contracts)
-- Dockerize and Deployment Script
-
-
-### Development setup:
-- Install Go [recommended version 1.10 and above](https://blog.golang.org/go1.10) and [setup golang workingspace](https://golang.org/doc/install), specifically environment variables like GOPATH.
+## Development Setup:
+- [Install](https://golang.org/doc/install) Go (recommended version 1.10+) and setup golang workingspace, specifically by adding environment variable [GOPATH](https://golang.org/doc/code.html#GOPATH) into PATH.
 - Install [dep](https://golang.github.io/dep/docs/daily-dep.html#key-takeaways) to manage package dependencies and versions.
   - Run `$ dep ensure` to update missing dependencies/packages.
   - [Visualize package dependencies](https://golang.github.io/dep/docs/daily-dep.html#visualizing-dependencies)
@@ -32,8 +21,8 @@
 
 
 
-### Running a Beta DOS Client on a VPS (Ubuntu 16.04 LTS):
-#### Requirements
+## Running a Beta DOS Client on a VPS (Ubuntu 16.04 LTS):
+### Requirements
 1) A Ubuntu 16.04 LTS VPS
 - A public IP
 - Open 7946,8545,8546 and 9501 ports
@@ -43,7 +32,7 @@
 - [Get Rinkeby test Ether from faucet](https://faucet.rinkeby.io/)
 - DOS Token 
 
-#### 1) Prepare the environment
+### 1) Prepare the environment
 - Download [vps_docker.sh](https://raw.githubusercontent.com/DOSNetwork/core/Beta/vps_docker.sh) or [vps.sh](https://raw.githubusercontent.com/DOSNetwork/core/Beta/vps.sh),[dos.setting](https://raw.githubusercontent.com/DOSNetwork/core/Beta/dos.setting),[static-nodes.json](https://raw.githubusercontent.com/DOSNetwork/core/Beta/static-nodes.json),[config.json](https://raw.githubusercontent.com/DOSNetwork/core/Beta/config.json),[rinkeby.json](https://www.rinkeby.io/rinkeby.json) and [geth.service](https://raw.githubusercontent.com/DOSNetwork/core/Beta/geth.service)
 - setup the following setting in the [dos.setting](https://raw.githubusercontent.com/DOSNetwork/core/Beta/dos.setting)
 	- USER : VPS user name
@@ -68,7 +57,7 @@
 			WorkingDirectory=/home/tester
 			User=tester
 			ExecStart=/usr/bin/geth --datadir /home/tester/.rinkeby ...
-#### 2) Install and run the client (Docker or Binary)
+### 2) Install and run the client (Docker or Binary)
 - Install and setup directorys for client
 ```sh
 $ bash vps_docker.sh install
@@ -94,6 +83,22 @@ or
 $ bash vps.sh clientInfo
 ```
 
-#### 2) Build the client locally and run the client on a VPS
+### 2) Build the client locally and run the client on a VPS
 - Follow the section [DEV setup and workflow] to build client
 - 
+
+
+
+## Status
+- ☑️ Secret Sharing
+- ☑️ Distributed Key Generation (Pedersen's DKG approach)
+- ☑️ Paring Library and BLS Signature
+- ☑️ Distributed Randomness Engine with VRF
+- ☑️ Gossip & DHT Implementation
+- ☑️ P2P NAT Support
+- ☑️ Json / Xml / Html Parser
+- ☑️ Dockerize and Deployment Script
+- ☑️ Integration with Ethereum On-chain [System Contracts](https://github.com/DOSNetwork/eth-contracts)
+- :white_large_square: P2P Network Performance Tuning
+- :white_large_square: Network Status Scanner/Explorer
+- :white_large_square: Staking & Delegation Contracts with a User-friendly Frontend
