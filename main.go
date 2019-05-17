@@ -13,14 +13,12 @@ import (
 	"syscall"
 
 	"github.com/DOSNetwork/core/dosnode"
-
-	//"github.com/pkg/profile"
-
 	"github.com/urfave/cli"
 	"golang.org/x/crypto/ssh/terminal"
 )
 
-var PIDFile = "./dosclient.pid"
+// Caching running node's process id.
+const PIDFile string = "./dosclient.pid"
 
 func savePID(pid int) {
 
@@ -135,7 +133,7 @@ func main() {
 			Action: func(c *cli.Context) error {
 				// check if daemon already running.
 				if _, err := os.Stat(PIDFile); err == nil {
-					fmt.Println("Already running or /tmp/dosclient.pid file exist.")
+					fmt.Println("Already running or ${PWD}/dosclient.pid file exist.")
 					os.Exit(1)
 				}
 				password := os.Getenv("PASSPHRASE")
@@ -157,46 +155,41 @@ func main() {
 			Name:  "stop",
 			Usage: "Stop a daemon",
 			Action: func(c *cli.Context) error {
-				if _, err := os.Stat(PIDFile); err == nil {
+				_, err := os.Stat(PIDFile)
+				if err == nil {
 					data, err := ioutil.ReadFile(PIDFile)
 					if err != nil {
 						fmt.Println("Not running")
-						return nil
+						return err
 					}
-					ProcessID, err := strconv.Atoi(string(data))
 
+					ProcessID, err := strconv.Atoi(string(data))
 					if err != nil {
 						fmt.Println("Unable to read and parse process id found in ", PIDFile)
-						return nil
+						return err
 					}
 
 					process, err := os.FindProcess(ProcessID)
-
 					if err != nil {
 						fmt.Printf("Unable to find process ID [%v] with error %v \n", ProcessID, err)
-						return nil
+						return err
 					}
+
 					// remove PID file
 					os.Remove(PIDFile)
-
 					fmt.Printf("Killing process ID [%v] now.\n", ProcessID)
+
 					// kill process and exit immediately
 					err = process.Kill()
-
 					if err != nil {
 						fmt.Printf("Unable to kill process ID [%v] with error %v \n", ProcessID, err)
-						return nil
-					} else {
-						fmt.Printf("Killed process ID [%v]\n", ProcessID)
-						return nil
+						return err
 					}
-
-				} else {
-
-					fmt.Println("Not running.")
+					fmt.Printf("Killed process ID [%v]\n", ProcessID)
 					return nil
 				}
-				return nil
+				fmt.Println("Not running.")
+				return err
 			},
 		},
 		{
@@ -207,54 +200,72 @@ func main() {
 					Name:  "showStatus",
 					Usage: "show status",
 					Action: func(c *cli.Context) error {
-						r, _ := makeRequest("/", []byte{})
-						fmt.Println(string(r))
-						return nil
+						r, err := makeRequest("/", []byte{})
+						if err == nil {
+							fmt.Println(string(r))
+							return nil
+						}
+						return err
 					},
 				},
 				{
 					Name:  "showBalance",
 					Usage: "show balance",
 					Action: func(c *cli.Context) error {
-						r, _ := makeRequest("balance", []byte{})
-						fmt.Println("show balance: ", string(r))
-						return nil
+						r, err := makeRequest("/", []byte{})
+						if err == nil {
+							fmt.Println("show balance: ", string(r))
+							return nil
+						}
+						return err
 					},
 				},
 				{
 					Name:  "showGroups",
 					Usage: "show how many group this client belong to",
 					Action: func(c *cli.Context) error {
-						r, _ := makeRequest("groups", []byte{})
-						fmt.Println("show group number: ", string(r))
-						return nil
+						r, err := makeRequest("/", []byte{})
+						if err == nil {
+							fmt.Println("show group number: ", string(r))
+							return nil
+						}
+						return err
 					},
 				},
 				{
 					Name:  "showProxyStatus",
 					Usage: "show proxy status",
 					Action: func(c *cli.Context) error {
-						r, _ := makeRequest("proxy", []byte{})
-						fmt.Println("show proxy status : \n", string(r))
-						return nil
+						r, err := makeRequest("/", []byte{})
+						if err == nil {
+							fmt.Println("show proxy status : \n", string(r))
+							return nil
+						}
+						return err
 					},
 				},
 				{
 					Name:  "triggerGuardian",
 					Usage: "trigger guardian functions",
 					Action: func(c *cli.Context) error {
-						r, _ := makeRequest("guardian", []byte{})
-						fmt.Println("trigger guardian functions : \n", string(r))
-						return nil
+						r, err := makeRequest("/", []byte{})
+						if err == nil {
+							fmt.Println("trigger guardian functions : \n", string(r))
+							return nil
+						}
+						return err
 					},
 				},
 				{
 					Name:  "testP2P",
 					Usage: "connect to all peer in members to check network condition",
 					Action: func(c *cli.Context) error {
-						r, _ := makeRequest("p2p", []byte{})
-						fmt.Println("test p2p : \n", string(r))
-						return nil
+						r, err := makeRequest("/", []byte{})
+						if err == nil {
+							fmt.Println("test p2p : \n", string(r))
+							return nil
+						}
+						return err
 					},
 				},
 			},
