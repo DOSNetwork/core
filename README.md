@@ -14,23 +14,36 @@
   - `$ make devClient` to build develoment version client.
   - `$ make updateSubmodule` to fetch latest system contracts from [repo](https://github.com/DOSNetwork/eth-contracts), instead of making contract modifications locally.
   - `$ make gen` to generate binding files for system contracts.
-- Dev:
-  - `$ go fmt .` for indentation and basic coding styles.
-  - `$ make clean` to remove binaries or unnecessary generated files.
-  - `$ make build && cd testing && make deploy && make buildDockers && cd ../ && docker-compose up --scale dosnode=3` to do local tests.
+- Dev tips:
+  - `$ go fmt ./...` to reformat go source code.
+  - `$ golint` to fix style mistakes conflicting with [effective go](https://golang.org/doc/effective_go.html). ([golint](https://github.com/golang/lint) tool for vim users.)
+  - `$ make clean` to remove built binaries or unnecessary generated files.
 
 
 
-## Running a Beta DOS Client on a VPS (Ubuntu 16.04 LTS):
+## Running a Beta DOS node on a cloud server or VPS:
 ### Requirements
-1) A Ubuntu 16.04 LTS VPS
-- A public IP
-- Open 7946,8545,8546 and 9501 ports
+1) Cloud Server / VPS Recommendations:
+ - [Vultr](https://www.vultr.com/?ref=7806004-4F) - Cloud Compute $5 monthly plan (1CPU, 1GB Memory, 25GB SSD, 1TB Bandwidth)
+ - [AWS Lightsail](https://aws.amazon.com/lightsail/pricing/?opdp1=pricing) - $5 monthly plan (1CPU, 1GB Memory, 40GB SSD, 2TB Bandwidth)
+ - [DigitalOcean](https://m.do.co/c/a912bdc08b78) - Droplet $5 monthly plan (1CPU, 25GB SSD, 1TB Bandwidth)
+ - [Linode](https://www.linode.com/?r=35c0c22d412b3fc8bd98b4c7c6f5ac42ae3bc2e2) - $5 monthly plan (1CPU, 1GB Memory, 25GB SSD, 1TB Bandwidth)
+ - .
+
+2) Verified and recommended installation environment
+- Ubuntu 16.04 x64 LTS or higher 
+- A static IPv4 address
+- Open port `7946, 8545, 8546 and 9501`
+
 - A ssh private key file for the VPS ( [How to set up ssh for Amazon Lightsail...](https://lightsail.aws.amazon.com/ls/docs/en_us/articles/lightsail-how-to-set-up-ssh))
-2) An Ethereum wallet with enough ether and DOS token.
+
+3) An Ethereum wallet with enough ether and DOS token.
 - An Ethereum keystore file ( [Create a keystore by geth ](https://github.com/ethereum/go-ethereum/wiki/Managing-your-accounts) or [Export a keystore through MyEtherwWllet Extension](https://bitcointalk.org/index.php?topic=3014688.0)])
-- [Get Rinkeby test Ether from faucet](https://faucet.rinkeby.io/)
-- DOS Token 
+- Acquire testnet ether from rinkeby [faucet](https://faucet.rinkeby.io/)
+- Acquire 50,000 [testnet DOS token](https://rinkeby.etherscan.io/address/0x214e79c85744cd2ebbc64ddc0047131496871bee)
+- (Optional - acquire several [testnet DropBurn token](https://rinkeby.etherscan.io/address/0x9bfe8f5749d90eb4049ad94cc4de9b6c4c31f822))
+
+
 
 ### 1) Prepare the environment
 - Download [vps_docker.sh](https://raw.githubusercontent.com/DOSNetwork/core/Beta/vps_docker.sh) or [vps.sh](https://raw.githubusercontent.com/DOSNetwork/core/Beta/vps.sh),[dos.setting](https://raw.githubusercontent.com/DOSNetwork/core/Beta/dos.setting),[static-nodes.json](https://raw.githubusercontent.com/DOSNetwork/core/Beta/static-nodes.json),[config.json](https://raw.githubusercontent.com/DOSNetwork/core/Beta/config.json),[rinkeby.json](https://www.rinkeby.io/rinkeby.json) and [geth.service](https://raw.githubusercontent.com/DOSNetwork/core/Beta/geth.service)
