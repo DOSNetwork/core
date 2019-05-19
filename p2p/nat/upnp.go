@@ -10,10 +10,10 @@ import (
 )
 
 var (
-	_ NAT = (*upnp_NAT)(nil)
+	_ NAT = (*uPnPNAT)(nil)
 )
 
-func discoverUPNP_IG1() <-chan NAT {
+func discoverUPNPIG1() <-chan NAT {
 	res := make(chan NAT, 1)
 	go func() {
 
@@ -38,7 +38,7 @@ func discoverUPNP_IG1() <-chan NAT {
 					}}
 					_, isNat, err := client.GetNATRSIPStatus()
 					if err == nil && isNat {
-						res <- &upnp_NAT{client, make(map[int]int), "UPNP (IG1-IP1)", dev.Root}
+						res <- &uPnPNAT{client, make(map[int]int), "UPNP (IG1-IP1)", dev.Root}
 						return
 					}
 
@@ -50,7 +50,7 @@ func discoverUPNP_IG1() <-chan NAT {
 					}}
 					_, isNat, err := client.GetNATRSIPStatus()
 					if err == nil && isNat {
-						res <- &upnp_NAT{client, make(map[int]int), "UPNP (IG1-PPP1)", dev.Root}
+						res <- &uPnPNAT{client, make(map[int]int), "UPNP (IG1-PPP1)", dev.Root}
 						return
 					}
 
@@ -62,7 +62,7 @@ func discoverUPNP_IG1() <-chan NAT {
 	return res
 }
 
-func discoverUPNP_IG2() <-chan NAT {
+func discoverUPNPIG2() <-chan NAT {
 	res := make(chan NAT, 1)
 	go func() {
 
@@ -87,7 +87,7 @@ func discoverUPNP_IG2() <-chan NAT {
 					}}
 					_, isNat, err := client.GetNATRSIPStatus()
 					if err == nil && isNat {
-						res <- &upnp_NAT{client, make(map[int]int), "UPNP (IG2-IP1)", dev.Root}
+						res <- &uPnPNAT{client, make(map[int]int), "UPNP (IG2-IP1)", dev.Root}
 						return
 					}
 
@@ -99,7 +99,7 @@ func discoverUPNP_IG2() <-chan NAT {
 					}}
 					_, isNat, err := client.GetNATRSIPStatus()
 					if err == nil && isNat {
-						res <- &upnp_NAT{client, make(map[int]int), "UPNP (IG2-IP2)", dev.Root}
+						res <- &uPnPNAT{client, make(map[int]int), "UPNP (IG2-IP2)", dev.Root}
 						return
 					}
 
@@ -111,7 +111,7 @@ func discoverUPNP_IG2() <-chan NAT {
 					}}
 					_, isNat, err := client.GetNATRSIPStatus()
 					if err == nil && isNat {
-						res <- &upnp_NAT{client, make(map[int]int), "UPNP (IG2-PPP1)", dev.Root}
+						res <- &uPnPNAT{client, make(map[int]int), "UPNP (IG2-PPP1)", dev.Root}
 						return
 					}
 
@@ -123,20 +123,20 @@ func discoverUPNP_IG2() <-chan NAT {
 	return res
 }
 
-type upnp_NAT_Client interface {
+type uPnPNATClient interface {
 	GetExternalIPAddress() (string, error)
 	AddPortMapping(string, uint16, string, uint16, string, bool, string, uint32) error
 	DeletePortMapping(string, uint16, string) error
 }
 
-type upnp_NAT struct {
-	c          upnp_NAT_Client
+type uPnPNAT struct {
+	c          uPnPNATClient
 	ports      map[int]int
 	typ        string
 	rootDevice *goupnp.RootDevice
 }
 
-func (u *upnp_NAT) getExternalAddress() (addr net.IP, err error) {
+func (u *uPnPNAT) getExternalAddress() (addr net.IP, err error) {
 	ipString, err := u.c.GetExternalIPAddress()
 	if err != nil {
 		return nil, err
@@ -161,7 +161,7 @@ func mapProtocol(s string) string {
 	}
 }
 
-func (u *upnp_NAT) addPortMapping(protocol string, externalPort, internalPort int, description string, timeout time.Duration) error {
+func (u *uPnPNAT) addPortMapping(protocol string, externalPort, internalPort int, description string, timeout time.Duration) error {
 	u.deletePortMapping(protocol, internalPort)
 
 	ip, err := u.getInternalAddress()
@@ -189,7 +189,7 @@ func (u *upnp_NAT) addPortMapping(protocol string, externalPort, internalPort in
 	return err
 }
 
-func (u *upnp_NAT) deletePortMapping(protocol string, internalPort int) error {
+func (u *uPnPNAT) deletePortMapping(protocol string, internalPort int) error {
 	if externalPort := u.ports[internalPort]; externalPort > 0 {
 		delete(u.ports, internalPort)
 		return u.c.DeletePortMapping("", uint16(externalPort), mapProtocol(protocol))
@@ -198,7 +198,7 @@ func (u *upnp_NAT) deletePortMapping(protocol string, internalPort int) error {
 	return nil
 }
 
-func (u *upnp_NAT) getDeviceAddress() (net.IP, error) {
+func (u *uPnPNAT) getDeviceAddress() (net.IP, error) {
 	addr, err := net.ResolveUDPAddr("udp4", u.rootDevice.URLBase.Host)
 	if err != nil {
 		return nil, err
@@ -207,7 +207,7 @@ func (u *upnp_NAT) getDeviceAddress() (net.IP, error) {
 	return addr.IP, nil
 }
 
-func (u *upnp_NAT) getInternalAddress() (net.IP, error) {
+func (u *uPnPNAT) getInternalAddress() (net.IP, error) {
 	devAddr, err := u.getDeviceAddress()
 	if err != nil {
 		return nil, err
@@ -237,4 +237,4 @@ func (u *upnp_NAT) getInternalAddress() (net.IP, error) {
 	return nil, ErrNoInternalAddress
 }
 
-func (n *upnp_NAT) getType() string { return n.typ }
+func (u *uPnPNAT) getType() string { return u.typ }

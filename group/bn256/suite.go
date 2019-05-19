@@ -74,7 +74,7 @@ func (s *Suite) Scalar() kyber.Scalar {
 }
 
 // String returns a recognizable string that this is a combined suite.
-func (c Suite) String() string {
+func (s Suite) String() string {
 	return "bn256"
 }
 

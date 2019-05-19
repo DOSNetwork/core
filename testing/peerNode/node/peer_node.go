@@ -117,9 +117,8 @@ func (d *PeerNode) requestIsReady() bool {
 		return false
 	} else if r[0] == byte(ALLNODEREADY) {
 		return true
-	} else {
-		return false
 	}
+	return false
 }
 
 func (d *PeerNode) requestIsNextRoundReady(roundCount uint16) byte {
@@ -153,10 +152,8 @@ func (d *PeerNode) requestIsFinish() bool {
 		return false
 	} else if r[0] == byte(ALLNODEFINISH) {
 		return true
-	} else {
-		return false
 	}
-
+	return false
 }
 
 func (d *PeerNode) Init(bootStrapIp string, port string, peerSize int, numMessages int, tStrategy string) {

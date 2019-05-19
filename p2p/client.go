@@ -113,7 +113,7 @@ func NewClient(suite suites.Suite, secKey kyber.Scalar, localPubKey kyber.Point,
 	errs = append(errs, errc)
 	decrypted, errc := decrypt(client.ctx, client.dhKey, client.dhNonce, bytes)
 	errs = append(errs, errc)
-	client.receiver, packByte, errc = dispatch(client.localID, client.remoteID, incomingConn, client.ctx, client.suite, client.remotePubKey, localID, client.sender, decrypted)
+	client.receiver, packByte, errc = dispatch(client.ctx, client.localID, client.remoteID, incomingConn, client.suite, client.remotePubKey, client.sender, decrypted)
 	errs = append(errs, errc)
 	encrypted, errc := encrypt(client.ctx, client.dhKey, client.dhNonce, packByte)
 	errs = append(errs, errc)
@@ -392,7 +392,7 @@ func decrypt(ctx context.Context, dhKey, dhNonce []byte, ciphertext chan []byte)
 	return out, errc
 }
 
-func dispatch(localID, remoteID []byte, incomingConn bool, ctx context.Context, suite suites.Suite, pub kyber.Point, Id []byte, sendMsg chan Request, receiveBytes chan []byte) (chan interface{}, chan []byte, chan error) {
+func dispatch(ctx context.Context, localID, remoteID []byte, incomingConn bool, suite suites.Suite, pub kyber.Point, sendMsg chan Request, receiveBytes chan []byte) (chan interface{}, chan []byte, chan error) {
 	receiver := make(chan interface{}, 21)
 	sender := make(chan []byte, 21)
 	errc := make(chan error)

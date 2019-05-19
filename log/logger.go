@@ -57,9 +57,8 @@ type logger struct {
 func (l *logger) New(key string, value interface{}) Logger {
 	if l.entry != nil {
 		return &logger{l.entry.WithFields(logrus.Fields{key: value})}
-	} else {
-		return nil
 	}
+	return nil
 }
 
 func (l *logger) AddField(key string, value interface{}) {

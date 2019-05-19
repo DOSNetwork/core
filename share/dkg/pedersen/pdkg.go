@@ -141,16 +141,15 @@ func (d *PDKG) Grouping(ctx context.Context, groupId string, participants [][]by
 	var errcList []<-chan error
 	if _, loaded := d.groups.LoadOrStore(groupId, group); loaded {
 		return nil, nil, errors.New("dkg: duplicate share public key")
-	} else {
-		dkgc, errc := exchangePub(ctx, d.suite, d.bufToNode, participants, d.p, groupId)
-		errcList = append(errcList, errc)
-		dkgCetifiedc, errc := processDeal(ctx, dkgc, d.bufToNode, participants, d.p, groupId)
-		errcList = append(errcList, errc)
-		outc, errc := genPubKey(ctx, group, d.suite, dkgCetifiedc, groupId)
-		errcList = append(errcList, errc)
-		errc = mergeErrors(ctx, errcList...)
-		return outc, errc, nil
 	}
+	dkgc, errc := exchangePub(ctx, d.suite, d.bufToNode, participants, d.p, groupId)
+	errcList = append(errcList, errc)
+	dkgCetifiedc, errc := processDeal(ctx, dkgc, d.bufToNode, participants, d.p, groupId)
+	errcList = append(errcList, errc)
+	outc, errc := genPubKey(ctx, group, d.suite, dkgCetifiedc, groupId)
+	errcList = append(errcList, errc)
+	errc = mergeErrors(ctx, errcList...)
+	return outc, errc, nil
 }
 
 func (d *PDKG) GetGroupNumber() int {

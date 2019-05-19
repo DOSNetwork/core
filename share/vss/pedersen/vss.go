@@ -784,8 +784,8 @@ func (p *PublicKeys) SetPointArray(s Suite, points []kyber.Point) (err error) {
 	return
 }
 
-func (ps *PublicKeys) GetPointArray(s Suite) (ret []kyber.Point, err error) {
-	pubkeys := ps.Keys
+func (p *PublicKeys) GetPointArray(s Suite) (ret []kyber.Point, err error) {
+	pubkeys := p.Keys
 	ret = make([]kyber.Point, len(pubkeys))
 	for i, pubkey := range pubkeys {
 		point := s.G2().Point()

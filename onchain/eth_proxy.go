@@ -434,13 +434,12 @@ func (e *EthAdaptor) sendRequest(ctx context.Context, c *ethclient.Client, pre <
 				if err == nil {
 					fmt.Println("Request has been fulfulled by previous sendRequest")
 					return
-				} else {
-					if strings.Contains(err.Error(), "transaction failed") {
-						fmt.Println("Transaction failed so delete the whole requestSend chain")
-						return
-					}
-					fmt.Println("Switch Client to handle request beacuse of e ,", err)
 				}
+				if strings.Contains(err.Error(), "transaction failed") {
+					fmt.Println("Transaction failed so delete the whole requestSend chain")
+					return
+				}
+				fmt.Println("Switch Client to handle request beacuse of e ,", err)
 			}
 		}
 
@@ -470,13 +469,11 @@ func (e *EthAdaptor) sendRequest(ctx context.Context, c *ethclient.Client, pre <
 						case <-ctx.Done():
 						}
 						return
-					} else {
-						fmt.Println("Retry :Reply err ", err, " Balance ", e.GetBalance())
-
-						time.Sleep(5 * time.Second)
-						retry--
-						continue
 					}
+					fmt.Println("Retry :Reply err ", err, " Balance ", e.GetBalance())
+					time.Sleep(5 * time.Second)
+					retry--
+					continue
 				}
 				//TODO : move this out of sendRequest
 				err = CheckTransaction(c, tx)
