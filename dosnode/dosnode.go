@@ -70,7 +70,7 @@ func NewDosNode(credentialPath, passphrase string) (dosNode *DosNode, err error)
 	}
 
 	port := config.Port
-	bootstrapIp := config.BootStrapIp
+	bootstrapIP := config.BootStrapIp
 
 	workingDir, err := os.Getwd()
 	if err != nil {
@@ -140,10 +140,10 @@ func NewDosNode(credentialPath, passphrase string) (dosNode *DosNode, err error)
 	}
 
 	//Bootstrapping p2p network
-	fmt.Println("Join :", bootstrapIp)
+	fmt.Println("Join :", bootstrapIP)
 	retry, num := 0, 0
 	for {
-		num, err = p.Join(bootstrapIp)
+		num, err = p.Join(bootstrapIP)
 		if err != nil || num == 0 {
 			fmt.Println("Join ", err, num)
 
@@ -281,7 +281,7 @@ func (d *DosNode) buildPipeline(valueCtx context.Context, groupID string, reques
 	//Build a pipeline
 	cSubmitter, cErr = choseSubmitter(valueCtx, d.chain, lastRand, ids, len(ids))
 	if len(cSubmitter) != len(ids) || len(ids) == 0 {
-		logger.Event("EuildPipeError2", map[string]interface{}{"GroupID": groupID, "RequestId": fmt.Sprintf("%x", requestID, "lenSubmitter", len(cSubmitter))})
+		logger.Event("EuildPipeError2", map[string]interface{}{"GroupID": groupID, "RequestId": fmt.Sprintf("%x", requestID), "lenSubmitter": len(cSubmitter)})
 		return
 	}
 	errcList = append(errcList, cErr)
@@ -333,7 +333,7 @@ func (d *DosNode) listen() (err error) {
 	errcList = append(errcList, errc)
 	eventGroupDissolve, errc := d.chain.SubscribeEvent(onchain.SubscribeDosproxyLogGroupDissolve)
 	errcList = append(errcList, errc)
-	chUrl, errc := d.chain.SubscribeEvent(onchain.SubscribeDosproxyLogUrl)
+	chURL, errc := d.chain.SubscribeEvent(onchain.SubscribeDosproxyLogUrl)
 	errcList = append(errcList, errc)
 	chRandom, errc := d.chain.SubscribeEvent(onchain.SubscribeDosproxyLogUpdateRandom)
 	errcList = append(errcList, errc)
@@ -676,7 +676,7 @@ func (d *DosNode) listen() (err error) {
 				d.buildPipeline(valueCtx, groupID, content.RequestId, content.LastSystemRandomness, content.UserSeed, "", "", uint32(onchain.TrafficUserRandom))
 				//}
 			}
-		case msg, ok := <-chUrl:
+		case msg, ok := <-chURL:
 			if !ok {
 				continue
 			}
@@ -784,7 +784,6 @@ func (d *DosNode) listen() (err error) {
 			return
 		}
 	}
-	return
 }
 
 func (d *DosNode) isMember(groupID string) bool {

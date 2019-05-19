@@ -170,7 +170,7 @@ func CheckSync(ctx context.Context, mClient *ethclient.Client, cs chan *ethclien
 
 			defer wg.Done()
 			ticker := time.NewTicker(time.Second * time.Duration(CHECKSYNCINTERVAL))
-			for _ = range ticker.C {
+			for range ticker.C {
 				highestBlk, e := mClient.BlockByNumber(ctx, nil)
 				if e != nil {
 					fmt.Println(e)

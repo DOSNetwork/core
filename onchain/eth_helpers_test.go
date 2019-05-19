@@ -82,7 +82,7 @@ func TestDialToEthDeadline(t *testing.T) {
 	clients := DialToEth(ctx, urls, nil)
 	time.Sleep(2 * time.Second)
 
-	for _ = range clients {
+	for range clients {
 		t.Errorf("Should not receive any client")
 	}
 }
@@ -101,7 +101,7 @@ func TestDialToEthErrHandling(t *testing.T) {
 	time.Sleep(2 * time.Second)
 
 	count := 0
-	for _ = range clients {
+	for range clients {
 		count++
 	}
 	if count != 1 {

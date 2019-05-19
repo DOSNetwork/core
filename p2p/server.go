@@ -70,8 +70,8 @@ type Subscription struct {
 	message   chan P2PMessage
 }
 
-func (n *Server) Join(bootstrapIp []string) (num int, err error) {
-	return n.network.Join(bootstrapIp)
+func (n *Server) Join(bootstrapIP []string) (num int, err error) {
+	return n.network.Join(bootstrapIP)
 }
 
 func (n *Server) Members() int {
@@ -503,8 +503,6 @@ func (n *Server) ConnectTo(addr string, id []byte) ([]byte, error) {
 	case <-callReq.ctx.Done():
 		return nil, callReq.ctx.Err()
 	}
-
-	return nil, err
 }
 
 func (n *Server) Request(id []byte, m proto.Message) (msg P2PMessage, err error) {
