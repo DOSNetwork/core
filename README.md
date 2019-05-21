@@ -1,5 +1,6 @@
 # <img align="left" width=30 src="media/logo-white.jpg"> DOS Client and Core Libraries
-
+ [![Go Report Card](https://goreportcard.com/badge/github.com/DOSNetwork/core)](https://goreportcard.com/report/github.com/DOSNetwork/core)
+ [![GoDoc](https://godoc.org/github.com/DOSNetwork/core?status.svg)](https://godoc.org/github.com/DOSNetwork/core)
 
 ## Development Setup:
 - [Install](https://golang.org/doc/install) Go (recommended version 1.10+) and setup golang workingspace, specifically by adding environment variable [GOPATH](https://golang.org/doc/code.html#GOPATH) into PATH.
