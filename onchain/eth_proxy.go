@@ -439,7 +439,7 @@ func (e *EthAdaptor) sendRequest(ctx context.Context, c *ethclient.Client, pre <
 					fmt.Println("Transaction failed so delete the whole requestSend chain")
 					return
 				}
-				fmt.Println("Switch Client to handle request beacuse of e ,", err)
+				fmt.Println("Switch Client to handle request because of e ,", err)
 			}
 		}
 
