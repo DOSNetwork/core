@@ -267,7 +267,6 @@ func genPubKey(ctx context.Context, group *Group, suite suites.Suite, dkgc <-cha
 	out := make(chan [5]*big.Int)
 	errc := make(chan error)
 	go func() {
-		defer logger.TimeTrack(time.Now(), "genPubKeyDone", map[string]interface{}{"GroupID": sessionID})
 
 		defer close(out)
 		defer close(errc)
@@ -282,6 +281,7 @@ func genPubKey(ctx context.Context, group *Group, suite suites.Suite, dkgc <-cha
 		case <-ctx.Done():
 			return
 		}
+		defer logger.TimeTrack(time.Now(), "genPubKeyDone", map[string]interface{}{"GroupID": sessionID})
 
 		if !dkg.Certified() {
 			err := errors.New("!dkg.Certified")
@@ -329,6 +329,7 @@ func genPubKey(ctx context.Context, group *Group, suite suites.Suite, dkgc <-cha
 	}()
 	return out, errc
 }
+
 func ByteTohex(a []byte) string {
 	unchecksummed := hex.EncodeToString(a[:])
 	sha := sha3.NewLegacyKeccak256()
@@ -349,6 +350,7 @@ func ByteTohex(a []byte) string {
 	}
 	return "0x" + string(result)
 }
+
 func exchangePub(ctx context.Context, suite suites.Suite, bufToNode chan interface{}, groupIds [][]byte, p p2p.P2PInterface, sessionID string) (<-chan *DistKeyGenerator, <-chan error) {
 	out := make(chan *DistKeyGenerator)
 	errc := make(chan error)
@@ -496,7 +498,6 @@ func processDeal(ctx context.Context, dkgc <-chan *DistKeyGenerator, bufToNode c
 	go func() {
 		defer close(out)
 		defer close(errc)
-		defer logger.TimeTrack(time.Now(), "processDealDone", map[string]interface{}{"GroupID": sessionID})
 		logger.Event("processDeal", map[string]interface{}{"GroupID": sessionID})
 
 		var dkg *DistKeyGenerator
@@ -509,6 +510,7 @@ func processDeal(ctx context.Context, dkgc <-chan *DistKeyGenerator, bufToNode c
 		case <-ctx.Done():
 			return
 		}
+		defer logger.TimeTrack(time.Now(), "processDealDone", map[string]interface{}{"GroupID": sessionID})
 
 		deals, err := dkg.Deals()
 		if err != nil {
