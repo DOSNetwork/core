@@ -66,8 +66,8 @@ endif
 
 build-client-docker:
 	cd .. && make client-docker
-	docker tag dosnode dosnetwork/dosnode:latest
-	docker push dosnetwork/dosnode:latest
+	docker tag dosnode dosnetwork/dosnode:dev
+	docker push dosnetwork/dosnode:dev
 
 dos-all:
 	$(MAKE) deploy-dos
