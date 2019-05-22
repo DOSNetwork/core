@@ -94,42 +94,39 @@ func fanIn(ctx context.Context, channels ...<-chan *vss.Signature) <-chan *vss.S
 	return multiplexedStream
 }
 
-func choseSubmitter(ctx context.Context, chain onchain.ProxyAdapter, lastSysRand *big.Int, ids [][]byte, outCount int) ([]chan []byte, <-chan error) {
+//choseSubmitter choses a submitter according to the last random number and check if the submitter is reachable
+func choseSubmitter(ctx context.Context, p p2p.P2PInterface, lastSysRand *big.Int, ids [][]byte, outCount int) ([]chan []byte, <-chan error) {
 	errc := make(chan error)
 	var outs []chan []byte
 	for i := 0; i < outCount; i++ {
 		outs = append(outs, make(chan []byte, 1))
 	}
+
 	go func() {
-		defer logger.TimeTrack(time.Now(), "ChoseSubmitter", map[string]interface{}{"GroupID": ctx.Value("GroupID"), "RequestID": ctx.Value("RequestID")})
-
 		defer close(errc)
-
+		start := time.Now()
 		lastRand := int(lastSysRand.Uint64())
 		if lastRand < 0 {
 			lastRand = 0 - lastRand
 		}
-		lastRand = lastRand - len(ids)
+
 		submitter := -1
-		//Check Balance
+		//Check to see if submitter is reachable
 		for i := 0; i < len(ids); i++ {
 			idx := (lastRand + i) % len(ids)
-			//if chain.EnoughBalance(common.BytesToAddress(ids[idx])) {
-			//	submitter = idx
-			//	break
-			//}
+			idx = 0
+			if !bytes.Equal(p.GetID(), ids[i]) {
+				if _, err := p.ConnectTo("", ids[i]); err != nil {
+					continue
+				}
+			}
 			submitter = idx
 			break
-			select {
-			case <-ctx.Done():
-				return
-			default:
-			}
 		}
 
 		if submitter == -1 {
 			select {
-			case errc <- errors.New("All member doen't have enough balance"):
+			case errc <- errors.New("No reachable submitter"):
 			case <-ctx.Done():
 			}
 		} else {
@@ -138,9 +135,12 @@ func choseSubmitter(ctx context.Context, chain onchain.ProxyAdapter, lastSysRand
 				case out <- ids[submitter]:
 				case <-ctx.Done():
 				}
-				close(out)
 			}
 		}
+		for _, out := range outs {
+			close(out)
+		}
+		logger.TimeTrack(start, "ChoseSubmitter", map[string]interface{}{"submitter": submitter, "GroupID": ctx.Value("GroupID"), "RequestID": ctx.Value("RequestID")})
 		return
 	}()
 	return outs, errc

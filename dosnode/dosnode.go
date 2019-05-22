@@ -218,7 +218,8 @@ func (d *DosNode) waitForGrouping(ctx context.Context, groupID string, errc <-ch
 
 	for err := range errc {
 		if err != nil {
-			logger.Error(err)
+			logger.Event("waitForGroupingError", map[string]interface{}{"Error": err.Error(), "GroupID": groupID})
+
 		}
 	}
 }
@@ -227,7 +228,7 @@ func (d *DosNode) waitForRequestDone(ctx context.Context, groupID string, reques
 	defer logger.TimeTrack(time.Now(), "WaitForRequestDone", map[string]interface{}{"GroupID": groupID, "RequestID": ctx.Value("RequestID")})
 	for err := range errc {
 		if err != nil {
-			logger.Error(err)
+			logger.Event("waitForRequestError", map[string]interface{}{"Error": err.Error(), "GroupID": groupID, "RequestID": ctx.Value("RequestID")})
 		}
 	}
 }
@@ -279,7 +280,7 @@ func (d *DosNode) buildPipeline(valueCtx context.Context, groupID string, reques
 	}
 
 	//Build a pipeline
-	cSubmitter, cErr = choseSubmitter(valueCtx, d.chain, lastRand, ids, len(ids))
+	cSubmitter, cErr = choseSubmitter(valueCtx, d.p, lastRand, ids, len(ids))
 	if len(cSubmitter) != len(ids) || len(ids) == 0 {
 		logger.Event("EuildPipeError2", map[string]interface{}{"GroupID": groupID, "RequestId": fmt.Sprintf("%x", requestID), "lenSubmitter": len(cSubmitter)})
 		return
@@ -569,7 +570,6 @@ func (d *DosNode) listen() (err error) {
 				"Tx":      content.Tx}
 			logger.Event("DGrouping1", f)
 			if isMember {
-
 				logger.Event("DGrouping2", f)
 				//if !content.Removed {
 				ctx, cancelFunc := context.WithCancel(context.Background())
@@ -630,9 +630,9 @@ func (d *DosNode) listen() (err error) {
 					"RequestId":            requestID,
 					"GroupID":              groupID,
 					"LastSystemRandomness": lastRand,
-					"Tx":                   content.Tx,
-					"CurBlkN":              currentBlockNumber,
-					"BlockN":               content.BlockN}
+					"Tx":      content.Tx,
+					"CurBlkN": currentBlockNumber,
+					"BlockN":  content.BlockN}
 				logger.Event("DOS_QuerySysRandom", f)
 
 				ctx, cancelFunc := context.WithCancel(context.Background())
@@ -665,9 +665,9 @@ func (d *DosNode) listen() (err error) {
 					"RequestId":            requestID,
 					"GroupID":              groupID,
 					"LastSystemRandomness": lastRand,
-					"Tx":                   content.Tx,
-					"CurBlkN":              currentBlockNumber,
-					"BlockN":               content.BlockN}
+					"Tx":      content.Tx,
+					"CurBlkN": currentBlockNumber,
+					"BlockN":  content.BlockN}
 				logger.Event("DOS_QueryUserRandom", f)
 				ctx, _ := context.WithCancel(context.Background())
 				valueCtx := context.WithValue(ctx, "RequestID", requestID)
