@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"runtime"
+	"strconv"
 
 	"github.com/DOSNetwork/core/log"
+	"github.com/DOSNetwork/core/p2p/nat"
 	"github.com/DOSNetwork/core/p2p/network"
 	"github.com/DOSNetwork/core/suites"
 
+	"github.com/ethereum/go-ethereum/p2p/netutil"
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes"
 )
@@ -21,20 +23,8 @@ var logger log.Logger
 const (
 	NONE = iota // 0
 	SWIM
+	SWIMPORT = 7946
 )
-
-func bToMb(b uint64) uint64 {
-	return b / 1024 / 1024
-}
-func PrintMemUsage() {
-	var m runtime.MemStats
-	runtime.ReadMemStats(&m)
-	// For info on each, see: https://golang.org/pkg/runtime/#MemStats
-	fmt.Printf("Alloc = %v MiB", bToMb(m.Alloc))
-	fmt.Printf("\tTotalAlloc = %v MiB", bToMb(m.TotalAlloc))
-	fmt.Printf("\tSys = %v MiB", bToMb(m.Sys))
-	fmt.Printf("\tNumGC = %v\n", m.NumGC)
-}
 
 func CreateP2PNetwork(id []byte, port string, netType int) (P2PInterface, error) {
 	suite := suites.MustFind("bn256")
@@ -50,62 +40,65 @@ func CreateP2PNetwork(id []byte, port string, netType int) (P2PInterface, error)
 	p.secKey = suite.Scalar().Pick(suite.RandomStream())
 	p.pubKey = suite.Point().Mul(p.secKey, nil)
 	p.id = id
-	ip, err := GetPublicIP()
-	if err != nil {
-		fmt.Println(err)
-		return nil, err
+
+	// If user specify a public ip from the env variable,use it as external IP.
+	if ip := net.ParseIP(os.Getenv("PUBLICIP")); ip != nil {
+		p.addr = ip
+	} else {
+		ip, err := getIP()
+		if err != nil {
+			return nil, err
+		}
+		if netutil.IsLAN(ip) {
+			natdev, err := nat.DiscoverGateway()
+			if err != nil {
+				return nil, err
+			}
+
+			externalIp, err := natdev.GetExternalAddress()
+			if err != nil {
+				fmt.Println(err)
+				return nil, err
+			}
+			if netutil.IsLAN(externalIp) {
+				return nil, errors.New("NAT IP is a local IP Address")
+			}
+
+			portInt, err := strconv.Atoi(port)
+			if err != nil {
+				return nil, err
+			}
+
+			if err := nat.SetMapping(p.ctx, natdev, "tcp", portInt, portInt, "DosClient"); err != nil {
+				fmt.Println(err)
+				return nil, err
+			}
+
+			if netType == SWIM {
+				if err := nat.SetMapping(p.ctx, natdev, "tcp", SWIMPORT, SWIMPORT, "DosGossip"); err != nil {
+					fmt.Println(err)
+					return nil, err
+				}
+			}
+			// If NAT port mapping success, then return NAT external IP.
+			p.addr = externalIp
+		} else {
+			// If the local IP is a public IP, then return it as a external IP.
+			p.addr = ip
+		}
 	}
-	p.addr = ip
 
 	switch netType {
 	case SWIM:
-		p.network, err = network.NewSerfNet(ip, id)
-	default:
-
-	}
-	return p, nil
-}
-
-func GetPublicIP() (ip net.IP, err error) {
-	ipString := os.Getenv("PUBLICIP")
-	if ipString != "" {
-		ip = net.ParseIP(ipString)
-	} else {
-		err = errors.New("No Public IP")
-	}
-	return
-	/*
-		//FOR DOCKER AWS TESTING
-
-		response, err := http.Get("http://ipconfig.me")
+		network, err := network.NewSerfNet(p.addr, p.id)
 		if err != nil {
-			return
-		}
-
-		ipBytes, err := ioutil.ReadAll(response.Body)
-		if err != nil {
-			return
-		}
-		ipString := string(ipBytes)
-		ip = net.ParseIP(ipString)
-	*/
-	//fmt.Println(ip)
-	//////////////////////////////
-	/*
-		var addrs []net.Addr
-
-		if addrs, err = net.InterfaceAddrs(); err != nil {
+			p.cancel()
 			return nil, err
 		}
-
-		for _, a := range addrs {
-			if ipnet, ok := a.(*net.IPNet); ok && !ipnet.IP.IsLoopback() {
-				if ipnet.IP.To4() != nil {
-					return ipnet.IP, nil
-				}
-			}
-		}*/
-	return
+		p.network = network
+	default:
+	}
+	return p, nil
 }
 
 type P2PMessage struct {

@@ -136,7 +136,7 @@ type uPnPNAT struct {
 	rootDevice *goupnp.RootDevice
 }
 
-func (u *uPnPNAT) getExternalAddress() (addr net.IP, err error) {
+func (u *uPnPNAT) GetExternalAddress() (addr net.IP, err error) {
 	ipString, err := u.c.GetExternalIPAddress()
 	if err != nil {
 		return nil, err

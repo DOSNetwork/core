@@ -68,7 +68,7 @@ func (n *natpmpNAT) getInternalAddress() (addr net.IP, err error) {
 	return nil, ErrNoInternalAddress
 }
 
-func (n *natpmpNAT) getExternalAddress() (addr net.IP, err error) {
+func (n *natpmpNAT) GetExternalAddress() (addr net.IP, err error) {
 	res, err := n.c.GetExternalAddress()
 	if err != nil {
 		return nil, err

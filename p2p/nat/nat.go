@@ -2,15 +2,13 @@
 package nat
 
 import (
+	"context"
 	"errors"
 	"log"
 	"math"
 	"math/rand"
 	"net"
 	"time"
-
-	"github.com/ethereum/go-ethereum/p2p/netutil"
-	"github.com/jackpal/gateway"
 )
 
 const (
@@ -31,7 +29,7 @@ type NAT interface {
 	getDeviceAddress() (addr net.IP, err error)
 
 	// GetExternalAddress returns the external address of the gateway device.
-	getExternalAddress() (addr net.IP, err error)
+	GetExternalAddress() (addr net.IP, err error)
 
 	// GetInternalAddress returns the address of the local host.
 	getInternalAddress() (addr net.IP, err error)
@@ -43,22 +41,11 @@ type NAT interface {
 	deletePortMapping(protocol string, internalPort int) (err error)
 }
 
-type natController struct {
-	natDevice NAT
-	c         chan struct{}
-}
-
-func SetMapping(protocol string, extport, intport int, name string) (*natController, error) {
-	nat, err := DiscoverGateway()
-	if err != nil {
-		return nil, err
-	}
-
+// Mapping adds a port mapping on m and keeps it alive until c is closed.
+func SetMapping(ctx context.Context, nat NAT, protocol string, extport, intport int, name string) error {
 	if err := nat.addPortMapping(protocol, extport, intport, name, mapTimeout); err != nil {
-		return nil, err
+		return err
 	}
-
-	c := make(chan struct{})
 
 	go func() {
 
@@ -70,10 +57,8 @@ func SetMapping(protocol string, extport, intport int, name string) (*natControl
 
 		for {
 			select {
-			case _, ok := <-c:
-				if !ok {
-					return
-				}
+			case <-ctx.Done():
+				return
 			case <-refresh.C:
 				if err := nat.addPortMapping(protocol, extport, intport, name, mapTimeout); err != nil {
 					log.Fatal(err)
@@ -84,54 +69,21 @@ func SetMapping(protocol string, extport, intport int, name string) (*natControl
 
 	}()
 
-	return &natController{
-		natDevice: nat,
-		c:         c,
-	}, nil
+	return nil
 }
 
 // DiscoverGateway attempts to find a gateway device.
 func DiscoverGateway() (NAT, error) {
 	select {
-	case nat := <-discoverUPNP_IG1():
+	case nat := <-discoverUPNPIG1():
 		return nat, nil
-	case nat := <-discoverUPNP_IG2():
+	case nat := <-discoverUPNPIG2():
 		return nat, nil
 	case nat := <-discoverNATPMP():
 		return nat, nil
 	case <-time.After(10 * time.Second):
 		return nil, ErrNoNATFound
 	}
-}
-
-func (natController *natController) CloseMapping() {
-	close(natController.c)
-	time.Sleep(2 * time.Second)
-}
-
-func (natController *natController) GetDeviceAddress() (addr net.IP, err error) {
-	return natController.natDevice.getDeviceAddress()
-}
-
-func (natController *natController) GetExternalAddress() (addr net.IP, err error) {
-	return natController.natDevice.getExternalAddress()
-}
-
-func (natController *natController) GetInternalAddress() (addr net.IP, err error) {
-	return natController.natDevice.getInternalAddress()
-}
-
-func (natController *natController) GetType() string {
-	return natController.natDevice.getType()
-}
-
-func IsPrivateIp() (bool, error) {
-	ip, err := gateway.DiscoverGateway()
-	if err != nil {
-		return false, err
-	}
-
-	return netutil.IsLAN(ip), nil
 }
 
 func RandomPort() int {
