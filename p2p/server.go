@@ -109,54 +109,17 @@ func (n *Server) GetIP() net.IP {
 }
 
 func (n *Server) Listen() (err error) {
-	var ip net.IP
 	n.receiveHandler()
 	n.callHandler()
 	go n.messageDispatch(context.Background())
 
-	if ip, err = GetPublicIP(); err != nil {
-		//fmt.Println("GetLocalIP err", err)
-
-		logger.Error(err)
-		return
-	}
-
 	p := fmt.Sprintf(":%s", n.port)
 	if n.listener, err = net.Listen("tcp", p); err != nil {
-		//fmt.Println("listener err", err)
-
 		logger.Error(err)
 		return
 	}
+	fmt.Println("Listen to ", n.addr, " ", n.port)
 
-	//NAT discover
-
-	//isPrivateIp, err := nat.IsPrivateIp()
-	//if err != nil {
-	//	return err
-	//}
-	//
-	//if isPrivateIp {
-	//	externalPort := nat.RandomPort()
-	//	nat, err := nat.SetMapping("tcp", externalPort, listener.Addr().(*net.TCPAddr).Port, "DosNode")
-	//	if err != nil {
-	//		return err
-	//	}
-	//
-	//	externalIp, err := nat.GetExternalAddress()
-	//	if err != nil {
-	//		return err
-	//	}
-	//
-	//	n.port = externalPort
-	//	ip = externalIp.String() + ":" + strconv.Itoa(n.port)
-	//} else {
-	//	n.port = listener.Addr().(*net.TCPAddr).Port
-	//	ip = ip + ":" + strconv.Itoa(n.port)
-	//}
-
-	n.addr = ip
-	fmt.Println("Listen to ", ip, " ", n.port)
 	go func() {
 		for {
 			conn, err := n.listener.Accept()
