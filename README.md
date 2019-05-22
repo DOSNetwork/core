@@ -67,37 +67,27 @@
 	KEYSTORE=<path-to-local-ethereum-keystore-file-generated-by-user>
 	```
 
-
-### Install and run the client (Docker or Binary)
-- Install and setup directorys for client
-```sh
-$ bash vps_docker.sh install
-or
-$ bash vps.sh install
-```
-- Run the client
-```sh
-$ bash vps_docker.sh run
-or
-$ bash vps.sh run
-```
-- Stop the client
-```sh
-$ bash vps_docker.sh stop
-or
-$ bash vps.sh stop
-```
-- Show the client status
-```sh
-$ bash vps_docker.sh clientInfo
-or
-$ bash vps.sh clientInfo
-```
+### Install and run client node using Docker
+- Install and setup docker environment: 
+  - `$ ./vps_docker.sh install`
+- Start client node: 
+  - `$ ./vps_docker.sh run`
+- Stop client node: 
+  - `$ ./vps_docker.sh stop`
+- Check node status: 
+  - `$ ./vps_docker.sh clientInfo`
 
 
-### Build the client locally and run the client on a VPS
-- Follow the section [DEV setup and workflow] to build client
-- 
+### Build from source and run standalone binary
+- Follow [development-setup](#development-setup) to download source code and build #beta1.0 client node from scratch.
+- Install and upload node executable binary file to remote server: 
+  - `$ ./vps.sh install`
+- Start client node: 
+  - `$ ./vps.sh run`
+- Stop client node: 
+  - `$ ./vps.sh stop`
+- Check node status: 
+  - `$ ./vps.sh clientInfo`
 
 
 
