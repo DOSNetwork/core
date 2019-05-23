@@ -1,7 +1,7 @@
-# <img align="left" width=30 src="media/logo-white.jpg"> DOS Client and Core Libraries
- [![Go Report Card](https://goreportcard.com/badge/github.com/DOSNetwork/core)](https://goreportcard.com/report/github.com/DOSNetwork/core)
- [![Maintainability](https://api.codeclimate.com/v1/badges/a2eb5767f8984835fb3b/maintainability)](https://codeclimate.com/github/DOSNetwork/core/maintainability)
- [![GoDoc](https://godoc.org/github.com/DOSNetwork/core?status.svg)](https://godoc.org/github.com/DOSNetwork/core)
+# <img align="center" width=40 src="media/logo-white.jpg"> DOS Client and Core Libraries
+[![Go Report Card](https://goreportcard.com/badge/github.com/DOSNetwork/core)](https://goreportcard.com/report/github.com/DOSNetwork/core)
+[![Maintainability](https://api.codeclimate.com/v1/badges/a2eb5767f8984835fb3b/maintainability)](https://codeclimate.com/github/DOSNetwork/core/maintainability)
+[![GoDoc](https://godoc.org/github.com/DOSNetwork/core?status.svg)](https://godoc.org/github.com/DOSNetwork/core)
 
 ## Development Setup:
 - [Install](https://golang.org/doc/install) Go (recommended version 1.10+) and setup golang workingspace, specifically by adding environment variable [GOPATH](https://golang.org/doc/code.html#GOPATH) into PATH.
@@ -79,7 +79,8 @@
 
 
 ### Build from source and run standalone binary
-- Follow [development-setup](#development-setup) to download source code and build #beta1.0 client node from scratch.
+- `$ git checkout Beta1` to use source code of [latest release](https://github.com/DOSNetwork/core/releases/tag/Beta1) and follow [development-setup](#development-setup) to build #beta1.0 client node from scratch.
+- You can also build from `master branch` which contains latest features/updates, but they might not be considered as release-ready.
 - Install and upload node executable binary file to remote server: 
   - `$ ./vps.sh install`
 - Start client node: 
