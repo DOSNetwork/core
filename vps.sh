@@ -33,7 +33,6 @@ else
   exit
 fi
 
-GETHPOOL="$GETHPOOL;ws://$IP:8546"
 if [ "$USER" == "root" ]; then
   DIR="/root"
 else
