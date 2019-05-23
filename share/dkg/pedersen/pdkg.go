@@ -172,6 +172,10 @@ func (d *PDKG) Listen() {
 		sessionPubKeys := map[string][]*PublicKey{}
 		sessionDeals := map[string][]*Deal{}
 		sessionResps := map[string][]*Response{}
+		sessionReqPubs := map[string]*ReqPubs{}
+		sessionReqDeals := map[string]*ReqDeals{}
+		sessionReResps := map[string]*ReResps{}
+
 		for {
 			select {
 			case msg, ok := <-peersToBuf:
@@ -181,68 +185,76 @@ func (d *PDKG) Listen() {
 				switch content := msg.Msg.Message.(type) {
 				case *PublicKey:
 					sessionPubKeys[content.SessionId] = append(sessionPubKeys[content.SessionId], content)
-					logger.Event("PublicKeyFromPeer", map[string]interface{}{"GroupID": content.SessionId})
+					d.p.Reply(msg.Sender, msg.RequestNonce, &PublicKey{})
 
-					go func() { d.p.Reply(msg.Sender, msg.RequestNonce, &PublicKey{}) }()
+					logger.Event("PublicKeyFromPeer", map[string]interface{}{"GroupID": content.SessionId})
+					if sessionReqPubs[content.SessionId] != nil {
+						if len(sessionPubKeys[content.SessionId]) == sessionReqPubs[content.SessionId].numOfPubs {
+							pubkeys := sessionPubKeys[content.SessionId]
+							sessionPubKeys[content.SessionId] = nil
+							sessionReqPubs[content.SessionId].Pubkeys <- pubkeys
+
+							close(sessionReqPubs[content.SessionId].Pubkeys)
+							sessionReqPubs[content.SessionId] = nil
+						}
+					}
 				case *Deal:
 					sessionDeals[content.SessionId] = append(sessionDeals[content.SessionId], content)
-					logger.Event("DealsFromPeer", map[string]interface{}{"GroupID": content.SessionId})
+					d.p.Reply(msg.Sender, msg.RequestNonce, &Deal{})
 
-					go func() { d.p.Reply(msg.Sender, msg.RequestNonce, &Deal{}) }()
+					if sessionReqDeals[content.SessionId] != nil {
+						if len(sessionDeals[content.SessionId]) == sessionReqDeals[content.SessionId].numOfDeals {
+							deals := sessionDeals[content.SessionId]
+							sessionDeals[content.SessionId] = nil
+							sessionReqDeals[content.SessionId].Reply <- deals
+							close(sessionReqDeals[content.SessionId].Reply)
+							sessionReqDeals[content.SessionId] = nil
+						}
+					}
 				case *Responses:
 					sessionResps[content.SessionId] = append(sessionResps[content.SessionId], content.Response...)
-					logger.Event("ResponsesFromPeer", map[string]interface{}{"GroupID": content.SessionId})
-					go func() { d.p.Reply(msg.Sender, msg.RequestNonce, &Responses{}) }()
+					d.p.Reply(msg.Sender, msg.RequestNonce, &Responses{})
+
+					if sessionReResps[content.SessionId] != nil {
+						if len(sessionResps[content.SessionId]) == sessionReResps[content.SessionId].numOfResps {
+							resps := sessionResps[content.SessionId]
+							sessionResps[content.SessionId] = nil
+							sessionReResps[content.SessionId].Reply <- resps
+							close(sessionReResps[content.SessionId].Reply)
+							sessionReResps[content.SessionId] = nil
+						}
+					}
 				}
 			case msg, ok := <-d.bufToNode:
 				if !ok {
 					return
 				}
 				switch content := msg.(type) {
-				case ReqPubs:
-					if len(sessionPubKeys[content.SessionId]) != content.numOfPubs {
-						go func() {
-							time.Sleep(1 * time.Second)
-							select {
-							case d.bufToNode <- content:
-							case <-content.ctx.Done():
-							}
-							return
-						}()
-					} else {
+				case *ReqPubs:
+					sessionReqPubs[content.SessionId] = content
+					if len(sessionPubKeys[content.SessionId]) == content.numOfPubs {
 						pubkeys := sessionPubKeys[content.SessionId]
 						sessionPubKeys[content.SessionId] = nil
-						content.Pubkeys <- pubkeys
+						sessionReqPubs[content.SessionId].Pubkeys <- pubkeys
+						close(content.Pubkeys)
 					}
-				case ReqDeals:
-					if len(sessionDeals[content.SessionId]) != content.numOfDeals {
-						go func() {
-							time.Sleep(1 * time.Second)
-							select {
-							case d.bufToNode <- content:
-							case <-content.ctx.Done():
-							}
-							return
-						}()
-					} else {
+				case *ReqDeals:
+					sessionReqDeals[content.SessionId] = content
+
+					if len(sessionDeals[content.SessionId]) == content.numOfDeals {
 						deals := sessionDeals[content.SessionId]
 						sessionDeals[content.SessionId] = nil
-						content.Reply <- deals
+						sessionReqDeals[content.SessionId].Reply <- deals
+						close(content.Reply)
 					}
-				case ReResps:
-					if len(sessionResps[content.SessionId]) != content.numOfResps {
-						go func() {
-							time.Sleep(1 * time.Second)
-							select {
-							case d.bufToNode <- content:
-							case <-content.ctx.Done():
-							}
-							return
-						}()
-					} else {
-						resps := sessionResps[content.SessionId]
+				case *ReResps:
+					sessionReResps[content.SessionId] = content
+
+					if len(sessionResps[content.SessionId]) == content.numOfResps {
+						deals := sessionResps[content.SessionId]
 						sessionResps[content.SessionId] = nil
-						content.Reply <- resps
+						sessionReResps[content.SessionId].Reply <- deals
+						close(content.Reply)
 					}
 				}
 			}
@@ -355,11 +367,11 @@ func exchangePub(ctx context.Context, suite suites.Suite, bufToNode chan interfa
 	out := make(chan *DistKeyGenerator)
 	errc := make(chan error)
 	go func() {
-		defer logger.TimeTrack(time.Now(), "exchangePubDone", map[string]interface{}{"GroupID": sessionID})
+		//defer logger.TimeTrack(time.Now(), "exchangePubDone", map[string]interface{}{"GroupID": sessionID})
 		defer close(out)
 		defer close(errc)
 		logger.Event("exchangePub", map[string]interface{}{"GroupID": sessionID})
-
+		start := time.Now()
 		for i := 0; i < len(groupIds); i++ {
 			start := time.Now()
 			if !bytes.Equal(p.GetID(), groupIds[i]) {
@@ -390,7 +402,8 @@ func exchangePub(ctx context.Context, suite suites.Suite, bufToNode chan interfa
 				}
 			}
 		}
-
+		logger.TimeTrack(start, "exchangePubConnectTo", map[string]interface{}{"GroupID": sessionID})
+		start = time.Now()
 		//Generate secret and public key
 		sec := suite.Scalar().Pick(suite.RandomStream())
 		pub := suite.Point().Mul(sec, nil)
@@ -435,7 +448,8 @@ func exchangePub(ctx context.Context, suite suites.Suite, bufToNode chan interfa
 			}
 		}
 		wg.Wait()
-
+		logger.TimeTrack(start, "exchangePubSendPub", map[string]interface{}{"GroupID": sessionID})
+		start = time.Now()
 		select {
 		case err := <-errc:
 			logger.Error(err)
@@ -444,7 +458,7 @@ func exchangePub(ctx context.Context, suite suites.Suite, bufToNode chan interfa
 		}
 
 		reqChan := make(chan []*PublicKey)
-		req := ReqPubs{ctx: ctx, SessionId: sessionID, numOfPubs: len(groupIds) - 1, Pubkeys: reqChan}
+		req := &ReqPubs{ctx: ctx, SessionId: sessionID, numOfPubs: len(groupIds) - 1, Pubkeys: reqChan}
 		select {
 		case <-ctx.Done():
 			return
@@ -454,11 +468,13 @@ func exchangePub(ctx context.Context, suite suites.Suite, bufToNode chan interfa
 		select {
 		case <-ctx.Done():
 			return
-		case pubs := <-reqChan:
-			partPubs = append(partPubs, pubs...)
+		case pubs, ok := <-reqChan:
+			if ok {
+				fmt.Println("Got pubkeys!!")
+				partPubs = append(partPubs, pubs...)
+			}
 		}
-		//}
-
+		logger.TimeTrack(start, "exchangePubReqChan", map[string]interface{}{"GroupID": sessionID})
 		if err == nil {
 			pubPoints := make([]kyber.Point, len(groupIds))
 			for _, pub := range partPubs {
@@ -473,7 +489,6 @@ func exchangePub(ctx context.Context, suite suites.Suite, bufToNode chan interfa
 					return
 				}
 			}
-			//var partPubs []kyber.Point
 
 			dkg, err := NewDistKeyGenerator(suite, sec, pubPoints, len(groupIds)/2+1)
 			if err != nil {
@@ -541,7 +556,7 @@ func processDeal(ctx context.Context, dkgc <-chan *DistKeyGenerator, bufToNode c
 		}
 		wg.Wait()
 		reply := make(chan []*Deal)
-		req := ReqDeals{ctx: ctx, SessionId: sessionID, numOfDeals: len(groupIds) - 1, Reply: reply}
+		req := &ReqDeals{ctx: ctx, SessionId: sessionID, numOfDeals: len(groupIds) - 1, Reply: reply}
 		select {
 		case <-ctx.Done():
 			return
@@ -595,7 +610,7 @@ func processDeal(ctx context.Context, dkgc <-chan *DistKeyGenerator, bufToNode c
 		wg.Wait()
 
 		replyResp := make(chan []*Response)
-		reqResp := ReResps{ctx: ctx, SessionId: sessionID, numOfResps: (len(groupIds) - 1) * (len(groupIds) - 1), Reply: replyResp}
+		reqResp := &ReResps{ctx: ctx, SessionId: sessionID, numOfResps: (len(groupIds) - 1) * (len(groupIds) - 1), Reply: replyResp}
 		select {
 		case <-ctx.Done():
 			return

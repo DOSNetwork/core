@@ -8,7 +8,6 @@ import (
 	"strconv"
 	"sync"
 	"testing"
-	"time"
 
 	"github.com/DOSNetwork/core/log"
 	"github.com/DOSNetwork/core/p2p"
@@ -40,6 +39,10 @@ func initP2P(id []byte, port string, t *testing.T) (p2p.P2PInterface, chan inter
 		sessionPubKeys := map[string][]*PublicKey{}
 		sessionDeals := map[string][]*Deal{}
 		sessionResps := map[string][]*Response{}
+		sessionReqPubs := map[string]*ReqPubs{}
+		sessionReqDeals := map[string]*ReqDeals{}
+		sessionReResps := map[string]*ReResps{}
+
 		for {
 			select {
 			case msg, ok := <-peersToBuf:
@@ -49,71 +52,80 @@ func initP2P(id []byte, port string, t *testing.T) (p2p.P2PInterface, chan inter
 				switch content := msg.Msg.Message.(type) {
 				case *PublicKey:
 					sessionPubKeys[content.SessionId] = append(sessionPubKeys[content.SessionId], content)
-					p.Reply(msg.Sender, msg.RequestNonce, &PublicKey{})
 					fmt.Println(string(id), " Got sessionPubKeys ", len(sessionPubKeys[content.SessionId]))
+					p.Reply(msg.Sender, msg.RequestNonce, &PublicKey{})
+
+					logger.Event("PublicKeyFromPeer", map[string]interface{}{"GroupID": content.SessionId})
+					if sessionReqPubs[content.SessionId] != nil {
+						if len(sessionPubKeys[content.SessionId]) == sessionReqPubs[content.SessionId].numOfPubs {
+							pubkeys := sessionPubKeys[content.SessionId]
+							sessionPubKeys[content.SessionId] = nil
+							sessionReqPubs[content.SessionId].Pubkeys <- pubkeys
+
+							close(sessionReqPubs[content.SessionId].Pubkeys)
+							sessionReqPubs[content.SessionId] = nil
+						}
+					}
 				case *Deal:
 					sessionDeals[content.SessionId] = append(sessionDeals[content.SessionId], content)
 					fmt.Println(string(id), "Got Deal ", len(sessionDeals[content.SessionId]), content.SessionId)
 					p.Reply(msg.Sender, msg.RequestNonce, &Deal{})
+
+					if sessionReqDeals[content.SessionId] != nil {
+						if len(sessionDeals[content.SessionId]) == sessionReqDeals[content.SessionId].numOfDeals {
+							deals := sessionDeals[content.SessionId]
+							sessionDeals[content.SessionId] = nil
+							sessionReqDeals[content.SessionId].Reply <- deals
+							close(sessionReqDeals[content.SessionId].Reply)
+							sessionReqDeals[content.SessionId] = nil
+						}
+					}
 				case *Responses:
 					sessionResps[content.SessionId] = append(sessionResps[content.SessionId], content.Response...)
-					fmt.Println(string(id), "Got Responses ", len(sessionResps[content.SessionId]))
+					fmt.Println(string(id), "Got Deal ", len(sessionResps[content.SessionId]), content.SessionId)
 					p.Reply(msg.Sender, msg.RequestNonce, &Responses{})
+
+					if sessionReResps[content.SessionId] != nil {
+						if len(sessionResps[content.SessionId]) == sessionReResps[content.SessionId].numOfResps {
+							resps := sessionResps[content.SessionId]
+							sessionResps[content.SessionId] = nil
+							sessionReResps[content.SessionId].Reply <- resps
+							close(sessionReResps[content.SessionId].Reply)
+							sessionReResps[content.SessionId] = nil
+						}
+					}
 				}
 			case msg, ok := <-bufToNode:
 				if !ok {
 					return
 				}
 				switch content := msg.(type) {
-				case ReqPubs:
-					fmt.Println("    sessionPubKeys ", len(sessionPubKeys[content.SessionId]), content.numOfPubs)
-					if len(sessionPubKeys[content.SessionId]) != content.numOfPubs {
-						go func() {
-							time.Sleep(1 * time.Second)
-							select {
-							case bufToNode <- content:
-							case <-content.ctx.Done():
-							}
-							return
-						}()
-					} else {
+				case *ReqPubs:
+					sessionReqPubs[content.SessionId] = content
+
+					if len(sessionPubKeys[content.SessionId]) == content.numOfPubs {
 						pubkeys := sessionPubKeys[content.SessionId]
 						sessionPubKeys[content.SessionId] = nil
-						content.Pubkeys <- pubkeys
+						sessionReqPubs[content.SessionId].Pubkeys <- pubkeys
+						close(content.Pubkeys)
 					}
-				case ReqDeals:
-					fmt.Println(string(id), "ReqDeals ", len(sessionDeals[content.SessionId]), content.SessionId)
-					if len(sessionDeals[content.SessionId]) != content.numOfDeals {
-						go func() {
-							time.Sleep(1 * time.Second)
-							select {
-							case bufToNode <- content:
-							case <-content.ctx.Done():
-							}
-							return
-						}()
-					} else {
-						fmt.Println(string(id), "ReqDeals ", len(sessionDeals[content.SessionId]))
+				case *ReqDeals:
+					sessionReqDeals[content.SessionId] = content
+
+					if len(sessionDeals[content.SessionId]) == content.numOfDeals {
 						deals := sessionDeals[content.SessionId]
 						sessionDeals[content.SessionId] = nil
-						content.Reply <- deals
+						sessionReqDeals[content.SessionId].Reply <- deals
+						close(content.Reply)
 					}
-				case ReResps:
-					fmt.Println(string(id), "ReResps ", len(sessionResps[content.SessionId]), content.SessionId)
-					if len(sessionResps[content.SessionId]) != content.numOfResps {
-						go func() {
-							time.Sleep(1 * time.Second)
-							select {
-							case bufToNode <- content:
-							case <-content.ctx.Done():
-							}
-							return
-						}()
-					} else {
-						fmt.Println(string(id), "ReResps ", len(sessionResps[content.SessionId]))
-						resps := sessionResps[content.SessionId]
+				case *ReResps:
+					sessionReResps[content.SessionId] = content
+
+					if len(sessionResps[content.SessionId]) == content.numOfResps {
+						deals := sessionResps[content.SessionId]
 						sessionResps[content.SessionId] = nil
-						content.Reply <- resps
+						sessionReResps[content.SessionId].Reply <- deals
+						close(content.Reply)
 					}
 				}
 			}
@@ -124,6 +136,7 @@ func initP2P(id []byte, port string, t *testing.T) (p2p.P2PInterface, chan inter
 
 func TestExchange(t *testing.T) {
 	log.Init([]byte("test"))
+	logger = log.New("module", "dkg")
 	var groupIds [][]byte
 	groupIds = append(groupIds, []byte("Participant0"))
 	groupIds = append(groupIds, []byte("Participant1"))
@@ -197,13 +210,19 @@ func TestPDKG(t *testing.T) {
 	groupIds = append(groupIds, []byte("Participant2"))
 	os.Setenv("PUBLICIP", "0.0.0.0")
 	p1, err := p2p.CreateP2PNetwork(groupIds[0], "9905", 0)
-	_ = err
+	if err != nil {
+		t.Errorf("CreateP2PNetwork err %s", err)
+	}
 	p1.Listen()
 	p2, err := p2p.CreateP2PNetwork(groupIds[1], "9906", 0)
-	_ = err
+	if err != nil {
+		t.Errorf("CreateP2PNetwork err %s", err)
+	}
 	p2.Listen()
 	p3, err := p2p.CreateP2PNetwork(groupIds[2], "9907", 0)
-	_ = err
+	if err != nil {
+		t.Errorf("CreateP2PNetwork err %s", err)
+	}
 	p3.Listen()
 	//Setup p2p network
 	buildConn(p1, p2, "9906", t)
@@ -224,8 +243,17 @@ func TestPDKG(t *testing.T) {
 			defer wg.Done()
 			ctx := context.Background()
 			out1, _, err := pdkg1.Grouping(ctx, groupID, groupIds)
+			if err != nil {
+				t.Errorf("Grouping err %s", err)
+			}
 			out2, _, err := pdkg2.Grouping(ctx, groupID, groupIds)
+			if err != nil {
+				t.Errorf("Grouping err %s", err)
+			}
 			out3, _, err := pdkg3.Grouping(ctx, groupID, groupIds)
+			if err != nil {
+				t.Errorf("Grouping err %s", err)
+			}
 			fmt.Println("out1 ", <-out1)
 			fmt.Println("out2 ", <-out2)
 			fmt.Println("out3 ", <-out3)
