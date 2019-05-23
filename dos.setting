@@ -1,6 +1,6 @@
 DOSIMAGE=dosnetwork/dosnode:beta
+GETHPOOL="https://rinkeby.infura.io/v3/db19cf9028054762865cb9ce883c6ab8;https://rinkeby.infura.io/v3/3a3e5d776961418e93a8b33fef2f6642;https://rinkeby.infura.io/v3/8e609c76fce442f8a1735fbea9999747;ws://195.154.119.64:8546;ws://195.154.119.67:8546;ws://51.15.0.157:8546;ws://51.159.4.51:8546"
 USER=
-VPSIP=
-VPSKEY=
+IP=
+SSHKEY=
 KEYSTORE=
-GETHPOOL="https://rinkeby.infura.io/v3/db19cf9028054762865cb9ce883c6ab8;https://rinkeby.infura.io/v3/3a3e5d776961418e93a8b33fef2f6642;ws://195.154.119.64:8546;ws://195.154.119.67:8546"
