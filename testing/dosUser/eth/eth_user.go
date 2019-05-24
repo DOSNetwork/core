@@ -88,6 +88,8 @@ func NewAMAUserSession(credentialPath, passphrase, addr string, gethUrls []strin
 	adaptor = &EthUserAdaptor{}
 	ctxD, cancelSession := context.WithCancel(context.Background())
 	auth := bind.NewKeyedTransactor(key.PrivateKey)
+	auth.GasPrice = big.NewInt(2000000000)
+
 	auth.GasLimit = uint64(5000000)
 	auth.Context = ctxD
 	//nonce, _ := c.PendingNonceAt(ctxD, key.Address)

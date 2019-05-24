@@ -15,11 +15,23 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 )
 
+// Reference imports to suppress errors if they are not otherwise used.
+var (
+	_ = big.NewInt
+	_ = strings.NewReader
+	_ = ethereum.NotFound
+	_ = abi.U256
+	_ = bind.Bind
+	_ = common.Big1
+	_ = types.BloomLookup
+	_ = event.NewSubscription
+)
+
 // AskMeAnythingABI is the input ABI used to generate the binding from.
 const AskMeAnythingABI = "[{\"constant\":false,\"inputs\":[{\"name\":\"requestId\",\"type\":\"uint256\"},{\"name\":\"generatedRandom\",\"type\":\"uint256\"}],\"name\":\"__callback__\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[],\"name\":\"requestFastRandom\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"internalSerial\",\"type\":\"uint8\"}],\"name\":\"requestSafeRandom\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"lastQueriedUrl\",\"outputs\":[{\"name\":\"\",\"type\":\"string\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"newMode\",\"type\":\"bool\"}],\"name\":\"setQueryMode\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"random\",\"outputs\":[{\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"queryId\",\"type\":\"uint256\"},{\"name\":\"result\",\"type\":\"bytes\"}],\"name\":\"__callback__\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"timeout\",\"outputs\":[{\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[],\"name\":\"renounceOwnership\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"response\",\"outputs\":[{\"name\":\"\",\"type\":\"string\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"isOwner\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"lastQueryInternalSerial\",\"outputs\":[{\"name\":\"\",\"type\":\"uint8\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"repeatedCall\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"lastRequestedRandom\",\"outputs\":[{\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"newTimeout\",\"type\":\"uint256\"}],\"name\":\"setTimeout\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"lastQueriedSelector\",\"outputs\":[{\"name\":\"\",\"type\":\"string\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"internalSerial\",\"type\":\"uint8\"},{\"name\":\"url\",\"type\":\"string\"},{\"name\":\"selector\",\"type\":\"string\"}],\"name\":\"AMA\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"previousTimeout\",\"type\":\"uint256\"},{\"indexed\":false,\"name\":\"newTimeout\",\"type\":\"uint256\"}],\"name\":\"SetTimeout\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"queryId\",\"type\":\"uint256\"},{\"indexed\":false,\"name\":\"result\",\"type\":\"string\"}],\"name\":\"QueryResponseReady\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"internalSerial\",\"type\":\"uint8\"},{\"indexed\":false,\"name\":\"succ\",\"type\":\"bool\"},{\"indexed\":false,\"name\":\"requestId\",\"type\":\"uint256\"}],\"name\":\"RequestSent\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"requestId\",\"type\":\"uint256\"},{\"indexed\":false,\"name\":\"generatedRandom\",\"type\":\"uint256\"}],\"name\":\"RandomReady\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"previousOwner\",\"type\":\"address\"}],\"name\":\"OwnershipRenounced\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"previousOwner\",\"type\":\"address\"},{\"indexed\":true,\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"}]"
 
 // AskMeAnythingBin is the compiled bytecode used for deploying new contracts.
-const AskMeAnythingBin = `0x6080604052600280546001600160a01b031990811673748bb8e4437273edececbc7f0faec9ea468c6769179091556006805460ff19169055601c60075560008054909116331790556111ad806100566000396000f3fe608060405234801561001057600080fd5b50600436106101215760003560e01c80637a7f01a7116100ad578063b8cf904e11610071578063b8cf904e14610354578063c58a34cc1461035c578063e3abd8b614610379578063e6eaadeb14610381578063f2fde38b146104b857610121565b80637a7f01a7146102e65780638da5cb5b146102ee5780638f32d59b14610312578063a3a9bf9e1461032e578063ab8c1bad1461034c57610121565b806357ae678b116100f457806357ae678b146101f05780635ec01e4d1461020f5780636d1129771461022957806370dea79a146102d6578063715018a6146102de57610121565b806318a1908d1461012657806335cd49e71461014b57806343c655831461015357806349b03ca014610173575b600080fd5b6101496004803603604081101561013c57600080fd5b50803590602001356104de565b005b6101496105e3565b6101496004803603602081101561016957600080fd5b503560ff166105f9565b61017b610672565b6040805160208082528351818301528351919283929083019185019080838360005b838110156101b557818101518382015260200161019d565b50505050905090810190601f1680156101e25780820380516001836020036101000a031916815260200191505b509250505060405180910390f35b6101496004803603602081101561020657600080fd5b50351515610700565b610217610724565b60408051918252519081900360200190f35b6101496004803603604081101561023f57600080fd5b8135919081019060408101602082013564010000000081111561026157600080fd5b82018360208201111561027357600080fd5b8035906020019184600183028401116401000000008311171561029557600080fd5b91908080601f01602080910402602001604051908101604052809392919081815260200183838082843760009201919091525092955061072a945050505050565b6102176109f0565b6101496109f6565b61017b610a4f565b6102f6610aaa565b604080516001600160a01b039092168252519081900360200190f35b61031a610aba565b604080519115158252519081900360200190f35b610336610acb565b6040805160ff9092168252519081900360200190f35b61031a610ad4565b610217610add565b6101496004803603602081101561037257600080fd5b5035610ae3565b61017b610b36565b6101496004803603606081101561039757600080fd5b60ff82351691908101906040810160208201356401000000008111156103bc57600080fd5b8201836020820111156103ce57600080fd5b803590602001918460018302840111640100000000831117156103f057600080fd5b91908080601f016020809104026020016040519081016040528093929190818152602001838380828437600092019190915250929594936020810193503591505064010000000081111561044357600080fd5b82018360208201111561045557600080fd5b8035906020019184600183028401116401000000008311171561047757600080fd5b91908080601f016020809104026020016040519081016040528093929190818152602001838380828437600092019190915250929550610b91945050505050565b610149600480360360208110156104ce57600080fd5b50356001600160a01b0316610c9a565b816104e7610cb7565b6001600160a01b0316336001600160a01b03161461053957604051600160e51b62461bcd02815260040180806020018281038252602681526020018061113b6026913960400191505060405180910390fd5b60008181526005602052604090205460ff1661058957604051600160e51b62461bcd0281526004018080602001828103825260218152602001806111616021913960400191505060405180910390fd5b6004829055604080518481526020810184905281517fd0ecc71f8b5af397da9123fd2bff63c544c04af5c6935935a7f81e14b84522f2929181900390910190a150506000908152600560205260409020805460ff19169055565b600454600a556105f4600042610d30565b600455565b600454600a55600061060c600142610d30565b600081815260056020908152604091829020805460ff19166001908117909155825160ff871681529182015280820183905290519192507ff6afd2f30d776f0b56e660068a4d6c44d9dd27e1c80b9fd3feff18f68dec7021919081900360600190a15050565b6008805460408051602060026001851615610100026000190190941693909304601f810184900484028201840190925281815292918301828280156106f85780601f106106cd576101008083540402835291602001916106f8565b820191906000526020600020905b8154815290600101906020018083116106db57829003601f168201915b505050505081565b610708610aba565b61071157600080fd5b6006805460ff1916911515919091179055565b60045481565b81610733610cb7565b6001600160a01b0316336001600160a01b03161461078557604051600160e51b62461bcd02815260040180806020018281038252602681526020018061113b6026913960400191505060405180910390fd5b60008181526005602052604090205460ff166107d557604051600160e51b62461bcd0281526004018080602001828103825260218152602001806111616021913960400191505060405180910390fd5b81516107e89060039060208501906110a2565b50604080518481526020810182815260038054600260001961010060018416150201909116049383018490527ffe1788dc549f39fbcdb06fdab5937f2d19ce5fe5616fa3be9311928bd5dabccb93879391929060608301908490801561088f5780601f106108645761010080835404028352916020019161088f565b820191906000526020600020905b81548152906001019060200180831161087257829003601f168201915b5050935050505060405180910390a16000838152600560205260409020805460ff1916905560065460ff16156109eb57600b5460088054604080516020601f600260001960018716156101000201909516949094049384018190048102820181019092528281526109eb9460ff1693909290918301828280156109535780601f1061092857610100808354040283529160200191610953565b820191906000526020600020905b81548152906001019060200180831161093657829003601f168201915b505060098054604080516020601f60026000196101006001881615020190951694909404938401819004810282018101909252828152955091935091508301828280156109e15780601f106109b6576101008083540402835291602001916109e1565b820191906000526020600020905b8154815290600101906020018083116109c457829003601f168201915b5050505050610b91565b505050565b60075481565b6109fe610aba565b610a0757600080fd5b600080546040516001600160a01b03909116917ff8df31144d9c2f0f6b59d69b8b98abd5459d07f2742c4df920b25aae33c6482091a2600080546001600160a01b0319169055565b6003805460408051602060026001851615610100026000190190941693909304601f810184900484028201840190925281815292918301828280156106f85780601f106106cd576101008083540402835291602001916106f8565b6000546001600160a01b03165b90565b6000546001600160a01b0316331490565b600b5460ff1681565b60065460ff1681565b600a5481565b610aeb610aba565b610af457600080fd5b600754604080519182526020820183905280517f9aa0de0157c9133b911d2d811f590159622cea28cefe31505c203c828799da589281900390910190a1600755565b6009805460408051602060026001851615610100026000190190941693909304601f810184900484028201840190925281815292918301828280156106f85780601f106106cd576101008083540402835291602001916106f8565b8151610ba49060089060208501906110a2565b508051610bb89060099060208401906110a2565b50600b805460ff191660ff8516179055600754600090610bd9908484610e4a565b90508015610c4457600081815260056020908152604091829020805460ff19166001908117909155825160ff881681529182015280820183905290517ff6afd2f30d776f0b56e660068a4d6c44d9dd27e1c80b9fd3feff18f68dec70219181900360600190a1610c94565b60408051600160e51b62461bcd02815260206004820152601160248201527f496e76616c69642071756572792069642e000000000000000000000000000000604482015290519081900360640190fd5b50505050565b610ca2610aba565b610cab57600080fd5b610cb481611034565b50565b60025460408051600160e11b6321d39ecd02815290516000926001600160a01b0316916343a73d9a916004808301926020929190829003018186803b158015610cff57600080fd5b505afa158015610d13573d6000803e3d6000fd5b505050506040513d6020811015610d2957600080fd5b5051905090565b60025460408051600160e11b6321d39ecd02815290516000926001600160a01b0316916343a73d9a916004808301926020929190829003018186803b158015610d7857600080fd5b505afa158015610d8c573d6000803e3d6000fd5b505050506040513d6020811015610da257600080fd5b5051600180546001600160a01b0319166001600160a01b03928316179081905560408051600160e01b631bf8205702815230600482015260ff871660248201526044810186905290519190921691631bf820579160648083019260209291908290030181600087803b158015610e1757600080fd5b505af1158015610e2b573d6000803e3d6000fd5b505050506040513d6020811015610e4157600080fd5b50519392505050565b60025460408051600160e11b6321d39ecd02815290516000926001600160a01b0316916343a73d9a916004808301926020929190829003018186803b158015610e9257600080fd5b505afa158015610ea6573d6000803e3d6000fd5b505050506040513d6020811015610ebc57600080fd5b5051600180546001600160a01b0319166001600160a01b039283161790819055604051600160e01b63b7fb8fd7028152306004820181815260248301899052608060448401908152885160848501528851949095169463b7fb8fd79492938a938a938a9390929091606482019160a40190602087019080838360005b83811015610f50578181015183820152602001610f38565b50505050905090810190601f168015610f7d5780820380516001836020036101000a031916815260200191505b50838103825284518152845160209182019186019080838360005b83811015610fb0578181015183820152602001610f98565b50505050905090810190601f168015610fdd5780820380516001836020036101000a031916815260200191505b509650505050505050602060405180830381600087803b15801561100057600080fd5b505af1158015611014573d6000803e3d6000fd5b505050506040513d602081101561102a57600080fd5b5051949350505050565b6001600160a01b03811661104757600080fd5b600080546040516001600160a01b03808516939216917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e091a3600080546001600160a01b0319166001600160a01b0392909216919091179055565b828054600181600116156101000203166002900490600052602060002090601f016020900481019282601f106110e357805160ff1916838001178555611110565b82800160010185558215611110579182015b828111156111105782518255916020019190600101906110f5565b5061111c929150611120565b5090565b610ab791905b8082111561111c576000815560010161112656fe556e61757468656e7469636174656420726573706f6e73652066726f6d206e6f6e2d444f532e526573706f6e7365207769746820696e76616c6964207265717565737420696421a165627a7a72305820b8716d70f6e2adc704e72b061a1f1886a3fa7a9b9aa90a0d65a0336e66886e2a0029`
+const AskMeAnythingBin = `0x6080604052600280546001600160a01b0319908116736ddf7c941106e875a96747e785c19dfd408d5117179091556006805460ff19169055601c60075560008054909116331790556111ad806100566000396000f3fe608060405234801561001057600080fd5b50600436106101215760003560e01c80637a7f01a7116100ad578063b8cf904e11610071578063b8cf904e14610354578063c58a34cc1461035c578063e3abd8b614610379578063e6eaadeb14610381578063f2fde38b146104b857610121565b80637a7f01a7146102e65780638da5cb5b146102ee5780638f32d59b14610312578063a3a9bf9e1461032e578063ab8c1bad1461034c57610121565b806357ae678b116100f457806357ae678b146101f05780635ec01e4d1461020f5780636d1129771461022957806370dea79a146102d6578063715018a6146102de57610121565b806318a1908d1461012657806335cd49e71461014b57806343c655831461015357806349b03ca014610173575b600080fd5b6101496004803603604081101561013c57600080fd5b50803590602001356104de565b005b6101496105e3565b6101496004803603602081101561016957600080fd5b503560ff166105f9565b61017b610672565b6040805160208082528351818301528351919283929083019185019080838360005b838110156101b557818101518382015260200161019d565b50505050905090810190601f1680156101e25780820380516001836020036101000a031916815260200191505b509250505060405180910390f35b6101496004803603602081101561020657600080fd5b50351515610700565b610217610724565b60408051918252519081900360200190f35b6101496004803603604081101561023f57600080fd5b8135919081019060408101602082013564010000000081111561026157600080fd5b82018360208201111561027357600080fd5b8035906020019184600183028401116401000000008311171561029557600080fd5b91908080601f01602080910402602001604051908101604052809392919081815260200183838082843760009201919091525092955061072a945050505050565b6102176109f0565b6101496109f6565b61017b610a4f565b6102f6610aaa565b604080516001600160a01b039092168252519081900360200190f35b61031a610aba565b604080519115158252519081900360200190f35b610336610acb565b6040805160ff9092168252519081900360200190f35b61031a610ad4565b610217610add565b6101496004803603602081101561037257600080fd5b5035610ae3565b61017b610b36565b6101496004803603606081101561039757600080fd5b60ff82351691908101906040810160208201356401000000008111156103bc57600080fd5b8201836020820111156103ce57600080fd5b803590602001918460018302840111640100000000831117156103f057600080fd5b91908080601f016020809104026020016040519081016040528093929190818152602001838380828437600092019190915250929594936020810193503591505064010000000081111561044357600080fd5b82018360208201111561045557600080fd5b8035906020019184600183028401116401000000008311171561047757600080fd5b91908080601f016020809104026020016040519081016040528093929190818152602001838380828437600092019190915250929550610b91945050505050565b610149600480360360208110156104ce57600080fd5b50356001600160a01b0316610c9a565b816104e7610cb7565b6001600160a01b0316336001600160a01b03161461053957604051600160e51b62461bcd02815260040180806020018281038252602681526020018061113b6026913960400191505060405180910390fd5b60008181526005602052604090205460ff1661058957604051600160e51b62461bcd0281526004018080602001828103825260218152602001806111616021913960400191505060405180910390fd5b6004829055604080518481526020810184905281517fd0ecc71f8b5af397da9123fd2bff63c544c04af5c6935935a7f81e14b84522f2929181900390910190a150506000908152600560205260409020805460ff19169055565b600454600a556105f4600042610d30565b600455565b600454600a55600061060c600142610d30565b600081815260056020908152604091829020805460ff19166001908117909155825160ff871681529182015280820183905290519192507ff6afd2f30d776f0b56e660068a4d6c44d9dd27e1c80b9fd3feff18f68dec7021919081900360600190a15050565b6008805460408051602060026001851615610100026000190190941693909304601f810184900484028201840190925281815292918301828280156106f85780601f106106cd576101008083540402835291602001916106f8565b820191906000526020600020905b8154815290600101906020018083116106db57829003601f168201915b505050505081565b610708610aba565b61071157600080fd5b6006805460ff1916911515919091179055565b60045481565b81610733610cb7565b6001600160a01b0316336001600160a01b03161461078557604051600160e51b62461bcd02815260040180806020018281038252602681526020018061113b6026913960400191505060405180910390fd5b60008181526005602052604090205460ff166107d557604051600160e51b62461bcd0281526004018080602001828103825260218152602001806111616021913960400191505060405180910390fd5b81516107e89060039060208501906110a2565b50604080518481526020810182815260038054600260001961010060018416150201909116049383018490527ffe1788dc549f39fbcdb06fdab5937f2d19ce5fe5616fa3be9311928bd5dabccb93879391929060608301908490801561088f5780601f106108645761010080835404028352916020019161088f565b820191906000526020600020905b81548152906001019060200180831161087257829003601f168201915b5050935050505060405180910390a16000838152600560205260409020805460ff1916905560065460ff16156109eb57600b5460088054604080516020601f600260001960018716156101000201909516949094049384018190048102820181019092528281526109eb9460ff1693909290918301828280156109535780601f1061092857610100808354040283529160200191610953565b820191906000526020600020905b81548152906001019060200180831161093657829003601f168201915b505060098054604080516020601f60026000196101006001881615020190951694909404938401819004810282018101909252828152955091935091508301828280156109e15780601f106109b6576101008083540402835291602001916109e1565b820191906000526020600020905b8154815290600101906020018083116109c457829003601f168201915b5050505050610b91565b505050565b60075481565b6109fe610aba565b610a0757600080fd5b600080546040516001600160a01b03909116917ff8df31144d9c2f0f6b59d69b8b98abd5459d07f2742c4df920b25aae33c6482091a2600080546001600160a01b0319169055565b6003805460408051602060026001851615610100026000190190941693909304601f810184900484028201840190925281815292918301828280156106f85780601f106106cd576101008083540402835291602001916106f8565b6000546001600160a01b03165b90565b6000546001600160a01b0316331490565b600b5460ff1681565b60065460ff1681565b600a5481565b610aeb610aba565b610af457600080fd5b600754604080519182526020820183905280517f9aa0de0157c9133b911d2d811f590159622cea28cefe31505c203c828799da589281900390910190a1600755565b6009805460408051602060026001851615610100026000190190941693909304601f810184900484028201840190925281815292918301828280156106f85780601f106106cd576101008083540402835291602001916106f8565b8151610ba49060089060208501906110a2565b508051610bb89060099060208401906110a2565b50600b805460ff191660ff8516179055600754600090610bd9908484610e4a565b90508015610c4457600081815260056020908152604091829020805460ff19166001908117909155825160ff881681529182015280820183905290517ff6afd2f30d776f0b56e660068a4d6c44d9dd27e1c80b9fd3feff18f68dec70219181900360600190a1610c94565b60408051600160e51b62461bcd02815260206004820152601160248201527f496e76616c69642071756572792069642e000000000000000000000000000000604482015290519081900360640190fd5b50505050565b610ca2610aba565b610cab57600080fd5b610cb481611034565b50565b60025460408051600160e11b6321d39ecd02815290516000926001600160a01b0316916343a73d9a916004808301926020929190829003018186803b158015610cff57600080fd5b505afa158015610d13573d6000803e3d6000fd5b505050506040513d6020811015610d2957600080fd5b5051905090565b60025460408051600160e11b6321d39ecd02815290516000926001600160a01b0316916343a73d9a916004808301926020929190829003018186803b158015610d7857600080fd5b505afa158015610d8c573d6000803e3d6000fd5b505050506040513d6020811015610da257600080fd5b5051600180546001600160a01b0319166001600160a01b03928316179081905560408051600160e01b631bf8205702815230600482015260ff871660248201526044810186905290519190921691631bf820579160648083019260209291908290030181600087803b158015610e1757600080fd5b505af1158015610e2b573d6000803e3d6000fd5b505050506040513d6020811015610e4157600080fd5b50519392505050565b60025460408051600160e11b6321d39ecd02815290516000926001600160a01b0316916343a73d9a916004808301926020929190829003018186803b158015610e9257600080fd5b505afa158015610ea6573d6000803e3d6000fd5b505050506040513d6020811015610ebc57600080fd5b5051600180546001600160a01b0319166001600160a01b039283161790819055604051600160e01b63b7fb8fd7028152306004820181815260248301899052608060448401908152885160848501528851949095169463b7fb8fd79492938a938a938a9390929091606482019160a40190602087019080838360005b83811015610f50578181015183820152602001610f38565b50505050905090810190601f168015610f7d5780820380516001836020036101000a031916815260200191505b50838103825284518152845160209182019186019080838360005b83811015610fb0578181015183820152602001610f98565b50505050905090810190601f168015610fdd5780820380516001836020036101000a031916815260200191505b509650505050505050602060405180830381600087803b15801561100057600080fd5b505af1158015611014573d6000803e3d6000fd5b505050506040513d602081101561102a57600080fd5b5051949350505050565b6001600160a01b03811661104757600080fd5b600080546040516001600160a01b03808516939216917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e091a3600080546001600160a01b0319166001600160a01b0392909216919091179055565b828054600181600116156101000203166002900490600052602060002090601f016020900481019282601f106110e357805160ff1916838001178555611110565b82800160010185558215611110579182015b828111156111105782518255916020019190600101906110f5565b5061111c929150611120565b5090565b610ab791905b8082111561111c576000815560010161112656fe556e61757468656e7469636174656420726573706f6e73652066726f6d206e6f6e2d444f532e526573706f6e7365207769746820696e76616c6964207265717565737420696421a165627a7a723058208cf5950993e0e0466d3da0942f10cbe8fc7d2d91acc47f2f12b4198527356f7d0029`
 
 // DeployAskMeAnything deploys a new Ethereum contract, binding an instance of AskMeAnything to it.
 func DeployAskMeAnything(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *AskMeAnything, error) {
@@ -438,44 +450,44 @@ func (_AskMeAnything *AskMeAnythingCallerSession) Timeout() (*big.Int, error) {
 
 // AMA is a paid mutator transaction binding the contract method 0xe6eaadeb.
 //
-// Solidity: function AMA(internalSerial uint8, url string, selector string) returns()
+// Solidity: function AMA(uint8 internalSerial, string url, string selector) returns()
 func (_AskMeAnything *AskMeAnythingTransactor) AMA(opts *bind.TransactOpts, internalSerial uint8, url string, selector string) (*types.Transaction, error) {
 	return _AskMeAnything.contract.Transact(opts, "AMA", internalSerial, url, selector)
 }
 
 // AMA is a paid mutator transaction binding the contract method 0xe6eaadeb.
 //
-// Solidity: function AMA(internalSerial uint8, url string, selector string) returns()
+// Solidity: function AMA(uint8 internalSerial, string url, string selector) returns()
 func (_AskMeAnything *AskMeAnythingSession) AMA(internalSerial uint8, url string, selector string) (*types.Transaction, error) {
 	return _AskMeAnything.Contract.AMA(&_AskMeAnything.TransactOpts, internalSerial, url, selector)
 }
 
 // AMA is a paid mutator transaction binding the contract method 0xe6eaadeb.
 //
-// Solidity: function AMA(internalSerial uint8, url string, selector string) returns()
+// Solidity: function AMA(uint8 internalSerial, string url, string selector) returns()
 func (_AskMeAnything *AskMeAnythingTransactorSession) AMA(internalSerial uint8, url string, selector string) (*types.Transaction, error) {
 	return _AskMeAnything.Contract.AMA(&_AskMeAnything.TransactOpts, internalSerial, url, selector)
 }
 
-// Callback_ is a paid mutator transaction binding the contract method 0x6d112977.
+// Callback is a paid mutator transaction binding the contract method 0x6d112977.
 //
-// Solidity: function __callback__(queryId uint256, result bytes) returns()
-func (_AskMeAnything *AskMeAnythingTransactor) Callback_(opts *bind.TransactOpts, queryId *big.Int, result []byte) (*types.Transaction, error) {
+// Solidity: function __callback__(uint256 queryId, bytes result) returns()
+func (_AskMeAnything *AskMeAnythingTransactor) Callback(opts *bind.TransactOpts, queryId *big.Int, result []byte) (*types.Transaction, error) {
 	return _AskMeAnything.contract.Transact(opts, "__callback__", queryId, result)
 }
 
-// Callback_ is a paid mutator transaction binding the contract method 0x6d112977.
+// Callback is a paid mutator transaction binding the contract method 0x6d112977.
 //
-// Solidity: function __callback__(queryId uint256, result bytes) returns()
-func (_AskMeAnything *AskMeAnythingSession) Callback_(queryId *big.Int, result []byte) (*types.Transaction, error) {
-	return _AskMeAnything.Contract.Callback_(&_AskMeAnything.TransactOpts, queryId, result)
+// Solidity: function __callback__(uint256 queryId, bytes result) returns()
+func (_AskMeAnything *AskMeAnythingSession) Callback(queryId *big.Int, result []byte) (*types.Transaction, error) {
+	return _AskMeAnything.Contract.Callback(&_AskMeAnything.TransactOpts, queryId, result)
 }
 
-// Callback_ is a paid mutator transaction binding the contract method 0x6d112977.
+// Callback is a paid mutator transaction binding the contract method 0x6d112977.
 //
-// Solidity: function __callback__(queryId uint256, result bytes) returns()
-func (_AskMeAnything *AskMeAnythingTransactorSession) Callback_(queryId *big.Int, result []byte) (*types.Transaction, error) {
-	return _AskMeAnything.Contract.Callback_(&_AskMeAnything.TransactOpts, queryId, result)
+// Solidity: function __callback__(uint256 queryId, bytes result) returns()
+func (_AskMeAnything *AskMeAnythingTransactorSession) Callback(queryId *big.Int, result []byte) (*types.Transaction, error) {
+	return _AskMeAnything.Contract.Callback(&_AskMeAnything.TransactOpts, queryId, result)
 }
 
 // RenounceOwnership is a paid mutator transaction binding the contract method 0x715018a6.
@@ -522,84 +534,84 @@ func (_AskMeAnything *AskMeAnythingTransactorSession) RequestFastRandom() (*type
 
 // RequestSafeRandom is a paid mutator transaction binding the contract method 0x43c65583.
 //
-// Solidity: function requestSafeRandom(internalSerial uint8) returns()
+// Solidity: function requestSafeRandom(uint8 internalSerial) returns()
 func (_AskMeAnything *AskMeAnythingTransactor) RequestSafeRandom(opts *bind.TransactOpts, internalSerial uint8) (*types.Transaction, error) {
 	return _AskMeAnything.contract.Transact(opts, "requestSafeRandom", internalSerial)
 }
 
 // RequestSafeRandom is a paid mutator transaction binding the contract method 0x43c65583.
 //
-// Solidity: function requestSafeRandom(internalSerial uint8) returns()
+// Solidity: function requestSafeRandom(uint8 internalSerial) returns()
 func (_AskMeAnything *AskMeAnythingSession) RequestSafeRandom(internalSerial uint8) (*types.Transaction, error) {
 	return _AskMeAnything.Contract.RequestSafeRandom(&_AskMeAnything.TransactOpts, internalSerial)
 }
 
 // RequestSafeRandom is a paid mutator transaction binding the contract method 0x43c65583.
 //
-// Solidity: function requestSafeRandom(internalSerial uint8) returns()
+// Solidity: function requestSafeRandom(uint8 internalSerial) returns()
 func (_AskMeAnything *AskMeAnythingTransactorSession) RequestSafeRandom(internalSerial uint8) (*types.Transaction, error) {
 	return _AskMeAnything.Contract.RequestSafeRandom(&_AskMeAnything.TransactOpts, internalSerial)
 }
 
 // SetQueryMode is a paid mutator transaction binding the contract method 0x57ae678b.
 //
-// Solidity: function setQueryMode(newMode bool) returns()
+// Solidity: function setQueryMode(bool newMode) returns()
 func (_AskMeAnything *AskMeAnythingTransactor) SetQueryMode(opts *bind.TransactOpts, newMode bool) (*types.Transaction, error) {
 	return _AskMeAnything.contract.Transact(opts, "setQueryMode", newMode)
 }
 
 // SetQueryMode is a paid mutator transaction binding the contract method 0x57ae678b.
 //
-// Solidity: function setQueryMode(newMode bool) returns()
+// Solidity: function setQueryMode(bool newMode) returns()
 func (_AskMeAnything *AskMeAnythingSession) SetQueryMode(newMode bool) (*types.Transaction, error) {
 	return _AskMeAnything.Contract.SetQueryMode(&_AskMeAnything.TransactOpts, newMode)
 }
 
 // SetQueryMode is a paid mutator transaction binding the contract method 0x57ae678b.
 //
-// Solidity: function setQueryMode(newMode bool) returns()
+// Solidity: function setQueryMode(bool newMode) returns()
 func (_AskMeAnything *AskMeAnythingTransactorSession) SetQueryMode(newMode bool) (*types.Transaction, error) {
 	return _AskMeAnything.Contract.SetQueryMode(&_AskMeAnything.TransactOpts, newMode)
 }
 
 // SetTimeout is a paid mutator transaction binding the contract method 0xc58a34cc.
 //
-// Solidity: function setTimeout(newTimeout uint256) returns()
+// Solidity: function setTimeout(uint256 newTimeout) returns()
 func (_AskMeAnything *AskMeAnythingTransactor) SetTimeout(opts *bind.TransactOpts, newTimeout *big.Int) (*types.Transaction, error) {
 	return _AskMeAnything.contract.Transact(opts, "setTimeout", newTimeout)
 }
 
 // SetTimeout is a paid mutator transaction binding the contract method 0xc58a34cc.
 //
-// Solidity: function setTimeout(newTimeout uint256) returns()
+// Solidity: function setTimeout(uint256 newTimeout) returns()
 func (_AskMeAnything *AskMeAnythingSession) SetTimeout(newTimeout *big.Int) (*types.Transaction, error) {
 	return _AskMeAnything.Contract.SetTimeout(&_AskMeAnything.TransactOpts, newTimeout)
 }
 
 // SetTimeout is a paid mutator transaction binding the contract method 0xc58a34cc.
 //
-// Solidity: function setTimeout(newTimeout uint256) returns()
+// Solidity: function setTimeout(uint256 newTimeout) returns()
 func (_AskMeAnything *AskMeAnythingTransactorSession) SetTimeout(newTimeout *big.Int) (*types.Transaction, error) {
 	return _AskMeAnything.Contract.SetTimeout(&_AskMeAnything.TransactOpts, newTimeout)
 }
 
 // TransferOwnership is a paid mutator transaction binding the contract method 0xf2fde38b.
 //
-// Solidity: function transferOwnership(newOwner address) returns()
+// Solidity: function transferOwnership(address newOwner) returns()
 func (_AskMeAnything *AskMeAnythingTransactor) TransferOwnership(opts *bind.TransactOpts, newOwner common.Address) (*types.Transaction, error) {
 	return _AskMeAnything.contract.Transact(opts, "transferOwnership", newOwner)
 }
 
 // TransferOwnership is a paid mutator transaction binding the contract method 0xf2fde38b.
 //
-// Solidity: function transferOwnership(newOwner address) returns()
+// Solidity: function transferOwnership(address newOwner) returns()
 func (_AskMeAnything *AskMeAnythingSession) TransferOwnership(newOwner common.Address) (*types.Transaction, error) {
 	return _AskMeAnything.Contract.TransferOwnership(&_AskMeAnything.TransactOpts, newOwner)
 }
 
 // TransferOwnership is a paid mutator transaction binding the contract method 0xf2fde38b.
 //
-// Solidity: function transferOwnership(newOwner address) returns()
+// Solidity: function transferOwnership(address newOwner) returns()
 func (_AskMeAnything *AskMeAnythingTransactorSession) TransferOwnership(newOwner common.Address) (*types.Transaction, error) {
 	return _AskMeAnything.Contract.TransferOwnership(&_AskMeAnything.TransactOpts, newOwner)
 }
@@ -679,7 +691,7 @@ type AskMeAnythingOwnershipRenounced struct {
 
 // FilterOwnershipRenounced is a free log retrieval operation binding the contract event 0xf8df31144d9c2f0f6b59d69b8b98abd5459d07f2742c4df920b25aae33c64820.
 //
-// Solidity: e OwnershipRenounced(previousOwner indexed address)
+// Solidity: event OwnershipRenounced(address indexed previousOwner)
 func (_AskMeAnything *AskMeAnythingFilterer) FilterOwnershipRenounced(opts *bind.FilterOpts, previousOwner []common.Address) (*AskMeAnythingOwnershipRenouncedIterator, error) {
 
 	var previousOwnerRule []interface{}
@@ -696,7 +708,7 @@ func (_AskMeAnything *AskMeAnythingFilterer) FilterOwnershipRenounced(opts *bind
 
 // WatchOwnershipRenounced is a free log subscription operation binding the contract event 0xf8df31144d9c2f0f6b59d69b8b98abd5459d07f2742c4df920b25aae33c64820.
 //
-// Solidity: e OwnershipRenounced(previousOwner indexed address)
+// Solidity: event OwnershipRenounced(address indexed previousOwner)
 func (_AskMeAnything *AskMeAnythingFilterer) WatchOwnershipRenounced(opts *bind.WatchOpts, sink chan<- *AskMeAnythingOwnershipRenounced, previousOwner []common.Address) (event.Subscription, error) {
 
 	var previousOwnerRule []interface{}
@@ -812,7 +824,7 @@ type AskMeAnythingOwnershipTransferred struct {
 
 // FilterOwnershipTransferred is a free log retrieval operation binding the contract event 0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0.
 //
-// Solidity: e OwnershipTransferred(previousOwner indexed address, newOwner indexed address)
+// Solidity: event OwnershipTransferred(address indexed previousOwner, address indexed newOwner)
 func (_AskMeAnything *AskMeAnythingFilterer) FilterOwnershipTransferred(opts *bind.FilterOpts, previousOwner []common.Address, newOwner []common.Address) (*AskMeAnythingOwnershipTransferredIterator, error) {
 
 	var previousOwnerRule []interface{}
@@ -833,7 +845,7 @@ func (_AskMeAnything *AskMeAnythingFilterer) FilterOwnershipTransferred(opts *bi
 
 // WatchOwnershipTransferred is a free log subscription operation binding the contract event 0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0.
 //
-// Solidity: e OwnershipTransferred(previousOwner indexed address, newOwner indexed address)
+// Solidity: event OwnershipTransferred(address indexed previousOwner, address indexed newOwner)
 func (_AskMeAnything *AskMeAnythingFilterer) WatchOwnershipTransferred(opts *bind.WatchOpts, sink chan<- *AskMeAnythingOwnershipTransferred, previousOwner []common.Address, newOwner []common.Address) (event.Subscription, error) {
 
 	var previousOwnerRule []interface{}
@@ -953,7 +965,7 @@ type AskMeAnythingQueryResponseReady struct {
 
 // FilterQueryResponseReady is a free log retrieval operation binding the contract event 0xfe1788dc549f39fbcdb06fdab5937f2d19ce5fe5616fa3be9311928bd5dabccb.
 //
-// Solidity: e QueryResponseReady(queryId uint256, result string)
+// Solidity: event QueryResponseReady(uint256 queryId, string result)
 func (_AskMeAnything *AskMeAnythingFilterer) FilterQueryResponseReady(opts *bind.FilterOpts) (*AskMeAnythingQueryResponseReadyIterator, error) {
 
 	logs, sub, err := _AskMeAnything.contract.FilterLogs(opts, "QueryResponseReady")
@@ -965,7 +977,7 @@ func (_AskMeAnything *AskMeAnythingFilterer) FilterQueryResponseReady(opts *bind
 
 // WatchQueryResponseReady is a free log subscription operation binding the contract event 0xfe1788dc549f39fbcdb06fdab5937f2d19ce5fe5616fa3be9311928bd5dabccb.
 //
-// Solidity: e QueryResponseReady(queryId uint256, result string)
+// Solidity: event QueryResponseReady(uint256 queryId, string result)
 func (_AskMeAnything *AskMeAnythingFilterer) WatchQueryResponseReady(opts *bind.WatchOpts, sink chan<- *AskMeAnythingQueryResponseReady) (event.Subscription, error) {
 
 	logs, sub, err := _AskMeAnything.contract.WatchLogs(opts, "QueryResponseReady")
@@ -1076,7 +1088,7 @@ type AskMeAnythingRandomReady struct {
 
 // FilterRandomReady is a free log retrieval operation binding the contract event 0xd0ecc71f8b5af397da9123fd2bff63c544c04af5c6935935a7f81e14b84522f2.
 //
-// Solidity: e RandomReady(requestId uint256, generatedRandom uint256)
+// Solidity: event RandomReady(uint256 requestId, uint256 generatedRandom)
 func (_AskMeAnything *AskMeAnythingFilterer) FilterRandomReady(opts *bind.FilterOpts) (*AskMeAnythingRandomReadyIterator, error) {
 
 	logs, sub, err := _AskMeAnything.contract.FilterLogs(opts, "RandomReady")
@@ -1088,7 +1100,7 @@ func (_AskMeAnything *AskMeAnythingFilterer) FilterRandomReady(opts *bind.Filter
 
 // WatchRandomReady is a free log subscription operation binding the contract event 0xd0ecc71f8b5af397da9123fd2bff63c544c04af5c6935935a7f81e14b84522f2.
 //
-// Solidity: e RandomReady(requestId uint256, generatedRandom uint256)
+// Solidity: event RandomReady(uint256 requestId, uint256 generatedRandom)
 func (_AskMeAnything *AskMeAnythingFilterer) WatchRandomReady(opts *bind.WatchOpts, sink chan<- *AskMeAnythingRandomReady) (event.Subscription, error) {
 
 	logs, sub, err := _AskMeAnything.contract.WatchLogs(opts, "RandomReady")
@@ -1200,7 +1212,7 @@ type AskMeAnythingRequestSent struct {
 
 // FilterRequestSent is a free log retrieval operation binding the contract event 0xf6afd2f30d776f0b56e660068a4d6c44d9dd27e1c80b9fd3feff18f68dec7021.
 //
-// Solidity: e RequestSent(internalSerial uint8, succ bool, requestId uint256)
+// Solidity: event RequestSent(uint8 internalSerial, bool succ, uint256 requestId)
 func (_AskMeAnything *AskMeAnythingFilterer) FilterRequestSent(opts *bind.FilterOpts) (*AskMeAnythingRequestSentIterator, error) {
 
 	logs, sub, err := _AskMeAnything.contract.FilterLogs(opts, "RequestSent")
@@ -1212,7 +1224,7 @@ func (_AskMeAnything *AskMeAnythingFilterer) FilterRequestSent(opts *bind.Filter
 
 // WatchRequestSent is a free log subscription operation binding the contract event 0xf6afd2f30d776f0b56e660068a4d6c44d9dd27e1c80b9fd3feff18f68dec7021.
 //
-// Solidity: e RequestSent(internalSerial uint8, succ bool, requestId uint256)
+// Solidity: event RequestSent(uint8 internalSerial, bool succ, uint256 requestId)
 func (_AskMeAnything *AskMeAnythingFilterer) WatchRequestSent(opts *bind.WatchOpts, sink chan<- *AskMeAnythingRequestSent) (event.Subscription, error) {
 
 	logs, sub, err := _AskMeAnything.contract.WatchLogs(opts, "RequestSent")
@@ -1323,7 +1335,7 @@ type AskMeAnythingSetTimeout struct {
 
 // FilterSetTimeout is a free log retrieval operation binding the contract event 0x9aa0de0157c9133b911d2d811f590159622cea28cefe31505c203c828799da58.
 //
-// Solidity: e SetTimeout(previousTimeout uint256, newTimeout uint256)
+// Solidity: event SetTimeout(uint256 previousTimeout, uint256 newTimeout)
 func (_AskMeAnything *AskMeAnythingFilterer) FilterSetTimeout(opts *bind.FilterOpts) (*AskMeAnythingSetTimeoutIterator, error) {
 
 	logs, sub, err := _AskMeAnything.contract.FilterLogs(opts, "SetTimeout")
@@ -1335,7 +1347,7 @@ func (_AskMeAnything *AskMeAnythingFilterer) FilterSetTimeout(opts *bind.FilterO
 
 // WatchSetTimeout is a free log subscription operation binding the contract event 0x9aa0de0157c9133b911d2d811f590159622cea28cefe31505c203c828799da58.
 //
-// Solidity: e SetTimeout(previousTimeout uint256, newTimeout uint256)
+// Solidity: event SetTimeout(uint256 previousTimeout, uint256 newTimeout)
 func (_AskMeAnything *AskMeAnythingFilterer) WatchSetTimeout(opts *bind.WatchOpts, sink chan<- *AskMeAnythingSetTimeout) (event.Subscription, error) {
 
 	logs, sub, err := _AskMeAnything.contract.WatchLogs(opts, "SetTimeout")
@@ -1561,7 +1573,7 @@ func (_DOSAddressBridgeInterface *DOSAddressBridgeInterfaceCallerSession) GetPro
 const DOSOnChainSDKABI = "[{\"constant\":false,\"inputs\":[{\"name\":\"requestId\",\"type\":\"uint256\"},{\"name\":\"generatedRandom\",\"type\":\"uint256\"}],\"name\":\"__callback__\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"queryId\",\"type\":\"uint256\"},{\"name\":\"result\",\"type\":\"bytes\"}],\"name\":\"__callback__\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]"
 
 // DOSOnChainSDKBin is the compiled bytecode used for deploying new contracts.
-const DOSOnChainSDKBin = `0x6080604052600180546001600160a01b03191673748bb8e4437273edececbc7f0faec9ea468c676917905534801561003657600080fd5b5061013d806100466000396000f3fe608060405234801561001057600080fd5b50600436106100365760003560e01c806318a1908d1461003b5780636d11297714610060575b600080fd5b61005e6004803603604081101561005157600080fd5b508035906020013561010d565b005b61005e6004803603604081101561007657600080fd5b8135919081019060408101602082013564010000000081111561009857600080fd5b8201836020820111156100aa57600080fd5b803590602001918460018302840111640100000000831117156100cc57600080fd5b91908080601f01602080910402602001604051908101604052809392919081815260200183838082843760009201919091525092955061010d945050505050565b505056fea165627a7a7230582084c9d466803528bdfdea8c99c49ec6243a227c9630d9ae40d846b4cd4e31ec980029`
+const DOSOnChainSDKBin = `0x6080604052600180546001600160a01b031916736ddf7c941106e875a96747e785c19dfd408d511717905534801561003657600080fd5b5060ff806100456000396000f3fe6080604052348015600f57600080fd5b506004361060325760003560e01c806318a1908d1460375780636d112977146059575b600080fd5b605760048036036040811015604b57600080fd5b508035906020013560ca565b005b605760048036036040811015606d57600080fd5b81359190810190604081016020820135640100000000811115608e57600080fd5b820183602082011115609f57600080fd5b8035906020019184600183028401116401000000008311171560c057600080fd5b50909250905060ce565b5050565b50505056fea165627a7a72305820be4d6c18ca5fd21eebbf76ae1289eb3e2d6e73e4722ba587add99948ec8c8e710029`
 
 // DeployDOSOnChainSDK deploys a new Ethereum contract, binding an instance of DOSOnChainSDK to it.
 func DeployDOSOnChainSDK(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *DOSOnChainSDK, error) {
@@ -1718,25 +1730,25 @@ func (_DOSOnChainSDK *DOSOnChainSDKTransactorRaw) Transact(opts *bind.TransactOp
 	return _DOSOnChainSDK.Contract.contract.Transact(opts, method, params...)
 }
 
-// Callback_ is a paid mutator transaction binding the contract method 0x6d112977.
+// Callback is a paid mutator transaction binding the contract method 0x6d112977.
 //
-// Solidity: function __callback__(queryId uint256, result bytes) returns()
-func (_DOSOnChainSDK *DOSOnChainSDKTransactor) Callback_(opts *bind.TransactOpts, queryId *big.Int, result []byte) (*types.Transaction, error) {
+// Solidity: function __callback__(uint256 queryId, bytes result) returns()
+func (_DOSOnChainSDK *DOSOnChainSDKTransactor) Callback(opts *bind.TransactOpts, queryId *big.Int, result []byte) (*types.Transaction, error) {
 	return _DOSOnChainSDK.contract.Transact(opts, "__callback__", queryId, result)
 }
 
-// Callback_ is a paid mutator transaction binding the contract method 0x6d112977.
+// Callback is a paid mutator transaction binding the contract method 0x6d112977.
 //
-// Solidity: function __callback__(queryId uint256, result bytes) returns()
-func (_DOSOnChainSDK *DOSOnChainSDKSession) Callback_(queryId *big.Int, result []byte) (*types.Transaction, error) {
-	return _DOSOnChainSDK.Contract.Callback_(&_DOSOnChainSDK.TransactOpts, queryId, result)
+// Solidity: function __callback__(uint256 queryId, bytes result) returns()
+func (_DOSOnChainSDK *DOSOnChainSDKSession) Callback(queryId *big.Int, result []byte) (*types.Transaction, error) {
+	return _DOSOnChainSDK.Contract.Callback(&_DOSOnChainSDK.TransactOpts, queryId, result)
 }
 
-// Callback_ is a paid mutator transaction binding the contract method 0x6d112977.
+// Callback is a paid mutator transaction binding the contract method 0x6d112977.
 //
-// Solidity: function __callback__(queryId uint256, result bytes) returns()
-func (_DOSOnChainSDK *DOSOnChainSDKTransactorSession) Callback_(queryId *big.Int, result []byte) (*types.Transaction, error) {
-	return _DOSOnChainSDK.Contract.Callback_(&_DOSOnChainSDK.TransactOpts, queryId, result)
+// Solidity: function __callback__(uint256 queryId, bytes result) returns()
+func (_DOSOnChainSDK *DOSOnChainSDKTransactorSession) Callback(queryId *big.Int, result []byte) (*types.Transaction, error) {
+	return _DOSOnChainSDK.Contract.Callback(&_DOSOnChainSDK.TransactOpts, queryId, result)
 }
 
 // DOSProxyInterfaceABI is the input ABI used to generate the binding from.
@@ -1902,42 +1914,42 @@ func (_DOSProxyInterface *DOSProxyInterfaceTransactorRaw) Transact(opts *bind.Tr
 
 // Query is a paid mutator transaction binding the contract method 0xb7fb8fd7.
 //
-// Solidity: function query( address,  uint256,  string,  string) returns(uint256)
+// Solidity: function query(address , uint256 , string , string ) returns(uint256)
 func (_DOSProxyInterface *DOSProxyInterfaceTransactor) Query(opts *bind.TransactOpts, arg0 common.Address, arg1 *big.Int, arg2 string, arg3 string) (*types.Transaction, error) {
 	return _DOSProxyInterface.contract.Transact(opts, "query", arg0, arg1, arg2, arg3)
 }
 
 // Query is a paid mutator transaction binding the contract method 0xb7fb8fd7.
 //
-// Solidity: function query( address,  uint256,  string,  string) returns(uint256)
+// Solidity: function query(address , uint256 , string , string ) returns(uint256)
 func (_DOSProxyInterface *DOSProxyInterfaceSession) Query(arg0 common.Address, arg1 *big.Int, arg2 string, arg3 string) (*types.Transaction, error) {
 	return _DOSProxyInterface.Contract.Query(&_DOSProxyInterface.TransactOpts, arg0, arg1, arg2, arg3)
 }
 
 // Query is a paid mutator transaction binding the contract method 0xb7fb8fd7.
 //
-// Solidity: function query( address,  uint256,  string,  string) returns(uint256)
+// Solidity: function query(address , uint256 , string , string ) returns(uint256)
 func (_DOSProxyInterface *DOSProxyInterfaceTransactorSession) Query(arg0 common.Address, arg1 *big.Int, arg2 string, arg3 string) (*types.Transaction, error) {
 	return _DOSProxyInterface.Contract.Query(&_DOSProxyInterface.TransactOpts, arg0, arg1, arg2, arg3)
 }
 
 // RequestRandom is a paid mutator transaction binding the contract method 0x1bf82057.
 //
-// Solidity: function requestRandom( address,  uint8,  uint256) returns(uint256)
+// Solidity: function requestRandom(address , uint8 , uint256 ) returns(uint256)
 func (_DOSProxyInterface *DOSProxyInterfaceTransactor) RequestRandom(opts *bind.TransactOpts, arg0 common.Address, arg1 uint8, arg2 *big.Int) (*types.Transaction, error) {
 	return _DOSProxyInterface.contract.Transact(opts, "requestRandom", arg0, arg1, arg2)
 }
 
 // RequestRandom is a paid mutator transaction binding the contract method 0x1bf82057.
 //
-// Solidity: function requestRandom( address,  uint8,  uint256) returns(uint256)
+// Solidity: function requestRandom(address , uint8 , uint256 ) returns(uint256)
 func (_DOSProxyInterface *DOSProxyInterfaceSession) RequestRandom(arg0 common.Address, arg1 uint8, arg2 *big.Int) (*types.Transaction, error) {
 	return _DOSProxyInterface.Contract.RequestRandom(&_DOSProxyInterface.TransactOpts, arg0, arg1, arg2)
 }
 
 // RequestRandom is a paid mutator transaction binding the contract method 0x1bf82057.
 //
-// Solidity: function requestRandom( address,  uint8,  uint256) returns(uint256)
+// Solidity: function requestRandom(address , uint8 , uint256 ) returns(uint256)
 func (_DOSProxyInterface *DOSProxyInterfaceTransactorSession) RequestRandom(arg0 common.Address, arg1 uint8, arg2 *big.Int) (*types.Transaction, error) {
 	return _DOSProxyInterface.Contract.RequestRandom(&_DOSProxyInterface.TransactOpts, arg0, arg1, arg2)
 }
@@ -1946,7 +1958,7 @@ func (_DOSProxyInterface *DOSProxyInterfaceTransactorSession) RequestRandom(arg0
 const OwnableABI = "[{\"constant\":false,\"inputs\":[],\"name\":\"renounceOwnership\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"isOwner\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"previousOwner\",\"type\":\"address\"}],\"name\":\"OwnershipRenounced\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"previousOwner\",\"type\":\"address\"},{\"indexed\":true,\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"}]"
 
 // OwnableBin is the compiled bytecode used for deploying new contracts.
-const OwnableBin = `0x608060405234801561001057600080fd5b50600080546001600160a01b031916331790556101f1806100326000396000f3fe608060405234801561001057600080fd5b506004361061004c5760003560e01c8063715018a6146100515780638da5cb5b1461005b5780638f32d59b1461007f578063f2fde38b1461009b575b600080fd5b6100596100c1565b005b61006361011a565b604080516001600160a01b039092168252519081900360200190f35b610087610129565b604080519115158252519081900360200190f35b610059600480360360208110156100b157600080fd5b50356001600160a01b031661013a565b6100c9610129565b6100d257600080fd5b600080546040516001600160a01b03909116917ff8df31144d9c2f0f6b59d69b8b98abd5459d07f2742c4df920b25aae33c6482091a2600080546001600160a01b0319169055565b6000546001600160a01b031690565b6000546001600160a01b0316331490565b610142610129565b61014b57600080fd5b61015481610157565b50565b6001600160a01b03811661016a57600080fd5b600080546040516001600160a01b03808516939216917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e091a3600080546001600160a01b0319166001600160a01b039290921691909117905556fea165627a7a72305820bf6e6c6474e528972eb50314218981741f3cc2ebba566ebb622a40e9533a0ebe0029`
+const OwnableBin = `0x608060405234801561001057600080fd5b50600080546001600160a01b031916331790556101f1806100326000396000f3fe608060405234801561001057600080fd5b506004361061004c5760003560e01c8063715018a6146100515780638da5cb5b1461005b5780638f32d59b1461007f578063f2fde38b1461009b575b600080fd5b6100596100c1565b005b61006361011a565b604080516001600160a01b039092168252519081900360200190f35b610087610129565b604080519115158252519081900360200190f35b610059600480360360208110156100b157600080fd5b50356001600160a01b031661013a565b6100c9610129565b6100d257600080fd5b600080546040516001600160a01b03909116917ff8df31144d9c2f0f6b59d69b8b98abd5459d07f2742c4df920b25aae33c6482091a2600080546001600160a01b0319169055565b6000546001600160a01b031690565b6000546001600160a01b0316331490565b610142610129565b61014b57600080fd5b61015481610157565b50565b6001600160a01b03811661016a57600080fd5b600080546040516001600160a01b03808516939216917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e091a3600080546001600160a01b0319166001600160a01b039290921691909117905556fea165627a7a72305820dff661e60575220200efb44e916362b46d15d7e6717d1bcac8dc96c1350a68920029`
 
 // DeployOwnable deploys a new Ethereum contract, binding an instance of Ownable to it.
 func DeployOwnable(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *Ownable, error) {
@@ -2178,21 +2190,21 @@ func (_Ownable *OwnableTransactorSession) RenounceOwnership() (*types.Transactio
 
 // TransferOwnership is a paid mutator transaction binding the contract method 0xf2fde38b.
 //
-// Solidity: function transferOwnership(newOwner address) returns()
+// Solidity: function transferOwnership(address newOwner) returns()
 func (_Ownable *OwnableTransactor) TransferOwnership(opts *bind.TransactOpts, newOwner common.Address) (*types.Transaction, error) {
 	return _Ownable.contract.Transact(opts, "transferOwnership", newOwner)
 }
 
 // TransferOwnership is a paid mutator transaction binding the contract method 0xf2fde38b.
 //
-// Solidity: function transferOwnership(newOwner address) returns()
+// Solidity: function transferOwnership(address newOwner) returns()
 func (_Ownable *OwnableSession) TransferOwnership(newOwner common.Address) (*types.Transaction, error) {
 	return _Ownable.Contract.TransferOwnership(&_Ownable.TransactOpts, newOwner)
 }
 
 // TransferOwnership is a paid mutator transaction binding the contract method 0xf2fde38b.
 //
-// Solidity: function transferOwnership(newOwner address) returns()
+// Solidity: function transferOwnership(address newOwner) returns()
 func (_Ownable *OwnableTransactorSession) TransferOwnership(newOwner common.Address) (*types.Transaction, error) {
 	return _Ownable.Contract.TransferOwnership(&_Ownable.TransactOpts, newOwner)
 }
@@ -2272,7 +2284,7 @@ type OwnableOwnershipRenounced struct {
 
 // FilterOwnershipRenounced is a free log retrieval operation binding the contract event 0xf8df31144d9c2f0f6b59d69b8b98abd5459d07f2742c4df920b25aae33c64820.
 //
-// Solidity: e OwnershipRenounced(previousOwner indexed address)
+// Solidity: event OwnershipRenounced(address indexed previousOwner)
 func (_Ownable *OwnableFilterer) FilterOwnershipRenounced(opts *bind.FilterOpts, previousOwner []common.Address) (*OwnableOwnershipRenouncedIterator, error) {
 
 	var previousOwnerRule []interface{}
@@ -2289,7 +2301,7 @@ func (_Ownable *OwnableFilterer) FilterOwnershipRenounced(opts *bind.FilterOpts,
 
 // WatchOwnershipRenounced is a free log subscription operation binding the contract event 0xf8df31144d9c2f0f6b59d69b8b98abd5459d07f2742c4df920b25aae33c64820.
 //
-// Solidity: e OwnershipRenounced(previousOwner indexed address)
+// Solidity: event OwnershipRenounced(address indexed previousOwner)
 func (_Ownable *OwnableFilterer) WatchOwnershipRenounced(opts *bind.WatchOpts, sink chan<- *OwnableOwnershipRenounced, previousOwner []common.Address) (event.Subscription, error) {
 
 	var previousOwnerRule []interface{}
@@ -2405,7 +2417,7 @@ type OwnableOwnershipTransferred struct {
 
 // FilterOwnershipTransferred is a free log retrieval operation binding the contract event 0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0.
 //
-// Solidity: e OwnershipTransferred(previousOwner indexed address, newOwner indexed address)
+// Solidity: event OwnershipTransferred(address indexed previousOwner, address indexed newOwner)
 func (_Ownable *OwnableFilterer) FilterOwnershipTransferred(opts *bind.FilterOpts, previousOwner []common.Address, newOwner []common.Address) (*OwnableOwnershipTransferredIterator, error) {
 
 	var previousOwnerRule []interface{}
@@ -2426,7 +2438,7 @@ func (_Ownable *OwnableFilterer) FilterOwnershipTransferred(opts *bind.FilterOpt
 
 // WatchOwnershipTransferred is a free log subscription operation binding the contract event 0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0.
 //
-// Solidity: e OwnershipTransferred(previousOwner indexed address, newOwner indexed address)
+// Solidity: event OwnershipTransferred(address indexed previousOwner, address indexed newOwner)
 func (_Ownable *OwnableFilterer) WatchOwnershipTransferred(opts *bind.WatchOpts, sink chan<- *OwnableOwnershipTransferred, previousOwner []common.Address, newOwner []common.Address) (event.Subscription, error) {
 
 	var previousOwnerRule []interface{}
@@ -2474,7 +2486,7 @@ func (_Ownable *OwnableFilterer) WatchOwnershipTransferred(opts *bind.WatchOpts,
 const UtilsABI = "[]"
 
 // UtilsBin is the compiled bytecode used for deploying new contracts.
-const UtilsBin = `0x604c6023600b82828239805160001a607314601657fe5b30600052607381538281f3fe73000000000000000000000000000000000000000030146080604052600080fdfea165627a7a72305820852cfabb5aa66592e1c814fc40a672e26a71dc29dce962884579f24002ed8dc00029`
+const UtilsBin = `0x604c6023600b82828239805160001a607314601657fe5b30600052607381538281f3fe73000000000000000000000000000000000000000030146080604052600080fdfea165627a7a72305820d1a5cd2ebd9c896d08938c10f7ace17d7dfcc56a656cf99796eeca128204bd670029`
 
 // DeployUtils deploys a new Ethereum contract, binding an instance of Utils to it.
 func DeployUtils(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *Utils, error) {

@@ -16,7 +16,7 @@ contract DOSOnChainSDK {
 
     DOSProxyInterface dosProxy;
     DOSAddressBridgeInterface dosAddrBridge =
-        DOSAddressBridgeInterface(0x748bb8e4437273edeCecBC7f0faEc9eA468C6769);
+        DOSAddressBridgeInterface(0x6DDf7C941106E875a96747e785c19dFd408d5117);
 
     modifier resolveAddress {
         dosProxy = DOSProxyInterface(dosAddrBridge.getProxyAddress());
@@ -62,7 +62,7 @@ contract DOSOnChainSDK {
     // @queryId: A unique queryId returned by DOSQuery() for callers to
     //           differentiate parallel responses.
     // @result: Response for the specified queryId.
-    function __callback__(uint queryId, bytes memory result) public {
+    function __callback__(uint queryId, bytes calldata result) external {
         // To be overridden in the caller contract.
     }
 
@@ -97,7 +97,7 @@ contract DOSOnChainSDK {
     //             differentiate random numbers generated concurrently.
     // @generatedRandom: Generated secure random number for the specific
     //                   requestId.
-    function __callback__(uint requestId, uint generatedRandom) public {
+    function __callback__(uint requestId, uint generatedRandom) external {
         // To be overridden in the caller contract.
     }
 }
