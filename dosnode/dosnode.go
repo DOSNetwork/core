@@ -236,12 +236,7 @@ func (d *DosNode) waitForRequestDone(ctx context.Context, groupID string, reques
 func (d *DosNode) buildPipeline(valueCtx context.Context, groupID string, requestID, lastRand, useSeed *big.Int, url, selector string, pType uint32) {
 	defer logger.TimeTrack(time.Now(), "BuildPipeline", map[string]interface{}{"GroupID": groupID, "RequestID": valueCtx.Value("RequestID")})
 	d.totalQuery++
-	var signShares []<-chan *vss.Signature
-	var errcList []<-chan error
-	var cSubmitter []chan []byte
-	var cErr <-chan error
-	var cSign <-chan *vss.Signature
-	var cContent <-chan []byte
+
 	var nonce []byte
 	ids := d.dkg.GetGroupIDs(groupID)
 	fmt.Println("GetGroupIDs ", len(ids), " ids = ", ids)
@@ -280,51 +275,54 @@ func (d *DosNode) buildPipeline(valueCtx context.Context, groupID string, reques
 	}
 
 	//Build a pipeline
-	cSubmitter, cErr = choseSubmitter(valueCtx, d.p, lastRand, ids, len(ids))
-	if len(cSubmitter) != len(ids) || len(ids) == 0 {
-		logger.Event("EuildPipeError2", map[string]interface{}{"GroupID": groupID, "RequestId": fmt.Sprintf("%x", requestID), "lenSubmitter": len(cSubmitter)})
+	var signShares []<-chan *vss.Signature
+	var errcList []<-chan error
+
+	submitterc, errc := choseSubmitter(valueCtx, d.p, lastRand, ids, len(ids))
+	if len(submitterc) != len(ids) || len(ids) == 0 {
+		logger.Event("EuildPipeError2", map[string]interface{}{"GroupID": groupID, "RequestId": fmt.Sprintf("%x", requestID), "lenSubmitter": len(submitterc)})
 		return
 	}
-	errcList = append(errcList, cErr)
+	errcList = append(errcList, errc)
 
+	var contentc <-chan []byte
 	switch pType {
 	case onchain.TrafficSystemRandom:
-		cContent = genSysRandom(valueCtx, cSubmitter[0], lastRand.Bytes())
+		contentc = genSysRandom(valueCtx, submitterc[0], lastRand.Bytes())
 	case onchain.TrafficUserRandom:
-		cContent = genUserRandom(valueCtx, cSubmitter[0], requestID.Bytes(), lastRand.Bytes(), useSeed.Bytes())
+		contentc = genUserRandom(valueCtx, submitterc[0], requestID.Bytes(), lastRand.Bytes(), useSeed.Bytes())
 	case onchain.TrafficUserQuery:
-		cContent, cErr = genQueryResult(valueCtx, cSubmitter[0], url, selector)
-		errcList = append(errcList, cErr)
+		contentc, errc = genQueryResult(valueCtx, submitterc[0], url, selector)
+		errcList = append(errcList, errc)
 	}
 
-	cSign, cErr = genSign(valueCtx, cContent, d.cSignToPeer, d.dkg.GetShareSecurity(groupID), d.suite, d.id, groupID, requestID.Bytes(), pType, nonce)
-	errcList = append(errcList, cErr)
+	signc, errc := genSign(valueCtx, contentc, d.cSignToPeer, d.dkg.GetShareSecurity(groupID), d.suite, d.id, groupID, requestID.Bytes(), pType, nonce)
+	errcList = append(errcList, errc)
+	signShares = append(signShares, signc)
 
-	signShares = append(signShares, cSign)
 	idx := 1
 	for _, id := range ids {
 		if r := bytes.Compare(d.id, id); r != 0 {
-			cSign, cErr = requestSign(valueCtx, cSubmitter[idx], cContent, d.p, d.id, requestID.Bytes(), pType, id, nonce)
-			signShares = append(signShares, cSign)
-			errcList = append(errcList, cErr)
+			signc, errc := requestSign(valueCtx, submitterc[idx], contentc, d.p, d.id, requestID.Bytes(), pType, id, nonce)
+			signShares = append(signShares, signc)
+			errcList = append(errcList, errc)
 			idx++
 		}
 	}
 
-	cSign, cErr = recoverSign(valueCtx, fanIn(valueCtx, signShares...), d.suite, pubPoly, (len(ids)/2 + 1), len(ids))
-	errcList = append(errcList, cErr)
+	recoveredSignc, errc := recoverSign(valueCtx, fanIn(valueCtx, signShares...), d.suite, pubPoly, (len(ids)/2 + 1), len(ids))
+	errcList = append(errcList, errc)
 
 	switch pType {
 	case onchain.TrafficSystemRandom:
-		cErr = d.chain.SetRandomNum(valueCtx, cSign)
+		errc := d.chain.SetRandomNum(valueCtx, recoveredSignc)
+		errcList = append(errcList, errc)
 	default:
-		cErr = d.chain.DataReturn(valueCtx, cSign)
+		errc := d.chain.DataReturn(valueCtx, recoveredSignc)
+		errcList = append(errcList, errc)
 	}
-	//errcList = append(errcList, cErr)
-	errc := mergeErrors(valueCtx, errcList...)
 
-	go d.waitForRequestDone(valueCtx, groupID, requestID, errc)
-
+	go d.waitForRequestDone(valueCtx, groupID, requestID, mergeErrors(valueCtx, errcList...))
 }
 
 func (d *DosNode) listen() (err error) {

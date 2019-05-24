@@ -18,11 +18,11 @@ import (
 )
 
 // Caching running node's process id.
-const PIDFile string = "./dosclient.pid"
+const pidFile string = "./dosclient.pid"
 
 func savePID(pid int) {
 
-	file, err := os.Create(PIDFile)
+	file, err := os.Create(pidFile)
 	if err != nil {
 		fmt.Printf("Unable to create pid file : %v\n", err)
 		os.Exit(1)
@@ -31,7 +31,6 @@ func savePID(pid int) {
 	defer file.Close()
 
 	_, err = file.WriteString(strconv.Itoa(pid))
-
 	if err != nil {
 		fmt.Printf("Unable to create pid file : %v\n", err)
 		os.Exit(1)
@@ -57,18 +56,23 @@ func runDos(credentialPath, passphrase string) {
 		fmt.Println("Received signal type : ", signalType)
 
 		// remove PID file
-		os.Remove(PIDFile)
+		os.Remove(pidFile)
 
 	}()
 
 	workingDir, err := os.Getwd()
 	if err != nil {
+		fmt.Println("runDos err ", err)
 		return
 	}
 	if workingDir == "/" {
 		workingDir = "."
 	}
 	fErr, err := os.OpenFile(workingDir+"/dos/doslog", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0666)
+	if err != nil {
+		fmt.Println("runDos err ", err)
+		return
+	}
 	syscall.Dup2(int(fErr.Fd()), 1) /* -- stdout */
 	syscall.Dup2(int(fErr.Fd()), 2) /* -- stderr */
 
@@ -86,14 +90,23 @@ func makeRequest(f string, args []byte) ([]byte, error) {
 	tServer := "http://localhost:8080/" + f
 
 	req, err := http.NewRequest("POST", tServer, bytes.NewBuffer(args))
+	if err != nil {
+		fmt.Println("makeRequest err ", err)
+		return nil, err
+	}
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
+		fmt.Println("makeRequest err ", err)
 		return nil, err
 	}
 	defer resp.Body.Close()
 	r, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Println("makeRequest err ", err)
+		return nil, err
+	}
 	return r, err
 }
 
@@ -132,7 +145,7 @@ func main() {
 			},
 			Action: func(c *cli.Context) error {
 				// check if daemon already running.
-				if _, err := os.Stat(PIDFile); err == nil {
+				if _, err := os.Stat(pidFile); err == nil {
 					fmt.Println("Already running or ${PWD}/dosclient.pid file exist.")
 					os.Exit(1)
 				}
@@ -155,9 +168,9 @@ func main() {
 			Name:  "stop",
 			Usage: "Stop a daemon",
 			Action: func(c *cli.Context) error {
-				_, err := os.Stat(PIDFile)
+				_, err := os.Stat(pidFile)
 				if err == nil {
-					data, err := ioutil.ReadFile(PIDFile)
+					data, err := ioutil.ReadFile(pidFile)
 					if err != nil {
 						fmt.Println("Not running")
 						return err
@@ -165,7 +178,7 @@ func main() {
 
 					ProcessID, err := strconv.Atoi(string(data))
 					if err != nil {
-						fmt.Println("Unable to read and parse process id found in ", PIDFile)
+						fmt.Println("Unable to read and parse process id found in ", pidFile)
 						return err
 					}
 
@@ -176,7 +189,7 @@ func main() {
 					}
 
 					// remove PID file
-					os.Remove(PIDFile)
+					os.Remove(pidFile)
 					fmt.Printf("Killing process ID [%v] now.\n", ProcessID)
 
 					// kill process and exit immediately

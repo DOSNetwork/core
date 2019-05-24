@@ -114,8 +114,7 @@ func choseSubmitter(ctx context.Context, p p2p.P2PInterface, lastSysRand *big.In
 		//Check to see if submitter is reachable
 		for i := 0; i < len(ids); i++ {
 			idx := (lastRand + i) % len(ids)
-			idx = 0
-			if !bytes.Equal(p.GetID(), ids[i]) {
+			if !bytes.Equal(p.GetID(), ids[idx]) {
 				if _, err := p.ConnectTo("", ids[i]); err != nil {
 					continue
 				}

@@ -16,7 +16,8 @@ type Network interface {
 	GetOtherMembersIP() (addr []net.IP)
 }
 
-func NewSerfNet(Addr net.IP, id []byte) (n Network, err error) {
+func NewSerfNet(Addr net.IP, id []byte) (Network, error) {
+	var err error
 	serfNet := &SerfNet{}
 	conf := serf.DefaultConfig()
 	conf.Init()
@@ -26,7 +27,7 @@ func NewSerfNet(Addr net.IP, id []byte) (n Network, err error) {
 	conf.NodeName = string(id)
 	serfNet.serf, err = serf.Create(conf)
 
-	return serfNet, nil
+	return serfNet, err
 }
 
 type SerfNet struct {
