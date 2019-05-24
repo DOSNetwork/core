@@ -57,7 +57,7 @@ func main() {
 	id := adaptor.Address()
 	//Init log module with nodeID that is an onchain account address
 	log.Init(id[:])
-	ctx, _ := context.WithCancel(context.Background())
+	ctx := context.Background()
 
 	var errcList []<-chan error
 	var eventList []<-chan interface{}

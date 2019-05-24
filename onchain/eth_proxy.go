@@ -2001,8 +2001,8 @@ func (e *EthAdaptor) clientGet(ctx context.Context, client *ethclient.Client, vT
 
 func (e *EthAdaptor) PendingNonce() (nonce uint64, err error) {
 	var ok bool
-	ctx, _ := context.WithTimeout(context.Background(), 60*time.Second)
-
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
 	var valList []chan interface{}
 	for _, client := range e.clients {
 		valList = append(valList, e.clientGet(ctx, client, PendingNonce))
@@ -2015,7 +2015,7 @@ func (e *EthAdaptor) PendingNonce() (nonce uint64, err error) {
 			err = errors.New("type error")
 		}
 	case <-ctx.Done():
-		err = errors.New("Timeout")
+		err = ctx.Err()
 	}
 	return
 }

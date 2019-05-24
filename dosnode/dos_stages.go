@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/DOSNetwork/core/log"
 	"github.com/DOSNetwork/core/onchain"
 	"github.com/DOSNetwork/core/p2p"
 	"github.com/DOSNetwork/core/share"
@@ -95,7 +96,7 @@ func fanIn(ctx context.Context, channels ...<-chan *vss.Signature) <-chan *vss.S
 }
 
 //choseSubmitter choses a submitter according to the last random number and check if the submitter is reachable
-func choseSubmitter(ctx context.Context, p p2p.P2PInterface, lastSysRand *big.Int, ids [][]byte, outCount int) ([]chan []byte, <-chan error) {
+func choseSubmitter(ctx context.Context, p p2p.P2PInterface, lastSysRand *big.Int, ids [][]byte, outCount int, logger log.Logger) ([]chan []byte, <-chan error) {
 	errc := make(chan error)
 	var outs []chan []byte
 	for i := 0; i < outCount; i++ {
@@ -115,7 +116,7 @@ func choseSubmitter(ctx context.Context, p p2p.P2PInterface, lastSysRand *big.In
 		for i := 0; i < len(ids); i++ {
 			idx := (lastRand + i) % len(ids)
 			if !bytes.Equal(p.GetID(), ids[idx]) {
-				if _, err := p.ConnectTo("", ids[i]); err != nil {
+				if _, err := p.ConnectTo("", ids[idx]); err != nil {
 					continue
 				}
 			}
@@ -154,7 +155,8 @@ func requestSign(
 	requestId []byte,
 	trafficType uint32,
 	id []byte,
-	nonce []byte) (<-chan *vss.Signature, <-chan error) {
+	nonce []byte,
+	logger log.Logger) (<-chan *vss.Signature, <-chan error) {
 	out := make(chan *vss.Signature)
 	errc := make(chan error)
 	go func() {
@@ -218,7 +220,8 @@ func genSign(
 	groupID string,
 	requestId []byte,
 	index uint32,
-	nonce []byte) (<-chan *vss.Signature, <-chan error) {
+	nonce []byte,
+	logger log.Logger) (<-chan *vss.Signature, <-chan error) {
 	out := make(chan *vss.Signature)
 	errc := make(chan error)
 	go func() {
@@ -279,6 +282,7 @@ func genUserRandom(
 	requestId []byte,
 	lastSysRand []byte,
 	userSeed []byte,
+	logger log.Logger,
 ) <-chan []byte {
 	out := make(chan []byte)
 	go func() {
@@ -312,6 +316,7 @@ func genSysRandom(
 	ctx context.Context,
 	submitterc <-chan []byte,
 	lastSysRand []byte,
+	logger log.Logger,
 ) <-chan []byte {
 	out := make(chan []byte)
 	go func() {
@@ -384,7 +389,7 @@ func dataParse(rawMsg []byte, pathStr string) (msg []byte, err error) {
 	return
 }
 
-func genQueryResult(ctx context.Context, submitterc chan []byte, url string, pathStr string) (<-chan []byte, chan error) {
+func genQueryResult(ctx context.Context, submitterc chan []byte, url string, pathStr string, logger log.Logger) (<-chan []byte, chan error) {
 	out := make(chan []byte)
 	errc := make(chan error)
 	go func() {
@@ -427,7 +432,7 @@ func genQueryResult(ctx context.Context, submitterc chan []byte, url string, pat
 	return out, errc
 }
 
-func recoverSign(ctx context.Context, signc <-chan *vss.Signature, suite suites.Suite, pubPoly *share.PubPoly, nbThreshold int, nbParticipants int) (<-chan *vss.Signature, <-chan error) {
+func recoverSign(ctx context.Context, signc <-chan *vss.Signature, suite suites.Suite, pubPoly *share.PubPoly, nbThreshold int, nbParticipants int, logger log.Logger) (<-chan *vss.Signature, <-chan error) {
 	out := make(chan *vss.Signature)
 	errc := make(chan error)
 	go func() {

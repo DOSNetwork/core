@@ -71,7 +71,7 @@ func TestConcurrentSend(t *testing.T) {
 	sink, errc := adaptor.SubscribeEvent(SubscribeDosproxyUpdateGroupToPick)
 	errcList = append(errcList, errc)
 
-	ctx, _ := context.WithCancel(context.Background())
+	ctx := context.Background()
 
 	for i := 3; i < 8; i++ {
 		go func(i int) {
@@ -117,7 +117,7 @@ func TestSendRequest(t *testing.T) {
 
 	fmt.Println("!!!!!!!!stop geth")
 	time.Sleep(5 * time.Second)
-	ctx, _ := context.WithCancel(context.Background())
+	ctx := context.Background()
 	count := 13
 	for i := 8; i < count; i++ {
 		_ = adaptor.SetGroupToPick(ctx, uint64(i))

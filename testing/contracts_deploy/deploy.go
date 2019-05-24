@@ -373,7 +373,7 @@ func main() {
 		fmt.Print("Enter Password: ")
 		bytePassword, err := terminal.ReadPassword(0)
 		if err == nil {
-			fmt.Println("\nPassword typed: ***\n")
+			fmt.Println("\nPassword typed: ***")
 		}
 		password = strings.TrimSpace(string(bytePassword))
 	}

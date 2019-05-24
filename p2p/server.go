@@ -295,6 +295,12 @@ func (n *Server) callHandler() {
 							continue
 						}
 						// Find Peer from routing map
+						if n.network == nil {
+							fmt.Println("network is nil")
+						}
+						if req.id == nil {
+							fmt.Println("req is nil")
+						}
 						req.addr = n.network.Lookups(req.id)
 
 						if req.addr == nil {
@@ -438,7 +444,9 @@ This is a block call
 func (n *Server) ConnectTo(addr string, id []byte) ([]byte, error) {
 	var err error
 	callReq := Request{}
-	callReq.ctx, _ = context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	callReq.ctx = ctx
 	callReq.rType = 0
 	callReq.id = id
 	if addr != "" {
@@ -472,6 +480,7 @@ func (n *Server) Request(id []byte, m proto.Message) (msg P2PMessage, err error)
 	//defer logger.TimeTrack(time.Now(), "Request", nil)
 	callReq := Request{}
 	callReq.ctx, callReq.cancel = context.WithTimeout(context.Background(), 5*time.Second)
+	defer callReq.cancel()
 	callReq.rType = 1
 	callReq.id = id
 	callReq.reply = make(chan interface{})

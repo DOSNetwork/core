@@ -26,6 +26,29 @@ const (
 	SWIMPORT = 7946
 )
 
+type P2PMessage struct {
+	Msg          ptypes.DynamicAny
+	Sender       []byte
+	RequestNonce uint64
+}
+
+type P2PInterface interface {
+	GetIP() net.IP
+	GetID() []byte
+	SetPort(port string)
+	Listen() error
+	Join(bootstrapIp []string) (num int, err error)
+	ConnectTo(ip string, id []byte) ([]byte, error)
+	DisConnectTo(id []byte) error
+	Leave()
+	Request(id []byte, m proto.Message) (msg P2PMessage, err error)
+	Reply(id []byte, nonce uint64, m proto.Message) (err error)
+	SubscribeEvent(chanBuffer int, messages ...interface{}) (outch chan P2PMessage, err error)
+	UnSubscribeEvent(messages ...interface{})
+	Members() int
+	ConnectToAll() (memNum, connNum int)
+}
+
 func CreateP2PNetwork(id []byte, port string, netType int) (P2PInterface, error) {
 	suite := suites.MustFind("bn256")
 	logger = log.New("module", "p2p")
@@ -99,27 +122,4 @@ func CreateP2PNetwork(id []byte, port string, netType int) (P2PInterface, error)
 	default:
 	}
 	return p, nil
-}
-
-type P2PMessage struct {
-	Msg          ptypes.DynamicAny
-	Sender       []byte
-	RequestNonce uint64
-}
-
-type P2PInterface interface {
-	GetIP() net.IP
-	GetID() []byte
-	SetPort(port string)
-	Listen() error
-	Join(bootstrapIp []string) (num int, err error)
-	ConnectTo(ip string, id []byte) ([]byte, error)
-	DisConnectTo(id []byte) error
-	Leave()
-	Request(id []byte, m proto.Message) (msg P2PMessage, err error)
-	Reply(id []byte, nonce uint64, m proto.Message) (err error)
-	SubscribeEvent(chanBuffer int, messages ...interface{}) (outch chan P2PMessage, err error)
-	UnSubscribeEvent(messages ...interface{})
-	Members() int
-	ConnectToAll() (memNum, connNum int)
 }
