@@ -93,18 +93,23 @@ func TestDialToEthErrHandling(t *testing.T) {
 	tUrls = append(tUrls, "http://123.123.123.123")
 	//It cause an error (dial unix: missing address)
 	tUrls = append(tUrls, "")
-	//It cause an error (dial unix: missing address)
-	tUrls = append(tUrls, "ws://123.123.123.123")
-	ctx, cancelFunc := context.WithCancel(context.Background())
-	defer cancelFunc()
-	clients := DialToEth(ctx, tUrls, nil)
-	time.Sleep(2 * time.Second)
+	tUrls = append(tUrls, "ws://123.123.123.123:8546")
+	//tUrls = append(tUrls, "ws://51.15.0.157:8546")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	//ctx := context.Background()
+	key, err := ReadEthKey(credentialPath, passphrase)
+	if err != nil {
+		return
+	}
+	clients := DialToEth(ctx, tUrls, key)
 
 	count := 0
 	for range clients {
 		count++
 	}
-	if count != 1 {
+	if count != 0 {
 		t.Errorf("Dial success count, got: %d, want: %d.", count, 1)
 	}
 }

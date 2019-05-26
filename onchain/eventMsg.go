@@ -7,10 +7,8 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
-//TODO: MAKE IT A UNIVERSAL INTERFACE FOR ALL KIND OF CHAINS IN FUTURE
-//TODO: NEED TO MOVE IT DIRECTLY INSIDE BLOCKCHAIN FOLDER
-
-type DosproxyLogUrl struct {
+//LogUrl is an onchain event that DOSProxy requests a query result from the specified URL
+type LogUrl struct {
 	QueryId           *big.Int
 	Timeout           *big.Int
 	DataSource        string
@@ -23,7 +21,8 @@ type DosproxyLogUrl struct {
 	Raw               types.Log
 }
 
-type DosproxyLogRequestUserRandom struct {
+//LogRequestUserRandom is an onchain event that DOSProxy requests a random number with RequestID
+type LogRequestUserRandom struct {
 	RequestId            *big.Int
 	LastSystemRandomness *big.Int
 	UserSeed             *big.Int
@@ -34,21 +33,8 @@ type DosproxyLogRequestUserRandom struct {
 	Raw                  types.Log
 }
 
-type DosproxyLogNonSupportedType struct {
-	InvalidSelector string
-}
-
-type DosproxyLogNonContractCall struct {
-	From common.Address
-}
-
-type DosproxyLogCallbackTriggeredFor struct {
-	CallbackAddr common.Address
-}
-
-type DosproxyLogRequestFromNonExistentUC struct{}
-
-type DosproxyLogUpdateRandom struct {
+//LogUpdateRandom is an onchain event that DOSProxy requests a system random number
+type LogUpdateRandom struct {
 	LastRandomness    *big.Int
 	DispatchedGroupId *big.Int
 	Tx                string
@@ -57,7 +43,8 @@ type DosproxyLogUpdateRandom struct {
 	Raw               types.Log
 }
 
-type DosproxyLogValidationResult struct {
+//LogValidationResult is an onchain event that shows a quesry result
+type LogValidationResult struct {
 	TrafficType uint8
 	TrafficId   *big.Int
 	Message     []byte
@@ -71,7 +58,8 @@ type DosproxyLogValidationResult struct {
 	Raw         types.Log
 }
 
-type DosproxyLogGroupingInitiated struct {
+//LogGroupingInitiated is an onchain event that DOSProxy has requested a random number to form a new group
+type LogGroupingInitiated struct {
 	NumPendingNodes   *big.Int
 	GroupSize         *big.Int
 	GroupingThreshold *big.Int
@@ -81,7 +69,8 @@ type DosproxyLogGroupingInitiated struct {
 	Raw               types.Log
 }
 
-type DosproxyLogInsufficientWorkingGroup struct {
+//LogInsufficientWorkingGroup is an onchain event that means there are no enough working groups to mix with pending nodes to form a new group
+type LogInsufficientWorkingGroup struct {
 	NumWorkingGroups *big.Int
 	Tx               string
 	BlockN           uint64
@@ -89,7 +78,8 @@ type DosproxyLogInsufficientWorkingGroup struct {
 	Raw              types.Log
 }
 
-type DosproxyLogInsufficientPendingNode struct {
+//LogInsufficientPendingNode is an onchain event that means there are no enough pending nodes to form a new group
+type LogInsufficientPendingNode struct {
 	NumPendingNodes *big.Int
 	Tx              string
 	BlockN          uint64
@@ -97,7 +87,8 @@ type DosproxyLogInsufficientPendingNode struct {
 	Raw             types.Log
 }
 
-type DosproxyLogGrouping struct {
+//LogGrouping is an onchain event that DOSProxy requests the specified nodes to start DKG to generate a new pubkey
+type LogGrouping struct {
 	GroupId *big.Int
 	NodeId  []common.Address
 	Tx      string
@@ -106,22 +97,8 @@ type DosproxyLogGrouping struct {
 	Raw     types.Log
 }
 
-type DosproxyLogDuplicatePubKey struct {
-	GroupId *big.Int
-	BlockN  uint64
-	Removed bool
-	Raw     types.Log
-}
-
-type DosproxyLogAddressNotFound struct {
-	GroupId *big.Int
-	Tx      string
-	BlockN  uint64
-	Removed bool
-	Raw     types.Log
-}
-
-type DosproxyLogPublicKeyAccepted struct {
+//LogPublicKeyAccepted is an onchain event that DOSProxy receives enough suggested pubkey so accepts it as a new pubkey
+type LogPublicKeyAccepted struct {
 	GroupId          *big.Int
 	WorkingGroupSize *big.Int
 	Tx               string
@@ -130,7 +107,8 @@ type DosproxyLogPublicKeyAccepted struct {
 	Raw              types.Log
 }
 
-type DosproxyLogPublicKeySuggested struct {
+//LogPublicKeySuggested is an onchain event that DOSProxy accepts a suggested pubkey
+type LogPublicKeySuggested struct {
 	GroupId   *big.Int
 	Count     *big.Int
 	GroupSize *big.Int
@@ -140,7 +118,8 @@ type DosproxyLogPublicKeySuggested struct {
 	Raw       types.Log
 }
 
-type DosproxyLogGroupDissolve struct {
+//LogGroupDissolve is an onchain event that DOSProxy requests to dissolve a specified group
+type LogGroupDissolve struct {
 	GroupId *big.Int
 	Tx      string
 	BlockN  uint64
@@ -148,14 +127,8 @@ type DosproxyLogGroupDissolve struct {
 	Raw     types.Log
 }
 
-type DosproxyLogNoWorkingGroup struct {
-	Raw     types.Log
-	Removed bool
-	BlockN  uint64
-	Tx      string
-}
-
-type DosproxyUpdateGroupToPick struct {
+//LogUpdateGroupToPick is an onchain event that means GroupToPick is updated
+type LogUpdateGroupToPick struct {
 	OldNum  *big.Int
 	NewNum  *big.Int
 	Tx      string
@@ -164,6 +137,7 @@ type DosproxyUpdateGroupToPick struct {
 	Raw     types.Log
 }
 
+//LogStartCommitReveal is an onchain event that means DOSProxy starts a new commit-revel process
 type LogStartCommitReveal struct {
 	Cid             *big.Int
 	StartBlock      *big.Int
@@ -176,6 +150,7 @@ type LogStartCommitReveal struct {
 	Raw             types.Log
 }
 
+//LogCommit is an onchain event that means a secret is committed
 type LogCommit struct {
 	Cid        *big.Int
 	From       common.Address
@@ -186,6 +161,7 @@ type LogCommit struct {
 	Raw        types.Log
 }
 
+//LogReveal is an onchain event that means a secret is revealed
 type LogReveal struct {
 	Cid     *big.Int
 	From    common.Address
@@ -196,6 +172,7 @@ type LogReveal struct {
 	Raw     types.Log
 }
 
+//LogRandom is an onchain event that means a new random is generated by a commit-reveal process with Cid
 type LogRandom struct {
 	Cid     *big.Int
 	Random  *big.Int

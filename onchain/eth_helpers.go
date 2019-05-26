@@ -7,7 +7,6 @@ import (
 	"io/ioutil"
 	"math"
 	"math/big"
-	"strings"
 	"sync"
 	"time"
 
@@ -93,45 +92,37 @@ func ReadEthKey(credentialPath, passphrase string) (key *keystore.Key, err error
 func DialToEth(ctx context.Context, urlPool []string, key *keystore.Key) (out chan *ethclient.Client) {
 	out = make(chan *ethclient.Client)
 	var wg sync.WaitGroup
-	connTemp := 1
-	multiplex := func(url string) {
-		//defer logger.TimeTrack(time.Now(), "DialToEth", map[string]interface{}{"URL": url})
 
+	multiplex := func(url string) {
 		var e error
 		var client *ethclient.Client
 		defer wg.Done()
+
 		client, e = ethclient.Dial(url)
 		if e != nil {
-			fmt.Println("DialToEth err ", e)
-		}
-		for connTemp < RETRYLIMIT && e != nil && strings.Contains(e.Error(), "no such host") {
-			client, e = ethclient.Dial(url)
-			if e != nil {
-				fmt.Println("DialToEth err ", e)
-			}
-			connTemp++
-			time.Sleep(time.Second * time.Duration(REDIALINTERVAL))
-		}
-		//retry := 100
-		if key != nil {
-			//Read balance to make sure client is working
-			for {
-				b := GetBalance(client, key)
-				if b != nil {
-					fmt.Println("balance ", b)
-					break
-				}
-				//if retry == 0 {
-				//	return
-				//}
-				//retry--
-				time.Sleep(15 * time.Second)
-				fmt.Println("Retry to get balance")
-			}
-		}
-		if e != nil {
+			fmt.Println(url, ":DialToEth err ", e)
 			return
 		}
+
+		//Read balance to make sure client is working
+		ticker := time.NewTicker(5 * time.Second)
+		for {
+			b := GetBalance(client, key)
+			if b != nil {
+				fmt.Println(url, ":balance ", b)
+				break
+			}
+			select {
+			case <-ticker.C:
+				fmt.Println(url, ":Retry GetBalance ")
+			case <-ctx.Done():
+				fmt.Println(url, ":ctx done ", ctx.Err())
+				ticker.Stop()
+				client.Close()
+				return
+			}
+		}
+
 		select {
 		case <-ctx.Done():
 			client.Close()

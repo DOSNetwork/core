@@ -25,18 +25,18 @@ import (
 )
 
 const (
-	SubscribeDosproxyLogUpdateRandom = iota
-	SubscribeDosproxyLogRequestUserRandom
-	SubscribeDosproxyLogUrl
-	SubscribeDosproxyLogValidationResult
-	SubscribeDosproxyLogGrouping
-	SubscribeDosproxyLogPublicKeyAccepted
-	SubscribeDosproxyLogPublicKeySuggested
-	SubscribeDosproxyLogGroupDissolve
-	SubscribeDosproxyLogInsufficientPendingNode
-	SubscribeDosproxyLogInsufficientWorkingGroup
-	SubscribeDosproxyLogNoWorkingGroup
-	SubscribeDosproxyLogGroupingInitiated
+	SubscribeLogUpdateRandom = iota
+	SubscribeLogRequestUserRandom
+	SubscribeLogUrl
+	SubscribeLogValidationResult
+	SubscribeLogGrouping
+	SubscribeLogPublicKeyAccepted
+	SubscribeLogPublicKeySuggested
+	SubscribeLogGroupDissolve
+	SubscribeLogInsufficientPendingNode
+	SubscribeLogInsufficientWorkingGroup
+	SubscribeLogNoWorkingGroup
+	SubscribeLogGroupingInitiated
 	SubscribeDosproxyUpdateGroupToPick
 	//For bootstraping
 	SubscribeCommitrevealLogStartCommitreveal
@@ -804,52 +804,47 @@ func (e *EthAdaptor) firstEvent(ctx context.Context, source chan interface{}) <-
 			case event, ok = <-source:
 				if ok {
 					switch content := event.(type) {
-					case *DosproxyLogUpdateRandom:
+					case *LogUpdateRandom:
 						bytes = append(bytes, content.Raw.Data...)
 						blkNum = content.BlockN
 						removed = content.Removed
 						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
-					case *DosproxyLogRequestUserRandom:
+					case *LogRequestUserRandom:
 						bytes = append(bytes, content.Raw.Data...)
 						blkNum = content.BlockN
 						removed = content.Removed
 						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
-					case *DosproxyLogUrl:
+					case *LogUrl:
 						bytes = append(bytes, content.Raw.Data...)
 						blkNum = content.BlockN
 						removed = content.Removed
 						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
-					case *DosproxyLogValidationResult:
+					case *LogValidationResult:
 						bytes = append(bytes, content.Raw.Data...)
 						blkNum = content.BlockN
 						removed = content.Removed
 						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
-					case *DosproxyLogNoWorkingGroup:
+					case *LogGrouping:
 						bytes = append(bytes, content.Raw.Data...)
 						blkNum = content.BlockN
 						removed = content.Removed
 						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
-					case *DosproxyLogGrouping:
+					case *LogPublicKeyAccepted:
 						bytes = append(bytes, content.Raw.Data...)
 						blkNum = content.BlockN
 						removed = content.Removed
 						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
-					case *DosproxyLogPublicKeyAccepted:
+					case *LogPublicKeySuggested:
 						bytes = append(bytes, content.Raw.Data...)
 						blkNum = content.BlockN
 						removed = content.Removed
 						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
-					case *DosproxyLogPublicKeySuggested:
+					case *LogGroupDissolve:
 						bytes = append(bytes, content.Raw.Data...)
 						blkNum = content.BlockN
 						removed = content.Removed
 						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
-					case *DosproxyLogGroupDissolve:
-						bytes = append(bytes, content.Raw.Data...)
-						blkNum = content.BlockN
-						removed = content.Removed
-						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
-					case *DosproxyUpdateGroupToPick:
+					case *LogUpdateGroupToPick:
 						bytes = append(bytes, content.Raw.Data...)
 						blkNum = content.BlockN
 						removed = content.Removed
@@ -1088,7 +1083,7 @@ func subscribeEvent(ctx context.Context, proxy *dosproxy.Dosproxy, subscribeType
 	opt := &bind.WatchOpts{}
 
 	switch subscribeType {
-	case SubscribeDosproxyLogUpdateRandom:
+	case SubscribeLogUpdateRandom:
 		go func() {
 			transitChan := make(chan *dosproxy.DosproxyLogUpdateRandom)
 			defer close(transitChan)
@@ -1107,7 +1102,7 @@ func subscribeEvent(ctx context.Context, proxy *dosproxy.Dosproxy, subscribeType
 					errc <- err
 					return
 				case i := <-transitChan:
-					out <- &DosproxyLogUpdateRandom{
+					out <- &LogUpdateRandom{
 						LastRandomness:    i.LastRandomness,
 						DispatchedGroupId: i.DispatchedGroupId,
 						Tx:                i.Raw.TxHash.Hex(),
@@ -1118,7 +1113,7 @@ func subscribeEvent(ctx context.Context, proxy *dosproxy.Dosproxy, subscribeType
 				}
 			}
 		}()
-	case SubscribeDosproxyLogUrl:
+	case SubscribeLogUrl:
 		go func() {
 			transitChan := make(chan *dosproxy.DosproxyLogUrl)
 			defer close(transitChan)
@@ -1138,7 +1133,7 @@ func subscribeEvent(ctx context.Context, proxy *dosproxy.Dosproxy, subscribeType
 					errc <- err
 					return
 				case i := <-transitChan:
-					out <- &DosproxyLogUrl{
+					out <- &LogUrl{
 						QueryId:           i.QueryId,
 						Timeout:           i.Timeout,
 						DataSource:        i.DataSource,
@@ -1153,7 +1148,7 @@ func subscribeEvent(ctx context.Context, proxy *dosproxy.Dosproxy, subscribeType
 				}
 			}
 		}()
-	case SubscribeDosproxyLogRequestUserRandom:
+	case SubscribeLogRequestUserRandom:
 		go func() {
 			transitChan := make(chan *dosproxy.DosproxyLogRequestUserRandom)
 			defer close(transitChan)
@@ -1173,7 +1168,7 @@ func subscribeEvent(ctx context.Context, proxy *dosproxy.Dosproxy, subscribeType
 					errc <- err
 					return
 				case i := <-transitChan:
-					out <- &DosproxyLogRequestUserRandom{
+					out <- &LogRequestUserRandom{
 						RequestId:            i.RequestId,
 						LastSystemRandomness: i.LastSystemRandomness,
 						UserSeed:             i.UserSeed,
@@ -1186,7 +1181,7 @@ func subscribeEvent(ctx context.Context, proxy *dosproxy.Dosproxy, subscribeType
 				}
 			}
 		}()
-	case SubscribeDosproxyLogValidationResult:
+	case SubscribeLogValidationResult:
 		go func() {
 			transitChan := make(chan *dosproxy.DosproxyLogValidationResult)
 			defer close(transitChan)
@@ -1195,23 +1190,23 @@ func subscribeEvent(ctx context.Context, proxy *dosproxy.Dosproxy, subscribeType
 
 			sub, err := proxy.DosproxyFilterer.WatchLogValidationResult(opt, transitChan)
 			if err != nil {
-				fmt.Println("SubscribeDosproxyLogValidationResult err", err)
+				fmt.Println("SubscribeLogValidationResult err", err)
 				return
 			}
 			for {
 				select {
 				case <-ctx.Done():
-					fmt.Println("SubscribeDosproxyLogValidationResult Done")
+					fmt.Println("SubscribeLogValidationResult Done")
 
 					sub.Unsubscribe()
 					return
 				case err := <-sub.Err():
-					fmt.Println("SubscribeDosproxyLogValidationResult err", err)
+					fmt.Println("SubscribeLogValidationResult err", err)
 
 					errc <- err
 					return
 				case i := <-transitChan:
-					out <- &DosproxyLogValidationResult{
+					out <- &LogValidationResult{
 						TrafficType: i.TrafficType,
 						TrafficId:   i.TrafficId,
 						Message:     i.Message,
@@ -1227,7 +1222,7 @@ func subscribeEvent(ctx context.Context, proxy *dosproxy.Dosproxy, subscribeType
 				}
 			}
 		}()
-	case SubscribeDosproxyLogInsufficientPendingNode:
+	case SubscribeLogInsufficientPendingNode:
 		go func() {
 			transitChan := make(chan *dosproxy.DosproxyLogInsufficientPendingNode)
 			defer close(transitChan)
@@ -1246,7 +1241,7 @@ func subscribeEvent(ctx context.Context, proxy *dosproxy.Dosproxy, subscribeType
 					errc <- err
 					return
 				case i := <-transitChan:
-					out <- &DosproxyLogInsufficientPendingNode{
+					out <- &LogInsufficientPendingNode{
 						NumPendingNodes: i.NumPendingNodes,
 						Tx:              i.Raw.TxHash.Hex(),
 						BlockN:          i.Raw.BlockNumber,
@@ -1256,7 +1251,7 @@ func subscribeEvent(ctx context.Context, proxy *dosproxy.Dosproxy, subscribeType
 				}
 			}
 		}()
-	case SubscribeDosproxyLogInsufficientWorkingGroup:
+	case SubscribeLogInsufficientWorkingGroup:
 		go func() {
 			transitChan := make(chan *dosproxy.DosproxyLogInsufficientWorkingGroup)
 			defer close(transitChan)
@@ -1275,7 +1270,7 @@ func subscribeEvent(ctx context.Context, proxy *dosproxy.Dosproxy, subscribeType
 					errc <- err
 					return
 				case i := <-transitChan:
-					out <- &DosproxyLogInsufficientWorkingGroup{
+					out <- &LogInsufficientWorkingGroup{
 						NumWorkingGroups: i.NumWorkingGroups,
 						Tx:               i.Raw.TxHash.Hex(),
 						BlockN:           i.Raw.BlockNumber,
@@ -1285,7 +1280,7 @@ func subscribeEvent(ctx context.Context, proxy *dosproxy.Dosproxy, subscribeType
 				}
 			}
 		}()
-	case SubscribeDosproxyLogGroupingInitiated:
+	case SubscribeLogGroupingInitiated:
 		go func() {
 			transitChan := make(chan *dosproxy.DosproxyLogGroupingInitiated)
 			defer close(transitChan)
@@ -1304,7 +1299,7 @@ func subscribeEvent(ctx context.Context, proxy *dosproxy.Dosproxy, subscribeType
 					errc <- err
 					return
 				case i := <-transitChan:
-					out <- &DosproxyLogGroupingInitiated{
+					out <- &LogGroupingInitiated{
 						Tx:      i.Raw.TxHash.Hex(),
 						BlockN:  i.Raw.BlockNumber,
 						Removed: i.Raw.Removed,
@@ -1332,7 +1327,7 @@ func subscribeEvent(ctx context.Context, proxy *dosproxy.Dosproxy, subscribeType
 					errc <- err
 					return
 				case i := <-transitChan:
-					out <- &DosproxyUpdateGroupToPick{
+					out <- &LogUpdateGroupToPick{
 						Tx:      i.Raw.TxHash.Hex(),
 						OldNum:  i.OldNum,
 						NewNum:  i.NewNum,
@@ -1343,7 +1338,7 @@ func subscribeEvent(ctx context.Context, proxy *dosproxy.Dosproxy, subscribeType
 				}
 			}
 		}()
-	case SubscribeDosproxyLogGrouping:
+	case SubscribeLogGrouping:
 		go func() {
 			transitChan := make(chan *dosproxy.DosproxyLogGrouping)
 			defer close(transitChan)
@@ -1366,7 +1361,7 @@ func subscribeEvent(ctx context.Context, proxy *dosproxy.Dosproxy, subscribeType
 						"GroupId": fmt.Sprintf("%x", i.GroupId),
 						"Tx":      i.Raw.TxHash.Hex()}
 					logger.Event("ETHGrouping", f)
-					out <- &DosproxyLogGrouping{
+					out <- &LogGrouping{
 						GroupId: i.GroupId,
 						NodeId:  i.NodeId,
 						Tx:      i.Raw.TxHash.Hex(),
@@ -1377,7 +1372,7 @@ func subscribeEvent(ctx context.Context, proxy *dosproxy.Dosproxy, subscribeType
 				}
 			}
 		}()
-	case SubscribeDosproxyLogPublicKeyAccepted:
+	case SubscribeLogPublicKeyAccepted:
 		go func() {
 			transitChan := make(chan *dosproxy.DosproxyLogPublicKeyAccepted)
 			defer close(transitChan)
@@ -1396,7 +1391,7 @@ func subscribeEvent(ctx context.Context, proxy *dosproxy.Dosproxy, subscribeType
 					errc <- err
 					return
 				case i := <-transitChan:
-					out <- &DosproxyLogPublicKeyAccepted{
+					out <- &LogPublicKeyAccepted{
 						GroupId:          i.GroupId,
 						WorkingGroupSize: i.NumWorkingGroups,
 						Tx:               i.Raw.TxHash.Hex(),
@@ -1407,7 +1402,7 @@ func subscribeEvent(ctx context.Context, proxy *dosproxy.Dosproxy, subscribeType
 				}
 			}
 		}()
-	case SubscribeDosproxyLogPublicKeySuggested:
+	case SubscribeLogPublicKeySuggested:
 		go func() {
 			transitChan := make(chan *dosproxy.DosproxyLogPublicKeySuggested)
 			defer close(transitChan)
@@ -1426,7 +1421,7 @@ func subscribeEvent(ctx context.Context, proxy *dosproxy.Dosproxy, subscribeType
 					errc <- err
 					return
 				case i := <-transitChan:
-					out <- &DosproxyLogPublicKeySuggested{
+					out <- &LogPublicKeySuggested{
 						GroupId: i.GroupId,
 						Count:   i.PubKeyCount,
 						Tx:      i.Raw.TxHash.Hex(),
@@ -1437,7 +1432,7 @@ func subscribeEvent(ctx context.Context, proxy *dosproxy.Dosproxy, subscribeType
 				}
 			}
 		}()
-	case SubscribeDosproxyLogGroupDissolve:
+	case SubscribeLogGroupDissolve:
 		go func() {
 			transitChan := make(chan *dosproxy.DosproxyLogGroupDissolve)
 			defer close(transitChan)
@@ -1456,7 +1451,7 @@ func subscribeEvent(ctx context.Context, proxy *dosproxy.Dosproxy, subscribeType
 					errc <- err
 					return
 				case i := <-transitChan:
-					out <- &DosproxyLogGroupDissolve{
+					out <- &LogGroupDissolve{
 						GroupId: i.GroupId,
 						Tx:      i.Raw.TxHash.Hex(),
 						BlockN:  i.Raw.BlockNumber,
@@ -1500,7 +1495,7 @@ func (e *EthAdaptor) PollLogs(subscribeType int, logBlockDiff, preBlockBuf uint6
 
 				for ; currentBlockN-logBlockDiff >= targetBlockN; targetBlockN++ {
 					switch subscribeType {
-					case SubscribeDosproxyLogGrouping:
+					case SubscribeLogGrouping:
 						logs, err := proxyFilter.FilterLogGrouping(&bind.FilterOpts{
 							Start:   targetBlockN,
 							End:     &targetBlockN,
@@ -1511,7 +1506,7 @@ func (e *EthAdaptor) PollLogs(subscribeType int, logBlockDiff, preBlockBuf uint6
 							continue
 						}
 						for logs.Next() {
-							sink <- &DosproxyLogGrouping{
+							sink <- &LogGrouping{
 								GroupId: logs.Event.GroupId,
 								NodeId:  logs.Event.NodeId,
 								Tx:      logs.Event.Raw.TxHash.Hex(),
@@ -1520,7 +1515,7 @@ func (e *EthAdaptor) PollLogs(subscribeType int, logBlockDiff, preBlockBuf uint6
 								Raw:     logs.Event.Raw,
 							}
 						}
-					case SubscribeDosproxyLogGroupDissolve:
+					case SubscribeLogGroupDissolve:
 						logs, err := proxyFilter.FilterLogGroupDissolve(&bind.FilterOpts{
 							Start:   targetBlockN,
 							End:     &targetBlockN,
@@ -1531,7 +1526,7 @@ func (e *EthAdaptor) PollLogs(subscribeType int, logBlockDiff, preBlockBuf uint6
 							continue
 						}
 						for logs.Next() {
-							sink <- &DosproxyLogGroupDissolve{
+							sink <- &LogGroupDissolve{
 								GroupId: logs.Event.GroupId,
 								Tx:      logs.Event.Raw.TxHash.Hex(),
 								BlockN:  logs.Event.Raw.BlockNumber,
@@ -1539,7 +1534,7 @@ func (e *EthAdaptor) PollLogs(subscribeType int, logBlockDiff, preBlockBuf uint6
 								Raw:     logs.Event.Raw,
 							}
 						}
-					case SubscribeDosproxyLogUpdateRandom:
+					case SubscribeLogUpdateRandom:
 						logs, err := proxyFilter.FilterLogUpdateRandom(&bind.FilterOpts{
 							Start:   targetBlockN,
 							End:     &targetBlockN,
@@ -1550,7 +1545,7 @@ func (e *EthAdaptor) PollLogs(subscribeType int, logBlockDiff, preBlockBuf uint6
 							continue
 						}
 						for logs.Next() {
-							sink <- &DosproxyLogUpdateRandom{
+							sink <- &LogUpdateRandom{
 								LastRandomness:    logs.Event.LastRandomness,
 								DispatchedGroupId: logs.Event.DispatchedGroupId,
 								Tx:                logs.Event.Raw.TxHash.Hex(),
@@ -1559,7 +1554,7 @@ func (e *EthAdaptor) PollLogs(subscribeType int, logBlockDiff, preBlockBuf uint6
 								Raw:               logs.Event.Raw,
 							}
 						}
-					case SubscribeDosproxyLogRequestUserRandom:
+					case SubscribeLogRequestUserRandom:
 						logs, err := proxyFilter.FilterLogRequestUserRandom(&bind.FilterOpts{
 							Start:   targetBlockN,
 							End:     &targetBlockN,
@@ -1570,7 +1565,7 @@ func (e *EthAdaptor) PollLogs(subscribeType int, logBlockDiff, preBlockBuf uint6
 							continue
 						}
 						for logs.Next() {
-							sink <- &DosproxyLogRequestUserRandom{
+							sink <- &LogRequestUserRandom{
 								RequestId:            logs.Event.RequestId,
 								LastSystemRandomness: logs.Event.LastSystemRandomness,
 								UserSeed:             logs.Event.UserSeed,
@@ -1581,7 +1576,7 @@ func (e *EthAdaptor) PollLogs(subscribeType int, logBlockDiff, preBlockBuf uint6
 								Raw:                  logs.Event.Raw,
 							}
 						}
-					case SubscribeDosproxyLogUrl:
+					case SubscribeLogUrl:
 						logs, err := proxyFilter.FilterLogUrl(&bind.FilterOpts{
 							Start:   targetBlockN,
 							End:     &targetBlockN,
@@ -1592,7 +1587,7 @@ func (e *EthAdaptor) PollLogs(subscribeType int, logBlockDiff, preBlockBuf uint6
 							continue
 						}
 						for logs.Next() {
-							sink <- &DosproxyLogUrl{
+							sink <- &LogUrl{
 								QueryId:           logs.Event.QueryId,
 								Timeout:           logs.Event.Timeout,
 								DataSource:        logs.Event.DataSource,
@@ -1605,7 +1600,7 @@ func (e *EthAdaptor) PollLogs(subscribeType int, logBlockDiff, preBlockBuf uint6
 								Raw:               logs.Event.Raw,
 							}
 						}
-					case SubscribeDosproxyLogValidationResult:
+					case SubscribeLogValidationResult:
 						logs, err := proxyFilter.FilterLogValidationResult(&bind.FilterOpts{
 							Start:   targetBlockN,
 							End:     &targetBlockN,
@@ -1616,7 +1611,7 @@ func (e *EthAdaptor) PollLogs(subscribeType int, logBlockDiff, preBlockBuf uint6
 							continue
 						}
 						for logs.Next() {
-							sink <- &DosproxyLogValidationResult{
+							sink <- &LogValidationResult{
 								TrafficType: logs.Event.TrafficType,
 								TrafficId:   logs.Event.TrafficId,
 								Message:     logs.Event.Message,
@@ -1630,7 +1625,7 @@ func (e *EthAdaptor) PollLogs(subscribeType int, logBlockDiff, preBlockBuf uint6
 								Raw:         logs.Event.Raw,
 							}
 						}
-					case SubscribeDosproxyLogInsufficientPendingNode:
+					case SubscribeLogInsufficientPendingNode:
 						logs, err := proxyFilter.FilterLogInsufficientPendingNode(&bind.FilterOpts{
 							Start:   targetBlockN,
 							End:     &targetBlockN,
@@ -1642,7 +1637,7 @@ func (e *EthAdaptor) PollLogs(subscribeType int, logBlockDiff, preBlockBuf uint6
 						}
 
 						for logs.Next() {
-							sink <- &DosproxyLogInsufficientPendingNode{
+							sink <- &LogInsufficientPendingNode{
 								NumPendingNodes: logs.Event.NumPendingNodes,
 								Tx:              logs.Event.Raw.TxHash.Hex(),
 								BlockN:          logs.Event.Raw.BlockNumber,
@@ -1650,7 +1645,7 @@ func (e *EthAdaptor) PollLogs(subscribeType int, logBlockDiff, preBlockBuf uint6
 								Raw:             logs.Event.Raw,
 							}
 						}
-					case SubscribeDosproxyLogInsufficientWorkingGroup:
+					case SubscribeLogInsufficientWorkingGroup:
 						logs, err := proxyFilter.FilterLogInsufficientWorkingGroup(&bind.FilterOpts{
 							Start:   targetBlockN,
 							End:     &targetBlockN,
@@ -1662,7 +1657,7 @@ func (e *EthAdaptor) PollLogs(subscribeType int, logBlockDiff, preBlockBuf uint6
 						}
 
 						for logs.Next() {
-							sink <- &DosproxyLogInsufficientWorkingGroup{
+							sink <- &LogInsufficientWorkingGroup{
 								NumWorkingGroups: logs.Event.NumWorkingGroups,
 								Tx:               logs.Event.Raw.TxHash.Hex(),
 								BlockN:           logs.Event.Raw.BlockNumber,
@@ -1670,7 +1665,7 @@ func (e *EthAdaptor) PollLogs(subscribeType int, logBlockDiff, preBlockBuf uint6
 								Raw:              logs.Event.Raw,
 							}
 						}
-					case SubscribeDosproxyLogGroupingInitiated:
+					case SubscribeLogGroupingInitiated:
 						logs, err := proxyFilter.FilterLogGroupingInitiated(&bind.FilterOpts{
 							Start:   targetBlockN,
 							End:     &targetBlockN,
@@ -1682,7 +1677,7 @@ func (e *EthAdaptor) PollLogs(subscribeType int, logBlockDiff, preBlockBuf uint6
 						}
 
 						for logs.Next() {
-							sink <- &DosproxyLogGroupingInitiated{
+							sink <- &LogGroupingInitiated{
 								Tx:      logs.Event.Raw.TxHash.Hex(),
 								BlockN:  logs.Event.Raw.BlockNumber,
 								Removed: logs.Event.Raw.Removed,
@@ -1701,7 +1696,7 @@ func (e *EthAdaptor) PollLogs(subscribeType int, logBlockDiff, preBlockBuf uint6
 						}
 
 						for logs.Next() {
-							sink <- &DosproxyUpdateGroupToPick{
+							sink <- &LogUpdateGroupToPick{
 								Tx:      logs.Event.Raw.TxHash.Hex(),
 								OldNum:  logs.Event.OldNum,
 								NewNum:  logs.Event.NewNum,

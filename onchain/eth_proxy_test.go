@@ -14,7 +14,7 @@ const (
 )
 
 var (
-	urls           = []string{}
+	urls           = []string{""}
 	proxyAddr      = ""
 	credentialPath = ""
 	passphrase     = ""
@@ -85,7 +85,7 @@ L:
 		select {
 		case event := <-sink:
 			switch content := event.(type) {
-			case *DosproxyUpdateGroupToPick:
+			case *LogUpdateGroupToPick:
 				fmt.Println("DOSProxyUpdateGroupToPick ", int(content.NewNum.Uint64()), content.Removed)
 				if content.Removed != true {
 					result = result + int(content.NewNum.Uint64())
@@ -132,7 +132,7 @@ L:
 		select {
 		case event := <-sink:
 			switch content := event.(type) {
-			case *DosproxyUpdateGroupToPick:
+			case *LogUpdateGroupToPick:
 				fmt.Println("DOSProxyUpdateGroupToPick ", int(content.NewNum.Uint64()), content.Removed, result)
 				if content.Removed != true {
 					result = result + int(content.NewNum.Uint64())
