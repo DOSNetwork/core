@@ -21,9 +21,9 @@ import (
 )
 
 const (
-	ENVKEYFOLDERPATH = "KEYFOLDERPATH"
-	ENVSCANRANGE     = "SCANRANGE"
-	ENVSCANINTERVAL  = "SCANINTERVAL"
+	keyPath      = "KEYFOLDERPATH"
+	scanRange    = "SCANRANGE"
+	scanInterval = "SCANINTERVAL"
 )
 
 func balanceMaintain(client *ethclient.Client, usrKey, rootKey *keystore.Key) (err error) {
@@ -114,7 +114,7 @@ func main() {
 
 	chainConfig := config.GetChainConfig()
 
-	keyFolderPath := os.Getenv(ENVKEYFOLDERPATH)
+	keyFolderPath := os.Getenv(keyPath)
 	if keyFolderPath == "" {
 		fmt.Println("No KEYFOLDERPATH Environment variable.")
 		keyFolderPath = "/testAccounts"
@@ -127,13 +127,13 @@ func main() {
 	}
 	fmt.Println("rootKey loaded")
 
-	scanRange := os.Getenv(ENVSCANRANGE)
+	scanRange := os.Getenv(scanRange)
 	scanRangeInt, err := strconv.Atoi(scanRange)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	scanInterval := os.Getenv(ENVSCANINTERVAL)
+	scanInterval := os.Getenv(scanInterval)
 	scanIntervalInt, err := strconv.Atoi(scanInterval)
 	if err != nil {
 		log.Fatal(err)

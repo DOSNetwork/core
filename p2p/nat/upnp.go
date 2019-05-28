@@ -144,7 +144,7 @@ func (u *uPnPNAT) GetExternalAddress() (addr net.IP, err error) {
 
 	ip := net.ParseIP(ipString)
 	if ip == nil {
-		return nil, ErrNoExternalAddress
+		return nil, errNoExternalAddress
 	}
 
 	return ip, nil
@@ -234,7 +234,7 @@ func (u *uPnPNAT) getInternalAddress() (net.IP, error) {
 		}
 	}
 
-	return nil, ErrNoInternalAddress
+	return nil, errNoInternalAddress
 }
 
 func (u *uPnPNAT) getType() string { return u.typ }

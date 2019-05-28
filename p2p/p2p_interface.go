@@ -9,8 +9,8 @@ import (
 	"strconv"
 
 	"github.com/DOSNetwork/core/log"
+	"github.com/DOSNetwork/core/p2p/discover"
 	"github.com/DOSNetwork/core/p2p/nat"
-	"github.com/DOSNetwork/core/p2p/network"
 	"github.com/DOSNetwork/core/suites"
 
 	"github.com/ethereum/go-ethereum/p2p/netutil"
@@ -113,12 +113,12 @@ func CreateP2PNetwork(id []byte, port string, netType int) (P2PInterface, error)
 
 	switch netType {
 	case SWIM:
-		network, err := network.NewSerfNet(p.addr, p.id)
+		network, err := discover.NewSerfNet(p.addr, p.id)
 		if err != nil {
 			p.cancel()
 			return nil, err
 		}
-		p.network = network
+		p.members = network
 	default:
 	}
 	return p, nil

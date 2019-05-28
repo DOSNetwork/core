@@ -9,9 +9,11 @@ import (
 )
 
 const (
+	//ETH represents the type of blockchain
 	ETH = "ETH"
 )
 
+//ProxyAdapter represents an unified adapter interface for different blockchain
 type ProxyAdapter interface {
 	RegisterNewNode(ctx context.Context) (errc <-chan error)
 	AddEventNode() (err error)
@@ -49,6 +51,7 @@ type ProxyAdapter interface {
 	IsPendingNode(id []byte) (bool, error)
 }
 
+//NewProxyAdapter constructs a new ProxyAdapter with the given type of blockchain and contract addresses
 func NewProxyAdapter(ChainType, credentialPath, passphrase, proxyAddr, crAddress string, urls []string) (ProxyAdapter, error) {
 	switch ChainType {
 	case ETH:

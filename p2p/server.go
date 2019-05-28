@@ -15,9 +15,7 @@ import (
 
 	"github.com/golang/protobuf/proto"
 
-	//	"reflect"
-	//	"github.com/DOSNetwork/core/log"
-	"github.com/DOSNetwork/core/p2p/network"
+	"github.com/DOSNetwork/core/p2p/discover"
 	"github.com/DOSNetwork/core/suites"
 )
 
@@ -32,7 +30,7 @@ type server struct {
 	listener net.Listener
 
 	//client lookup
-	network     network.Network
+	members     discover.Membership
 	calling     chan Request
 	replying    chan Request
 	incoming    chan *client
@@ -69,15 +67,15 @@ type Subscription struct {
 }
 
 func (n *server) Join(bootstrapIP []string) (num int, err error) {
-	return n.network.Join(bootstrapIP)
+	return n.members.Join(bootstrapIP)
 }
 
 func (n *server) Members() int {
-	return n.network.NumPeers()
+	return n.members.NumOfPeers()
 }
 
 func (n *server) ConnectToAll() (memNum, connNum int) {
-	addrs := n.network.GetOtherMembersIP()
+	addrs := n.members.PeersIP()
 	memNum = len(addrs)
 	for _, addr := range addrs {
 		if _, err := n.ConnectTo(addr.String(), nil); err != nil {
@@ -293,13 +291,13 @@ func (n *server) callHandler() {
 							continue
 						}
 						// Find Peer from routing map
-						if n.network == nil {
+						if n.members == nil {
 							fmt.Println("network is nil")
 						}
 						if req.id == nil {
 							fmt.Println("req is nil")
 						}
-						req.addr = n.network.Lookups(req.id)
+						req.addr = n.members.Lookup(req.id)
 
 						if req.addr == nil {
 							//Retry later
@@ -424,8 +422,8 @@ func (n *server) Leave() {
 	}
 	n.cancel()
 
-	if n.network != nil {
-		n.network.Leave()
+	if n.members != nil {
+		n.members.Leave()
 	}
 
 	return

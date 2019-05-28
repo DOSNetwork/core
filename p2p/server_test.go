@@ -28,7 +28,6 @@ func TestServer(t *testing.T) {
 			pListener.Reply(msg.Sender, msg.RequestNonce, proto.Message(&Pong{Count: r.Count + 10}))
 		}
 	}(pListener)
-	PrintMemUsage()
 
 	var wgForPeer sync.WaitGroup
 	wgForPeer.Add(3)
@@ -66,7 +65,6 @@ func TestServer(t *testing.T) {
 		}(c)
 	}
 	wgForPeer.Wait()
-	PrintMemUsage()
 
 }
 

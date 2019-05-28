@@ -65,7 +65,7 @@ func (n *natpmpNAT) getInternalAddress() (addr net.IP, err error) {
 		}
 	}
 
-	return nil, ErrNoInternalAddress
+	return nil, errNoInternalAddress
 }
 
 func (n *natpmpNAT) GetExternalAddress() (addr net.IP, err error) {

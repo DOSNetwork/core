@@ -26,7 +26,7 @@ func listen(t *testing.T, listener net.Listener, sID string) {
 			suite := suites.MustFind("bn256")
 			secret := suite.Scalar().Pick(suite.RandomStream())
 			public := suite.Point().Mul(secret, nil)
-			client, err := newclient(suite, secret, public, []byte(sID), conn, true)
+			client, err := newClient(suite, secret, public, []byte(sID), conn, true)
 			if err != nil {
 				fmt.Println("err", err)
 
@@ -75,9 +75,9 @@ func TestExchangeID(t *testing.T) {
 	suite := suites.MustFind("bn256")
 	secret := suite.Scalar().Pick(suite.RandomStream())
 	public := suite.Point().Mul(secret, nil)
-	client, err = newclient(suite, secret, public, []byte("local"), conn, false)
+	client, err = newClient(suite, secret, public, []byte("local"), conn, false)
 	if err != nil {
-		t.Errorf("newclient,Error %s", err.Error())
+		t.Errorf("newClient,Error %s", err.Error())
 	}
 	if string(client.localID) != "local" || string(client.remoteID) != "server" {
 		t.Errorf("ExchangeID ,Error %s %s", string(client.localID), string(client.remoteID))
@@ -102,9 +102,9 @@ func TestRequest(t *testing.T) {
 	secret := suite.Scalar().Pick(suite.RandomStream())
 	public := suite.Point().Mul(secret, nil)
 
-	client, err = newclient(suite, secret, public, []byte("local"), conn, false)
+	client, err = newClient(suite, secret, public, []byte("local"), conn, false)
 	if err != nil {
-		t.Errorf("newclient,Error %s", err.Error())
+		t.Errorf("newClient,Error %s", err.Error())
 	}
 	var count uint64
 	checkRoll := make(map[uint64]uint64)

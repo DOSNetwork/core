@@ -6,13 +6,13 @@ import (
 	"github.com/ethereum/go-ethereum/core/types"
 )
 
-//TODO: MAKE IT A UNIVERSAL INTERFACE FOR ALL KIND OF CHAINS IN FUTURE
-//TODO: NEED TO MOVE IT DIRECTLY INSIDE BLOCKCHAIN FOLDER
+// AskMeAnythingSetTimeout represents a SetTimeout event raised by the AskMeAnything contract.
 type AskMeAnythingSetTimeout struct {
 	PreviousTimeout *big.Int
 	NewTimeout      *big.Int
 }
 
+// AskMeAnythingQueryResponseReady represents a QueryResponseReady event raised by the AskMeAnything contract.
 type AskMeAnythingQueryResponseReady struct {
 	QueryId *big.Int
 	Result  string
@@ -22,6 +22,7 @@ type AskMeAnythingQueryResponseReady struct {
 	Raw     types.Log
 }
 
+// AskMeAnythingRequestSent represents a RequestSent event raised by the AskMeAnything contract.types
 type AskMeAnythingRequestSent struct {
 	InternalSerial uint8
 	Succ           bool
@@ -32,6 +33,7 @@ type AskMeAnythingRequestSent struct {
 	Raw            types.Log
 }
 
+// AskMeAnythingRandomReady represents a RandomReady event raised by the AskMeAnything contract.
 type AskMeAnythingRandomReady struct {
 	RequestId       *big.Int
 	GeneratedRandom *big.Int

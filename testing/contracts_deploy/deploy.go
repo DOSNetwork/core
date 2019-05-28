@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -31,8 +30,8 @@ import (
 )
 
 const (
-	ProxyAddressType = iota
-	CommitrevealAddressType
+	proxyAddressType = iota
+	crAddressType
 )
 
 func between(value string, a string, b string) string {

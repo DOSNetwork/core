@@ -5,8 +5,6 @@ import (
 	"context"
 	"errors"
 	"log"
-	"math"
-	"math/rand"
 	"net"
 	"time"
 )
@@ -16,11 +14,11 @@ const (
 	mapUpdateInterval = 15 * time.Minute
 )
 
-var ErrNoExternalAddress = errors.New("no external address")
-var ErrNoInternalAddress = errors.New("no internalMsg address")
-var ErrNoNATFound = errors.New("no NAT found")
+var errNoExternalAddress = errors.New("no external address")
+var errNoInternalAddress = errors.New("no internalMsg address")
+var errNoNATFound = errors.New("no NAT found")
 
-// protocol is either "udp" or "tcp"
+// NAT represents an interface for upnp and natpmp
 type NAT interface {
 	// Type returns the kind of NAT port mapping service that is used
 	getType() string
@@ -41,7 +39,7 @@ type NAT interface {
 	deletePortMapping(protocol string, internalPort int) (err error)
 }
 
-// Mapping adds a port mapping on m and keeps it alive until c is closed.
+// SetMapping adds a port mapping on m and keeps it alive until c is closed.
 func SetMapping(ctx context.Context, nat NAT, protocol string, extport, intport int, name string) error {
 	if err := nat.addPortMapping(protocol, extport, intport, name, mapTimeout); err != nil {
 		return err
@@ -82,11 +80,6 @@ func DiscoverGateway() (NAT, error) {
 	case nat := <-discoverNATPMP():
 		return nat, nil
 	case <-time.After(10 * time.Second):
-		return nil, ErrNoNATFound
+		return nil, errNoNATFound
 	}
-}
-
-func RandomPort() int {
-	rand.Seed(time.Now().UnixNano())
-	return rand.Intn(math.MaxUint16-10000) + 10000
 }
