@@ -497,7 +497,6 @@ func exchangePub(ctx context.Context, suite suites.Suite, bufToNode chan interfa
 				errc <- err
 				return
 			}
-			pubPoints = nil
 			out <- dkg
 		} else {
 			logger.Error(err)

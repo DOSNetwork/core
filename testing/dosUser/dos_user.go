@@ -185,8 +185,10 @@ func main() {
 		log.Fatal(err)
 	}
 
-	userTestAdaptor, err = eth.NewAMAUserSession(credentialPath, passphrase, config.AskMeAnythingAddressPool[index], chainConfig.RemoteNodeAddressPool)
-
+	userTestAdaptor, err := eth.NewAMAUserSession(credentialPath, passphrase, config.AskMeAnythingAddressPool[index], chainConfig.RemoteNodeAddressPool)
+	if err != nil {
+		log.Fatal(err)
+	}
 	log.Init(userTestAdaptor.Address().Bytes()[:])
 
 	if logger == nil {
@@ -257,8 +259,9 @@ func main() {
 	query(counter)
 	counter--
 
-	finish := make(chan bool)
-	<-finish
+	for e := range errc {
+		fmt.Println(e)
+	}
 }
 
 func query(counter int) {

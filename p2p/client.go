@@ -197,13 +197,13 @@ func (c *client) receiveID(wg *sync.WaitGroup) (err error) {
 	if size == 0 {
 		return
 	}
-	bytesRead, totalBytesRead = 0, 0
 
-	for totalBytesRead < int(size) && err == nil {
-		if bytesRead, err = c.conn.Read(buffer[totalBytesRead:]); err != nil {
+	contentBytesRead, totalContentBytesRead := 0, 0
+	for totalContentBytesRead < int(size) && err == nil {
+		if contentBytesRead, err = c.conn.Read(buffer[totalContentBytesRead:]); err != nil {
 			return
 		}
-		totalBytesRead += bytesRead
+		totalContentBytesRead += contentBytesRead
 	}
 	pa := new(Package)
 	if err = proto.Unmarshal(buffer, pa); err != nil {

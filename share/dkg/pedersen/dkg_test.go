@@ -144,7 +144,7 @@ func TestDKGProcessResponse(t *testing.T) {
 	assert.Equal(t, vss.StatusComplaint, resp.Response.Status)
 	deal.SecShare.V = goodSecret
 	dd, _ = dkg.Deals()
-	encD = dd[idxRec]
+	_ = dd[idxRec]
 
 	// no verifier tied to Response
 	v, ok := dkg.verifiers[0]
@@ -184,6 +184,7 @@ func TestDKGProcessResponse(t *testing.T) {
 	require.Nil(t, err)
 
 	resp12, err := rec.ProcessDeal(deals2[idxRec])
+	require.Nil(t, err)
 	assert.NotNil(t, resp)
 	assert.Equal(t, vss.StatusComplaint, resp12.Response.Status)
 
@@ -355,7 +356,7 @@ func TestTBLS(t *testing.T) {
 	dks := dkss[0]
 	pubPoly := share.NewPubPoly(suite, suite.Point().Base(), dks.Commitments())
 	sig, err := tbls.Recover(suite, pubPoly, msg, sigShares, nbParticipants/2+1, nbParticipants)
-
+	require.Nil(t, err)
 	err = bls.Verify(suite, pubPoly.Commit(), msg, sig)
 	require.Nil(t, err)
 
