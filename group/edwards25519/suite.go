@@ -42,8 +42,7 @@ func (s *SuiteEd25519) Pair(p1 kyber.Point, p2 kyber.Point) kyber.Point {
 	return s.Point()
 }
 
-// Pair takes the points p1 and p2 in groups G1 and G2, respectively, as input
-// and computes their pairing in GT.
+// PairingCheck always return false for SuiteEd25519.
 func (s *SuiteEd25519) PairingCheck(a []kyber.Point, b []kyber.Point) bool {
 	return false
 }

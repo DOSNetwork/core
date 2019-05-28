@@ -26,8 +26,8 @@ import (
 )
 
 const (
-	RANDOMNUMBERSIZE = 32
-	ADDRESSLENGTH    = 20
+	randNumberSize = 32
+	addrLen        = 20
 )
 
 func mergeErrors(ctx context.Context, cs ...<-chan error) <-chan error {
@@ -330,7 +330,7 @@ func genSysRandom(
 			defer logger.TimeTrack(time.Now(), "GenSysRandom", map[string]interface{}{"GroupID": ctx.Value("GroupID"), "RequestID": ctx.Value("RequestID")})
 
 			// signed message: concat(lastSystemRandom, submitter address)
-			paddedLastSysRand := padOrTrim(lastSysRand, RANDOMNUMBERSIZE)
+			paddedLastSysRand := padOrTrim(lastSysRand, randNumberSize)
 			random := append(paddedLastSysRand, submitter...)
 			select {
 			case out <- random:
@@ -479,7 +479,7 @@ func recoverSign(ctx context.Context, signc <-chan *vss.Signature, suite suites.
 					fmt.Println("Verify success signature ", x.String(), y.String())
 
 					//Contract will append sender address to content to verify if it is a right submitter
-					t := len(sign.Content) - ADDRESSLENGTH
+					t := len(sign.Content) - addrLen
 					if t < 0 {
 						errc <- errors.New("length of content less than 0")
 					}

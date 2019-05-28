@@ -389,7 +389,7 @@ func main() {
 	//Use first client
 	c, ok := <-clients
 	if !ok {
-		err = errors.New("No any working eth client")
+		fmt.Println("NewETHProxySession ", err)
 		return
 	}
 

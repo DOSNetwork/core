@@ -21,9 +21,7 @@ import (
 	"github.com/DOSNetwork/core/suites"
 )
 
-const DefaultModelName = "Undefined"
-
-type Server struct {
+type server struct {
 	id     []byte
 	suite  suites.Suite
 	secKey kyber.Scalar
@@ -33,12 +31,12 @@ type Server struct {
 	port     string
 	listener net.Listener
 
-	//Client lookup
+	//client lookup
 	network     network.Network
 	calling     chan Request
 	replying    chan Request
-	incoming    chan *Client
-	registerC   chan *Client
+	incoming    chan *client
+	registerC   chan *client
 	deRegisterC chan []byte
 
 	//Event
@@ -56,7 +54,7 @@ type Request struct {
 	cancel context.CancelFunc
 	addr   net.IP
 	id     []byte
-	//Client signs and packs msg into Package
+	//client signs and packs msg into Package
 	msg proto.Message
 	p   *Package
 	//
@@ -70,15 +68,15 @@ type Subscription struct {
 	message   chan P2PMessage
 }
 
-func (n *Server) Join(bootstrapIP []string) (num int, err error) {
+func (n *server) Join(bootstrapIP []string) (num int, err error) {
 	return n.network.Join(bootstrapIP)
 }
 
-func (n *Server) Members() int {
+func (n *server) Members() int {
 	return n.network.NumPeers()
 }
 
-func (n *Server) ConnectToAll() (memNum, connNum int) {
+func (n *server) ConnectToAll() (memNum, connNum int) {
 	addrs := n.network.GetOtherMembersIP()
 	memNum = len(addrs)
 	for _, addr := range addrs {
@@ -92,23 +90,23 @@ func (n *Server) ConnectToAll() (memNum, connNum int) {
 	return
 }
 
-func (n *Server) SetID(id []byte) {
+func (n *server) SetID(id []byte) {
 	n.id = id
 }
 
-func (n *Server) SetPort(port string) {
+func (n *server) SetPort(port string) {
 	n.port = port
 }
 
-func (n *Server) GetID() []byte {
+func (n *server) GetID() []byte {
 	return n.id
 }
 
-func (n *Server) GetIP() net.IP {
+func (n *server) GetIP() net.IP {
 	return n.addr
 }
 
-func (n *Server) Listen() (err error) {
+func (n *server) Listen() (err error) {
 	n.receiveHandler()
 	n.callHandler()
 	go n.messageDispatch(context.Background())
@@ -131,49 +129,49 @@ func (n *Server) Listen() (err error) {
 			start := time.Now()
 			//fmt.Println("new conn ")
 			go func(conn net.Conn, start time.Time) {
-				client, err := NewClient(n.suite, n.secKey, n.pubKey, n.id, conn, true)
+				c, err := newClient(n.suite, n.secKey, n.pubKey, n.id, conn, true)
 				if err != nil {
 					//fmt.Println("listen to client err", err)
 					logger.Error(err)
 					return
 				}
-				go func(client *Client, messages chan P2PMessage) {
+				go func(c *client, messages chan P2PMessage) {
 					//defer //fmt.Println("connect to client over")
 					for {
 						select {
-						case pa, ok := <-client.receiver:
+						case pa, ok := <-c.receiver:
 							if !ok {
 								return
 							}
 							if m, ok := pa.(P2PMessage); ok {
 								messages <- m
 							}
-						case err, ok := <-client.errc:
+						case err, ok := <-c.errc:
 							if !ok {
 								return
 							}
 							//fmt.Println(client.localID, " err ", err)
 							if err.Error() == "EOF" {
-								client.Close()
+								c.close()
 								return
 							}
-						case <-client.ctx.Done():
+						case <-c.ctx.Done():
 							//fmt.Println(client.localID, " Over")
 							return
 						}
 					}
-				}(client, n.messages)
-				n.incoming <- client
+				}(c, n.messages)
+				n.incoming <- c
 			}(conn, start)
 		}
 	}()
 
 	return nil
 }
-func (n *Server) receiveHandler() {
-	n.incoming = make(chan *Client, 21)
+func (n *server) receiveHandler() {
+	n.incoming = make(chan *client, 21)
 	n.replying = make(chan Request)
-	clients := make(map[string]*Client)
+	clients := make(map[string]*client)
 
 	go func() {
 		for {
@@ -217,14 +215,14 @@ func (n *Server) receiveHandler() {
 		}
 	}()
 }
-func (n *Server) callHandler() {
+func (n *server) callHandler() {
 	n.calling = make(chan Request, 21)
 	hangup := make(chan string)
 	addrToid := make(map[string][]byte)
 	idTostatus := make(map[string][]byte)
 
-	clients := make(map[string]*Client)
-	n.registerC = make(chan *Client)
+	clients := make(map[string]*client)
+	n.registerC = make(chan *client)
 	n.deRegisterC = make(chan []byte)
 	go func() {
 		for {
@@ -269,7 +267,7 @@ func (n *Server) callHandler() {
 					}
 				} else {
 					if client := clients[string(req.id)]; client != nil {
-						//TODO:ASK Client to send request here
+						//TODO:ASK client to send request here
 						if req.rType == 1 {
 							client.send(req)
 						} else if req.rType == 0 {
@@ -319,7 +317,7 @@ func (n *Server) callHandler() {
 
 					go func(req Request, start time.Time) {
 						var conn net.Conn
-						var client *Client
+						var c *client
 						if conn, err = net.Dial("tcp", req.addr.String()+":"+n.port); err != nil {
 							logger.Error(err)
 							select {
@@ -336,7 +334,7 @@ func (n *Server) callHandler() {
 							return
 						}
 
-						if client, err = NewClient(n.suite, n.secKey, n.pubKey, n.id, conn, false); err != nil {
+						if c, err = newClient(n.suite, n.secKey, n.pubKey, n.id, conn, false); err != nil {
 							logger.Error(err)
 							select {
 							case req.errc <- err:
@@ -356,62 +354,62 @@ func (n *Server) callHandler() {
 						go func() {
 							for {
 								select {
-								case pa, ok := <-client.receiver:
+								case pa, ok := <-c.receiver:
 									if !ok {
 										return
 									}
 									if m, ok := pa.(P2PMessage); ok {
 										n.messages <- m
 									}
-								case err := <-client.errc:
+								case err := <-c.errc:
 									if err.Error() == "EOF" {
-										client.Close()
+										c.close()
 										return
 									}
-								case <-client.ctx.Done():
+								case <-c.ctx.Done():
 									return
 								}
 							}
 						}()
-						//TODO:ASK Client to send request her
+						//TODO:ASK client to send request her
 						if req.rType == 1 {
-							client.send(req)
+							c.send(req)
 						} else if req.rType == 0 {
 							select {
-							case req.reply <- client:
+							case req.reply <- c:
 							case <-req.ctx.Done():
 							}
 							close(req.reply)
 							close(req.errc)
 						}
 						select {
-						case n.registerC <- client:
+						case n.registerC <- c:
 						case <-req.ctx.Done():
 						}
 					}(req, start)
 				}
-			case client, ok := <-n.registerC:
+			case c, ok := <-n.registerC:
 				if !ok {
 					return
 				}
 
-				clients[string(client.remoteID)] = client
-				addrToid[client.conn.RemoteAddr().String()] = client.remoteID
+				clients[string(c.remoteID)] = c
+				addrToid[c.conn.RemoteAddr().String()] = c.remoteID
 
-				delete(idTostatus, string(client.remoteID))
+				delete(idTostatus, string(c.remoteID))
 				f := map[string]interface{}{
-					"localID":    client.localID,
-					"remoteID":   client.remoteID,
-					"RemoteAddr": client.conn.RemoteAddr().String()}
-				logger.Event("registerClient", f)
+					"localID":    c.localID,
+					"remoteID":   c.remoteID,
+					"RemoteAddr": c.conn.RemoteAddr().String()}
+				logger.Event("registerclient", f)
 			case id, ok := <-n.deRegisterC:
 				if !ok {
 					return
 				}
-				client := clients[string(id)]
-				if client != nil {
+				c := clients[string(id)]
+				if c != nil {
 					//delete(addrToid, client.conn.RemoteAddr().String())
-					client.Close()
+					c.close()
 				}
 			case _, _ = <-hangup:
 			}
@@ -420,7 +418,7 @@ func (n *Server) callHandler() {
 	return
 }
 
-func (n *Server) Leave() {
+func (n *server) Leave() {
 	err := n.listener.Close()
 	if err != nil {
 	}
@@ -433,7 +431,7 @@ func (n *Server) Leave() {
 	return
 }
 
-func (n *Server) DisConnectTo(id []byte) (err error) {
+func (n *server) DisConnectTo(id []byte) (err error) {
 	n.deRegisterC <- id
 	return
 }
@@ -441,7 +439,7 @@ func (n *Server) DisConnectTo(id []byte) (err error) {
 /*
 This is a block call
 */
-func (n *Server) ConnectTo(addr string, id []byte) ([]byte, error) {
+func (n *server) ConnectTo(addr string, id []byte) ([]byte, error) {
 	var err error
 	callReq := Request{}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -463,7 +461,7 @@ func (n *Server) ConnectTo(addr string, id []byte) ([]byte, error) {
 
 	select {
 	case r := <-callReq.reply:
-		client, ok := r.(*Client)
+		client, ok := r.(*client)
 		if ok {
 			id = client.remoteID
 		}
@@ -476,7 +474,7 @@ func (n *Server) ConnectTo(addr string, id []byte) ([]byte, error) {
 	}
 }
 
-func (n *Server) Request(id []byte, m proto.Message) (msg P2PMessage, err error) {
+func (n *server) Request(id []byte, m proto.Message) (msg P2PMessage, err error) {
 	//defer logger.TimeTrack(time.Now(), "Request", nil)
 	callReq := Request{}
 	callReq.ctx, callReq.cancel = context.WithTimeout(context.Background(), 5*time.Second)
@@ -520,7 +518,7 @@ func (n *Server) Request(id []byte, m proto.Message) (msg P2PMessage, err error)
 	return
 }
 
-func (n *Server) Reply(id []byte, nonce uint64, response proto.Message) (err error) {
+func (n *server) Reply(id []byte, nonce uint64, response proto.Message) (err error) {
 	callReq := Request{}
 
 	callReq.ctx, callReq.cancel = context.WithTimeout(context.Background(), 5*time.Second)
@@ -546,7 +544,7 @@ func (n *Server) Reply(id []byte, nonce uint64, response proto.Message) (err err
 				//fmt.Println(time.Now(), "Reply err ", e)
 				return
 			} else {
-				//fmt.Println(time.Now(), "Server reply  done")
+				//fmt.Println(time.Now(), "server reply  done")
 
 			}
 		case <-callReq.ctx.Done():
@@ -559,7 +557,7 @@ func (n *Server) Reply(id []byte, nonce uint64, response proto.Message) (err err
 		}*/
 	return
 }
-func (n *Server) messageDispatch(ctx context.Context) {
+func (n *server) messageDispatch(ctx context.Context) {
 	subscriptions := make(map[string]chan P2PMessage)
 	go func() {
 		for {
@@ -600,7 +598,7 @@ func (n *Server) messageDispatch(ctx context.Context) {
 	}()
 }
 
-func (n *Server) SubscribeEvent(chanBuffer int, messages ...interface{}) (outch chan P2PMessage, err error) {
+func (n *server) SubscribeEvent(chanBuffer int, messages ...interface{}) (outch chan P2PMessage, err error) {
 	if chanBuffer > 0 {
 		outch = make(chan P2PMessage, chanBuffer)
 	} else {
@@ -612,7 +610,7 @@ func (n *Server) SubscribeEvent(chanBuffer int, messages ...interface{}) (outch 
 	return
 }
 
-func (n *Server) UnSubscribeEvent(messages ...interface{}) {
+func (n *server) UnSubscribeEvent(messages ...interface{}) {
 	for _, m := range messages {
 		n.unscribe <- Subscription{reflect.TypeOf(m).String(), nil}
 

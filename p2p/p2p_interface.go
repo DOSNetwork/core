@@ -52,7 +52,7 @@ type P2PInterface interface {
 func CreateP2PNetwork(id []byte, port string, netType int) (P2PInterface, error) {
 	suite := suites.MustFind("bn256")
 	logger = log.New("module", "p2p")
-	p := &Server{
+	p := &server{
 		suite:     suite,
 		messages:  make(chan P2PMessage, 100),
 		subscribe: make(chan Subscription),

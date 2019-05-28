@@ -1801,12 +1801,14 @@ func (e *EthAdaptor) GroupSize() (size uint64, err error) {
 	out := first(ctx, merge(ctx, valList...))
 	select {
 	case val, ok := <-out:
-		sizeBig, ok := val.(*big.Int)
-		if !ok {
-			err = errors.New("type error")
-			return
+		if ok {
+			sizeBig, ok := val.(*big.Int)
+			if !ok {
+				err = errors.New("type error")
+				return
+			}
+			size = sizeBig.Uint64()
 		}
-		size = sizeBig.Uint64()
 	case <-ctx.Done():
 		err = errors.New("Timeout")
 	}
@@ -1823,12 +1825,14 @@ func (e *EthAdaptor) GetWorkingGroupSize() (size uint64, err error) {
 	out := first(ctx, merge(ctx, valList...))
 	select {
 	case val, ok := <-out:
-		sizeBig, ok := val.(*big.Int)
-		if !ok {
-			err = errors.New("type error")
-			return
+		if ok {
+			sizeBig, ok := val.(*big.Int)
+			if !ok {
+				err = errors.New("type error")
+				return
+			}
+			size = sizeBig.Uint64()
 		}
-		size = sizeBig.Uint64()
 	case <-ctx.Done():
 		err = errors.New("Timeout")
 	}

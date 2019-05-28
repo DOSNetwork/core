@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
 	//	"github.com/DOSNetwork/core/log"
 	"github.com/DOSNetwork/core/sign/bls"
 	"github.com/DOSNetwork/core/suites"
@@ -25,12 +26,12 @@ import (
 )
 
 const (
-	MAXMESSAGESIZE = 1024 * 1024
-	BUFFERSIZE     = 1024
-	HEADERSIZE     = 4
+	msgSizeLimit = 1024 * 1024
+	bufSize      = 1024
+	headerSize   = 4
 )
 
-type Client struct {
+type client struct {
 	conn         net.Conn
 	incomingConn bool
 
@@ -50,7 +51,7 @@ type Client struct {
 	errc     chan error
 }
 
-func MergeErrors(ctx context.Context, cs ...<-chan error) chan error {
+func mergeErrors(ctx context.Context, cs ...<-chan error) chan error {
 	var wg sync.WaitGroup
 	// We must ensure that the output channel has the capacity to
 	// hold as many errors
@@ -84,8 +85,8 @@ func MergeErrors(ctx context.Context, cs ...<-chan error) chan error {
 	return out
 }
 
-func NewClient(suite suites.Suite, secKey kyber.Scalar, localPubKey kyber.Point, localID []byte, conn net.Conn, incomingConn bool) (client *Client, err error) {
-	client = &Client{
+func newClient(suite suites.Suite, secKey kyber.Scalar, localPubKey kyber.Point, localID []byte, conn net.Conn, incomingConn bool) (c *client, err error) {
+	c = &client{
 		suite:        suite,
 		localSecKey:  secKey,
 		localPubKey:  localPubKey,
@@ -93,11 +94,11 @@ func NewClient(suite suites.Suite, secKey kyber.Scalar, localPubKey kyber.Point,
 		conn:         conn,
 		incomingConn: incomingConn,
 	}
-	client.ctx, client.cancel = context.WithCancel(context.Background())
-	client.sender = make(chan Request, 21)
+	c.ctx, c.cancel = context.WithCancel(context.Background())
+	c.sender = make(chan Request, 21)
 	//Wait for exchanging ID complete
-	err = client.exchangeID()
-	if client.remoteID == nil {
+	err = c.exchangeID()
+	if c.remoteID == nil {
 		err = errors.New("exchangeID failed")
 		return
 	}
@@ -109,38 +110,38 @@ func NewClient(suite suites.Suite, secKey kyber.Scalar, localPubKey kyber.Point,
 	var errs []<-chan error
 	var packByte chan []byte
 	//Build a secure pipeline
-	bytes, errc := readBytes(client.ctx, conn, client.localID, client.remoteID, incomingConn)
+	bytes, errc := readBytes(c.ctx, conn, c.localID, c.remoteID, incomingConn)
 	errs = append(errs, errc)
-	decrypted, errc := decrypt(client.ctx, client.dhKey, client.dhNonce, bytes)
+	decrypted, errc := decrypt(c.ctx, c.dhKey, c.dhNonce, bytes)
 	errs = append(errs, errc)
-	client.receiver, packByte, errc = dispatch(client.ctx, client.localID, client.remoteID, incomingConn, client.suite, client.remotePubKey, client.sender, decrypted)
+	c.receiver, packByte, errc = dispatch(c.ctx, c.localID, c.remoteID, incomingConn, c.suite, c.remotePubKey, c.sender, decrypted)
 	errs = append(errs, errc)
-	encrypted, errc := encrypt(client.ctx, client.dhKey, client.dhNonce, packByte)
+	encrypted, errc := encrypt(c.ctx, c.dhKey, c.dhNonce, packByte)
 	errs = append(errs, errc)
-	errc = sendBytes(client.ctx, client.conn, encrypted, client.localID, client.remoteID, incomingConn)
+	errc = sendBytes(c.ctx, c.conn, encrypted, c.localID, c.remoteID, incomingConn)
 	errs = append(errs, errc)
-	client.errc = MergeErrors(client.ctx, errs...)
+	c.errc = mergeErrors(c.ctx, errs...)
 	return
 }
 
-func (c *Client) Close() {
+func (c *client) close() {
 	c.conn.Close()
 	c.cancel()
 
 }
-func (c *Client) ErrorHandling(errc <-chan error) {
+func (c *client) errorHandling(errc <-chan error) {
 	go func() {
 		for err := range errc {
 			if err.Error() != "cipher: message authentication failed" {
 			}
 			if err.Error() == "EOF" {
-				c.Close()
+				c.close()
 			}
 		}
 	}()
 }
 
-func (c *Client) exchangeID() (err error) {
+func (c *client) exchangeID() (err error) {
 	var wg sync.WaitGroup
 	ch := make(chan struct{})
 	wg.Add(2)
@@ -167,16 +168,16 @@ func (c *Client) exchangeID() (err error) {
 	return
 }
 
-func (c *Client) receiveID(wg *sync.WaitGroup) (err error) {
+func (c *client) receiveID(wg *sync.WaitGroup) (err error) {
 	defer wg.Done()
 	// Read until all header bytes have been read.
-	header := make([]byte, HEADERSIZE)
+	header := make([]byte, headerSize)
 	// Read until all header bytes have been read.
 	bytesRead, totalBytesRead := 0, 0
-	for totalBytesRead < HEADERSIZE && err == nil {
+	for totalBytesRead < headerSize && err == nil {
 		if bytesRead, err = c.conn.Read(header[totalBytesRead:]); err != nil {
 			if err.Error() == "EOF" {
-				c.Close()
+				c.close()
 			}
 			return
 		}
@@ -187,7 +188,7 @@ func (c *Client) receiveID(wg *sync.WaitGroup) (err error) {
 	size := binary.BigEndian.Uint32(header)
 
 	header = nil
-	if size > MAXMESSAGESIZE {
+	if size > msgSizeLimit {
 		err = errors.New("p2p message size is too big " + strconv.Itoa(int(size)))
 		return
 	}
@@ -244,7 +245,7 @@ func (c *Client) receiveID(wg *sync.WaitGroup) (err error) {
 	return
 }
 
-func (c *Client) sendID(wg *sync.WaitGroup) (err error) {
+func (c *client) sendID(wg *sync.WaitGroup) (err error) {
 	defer wg.Done()
 	var anything *any.Any
 	var bytes, pubKeyBytes []byte
@@ -269,19 +270,19 @@ func (c *Client) sendID(wg *sync.WaitGroup) (err error) {
 		logger.Error(err)
 		return
 	}
-	if len(bytes) > MAXMESSAGESIZE {
+	if len(bytes) > msgSizeLimit {
 		err = errors.New("p2p message size is too big " + strconv.Itoa(int(len(bytes))))
 		return
 	}
-	prefix := make([]byte, HEADERSIZE)
+	prefix := make([]byte, headerSize)
 	binary.BigEndian.PutUint32(prefix, uint32(len(bytes)))
 
 	bytes = append(prefix, bytes...)
 
 	bytesRead, totalBytesRead := 0, 0
-	for totalBytesRead < HEADERSIZE && err == nil {
+	for totalBytesRead < headerSize && err == nil {
 		if bytesRead, err = c.conn.Write(bytes); err != nil {
-			c.Close()
+			c.close()
 			return
 		}
 		totalBytesRead += bytesRead
@@ -515,7 +516,7 @@ func dispatch(ctx context.Context, localID, remoteID []byte, incomingConn bool, 
 
 func sendBytes(ctx context.Context, c net.Conn, bytesC chan []byte, localID, remoteID []byte, incomingConn bool) chan error {
 	errc := make(chan error)
-	prefix := make([]byte, HEADERSIZE)
+	prefix := make([]byte, headerSize)
 	go func() {
 		for {
 			select {
@@ -552,7 +553,7 @@ func sendBytes(ctx context.Context, c net.Conn, bytesC chan []byte, localID, rem
 func readBytes(ctx context.Context, c net.Conn, localID, remoteID []byte, incomingConn bool) (chan []byte, chan error) {
 	out := make(chan []byte, 10)
 	errc := make(chan error)
-	header := make([]byte, HEADERSIZE)
+	header := make([]byte, headerSize)
 	go func() {
 		defer close(out)
 		defer close(errc)
@@ -565,7 +566,7 @@ func readBytes(ctx context.Context, c net.Conn, localID, remoteID []byte, incomi
 				var err error
 				// Read until all header bytes have been read.
 				bytesRead, totalBytesRead := 0, 0
-				for totalBytesRead < HEADERSIZE && err == nil {
+				for totalBytesRead < headerSize && err == nil {
 					if bytesRead, err = c.Read(header[totalBytesRead:]); err != nil {
 						fmt.Println("readBytes err ", err)
 						if err.Error() == "EOF" {
@@ -580,7 +581,7 @@ func readBytes(ctx context.Context, c net.Conn, localID, remoteID []byte, incomi
 				// Decode message size and check size to avoid OOM
 				size := binary.BigEndian.Uint32(header)
 
-				if size > MAXMESSAGESIZE {
+				if size > msgSizeLimit {
 					err = errors.New("p2p message size is too big " + strconv.Itoa(int(size)))
 					select {
 					case errc <- err:
@@ -618,7 +619,7 @@ func readBytes(ctx context.Context, c net.Conn, localID, remoteID []byte, incomi
 	return out, errc
 }
 
-func (c *Client) send(req Request) error {
+func (c *client) send(req Request) error {
 	if req.msg == nil {
 		//return errors.New("Request msg is nil")
 	}
