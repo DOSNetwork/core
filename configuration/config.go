@@ -22,6 +22,7 @@ const (
 	ENVGROUPTOPICK   = "GROUPTOPICK"
 )
 
+// Config is the configuration for creating a DOS client instance.
 type Config struct {
 	NodeRole        string
 	BootStrapIp     []string
@@ -35,6 +36,7 @@ type Config struct {
 	currentNode     string
 }
 
+// ChainConfig is the configuration for connecting to onchan contracts.
 type ChainConfig struct {
 	DOSProxyAddress         string
 	DOSPaymentAddress       string
@@ -43,6 +45,7 @@ type ChainConfig struct {
 	RemoteNodeAddressPool   []string
 }
 
+// LoadConfig loads configuration file from path.
 func LoadConfig(path string, c interface{}) (err error) {
 	var jsonFile *os.File
 	var byteValue []byte
@@ -74,12 +77,14 @@ func LoadConfig(path string, c interface{}) (err error) {
 	return
 }
 
+// UpdateConfig saves configuration to a file.
 func UpdateConfig(path string, c interface{}) (err error) {
 	configsJson, _ := json.MarshalIndent(c, "", "    ")
 	err = ioutil.WriteFile(path, configsJson, 0644)
 	return
 }
 
+// LoadConfig loads configuration file from path.
 func (c *Config) LoadConfig() (err error) {
 	path := os.Getenv(ENVCONFIGPATH)
 	if path == "" {
@@ -104,11 +109,6 @@ func (c *Config) LoadConfig() (err error) {
 }
 
 func (c *Config) overWrite() (err error) {
-	/*
-		bootStrapIP := os.Getenv(ENVBOOTSTRAPIP)
-		if bootStrapIP != "" {
-			c.BootStrapIp = bootStrapIP
-		}*/
 	envSize := os.Getenv(ENVGROUPSIZE)
 	if envSize != "" {
 		var size int
@@ -158,22 +158,17 @@ func (c *Config) overWrite() (err error) {
 	return
 }
 
-func (c *Config) GetRandomGroupSize() int {
-	return c.randomGroupSize
-}
-
-func (c *Config) GetCredentialPath() string {
-	return c.credentialPath
-}
-
+// GetCurrentType return a string to indicate the type of onchain.
 func (c *Config) GetCurrentType() string {
 	return c.currentType
 }
 
+// GetChainConfig return a ChainConfig struct that contain onchain information
 func (c *Config) GetChainConfig() (config ChainConfig) {
 	return c.ChainConfigs[c.currentType][c.currentNode]
 }
 
+// UpdateConfig saves configuration to a file.
 func (c *Config) UpdateConfig(updated ChainConfig) (err error) {
 	if _, loaded := c.ChainConfigs[c.currentType][c.currentNode]; loaded {
 		c.ChainConfigs[c.currentType][c.currentNode] = updated
