@@ -16,6 +16,8 @@ var (
 	root = &logger{}
 )
 
+// New returns a new logger with the given key/value .
+// New is a convenient alias for Root().New
 func New(key string, value interface{}) Logger {
 	if root == nil {
 		fmt.Println("no root")
@@ -23,24 +25,14 @@ func New(key string, value interface{}) Logger {
 	return root.New(key, value)
 }
 
-type UTCFormatter struct {
-	logrus.Formatter
-}
-
-func (u UTCFormatter) Format(e *logrus.Entry) ([]byte, error) {
-	e.Time = time.Now()
-
-	return u.Formatter.Format(e)
-}
-
+// Init setups default field and add hook
 func Init(id []byte) {
 	appSession := os.Getenv("APPSESSION")
 	appName := os.Getenv("APPNAME")
-	nodId := ByteTohex(id)
+	nodId := byteTohex(id)
 	logIp := os.Getenv("LOGIP")
 	logrus.SetLevel(logrus.DebugLevel)
 	logrus.SetOutput(ioutil.Discard)
-	logrus.SetFormatter(UTCFormatter{&logrus.JSONFormatter{}})
 	//IP,Subject and appName should read from environment variables
 
 	if logIp != "" {
@@ -58,7 +50,7 @@ func Init(id []byte) {
 	})
 }
 
-func ByteTohex(a []byte) string {
+func byteTohex(a []byte) string {
 	unchecksummed := hex.EncodeToString(a[:])
 	sha := sha3.NewLegacyKeccak256()
 	sha.Write([]byte(unchecksummed))
@@ -79,44 +71,44 @@ func ByteTohex(a []byte) string {
 	return "0x" + string(result)
 }
 
+// AddField is a convenient alias for Root().AddField
 func AddField(key string, value interface{}) {
 	root.AddField(key, value)
 }
 
+// Debug is a convenient alias for Root().Debug
 func Debug(msg string) {
 	root.Debug(msg)
 }
 
+// Info is a convenient alias for Root().Info
 func Info(msg string) {
 	root.Info(msg)
 }
 
+// Warn is a convenient alias for Root().Warn
 func Warn(msg string) {
 	root.Warn(msg)
 }
 
+// Error is a convenient alias for Root().Error
 func Error(err error) {
 	if root != nil {
 		root.Error(err)
 	}
 }
 
+// Fatal is a convenient alias for Root().Fatal
 func Fatal(err error) {
 	root.Fatal(err)
 }
 
-// Info is a convenient alias for Root().Info
-func Metrics(value interface{}) {
-	root.Metrics(value)
-}
-
-func Progress(progress string) {
-	root.Progress(progress)
-}
-
+// Event is a convenient alias for Root().Event
 func Event(e string, f map[string]interface{}) {
 	root.Event(e, f)
 }
+
+// TimeTrack is a convenient alias for Root().TimeTrack
 func TimeTrack(start time.Time, e string, info map[string]interface{}) {
 	root.TimeTrack(start, e, info)
 }

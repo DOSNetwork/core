@@ -334,23 +334,21 @@ func (d *DosNode) buildPipeline(valueCtx context.Context, groupID string, reques
 func (d *DosNode) listen() (err error) {
 
 	var errcList []<-chan error
-	eventGrouping, errc := d.chain.SubscribeEvent(onchain.SubscribeDosproxyLogGrouping)
+	eventGrouping, errc := d.chain.SubscribeEvent(onchain.SubscribeLogGrouping)
 	errcList = append(errcList, errc)
-	eventGroupDissolve, errc := d.chain.SubscribeEvent(onchain.SubscribeDosproxyLogGroupDissolve)
+	eventGroupDissolve, errc := d.chain.SubscribeEvent(onchain.SubscribeLogGroupDissolve)
 	errcList = append(errcList, errc)
-	chURL, errc := d.chain.SubscribeEvent(onchain.SubscribeDosproxyLogUrl)
+	chURL, errc := d.chain.SubscribeEvent(onchain.SubscribeLogUrl)
 	errcList = append(errcList, errc)
-	chRandom, errc := d.chain.SubscribeEvent(onchain.SubscribeDosproxyLogUpdateRandom)
+	chRandom, errc := d.chain.SubscribeEvent(onchain.SubscribeLogUpdateRandom)
 	errcList = append(errcList, errc)
-	chUsrRandom, errc := d.chain.SubscribeEvent(onchain.SubscribeDosproxyLogRequestUserRandom)
+	chUsrRandom, errc := d.chain.SubscribeEvent(onchain.SubscribeLogRequestUserRandom)
 	errcList = append(errcList, errc)
-	eventValidation, errc := d.chain.SubscribeEvent(onchain.SubscribeDosproxyLogValidationResult)
+	eventValidation, errc := d.chain.SubscribeEvent(onchain.SubscribeLogValidationResult)
 	errcList = append(errcList, errc)
-	keyAccepted, errc := d.chain.SubscribeEvent(onchain.SubscribeDosproxyLogPublicKeyAccepted)
+	keyAccepted, errc := d.chain.SubscribeEvent(onchain.SubscribeLogPublicKeyAccepted)
 	errcList = append(errcList, errc)
-	keySuggested, errc := d.chain.SubscribeEvent(onchain.SubscribeDosproxyLogPublicKeySuggested)
-	errcList = append(errcList, errc)
-	noworkinggroup, errc := d.chain.SubscribeEvent(onchain.SubscribeDosproxyLogNoWorkingGroup)
+	keySuggested, errc := d.chain.SubscribeEvent(onchain.SubscribeLogPublicKeySuggested)
 	errcList = append(errcList, errc)
 	commitRevealStart, errc := d.chain.SubscribeEvent(onchain.SubscribeCommitrevealLogStartCommitreveal)
 	errcList = append(errcList, errc)
@@ -551,7 +549,7 @@ func (d *DosNode) listen() (err error) {
 			if !ok {
 				continue
 			}
-			content, ok := msg.(*onchain.DosproxyLogGrouping)
+			content, ok := msg.(*onchain.LogGrouping)
 			if !ok {
 				log.Error(err)
 				continue
@@ -592,7 +590,7 @@ func (d *DosNode) listen() (err error) {
 			if !ok {
 				continue
 			}
-			content, ok := msg.(*onchain.DosproxyLogGroupDissolve)
+			content, ok := msg.(*onchain.LogGroupDissolve)
 			if !ok {
 				e, ok := msg.(error)
 				if ok {
@@ -612,7 +610,7 @@ func (d *DosNode) listen() (err error) {
 			if !ok {
 				continue
 			}
-			content, ok := msg.(*onchain.DosproxyLogUpdateRandom)
+			content, ok := msg.(*onchain.LogUpdateRandom)
 			if !ok {
 				log.Error(err)
 			}
@@ -630,9 +628,9 @@ func (d *DosNode) listen() (err error) {
 					"RequestId":            requestID,
 					"GroupID":              groupID,
 					"LastSystemRandomness": lastRand,
-					"Tx":                   content.Tx,
-					"CurBlkN":              currentBlockNumber,
-					"BlockN":               content.BlockN}
+					"Tx":      content.Tx,
+					"CurBlkN": currentBlockNumber,
+					"BlockN":  content.BlockN}
 				d.logger.Event("DOS_QuerySysRandom", f)
 
 				valueCtx := context.WithValue(context.Background(), "RequestID", requestID)
@@ -645,7 +643,7 @@ func (d *DosNode) listen() (err error) {
 			if !ok {
 				continue
 			}
-			content, ok := msg.(*onchain.DosproxyLogRequestUserRandom)
+			content, ok := msg.(*onchain.LogRequestUserRandom)
 			if !ok {
 				log.Error(err)
 				continue
@@ -662,9 +660,9 @@ func (d *DosNode) listen() (err error) {
 					"RequestId":            requestID,
 					"GroupID":              groupID,
 					"LastSystemRandomness": lastRand,
-					"Tx":                   content.Tx,
-					"CurBlkN":              currentBlockNumber,
-					"BlockN":               content.BlockN}
+					"Tx":      content.Tx,
+					"CurBlkN": currentBlockNumber,
+					"BlockN":  content.BlockN}
 				d.logger.Event("DOS_QueryUserRandom", f)
 				valueCtx := context.WithValue(context.Background(), "RequestID", requestID)
 				valueCtx = context.WithValue(valueCtx, "GroupID", groupID)
@@ -676,7 +674,7 @@ func (d *DosNode) listen() (err error) {
 			if !ok {
 				continue
 			}
-			content, ok := msg.(*onchain.DosproxyLogUrl)
+			content, ok := msg.(*onchain.LogUrl)
 			if !ok {
 				log.Error(err)
 				continue
@@ -715,7 +713,7 @@ func (d *DosNode) listen() (err error) {
 			if !ok {
 				continue
 			}
-			content, ok := msg.(*onchain.DosproxyLogPublicKeySuggested)
+			content, ok := msg.(*onchain.LogPublicKeySuggested)
 			if !ok {
 				e, ok := msg.(error)
 				if ok {
@@ -736,7 +734,7 @@ func (d *DosNode) listen() (err error) {
 			if !ok {
 				continue
 			}
-			content, ok := msg.(*onchain.DosproxyLogPublicKeyAccepted)
+			content, ok := msg.(*onchain.LogPublicKeyAccepted)
 			if !ok {
 				e, ok := msg.(error)
 				if ok {
@@ -753,28 +751,6 @@ func (d *DosNode) listen() (err error) {
 					"BlockN":           content.BlockN,
 				})
 			}
-		case msg, ok := <-noworkinggroup:
-			if !ok {
-				continue
-			}
-			currentBlockNumber, err := d.chain.CurrentBlock()
-			if err != nil {
-				d.logger.Error(err)
-			}
-			content, ok := msg.(*onchain.DosproxyLogNoWorkingGroup)
-			if !ok {
-				e, ok := msg.(error)
-				if ok {
-					d.logger.Error(e)
-				}
-				continue
-			}
-			f := map[string]interface{}{
-				"Removed": content.Removed,
-				"Tx":      content.Tx,
-				"CurBlkN": currentBlockNumber,
-				"BlockN":  content.BlockN}
-			d.logger.Event("DOS_NOWORKINGGROUP", f)
 		case <-d.done:
 			return
 		}
