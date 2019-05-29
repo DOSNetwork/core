@@ -640,9 +640,9 @@ func (d *DosNode) listen() (err error) {
 					"RequestId":            requestID,
 					"GroupID":              groupID,
 					"LastSystemRandomness": lastRand,
-					"Tx":      content.Tx,
-					"CurBlkN": currentBlockNumber,
-					"BlockN":  content.BlockN}
+					"Tx":                   content.Tx,
+					"CurBlkN":              currentBlockNumber,
+					"BlockN":               content.BlockN}
 				d.logger.Event("DOS_QuerySysRandom", f)
 
 				valueCtx := context.WithValue(context.Background(), ContextKeyRequestID, requestID)
@@ -672,9 +672,9 @@ func (d *DosNode) listen() (err error) {
 					"RequestId":            requestID,
 					"GroupID":              groupID,
 					"LastSystemRandomness": lastRand,
-					"Tx":      content.Tx,
-					"CurBlkN": currentBlockNumber,
-					"BlockN":  content.BlockN}
+					"Tx":                   content.Tx,
+					"CurBlkN":              currentBlockNumber,
+					"BlockN":               content.BlockN}
 				d.logger.Event("DOS_QueryUserRandom", f)
 				valueCtx := context.WithValue(context.Background(), ContextKeyRequestID, requestID)
 				valueCtx = context.WithValue(valueCtx, ContextKeyGroupID, groupID)
