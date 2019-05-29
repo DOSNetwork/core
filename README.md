@@ -77,7 +77,7 @@
 
 
 ### Build from source and run standalone binary
-- `$ git checkout Beta1` to use source code of [latest release](https://github.com/DOSNetwork/core/releases/tag/Beta1) and follow [development-setup](#development-setup) to build #beta1.0 client node from scratch.
+- `$ git checkout Beta1.1` to use source code of [latest release](https://github.com/DOSNetwork/core/releases/tag/Beta1) and follow [development-setup](#development-setup) to build #beta1.0 client node from scratch.
 - You can also build from `master branch` which contains latest features/updates, but they might not be considered as release-ready.
 - Install and upload node executable binary file to remote server: 
   - `$ ./vps.sh install`
