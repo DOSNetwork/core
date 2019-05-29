@@ -53,6 +53,7 @@ const (
 	GroupSize
 	PendingNodeList
 	GetExpiredWorkingGroupSize
+	RefreshSystemRandomHardLimit
 )
 
 // TODO: Move constants to some unified places.
@@ -483,19 +484,11 @@ func (e *EthAdaptor) sendRequest(ctx context.Context, c *ethclient.Client, pre <
 						continue
 					}
 					logger.Error(err)
-					if ctx.Value("GroupID") != nil && ctx.Value("RequestID") != nil {
-						f := map[string]interface{}{
-							"Tx":        fmt.Sprintf("%x", tx.Hash()),
-							"GroupID":   ctx.Value("GroupID"),
-							"RequestID": ctx.Value("RequestID"),
-							"ErrMsg":    err.Error()}
-						logger.Event("TransactionFail", f)
-					} else {
-						f := map[string]interface{}{
-							"Tx":     fmt.Sprintf("%x", tx.Hash()),
-							"ErrMsg": err.Error()}
-						logger.Event("TransactionFail", f)
-					}
+
+					f := map[string]interface{}{
+						"Tx":     fmt.Sprintf("%x", tx.Hash()),
+						"ErrMsg": err.Error()}
+					logger.Event("TransactionFail", f)
 
 					fmt.Println("TransactionFail err ", err)
 					//Don't return err to errc to delete the whole sendRequest chain
@@ -505,18 +498,10 @@ func (e *EthAdaptor) sendRequest(ctx context.Context, c *ethclient.Client, pre <
 					}
 					return
 				}
-				if ctx.Value("GroupID") != nil && ctx.Value("RequestID") != nil {
-					f := map[string]interface{}{
-						"Tx":        fmt.Sprintf("%x", tx.Hash()),
-						"GroupID":   ctx.Value("GroupID"),
-						"RequestID": ctx.Value("RequestID")}
-					logger.Event("TransactionSucc", f)
-				} else {
-					f := map[string]interface{}{
-						"Tx": fmt.Sprintf("%x", tx.Hash())}
-					logger.Event("TransactionSucc", f)
 
-				}
+				f := map[string]interface{}{
+					"Tx": fmt.Sprintf("%x", tx.Hash())}
+				logger.Event("TransactionSucc", f)
 				return
 			case <-ctx.Done():
 				return
@@ -557,11 +542,11 @@ func (e *EthAdaptor) SignalGroupFormation(ctx context.Context) (errc <-chan erro
 	return
 }
 
-func (e *EthAdaptor) SignalDissolve(ctx context.Context) (errc <-chan error) {
-	defer logger.TimeTrack(time.Now(), "SignalDissolve", nil)
+func (e *EthAdaptor) SignalGroupDissolve(ctx context.Context) (errc <-chan error) {
+	defer logger.TimeTrack(time.Now(), "SignalGroupDissolve", nil)
 	result := make(chan Reply)
 	for i, proxy := range e.proxies {
-		request := &Request{ctx, &proxy.TransactOpts, proxy.SignalDissolve, result}
+		request := &Request{ctx, &proxy.TransactOpts, proxy.SignalGroupDissolve, result}
 		errc = e.sendRequest(ctx, e.clients[i], errc, request, result)
 	}
 	return
@@ -1748,6 +1733,8 @@ func proxyGet(proxy *dosproxy.DosproxySession, vType int, p interface{}) chan in
 			val, err = proxy.LastUpdatedBlock()
 		case GetExpiredWorkingGroupSize:
 			val, err = proxy.GetExpiredWorkingGroupSize()
+		case RefreshSystemRandomHardLimit:
+			val, err = proxy.RefreshSystemRandomHardLimit()
 		case PendingNodeList:
 			id, ok := p.(common.Address)
 			if ok {
@@ -1861,6 +1848,28 @@ func (e *EthAdaptor) NumPendingGroups() (size uint64, err error) {
 	return
 }
 
+func (e *EthAdaptor) RefreshSystemRandomHardLimit() (limit uint64, err error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	var valList []chan interface{}
+	for _, proxy := range e.proxies {
+		valList = append(valList, proxyGet(proxy, RefreshSystemRandomHardLimit, nil))
+	}
+	out := first(ctx, merge(ctx, valList...))
+	select {
+	case val := <-out:
+		limitBig, ok := val.(*big.Int)
+		if !ok {
+			err = errors.New("type error")
+			return
+		}
+		limit = limitBig.Uint64()
+	case <-ctx.Done():
+		err = errors.New("Timeout")
+	}
+	return
+}
+
 func (e *EthAdaptor) GetPengindNodeSize() (size uint64, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
@@ -1882,6 +1891,7 @@ func (e *EthAdaptor) GetPengindNodeSize() (size uint64, err error) {
 	}
 	return
 }
+
 func (e *EthAdaptor) GetExpiredWorkingGroupSize() (size uint64, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()

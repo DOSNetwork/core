@@ -30,7 +30,7 @@ type ProxyAdapter interface {
 	//Guardian node functions
 	SignalRandom(ctx context.Context) (errc <-chan error)
 	SignalGroupFormation(ctx context.Context) (errc <-chan error)
-	SignalDissolve(ctx context.Context) (errc <-chan error)
+	SignalGroupDissolve(ctx context.Context) (errc <-chan error)
 	SignalBootstrap(ctx context.Context, cid uint64) (errc <-chan error)
 
 	SubscribeEvent(subscribeType int) (<-chan interface{}, <-chan error)
@@ -47,6 +47,7 @@ type ProxyAdapter interface {
 	Address() (addr []byte)
 	CurrentBlock() (blknum uint64, err error)
 	PendingNonce() (nonce uint64, err error)
+	RefreshSystemRandomHardLimit() (limit uint64, err error)
 	GroupPubKey(idx int) (groupPubKeys [4]*big.Int, err error)
 	IsPendingNode(id []byte) (bool, error)
 }

@@ -41,8 +41,9 @@ func (d *DosNode) groupSize(w http.ResponseWriter, r *http.Request) {
 
 func (d *DosNode) guardian(w http.ResponseWriter, r *http.Request) {
 	d.chain.SignalGroupFormation(context.Background())
-	d.chain.SignalDissolve(context.Background())
+	d.chain.SignalGroupDissolve(context.Background())
 }
+
 func (d *DosNode) signalRandom(w http.ResponseWriter, r *http.Request) {
 	d.chain.SignalRandom(context.Background())
 }

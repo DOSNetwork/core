@@ -28,11 +28,16 @@ import (
 )
 
 const (
-	WATCHDOGINTERVAL = 10 //In minutes
-	SYSRANDOMNTERVAL = 60 //In block numbers
-	GROUPINITIATED   = 0
-	GROUPDELETED     = 1
+	watchdogInterval    = 10 //In minutes
+	ContextKeyGroupID   = contextKey("GroupID")
+	ContextKeyRequestID = contextKey("RequestID")
 )
+
+type contextKey string
+
+func (c contextKey) String() string {
+	return "dosnode " + string(c)
+}
 
 type DosNode struct {
 	suite        suites.Suite
@@ -358,7 +363,7 @@ func (d *DosNode) listen() (err error) {
 	errc = mergeErrors(context.Background(), errcList...)
 
 	peerSignMap := make(map[string]*vss.Signature)
-	watchdog := time.NewTicker(WATCHDOGINTERVAL * time.Minute)
+	watchdog := time.NewTicker(watchdogInterval * time.Minute)
 	//	latestRandm := big.NewInt(0)
 	defer watchdog.Stop()
 	defer d.p.UnSubscribeEvent(vss.Signature{})
@@ -507,6 +512,11 @@ func (d *DosNode) listen() (err error) {
 					d.logger.Error(err)
 					continue
 				}
+				sysrandInterval, err := d.chain.RefreshSystemRandomHardLimit()
+				if err != nil {
+					d.logger.Error(err)
+					continue
+				}
 				f := map[string]interface{}{
 					"WorkingGroupSize":    workingGroup,
 					"GroupToPick":         groupToPick,
@@ -514,13 +524,14 @@ func (d *DosNode) listen() (err error) {
 					"PendingNodeSize":     pendingNodeSize,
 					"PendingGrouSize":     pendingGrouSize,
 					"expiredWorkingGSize": expiredWGSize,
-					"Members":             d.p.Members()}
+					"Members":             d.p.Members(),
+					"sysrandInterval":     sysrandInterval}
 				d.logger.Event("DWatchdog", f)
 				//Let pendingNode be a guardian
 				//Signal random if there are enough working groups
 				if workingGroup >= groupToPick {
 					diff := currentBlockNumber - lastUpdatedBlock
-					if diff > SYSRANDOMNTERVAL {
+					if diff > sysrandInterval {
 						d.chain.SignalRandom(context.Background())
 					}
 				}
@@ -528,8 +539,9 @@ func (d *DosNode) listen() (err error) {
 				if pendingNodeSize >= groupSize+(groupSize/2) {
 					d.chain.SignalGroupFormation(context.Background())
 				}
-				if expiredWGSize > 0 {
-					d.chain.SignalDissolve(context.Background())
+
+				if expiredWGSize > 0 || pendingGrouSize > 0 {
+					d.chain.SignalGroupDissolve(context.Background())
 				}
 			}
 		case msg, ok := <-d.cSignToPeer:
@@ -572,7 +584,7 @@ func (d *DosNode) listen() (err error) {
 			if isMember {
 				d.logger.Event("DGrouping2", f)
 				//if !content.Removed {
-				valueCtx := context.WithValue(context.Background(), "GroupID", groupID)
+				valueCtx := context.WithValue(context.Background(), ContextKeyGroupID, groupID)
 
 				outFromDkg, errc, err := d.dkg.Grouping(valueCtx, groupID, participants)
 				if err != nil {
@@ -633,8 +645,8 @@ func (d *DosNode) listen() (err error) {
 					"BlockN":  content.BlockN}
 				d.logger.Event("DOS_QuerySysRandom", f)
 
-				valueCtx := context.WithValue(context.Background(), "RequestID", requestID)
-				valueCtx = context.WithValue(valueCtx, "GroupID", groupID)
+				valueCtx := context.WithValue(context.Background(), ContextKeyRequestID, requestID)
+				valueCtx = context.WithValue(valueCtx, ContextKeyGroupID, groupID)
 
 				d.buildPipeline(valueCtx, groupID, content.LastRandomness, content.LastRandomness, nil, "", "", uint32(onchain.TrafficSystemRandom))
 				//}
@@ -664,8 +676,8 @@ func (d *DosNode) listen() (err error) {
 					"CurBlkN": currentBlockNumber,
 					"BlockN":  content.BlockN}
 				d.logger.Event("DOS_QueryUserRandom", f)
-				valueCtx := context.WithValue(context.Background(), "RequestID", requestID)
-				valueCtx = context.WithValue(valueCtx, "GroupID", groupID)
+				valueCtx := context.WithValue(context.Background(), ContextKeyRequestID, requestID)
+				valueCtx = context.WithValue(valueCtx, ContextKeyGroupID, groupID)
 
 				d.buildPipeline(valueCtx, groupID, content.RequestId, content.LastSystemRandomness, content.UserSeed, "", "", uint32(onchain.TrafficUserRandom))
 
@@ -699,8 +711,8 @@ func (d *DosNode) listen() (err error) {
 					"CurBlkN":    currentBlockNumber,
 					"BlockN":     content.BlockN}
 				d.logger.Event("DOS_QueryURL", f)
-				valueCtx := context.WithValue(context.Background(), "RequestID", requestID)
-				valueCtx = context.WithValue(valueCtx, "GroupID", groupID)
+				valueCtx := context.WithValue(context.Background(), ContextKeyRequestID, requestID)
+				valueCtx = context.WithValue(valueCtx, ContextKeyGroupID, groupID)
 
 				d.buildPipeline(valueCtx, groupID, content.QueryId, content.Randomness, nil, content.DataSource, content.Selector, uint32(onchain.TrafficUserQuery))
 				//}
