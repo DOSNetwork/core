@@ -8,6 +8,7 @@ import (
 	"github.com/hashicorp/serf/serf"
 )
 
+// Membership represents the p2p network
 type Membership interface {
 	Join(Ip []string) (num int, err error)
 	Leave()
@@ -16,9 +17,10 @@ type Membership interface {
 	PeersIP() (addr []net.IP)
 }
 
+//NewserfNet creates a Serf implementation
 func NewSerfNet(Addr net.IP, id []byte) (Membership, error) {
 	var err error
-	serfNet := &SerfNet{}
+	serfNet := &serfNet{}
 	conf := serf.DefaultConfig()
 	conf.Init()
 	conf.LogOutput = ioutil.Discard
@@ -30,25 +32,30 @@ func NewSerfNet(Addr net.IP, id []byte) (Membership, error) {
 	return serfNet, err
 }
 
-type SerfNet struct {
+type serfNet struct {
 	serf *serf.Serf
 }
 
-func (s *SerfNet) NumOfPeers() int {
+//NumOfPeers return the length of members
+func (s *serfNet) NumOfPeers() int {
 	return len(s.serf.Members())
 }
 
-func (s *SerfNet) Join(bootstrapIp []string) (num int, err error) {
+// Join joins an existing Serf cluster. Returns the number of nodes
+// successfully contacted.
+func (s *serfNet) Join(bootstrapIp []string) (num int, err error) {
 	num, err = s.serf.Join(bootstrapIp, true)
 	return
 }
 
-func (s *SerfNet) Leave() {
+// Join leaves an Serf cluster.
+func (s *serfNet) Leave() {
 	s.Leave()
 	return
 }
 
-func (s *SerfNet) Lookup(id []byte) (addr net.IP) {
+// Lookup return the IP address of the given ID
+func (s *serfNet) Lookup(id []byte) (addr net.IP) {
 	members := s.serf.Members()
 	for i := 0; i < len(members); i++ {
 		if members[i].Name == string(id) {
@@ -58,7 +65,8 @@ func (s *SerfNet) Lookup(id []byte) (addr net.IP) {
 	return
 }
 
-func (s *SerfNet) PeersIP() (addr []net.IP) {
+// PeersIP return the all IP address of an existing cluster
+func (s *serfNet) PeersIP() (addr []net.IP) {
 	fmt.Println("members len ", len(s.serf.Members()))
 
 	members := s.serf.Members()
