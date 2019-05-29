@@ -11,10 +11,10 @@
     "ChainConfigs": {
         "ETH": {
             "rinkeby": {
-                "DOSProxyAddress": "0xf3d1F14620eCAFF7DF9f917c1A3eC21a40B87B7F",
-                "DOSPaymentAddress": "0x9FDf523e39F023B510128c15bb214b063bf90adA",
-                "DOSAddressBridgeAddress": "0x6DDf7C941106E875a96747e785c19dFd408d5117",
-                "CommitReveal": "0xA956D5B0a1161fA1b00A2AF3267CF418338F5E6e",
+                "DOSProxyAddress": "0x7fD667a87E2ef724f19315124755558cAA18836E",
+                "DOSPaymentAddress": "0x068B1722Fb3E6a51eA3F1E5BCD83e20577aaD73C",
+                "DOSAddressBridgeAddress": "0xf0CEFfc4209e38EA3Cd1926DDc2bC641cbFFd1cF",
+                "CommitReveal": "0xbDD6c1796d3cB3F8f2E66efdc53616E98684c893",
                 "RemoteNodeAddressPool": [
                 ]
             }
