@@ -29,12 +29,13 @@ const (
 	SubscribeAskMeAnythingRandomReady
 )
 
+var logger log.Logger
+
 type AMAConfig struct {
 	AskMeAnythingAddressPool []string
 }
 
-var logger log.Logger
-
+//EthUserAdaptor is an adaptor to the proxy contract on the ethereum
 type EthUserAdaptor struct {
 	s        *dosUser.AskMeAnythingSession
 	c        *ethclient.Client
@@ -50,6 +51,7 @@ type EthUserAdaptor struct {
 	rCancelFuncs []context.CancelFunc
 }
 
+//NewAMAUserSession creates a dosproxy adaptor struct
 func NewAMAUserSession(credentialPath, passphrase, addr string, gethUrls []string) (adaptor *EthUserAdaptor, err error) {
 	var httpUrls []string
 	var wsUrls []string
@@ -96,6 +98,8 @@ func NewAMAUserSession(credentialPath, passphrase, addr string, gethUrls []strin
 	//auth.Nonce = big.NewInt(0)
 	//auth.Nonce = auth.Nonce.SetUint64(nonce)
 	adaptor.s = &dosUser.AskMeAnythingSession{Contract: a, CallOpts: bind.CallOpts{Context: ctxD}, TransactOpts: *auth}
+	fmt.Println("adaptor.s ", adaptor.s)
+
 	adaptor.c = c
 	adaptor.key = key
 	adaptor.ctx = ctxD
@@ -119,121 +123,12 @@ func NewAMAUserSession(credentialPath, passphrase, addr string, gethUrls []strin
 	return
 }
 
+// Address return a key address
 func (e *EthUserAdaptor) Address() (addr common.Address) {
 	return e.key.Address
 }
 
-func (e *EthUserAdaptor) PollLogs(subscribeType int, logBlockDiff, preBlockBuf uint64) (<-chan interface{}, <-chan error) {
-	var errcs []<-chan error
-	var sinks []<-chan interface{}
-	var wg sync.WaitGroup
-
-	multiplex := func(client *ethclient.Client, askMeAnythingFilterer *dosUser.AskMeAnythingFilterer, ctx context.Context) {
-		errc := make(chan error)
-		errcs = append(errcs, errc)
-		sink := make(chan interface{})
-		sinks = append(sinks, sink)
-		wg.Done()
-		defer close(errc)
-		defer close(sink)
-		targetBlockN, err := onchain.GetCurrentBlock(client)
-		if err != nil {
-			errc <- err
-			return
-		}
-		targetBlockN -= preBlockBuf
-		timer := time.NewTimer(onchain.LogCheckingInterval * time.Second)
-		for {
-			select {
-			case <-timer.C:
-				currentBlockN, err := onchain.GetCurrentBlock(client)
-				if err != nil {
-					errc <- err
-					continue
-				}
-				for ; currentBlockN-logBlockDiff >= targetBlockN; targetBlockN++ {
-					switch subscribeType {
-					case SubscribeAskMeAnythingQueryResponseReady:
-						logs, err := askMeAnythingFilterer.FilterQueryResponseReady(&bind.FilterOpts{
-							Start:   targetBlockN,
-							End:     &targetBlockN,
-							Context: ctx,
-						})
-						if err != nil {
-							errc <- err
-							continue
-						}
-						for logs.Next() {
-							sink <- &AskMeAnythingQueryResponseReady{
-								QueryId: logs.Event.QueryId,
-								Result:  logs.Event.Result,
-								Tx:      logs.Event.Raw.TxHash.Hex(),
-								BlockN:  logs.Event.Raw.BlockNumber,
-								Removed: logs.Event.Raw.Removed,
-								Raw:     logs.Event.Raw,
-							}
-						}
-					case SubscribeAskMeAnythingRequestSent:
-						logs, err := askMeAnythingFilterer.FilterRequestSent(&bind.FilterOpts{
-							Start:   targetBlockN,
-							End:     &targetBlockN,
-							Context: ctx,
-						})
-						if err != nil {
-							errc <- err
-							continue
-						}
-						for logs.Next() {
-							sink <- &AskMeAnythingRequestSent{
-								InternalSerial: logs.Event.InternalSerial,
-								Succ:           logs.Event.Succ,
-								RequestId:      logs.Event.RequestId,
-								Tx:             logs.Event.Raw.TxHash.Hex(),
-								BlockN:         logs.Event.Raw.BlockNumber,
-								Removed:        logs.Event.Raw.Removed,
-								Raw:            logs.Event.Raw,
-							}
-						}
-					case SubscribeAskMeAnythingRandomReady:
-						logs, err := askMeAnythingFilterer.FilterRandomReady(&bind.FilterOpts{
-							Start:   targetBlockN,
-							End:     &targetBlockN,
-							Context: ctx,
-						})
-						if err != nil {
-							errc <- err
-							continue
-						}
-						for logs.Next() {
-							sink <- &AskMeAnythingRandomReady{
-								GeneratedRandom: logs.Event.GeneratedRandom,
-								RequestId:       logs.Event.RequestId,
-								Tx:              logs.Event.Raw.TxHash.Hex(),
-								BlockN:          logs.Event.Raw.BlockNumber,
-								Removed:         logs.Event.Raw.Removed,
-								Raw:             logs.Event.Raw,
-							}
-						}
-					}
-				}
-				timer.Reset(onchain.LogCheckingInterval * time.Second)
-			case <-ctx.Done():
-				return
-			}
-		}
-
-	}
-
-	wg.Add(len(e.rClients) + 1)
-	go multiplex(e.c, &e.s.Contract.AskMeAnythingFilterer, e.ctx)
-	for i := 0; i < len(e.rClients); i++ {
-		go multiplex(e.rClients[i], &e.rProxies[i].AskMeAnythingFilterer, e.rCtxs[i])
-	}
-
-	wg.Wait()
-
-	return e.first(e.ctx, MergeEvents(e.ctx, sinks...)), MergeErrors(e.ctx, errcs...)
-}
+//SubscribeEvent is a log subscription operation binding the contract event
 func (e *EthUserAdaptor) SubscribeEvent(subscribeType int) (<-chan interface{}, <-chan error) {
 	var eventList []<-chan interface{}
 	var errcs []<-chan error
@@ -253,6 +148,7 @@ func (e *EthUserAdaptor) SubscribeEvent(subscribeType int) (<-chan interface{}, 
 
 	return e.first(e.ctx, MergeEvents(e.ctx, eventList...)), MergeErrors(e.ctx, errcs...)
 }
+
 func subscribeEvent(ctx context.Context, proxy *dosUser.AskMeAnything, subscribeType int) (<-chan interface{}, <-chan error) {
 	out := make(chan interface{})
 	errc := make(chan error)
@@ -418,6 +314,7 @@ func (e *EthUserAdaptor) first(ctx context.Context, source chan interface{}) <-c
 	return sink
 }
 
+//MergeEvents is a fan in pattern to merge all events from all channel
 func MergeEvents(ctx context.Context, cs ...<-chan interface{}) chan interface{} {
 	var wg sync.WaitGroup
 	// We must ensure that the output channel has the capacity to
@@ -452,6 +349,7 @@ func MergeEvents(ctx context.Context, cs ...<-chan interface{}) chan interface{}
 	return out
 }
 
+//MergeEvents is a fan in pattern to merge all errors from all channel
 func MergeErrors(ctx context.Context, cs ...<-chan error) <-chan error {
 	var wg sync.WaitGroup
 	// We must ensure that the output channel has the capacity to
@@ -486,6 +384,7 @@ func MergeErrors(ctx context.Context, cs ...<-chan error) <-chan error {
 	return out
 }
 
+//Query requests for external data
 func (e *EthUserAdaptor) Query(internalSerial uint8, url, selector string) (err error) {
 	tx, err := e.s.AMA(internalSerial, url, selector)
 	for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error() || err.Error() == core.ErrInsufficientFunds.Error()) {
@@ -503,7 +402,11 @@ func (e *EthUserAdaptor) Query(internalSerial uint8, url, selector string) (err 
 	return
 }
 
+//GetSafeRandom requests for a random number that is generated for this requesting
 func (e *EthUserAdaptor) GetSafeRandom(internalSerial uint8) (err error) {
+	if e.s == nil {
+		fmt.Println("e.s ==nil")
+	}
 	tx, err := e.s.RequestSafeRandom(internalSerial)
 	for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
 		fmt.Println(err)
@@ -520,6 +423,7 @@ func (e *EthUserAdaptor) GetSafeRandom(internalSerial uint8) (err error) {
 	return
 }
 
+//GetFastRandom requests for a random number that is updated periodically on dos proxy
 func (e *EthUserAdaptor) GetFastRandom() (err error) {
 	tx, err := e.s.RequestFastRandom()
 	for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {

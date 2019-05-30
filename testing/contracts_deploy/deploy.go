@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"math/big"
 	"os"
 	"strconv"
 	"strings"
@@ -85,8 +86,8 @@ func updateBridge(client *ethclient.Client, key *keystore.Key, bridgeAddress, pr
 	var auth *bind.TransactOpts
 	fmt.Println("start to update proxy address to bridge...")
 	auth = bind.NewKeyedTransactor(key.PrivateKey)
-	auth.GasLimit = uint64(5000000)
-
+	auth.GasLimit = uint64(6000000)
+	auth.GasPrice = big.NewInt(30000000000)
 	bridge, err := dosbridge.NewDosbridge(bridgeAddress, client)
 	if err != nil {
 		return

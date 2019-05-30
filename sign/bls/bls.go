@@ -12,11 +12,9 @@ import (
 	"github.com/ethereum/go-ethereum/crypto/sha3"
 )
 
-type Suite suites.Suite
-
 // NewKeyPair creates a new BLS signing key pair. The private key x is a scalar
 // and the public key X is a point on curve G2.
-func NewKeyPair(suite Suite, random cipher.Stream) (kyber.Scalar, kyber.Point) {
+func NewKeyPair(suite suites.Suite, random cipher.Stream) (kyber.Scalar, kyber.Point) {
 	x := suite.G2().Scalar().Pick(random)
 	X := suite.G2().Point().Mul(x, nil)
 	return x, X
@@ -24,7 +22,7 @@ func NewKeyPair(suite Suite, random cipher.Stream) (kyber.Scalar, kyber.Point) {
 
 // Sign creates a BLS signature S = x * H(m) on a message m using the private
 // key x. The signature S is a point on curve G1.
-func Sign(suite Suite, x kyber.Scalar, msg []byte) ([]byte, error) {
+func Sign(suite suites.Suite, x kyber.Scalar, msg []byte) ([]byte, error) {
 	HM := hashToPoint(suite, msg)
 	xHM := HM.Mul(x, HM)
 	s, err := xHM.MarshalBinary()
@@ -38,7 +36,7 @@ func Sign(suite Suite, x kyber.Scalar, msg []byte) ([]byte, error) {
 // key X by verifying that the equality e(H(m), X) == e(H(m), x*B2) ==
 // e(x*H(m), B2) == e(S, B2) holds where e is the pairing operation and B2 is
 // the base point from curve G2.
-func Verify(suite Suite, X kyber.Point, msg, sig []byte) error {
+func Verify(suite suites.Suite, X kyber.Point, msg, sig []byte) error {
 	HM := hashToPoint(suite, msg)
 	s := suite.G1().Point()
 	if err := s.UnmarshalBinary(sig); err != nil {
@@ -53,7 +51,7 @@ func Verify(suite Suite, X kyber.Point, msg, sig []byte) error {
 
 // hashToPoint hashes a message to a point on curve G1. XXX: This should be replaced
 // eventually by a proper hash-to-point mapping like Elligator.
-func hashToPoint(suite Suite, msg []byte) kyber.Point {
+func hashToPoint(suite suites.Suite, msg []byte) kyber.Point {
 	hash := sha3.NewKeccak256()
 	var buf []byte
 	hash.Write(msg)

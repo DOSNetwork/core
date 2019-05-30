@@ -18,16 +18,8 @@ import (
 )
 
 const (
-	GASLIMIT            = 6000000
-	REPLENISHTHRESHOLD  = 0.6
-	REPLENISHAMOUNT     = 800000000000000000 //0.8 Eth
-	STOPSUBMITTHRESHOLD = 0.1
-	RETRTCOUNT          = 2
-	CHECKSYNCINTERVAL   = 1
-	REDIALINTERVAL      = 5
-	WCLIENTINDEX        = 0
-	SYNCBLOCKDRIFT      = 3
-	RETRYLIMIT          = 10
+	checkSyncInterval = 1
+	syncBlockDiff     = 3
 )
 
 func first(ctx context.Context, source <-chan interface{}) <-chan interface{} {
@@ -71,6 +63,7 @@ func merge(ctx context.Context, cs ...chan interface{}) <-chan interface{} {
 	return out
 }
 
+//ReadEthKey is a utility function to read a keystore file
 func ReadEthKey(credentialPath, passphrase string) (key *keystore.Key, err error) {
 	newKeyStore := keystore.NewKeyStore(credentialPath, keystore.StandardScryptN, keystore.StandardScryptP)
 	if len(newKeyStore.Accounts()) < 1 {
@@ -87,8 +80,10 @@ func ReadEthKey(credentialPath, passphrase string) (key *keystore.Key, err error
 	key, err = keystore.DecryptKey(keyJson, passphrase)
 
 	return
+
 }
 
+//DialToEth is a utility function to dial to Ethereum
 func DialToEth(ctx context.Context, urlPool []string, key *keystore.Key) (out chan *ethclient.Client) {
 	out = make(chan *ethclient.Client)
 	var wg sync.WaitGroup
@@ -149,6 +144,7 @@ func DialToEth(ctx context.Context, urlPool []string, key *keystore.Key) (out ch
 	return
 }
 
+//CheckSync is a utility function to check sync state
 func CheckSync(ctx context.Context, mClient *ethclient.Client, cs chan *ethclient.Client) chan *ethclient.Client {
 	out := make(chan *ethclient.Client)
 	var wg sync.WaitGroup
@@ -160,7 +156,7 @@ func CheckSync(ctx context.Context, mClient *ethclient.Client, cs chan *ethclien
 			//defer logger.TimeTrack(time.Now(), "CheckSync", nil)
 
 			defer wg.Done()
-			ticker := time.NewTicker(time.Second * time.Duration(CHECKSYNCINTERVAL))
+			ticker := time.NewTicker(time.Second * time.Duration(checkSyncInterval))
 			for range ticker.C {
 				highestBlk, e := mClient.BlockByNumber(ctx, nil)
 				if e != nil {
@@ -185,7 +181,7 @@ func CheckSync(ctx context.Context, mClient *ethclient.Client, cs chan *ethclien
 				fmt.Println("highestBlkN ", highestBlkN, "  currBlkN ", currBlkN)
 				blockDiff := math.Abs(float64(highestBlkN) - float64(currBlkN))
 				fmt.Println("block to Sync ", blockDiff)
-				if blockDiff <= SYNCBLOCKDRIFT {
+				if blockDiff <= syncBlockDiff {
 					ticker.Stop()
 					out <- client
 					return
