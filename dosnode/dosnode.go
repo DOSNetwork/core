@@ -29,16 +29,12 @@ import (
 
 const (
 	watchdogInterval    = 10 //In minutes
-	ContextKeyGroupID   = contextKey("GroupID")
-	ContextKeyRequestID = contextKey("RequestID")
+	contextKeyGroupID   = "GroupID"
+	contextKeyRequestID = "RequestID"
+	envPassPhrase       = "PASSPHRASE"
 )
 
-type contextKey string
-
-func (c contextKey) String() string {
-	return "dosnode " + string(c)
-}
-
+// DosNode is a strcut that represents a offchain dos client
 type DosNode struct {
 	suite        suites.Suite
 	chain        onchain.ProxyAdapter
@@ -57,9 +53,10 @@ type DosNode struct {
 	numOfworkingGroup int
 }
 
+//NewDosNode creates a DosNode struct
 func NewDosNode(credentialPath, passphrase string) (dosNode *DosNode, err error) {
 	if passphrase == "" {
-		passphrase = os.Getenv(configuration.ENVPASSPHRASE)
+		passphrase = os.Getenv(envPassPhrase)
 		if passphrase == "" {
 			err = errors.New("No passphrase")
 			return
@@ -185,6 +182,7 @@ func NewDosNode(credentialPath, passphrase string) (dosNode *DosNode, err error)
 	return dosNode, nil
 }
 
+// Start registers to onchain and listen to p2p events
 func (d *DosNode) Start() (err error) {
 
 	mux := http.NewServeMux()
@@ -220,6 +218,7 @@ func (d *DosNode) Start() (err error) {
 	return
 }
 
+//End is an operation that does a graceful shutdown
 func (d *DosNode) End() {
 	close(d.done)
 }
@@ -584,7 +583,7 @@ func (d *DosNode) listen() (err error) {
 			if isMember {
 				d.logger.Event("DGrouping2", f)
 				//if !content.Removed {
-				valueCtx := context.WithValue(context.Background(), ContextKeyGroupID, groupID)
+				valueCtx := context.WithValue(context.Background(), contextKeyGroupID, groupID)
 
 				outFromDkg, errc, err := d.dkg.Grouping(valueCtx, groupID, participants)
 				if err != nil {
@@ -640,13 +639,13 @@ func (d *DosNode) listen() (err error) {
 					"RequestId":            requestID,
 					"GroupID":              groupID,
 					"LastSystemRandomness": lastRand,
-					"Tx":                   content.Tx,
-					"CurBlkN":              currentBlockNumber,
-					"BlockN":               content.BlockN}
+					"Tx":      content.Tx,
+					"CurBlkN": currentBlockNumber,
+					"BlockN":  content.BlockN}
 				d.logger.Event("DOS_QuerySysRandom", f)
 
-				valueCtx := context.WithValue(context.Background(), ContextKeyRequestID, requestID)
-				valueCtx = context.WithValue(valueCtx, ContextKeyGroupID, groupID)
+				valueCtx := context.WithValue(context.Background(), contextKeyRequestID, requestID)
+				valueCtx = context.WithValue(valueCtx, contextKeyGroupID, groupID)
 
 				d.buildPipeline(valueCtx, groupID, content.LastRandomness, content.LastRandomness, nil, "", "", uint32(onchain.TrafficSystemRandom))
 				//}
@@ -672,12 +671,12 @@ func (d *DosNode) listen() (err error) {
 					"RequestId":            requestID,
 					"GroupID":              groupID,
 					"LastSystemRandomness": lastRand,
-					"Tx":                   content.Tx,
-					"CurBlkN":              currentBlockNumber,
-					"BlockN":               content.BlockN}
+					"Tx":      content.Tx,
+					"CurBlkN": currentBlockNumber,
+					"BlockN":  content.BlockN}
 				d.logger.Event("DOS_QueryUserRandom", f)
-				valueCtx := context.WithValue(context.Background(), ContextKeyRequestID, requestID)
-				valueCtx = context.WithValue(valueCtx, ContextKeyGroupID, groupID)
+				valueCtx := context.WithValue(context.Background(), contextKeyRequestID, requestID)
+				valueCtx = context.WithValue(valueCtx, contextKeyGroupID, groupID)
 
 				d.buildPipeline(valueCtx, groupID, content.RequestId, content.LastSystemRandomness, content.UserSeed, "", "", uint32(onchain.TrafficUserRandom))
 
@@ -711,8 +710,8 @@ func (d *DosNode) listen() (err error) {
 					"CurBlkN":    currentBlockNumber,
 					"BlockN":     content.BlockN}
 				d.logger.Event("DOS_QueryURL", f)
-				valueCtx := context.WithValue(context.Background(), ContextKeyRequestID, requestID)
-				valueCtx = context.WithValue(valueCtx, ContextKeyGroupID, groupID)
+				valueCtx := context.WithValue(context.Background(), contextKeyRequestID, requestID)
+				valueCtx = context.WithValue(valueCtx, contextKeyGroupID, groupID)
 
 				d.buildPipeline(valueCtx, groupID, content.QueryId, content.Randomness, nil, content.DataSource, content.Selector, uint32(onchain.TrafficUserQuery))
 				//}

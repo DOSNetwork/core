@@ -61,15 +61,13 @@ func NewSuiteRand(rand cipher.Stream) *Suite {
 	return s
 }
 
-// test
+// Point returns a point in groups G2
 func (s *Suite) Point() kyber.Point {
-	//fmt.Println("test point")
 	return s.g2.Point()
 }
 
-// test
+// Scalar returns a scalar in groups G1
 func (s *Suite) Scalar() kyber.Scalar {
-	//fmt.Println("test Scalar")
 	return s.g1.Scalar()
 }
 
@@ -99,8 +97,7 @@ func (s *Suite) Pair(p1 kyber.Point, p2 kyber.Point) kyber.Point {
 	return s.GT().Point().(*pointGT).Pair(p1, p2)
 }
 
-// Pair takes the points p1 and p2 in groups G1 and G2, respectively, as input
-// and computes their pairing in GT.
+// PairingCheck calculates the Optimal Ate pairing for a set of points
 func (s *Suite) PairingCheck(a []kyber.Point, b []kyber.Point) bool {
 	return s.GT().Point().(*pointGT).PairingCheck(a, b)
 }

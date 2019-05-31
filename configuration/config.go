@@ -10,16 +10,15 @@ import (
 )
 
 const (
-	ENVCHAINTYPE     = "CHAINTYPE"
-	ENVCHAINNODE     = "CHAINNODE"
-	ENVRANDOMCONNECT = "RANDOMCONNECT"
-	ENVCONFIGPATH    = "CONFIGPATH"
-	ENVNODEROLE      = "NODEROLE"
-	ENVBOOTSTRAPIP   = "BOOTSTRAPIP"
-	ENVNODEPORT      = "NODEPORT"
-	ENVGROUPSIZE     = "GROUPSIZE"
-	ENVPASSPHRASE    = "PASSPHRASE"
-	ENVGROUPTOPICK   = "GROUPTOPICK"
+	envChainType     = "CHAINTYPE"
+	envChainNode     = "CHAINNODE"
+	envRandomConnect = "RANDOMCONNECT"
+	envConfigPath    = "CONFIGPATH"
+	envNodeRole      = "NODEROLE"
+	envBootStrapIP   = "BOOTSTRAPIP"
+	envNodePort      = "NODEPORT"
+	envGroupSize     = "GROUPSIZE"
+	envGroupToPick   = "GROUPTOPICK"
 )
 
 // Config is the configuration for creating a DOS client instance.
@@ -86,7 +85,7 @@ func UpdateConfig(path string, c interface{}) (err error) {
 
 // LoadConfig loads configuration file from path.
 func (c *Config) LoadConfig() (err error) {
-	path := os.Getenv(ENVCONFIGPATH)
+	path := os.Getenv(envConfigPath)
 	if path == "" {
 		path, err = os.Getwd()
 		if err != nil {
@@ -109,7 +108,7 @@ func (c *Config) LoadConfig() (err error) {
 }
 
 func (c *Config) overWrite() (err error) {
-	envSize := os.Getenv(ENVGROUPSIZE)
+	envSize := os.Getenv(envGroupSize)
 	if envSize != "" {
 		var size int
 		size, err = strconv.Atoi(envSize)
@@ -120,25 +119,25 @@ func (c *Config) overWrite() (err error) {
 		c.queryGroupSize = size
 	}
 
-	nodeRole := os.Getenv(ENVNODEROLE)
+	nodeRole := os.Getenv(envNodeRole)
 	if nodeRole != "" {
 		c.NodeRole = nodeRole
 	}
 
-	port := os.Getenv(ENVNODEPORT)
+	port := os.Getenv(envNodePort)
 	if port != "" {
 		//TODO:add a check
 		c.Port = port
 	}
 
-	chainType := os.Getenv(ENVCHAINTYPE)
+	chainType := os.Getenv(envChainType)
 	if chainType == "" {
 		fmt.Println("No CHAINTYPE Environment variable.")
 		chainType = "ETH"
 	}
 	c.currentType = chainType
 
-	chainNode := os.Getenv(ENVCHAINNODE)
+	chainNode := os.Getenv(envChainNode)
 	if chainNode == "" {
 		fmt.Println("No CHAINNODE Environment variable.")
 		chainNode = "rinkeby"

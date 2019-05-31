@@ -43,7 +43,7 @@ func listen(t *testing.T, listener net.Listener, sID string) {
 					t.Errorf("casting failed")
 				}
 
-				reply := Request{}
+				reply := request{}
 
 				reply.ctx, reply.cancel = context.WithTimeout(context.Background(), 5*time.Second)
 				reply.id = client.remoteID
@@ -114,7 +114,7 @@ func TestRequest(t *testing.T) {
 		go func(count uint64) {
 			defer wg.Done()
 
-			callReq := Request{}
+			callReq := request{}
 			callReq.ctx, callReq.cancel = context.WithTimeout(context.Background(), 35*time.Second)
 			callReq.rType = 1
 			callReq.id = client.remoteID

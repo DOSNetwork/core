@@ -20,12 +20,10 @@ import (
 	"github.com/dedis/protobuf"
 )
 
-type Suite suites.Suite
-
 // Dealer encapsulates for creating and distributing the shares and for
 // replying to any Responses.
 type Dealer struct {
-	suite  Suite
+	suite  suites.Suite
 	reader cipher.Stream
 	// long is the longterm key of the Dealer
 	long          kyber.Scalar
@@ -115,7 +113,7 @@ type Justification struct {
 // RECOMMENDED to use a threshold higher or equal than what the method
 // MinimumT() returns, otherwise it breaks the security assumptions of the whole
 // scheme. It returns an error if the t is less than or equal to 2.
-func NewDealer(suite Suite, longterm, secret kyber.Scalar, verifiers []kyber.Point, t int) (*Dealer, error) {
+func NewDealer(suite suites.Suite, longterm, secret kyber.Scalar, verifiers []kyber.Point, t int) (*Dealer, error) {
 	d := &Dealer{
 		suite:     suite,
 		long:      longterm,
@@ -298,7 +296,7 @@ func (d *Dealer) PrivatePoly() *share.PriPoly {
 // Verifier receives a Deal from a Dealer, can reply with a Complaint, and can
 // collaborate with other Verifiers to reconstruct a secret.
 type Verifier struct {
-	suite       Suite
+	suite       suites.Suite
 	longterm    kyber.Scalar
 	pub         kyber.Point
 	dealer      kyber.Point
@@ -315,7 +313,7 @@ type Verifier struct {
 // The security parameter t of the secret sharing scheme is automatically set to
 // a default safe value. If a different t value is required, it is possible to set
 // it with `verifier.SetT()`.
-func NewVerifier(suite Suite, longterm kyber.Scalar, dealerKey kyber.Point,
+func NewVerifier(suite suites.Suite, longterm kyber.Scalar, dealerKey kyber.Point,
 	verifiers []kyber.Point) (*Verifier, error) {
 
 	pub := suite.Point().Mul(longterm, nil)
@@ -474,7 +472,7 @@ func (v *Verifier) SessionID() []byte {
 // RecoverSecret recovers the secret shared by a Dealer by gathering at least t
 // Deals from the verifiers. It returns an error if there is not enough Deals or
 // if all Deals don't have the same SessionID.
-func RecoverSecret(suite Suite, deals []*Deal, n, t int) (kyber.Scalar, error) {
+func RecoverSecret(suite suites.Suite, deals []*Deal, n, t int) (kyber.Scalar, error) {
 	shares := make([]*share.PriShare, len(deals))
 	for i, deal := range deals {
 		// all sids the same
@@ -509,7 +507,7 @@ func (v *Verifier) UnsafeSetResponseDKG(idx uint32, approval bool) {
 // aggregator is used to collect all deals, and responses for one protocol run.
 // It brings common functionalities for both Dealer and Verifier structs.
 type aggregator struct {
-	suite     Suite
+	suite     suites.Suite
 	dealer    kyber.Point
 	verifiers []kyber.Point
 	commits   []kyber.Point
@@ -521,7 +519,7 @@ type aggregator struct {
 	badDealer bool
 }
 
-func newAggregator(suite Suite, dealer kyber.Point, verifiers, commitments []kyber.Point, t int, sid []byte) *aggregator {
+func newAggregator(suite suites.Suite, dealer kyber.Point, verifiers, commitments []kyber.Point, t int, sid []byte) *aggregator {
 	agg := &aggregator{
 		suite:     suite,
 		dealer:    dealer,
@@ -685,7 +683,7 @@ func validT(t int, verifiers []kyber.Point) bool {
 	return t >= 2 && t <= len(verifiers) && int(uint32(t)) == t
 }
 
-func deriveH(suite Suite, verifiers []kyber.Point) kyber.Point {
+func deriveH(suite suites.Suite, verifiers []kyber.Point) kyber.Point {
 	var b bytes.Buffer
 	for _, v := range verifiers {
 		_, _ = v.MarshalTo(&b)
@@ -702,7 +700,7 @@ func findPub(verifiers []kyber.Point, idx uint32) (kyber.Point, bool) {
 	return verifiers[iidx], true
 }
 
-func sessionID(suite Suite, dealer kyber.Point, verifiers, commitments []kyber.Point, t int) ([]byte, error) {
+func sessionID(suite suites.Suite, dealer kyber.Point, verifiers, commitments []kyber.Point, t int) ([]byte, error) {
 	h := suite.Hash()
 	_, _ = dealer.MarshalTo(h)
 
@@ -719,7 +717,7 @@ func sessionID(suite Suite, dealer kyber.Point, verifiers, commitments []kyber.P
 }
 
 // Hash returns the Hash representation of the Response
-func (r *Response) Hash(s Suite) []byte {
+func (r *Response) Hash(s suites.Suite) []byte {
 	h := s.Hash()
 	_, _ = h.Write([]byte("response"))
 	_, _ = h.Write(r.SessionID)
@@ -735,7 +733,7 @@ func (d *Deal) MarshalBinary() ([]byte, error) {
 }
 
 // UnmarshalBinary reads the Deal from the binary represenstation.
-func (d *Deal) UnmarshalBinary(s Suite, buff []byte) error {
+func (d *Deal) UnmarshalBinary(s suites.Suite, buff []byte) error {
 	constructors := make(protobuf.Constructors)
 	var point kyber.Point
 	var secret kyber.Scalar
@@ -745,7 +743,7 @@ func (d *Deal) UnmarshalBinary(s Suite, buff []byte) error {
 }
 
 // Hash returns the hash of a Justification.
-func (j *Justification) Hash(s Suite) []byte {
+func (j *Justification) Hash(s suites.Suite) []byte {
 	h := s.Hash()
 	_, _ = h.Write([]byte("justification"))
 	_, _ = h.Write(j.SessionID)
@@ -753,63 +751,4 @@ func (j *Justification) Hash(s Suite) []byte {
 	buff, _ := j.Deal.MarshalBinary()
 	_, _ = h.Write(buff)
 	return h.Sum(nil)
-}
-
-func (e *EncryptedDeals) SetEncryptedDealsArray(deals []*EncryptedDeal) {
-	e.Deals = make([]*EncryptedDeal, len(deals))
-	for i, deal := range deals {
-		e.Deals[i] = deal
-	}
-	return
-}
-
-func (p *Responses) SetResponseArray(s Suite, responses []*Response) {
-	p.Responses = make([]*Response, len(responses))
-	for i, r := range responses {
-		p.Responses[i] = r
-	}
-	return
-}
-
-func (p *PublicKeys) SetPointArray(s Suite, points []kyber.Point) (err error) {
-	var binary []byte
-	p.Keys = make([]*PublicKey, len(points))
-	for i, point := range points {
-		binary, err = point.MarshalBinary()
-		if err != nil {
-			return
-		}
-		p.Keys[i] = &PublicKey{Binary: binary}
-	}
-	return
-}
-
-func (p *PublicKeys) GetPointArray(s Suite) (ret []kyber.Point, err error) {
-	pubkeys := p.Keys
-	ret = make([]kyber.Point, len(pubkeys))
-	for i, pubkey := range pubkeys {
-		point := s.G2().Point()
-		err = point.UnmarshalBinary(pubkey.Binary)
-		if err != nil {
-			return
-		}
-		ret[i] = point
-	}
-	return
-}
-func (p *PublicKey) GetPoint(s Suite) (ret kyber.Point, err error) {
-	ret = s.G2().Point()
-	err = ret.UnmarshalBinary(p.Binary)
-	if err != nil {
-		return
-	}
-	return
-}
-
-func (p *PublicKey) SetPoint(s Suite, point kyber.Point) (err error) {
-	p.Binary, err = point.MarshalBinary()
-	if err != nil {
-		return
-	}
-	return
 }

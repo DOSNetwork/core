@@ -31,6 +31,7 @@ const (
 
 var logger log.Logger
 
+//AMAConfig is a struct that saves AMA contract address
 type AMAConfig struct {
 	AskMeAnythingAddressPool []string
 }

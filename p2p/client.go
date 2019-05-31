@@ -4,14 +4,12 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
-	"fmt"
 	"net"
 	"os"
 	"strconv"
 	"sync"
 	"time"
 
-	//	"github.com/DOSNetwork/core/log"
 	"github.com/DOSNetwork/core/sign/bls"
 	"github.com/DOSNetwork/core/suites"
 
@@ -46,7 +44,7 @@ type client struct {
 
 	ctx      context.Context
 	cancel   context.CancelFunc
-	sender   chan Request
+	sender   chan request
 	receiver chan interface{}
 	errc     chan error
 }
@@ -95,7 +93,7 @@ func newClient(suite suites.Suite, secKey kyber.Scalar, localPubKey kyber.Point,
 		incomingConn: incomingConn,
 	}
 	c.ctx, c.cancel = context.WithCancel(context.Background())
-	c.sender = make(chan Request, 21)
+	c.sender = make(chan request, 21)
 	//Wait for exchanging ID complete
 	err = c.exchangeID()
 	if c.remoteID == nil {
@@ -125,20 +123,8 @@ func newClient(suite suites.Suite, secKey kyber.Scalar, localPubKey kyber.Point,
 }
 
 func (c *client) close() {
-	c.conn.Close()
 	c.cancel()
-
-}
-func (c *client) errorHandling(errc <-chan error) {
-	go func() {
-		for err := range errc {
-			if err.Error() != "cipher: message authentication failed" {
-			}
-			if err.Error() == "EOF" {
-				c.close()
-			}
-		}
-	}()
+	c.conn.Close()
 }
 
 func (c *client) exchangeID() (err error) {
@@ -345,7 +331,6 @@ func decrypt(ctx context.Context, dhKey, dhNonce []byte, ciphertext chan []byte)
 	go func() {
 		defer close(out)
 		defer close(errc)
-
 		for {
 			select {
 			case c, ok := <-ciphertext:
@@ -393,17 +378,16 @@ func decrypt(ctx context.Context, dhKey, dhNonce []byte, ciphertext chan []byte)
 	return out, errc
 }
 
-func dispatch(ctx context.Context, localID, remoteID []byte, incomingConn bool, suite suites.Suite, pub kyber.Point, sendMsg chan Request, receiveBytes chan []byte) (chan interface{}, chan []byte, chan error) {
+func dispatch(ctx context.Context, localID, remoteID []byte, incomingConn bool, suite suites.Suite, pub kyber.Point, sendMsg chan request, receiveBytes chan []byte) (chan interface{}, chan []byte, chan error) {
 	receiver := make(chan interface{}, 21)
 	sender := make(chan []byte, 21)
 	errc := make(chan error)
-	requests := make(map[uint64]Request)
+	requests := make(map[uint64]request)
 	var nonce uint64
 	go func() {
 		defer close(receiver)
 		defer close(sender)
 		defer close(errc)
-
 		for {
 			select {
 			case req, ok := <-sendMsg:
@@ -518,6 +502,7 @@ func sendBytes(ctx context.Context, c net.Conn, bytesC chan []byte, localID, rem
 	errc := make(chan error)
 	prefix := make([]byte, headerSize)
 	go func() {
+		defer close(errc)
 		for {
 			select {
 			case bytes, ok := <-bytesC:
@@ -557,7 +542,6 @@ func readBytes(ctx context.Context, c net.Conn, localID, remoteID []byte, incomi
 	go func() {
 		defer close(out)
 		defer close(errc)
-
 		for {
 			select {
 			case <-ctx.Done():
@@ -568,11 +552,10 @@ func readBytes(ctx context.Context, c net.Conn, localID, remoteID []byte, incomi
 				bytesRead, totalBytesRead := 0, 0
 				for totalBytesRead < headerSize && err == nil {
 					if bytesRead, err = c.Read(header[totalBytesRead:]); err != nil {
-						fmt.Println("readBytes err ", err)
-						if err.Error() == "EOF" {
-							c.Close()
+						select {
+						case errc <- err:
+						case <-ctx.Done():
 						}
-
 						return
 					}
 					totalBytesRead += bytesRead
@@ -619,14 +602,14 @@ func readBytes(ctx context.Context, c net.Conn, localID, remoteID []byte, incomi
 	return out, errc
 }
 
-func (c *client) send(req Request) error {
+func (c *client) send(req request) error {
 	if req.msg == nil {
-		//return errors.New("Request msg is nil")
+		//return errors.New("request msg is nil")
 	}
 	if req.ctx == nil {
-		return errors.New("Request msg is nil")
+		return errors.New("request msg is nil")
 	}
-	go func(req Request) {
+	go func(req request) {
 		var anything *any.Any
 		var err error
 		var sig []byte
@@ -667,7 +650,7 @@ func (c *client) send(req Request) error {
 		select {
 		case c.sender <- req:
 		case <-req.ctx.Done():
-			err := errors.New("Request Timeout")
+			err := errors.New("request Timeout")
 			logger.Error(err)
 			close(req.errc)
 			if req.reply != nil {

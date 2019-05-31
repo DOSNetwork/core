@@ -30,23 +30,27 @@ type server struct {
 	listener net.Listener
 
 	//client lookup
-	members     discover.Membership
-	calling     chan Request
-	replying    chan Request
-	incoming    chan *client
-	registerC   chan *client
-	deRegisterC chan []byte
+	members  discover.Membership
+	calling  chan request
+	replying chan request
+
+	addIncomingC    chan *client
+	removeIncomingC chan []byte
+	addCallingC     chan *client
+	removeCallingC  chan []byte
+	incomingNum     int
+	callingNum      int
 
 	//Event
 	messages  chan P2PMessage
-	subscribe chan Subscription
-	unscribe  chan Subscription
+	subscribe chan subscription
+	unscribe  chan subscription
 
 	ctx    context.Context
 	cancel context.CancelFunc
 }
 
-type Request struct {
+type request struct {
 	rType  int
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -61,7 +65,7 @@ type Request struct {
 	errc  chan error
 }
 
-type Subscription struct {
+type subscription struct {
 	eventType string
 	message   chan P2PMessage
 }
@@ -86,6 +90,9 @@ func (n *server) ConnectToAll() (memNum, connNum int) {
 	}
 
 	return
+}
+func (n *server) numOfClient() (iNum, cNum int) {
+	return n.incomingNum, n.callingNum
 }
 
 func (n *server) SetID(id []byte) {
@@ -127,6 +134,7 @@ func (n *server) Listen() (err error) {
 			start := time.Now()
 			//fmt.Println("new conn ")
 			go func(conn net.Conn, start time.Time) {
+				fmt.Println(string(n.id), "Got a conn")
 				c, err := newClient(n.suite, n.secKey, n.pubKey, n.id, conn, true)
 				if err != nil {
 					//fmt.Println("listen to client err", err)
@@ -134,7 +142,8 @@ func (n *server) Listen() (err error) {
 					return
 				}
 				go func(c *client, messages chan P2PMessage) {
-					//defer //fmt.Println("connect to client over")
+					defer fmt.Println(string(n.id), "Close a Incoming Client")
+					defer func() { n.removeIncomingC <- c.remoteID }()
 					for {
 						select {
 						case pa, ok := <-c.receiver:
@@ -148,18 +157,18 @@ func (n *server) Listen() (err error) {
 							if !ok {
 								return
 							}
-							//fmt.Println(client.localID, " err ", err)
-							if err.Error() == "EOF" {
+							fmt.Println(string(n.id), "err.Error() ", err.Error())
+							if err.Error() == "EOF" || err.Error() == "use of closed network connection" {
 								c.close()
 								return
 							}
 						case <-c.ctx.Done():
-							//fmt.Println(client.localID, " Over")
 							return
 						}
 					}
+					fmt.Println(string(n.id), "c.remoteID", string(c.remoteID))
 				}(c, n.messages)
-				n.incoming <- c
+				n.addIncomingC <- c
 			}(conn, start)
 		}
 	}()
@@ -167,45 +176,45 @@ func (n *server) Listen() (err error) {
 	return nil
 }
 func (n *server) receiveHandler() {
-	n.incoming = make(chan *client, 21)
-	n.replying = make(chan Request)
+	n.addIncomingC = make(chan *client, 21)
+	n.removeIncomingC = make(chan []byte)
+	n.replying = make(chan request)
 	clients := make(map[string]*client)
 
 	go func() {
 		for {
 			select {
-			case c, ok := <-n.incoming:
+			case c, ok := <-n.addIncomingC:
 				if !ok {
 					return
 				}
-				//fmt.Println(time.Now(), "receiveHandler incoming ", c.remoteID)
-
 				clients[string(c.remoteID)] = c
+				n.incomingNum = len(clients)
+			case id, ok := <-n.removeIncomingC:
+				if !ok {
+					return
+				}
+				c := clients[string(id)]
+				if c != nil {
+					delete(clients, string(id))
+				}
+				n.incomingNum = len(clients)
 
 			case req, ok := <-n.replying:
 				if !ok || req.id == nil {
-					//fmt.Println(time.Now(), "receiveHandler close")
-
 					return
 				}
 
 				client := clients[string(req.id)]
 				if client == nil {
-					//fmt.Println(time.Now(), "receiveHandler client is nil")
-
 					select {
 					case n.replying <- req:
-						//fmt.Println(time.Now(), "receiveHandler retry late")
-
 						if req.ctx == nil || req.reply == nil {
-							//fmt.Println(time.Now(), "receiveHandler  req is nil ")
 						}
 					case <-req.ctx.Done():
 					}
 				} else {
-					//fmt.Println(time.Now(), "receiveHandler found client")
 					if req.ctx == nil {
-						//fmt.Println(time.Now(), "receiveHandler  req is nil ")
 					}
 					client.send(req)
 				}
@@ -213,15 +222,17 @@ func (n *server) receiveHandler() {
 		}
 	}()
 }
+
 func (n *server) callHandler() {
-	n.calling = make(chan Request, 21)
+	n.calling = make(chan request, 21)
 	hangup := make(chan string)
 	addrToid := make(map[string][]byte)
 	idTostatus := make(map[string][]byte)
 
 	clients := make(map[string]*client)
-	n.registerC = make(chan *client)
-	n.deRegisterC = make(chan []byte)
+	n.addCallingC = make(chan *client)
+	n.removeCallingC = make(chan []byte)
+
 	go func() {
 		for {
 			select {
@@ -254,7 +265,7 @@ func (n *server) callHandler() {
 								}
 							}
 						} else {
-							go func(req Request) {
+							go func(req request) {
 								select {
 								case n.calling <- req:
 								case <-req.ctx.Done():
@@ -301,7 +312,7 @@ func (n *server) callHandler() {
 
 						if req.addr == nil {
 							//Retry later
-							go func(req Request) {
+							go func(req request) {
 								select {
 								case n.calling <- req:
 								case <-req.ctx.Done():
@@ -313,7 +324,7 @@ func (n *server) callHandler() {
 					idTostatus[string(req.id)] = []byte{'p', 'e', 'n', 'd', 'i', 'n', 'g'}
 					addrToid[req.addr.String()+":"+n.port] = []byte{'p', 'e', 'n', 'd', 'i', 'n', 'g'}
 
-					go func(req Request, start time.Time) {
+					go func(req request, start time.Time) {
 						var conn net.Conn
 						var c *client
 						if conn, err = net.Dial("tcp", req.addr.String()+":"+n.port); err != nil {
@@ -323,7 +334,7 @@ func (n *server) callHandler() {
 							case <-req.ctx.Done():
 							}
 							//Retry later
-							go func(req Request) {
+							go func(req request) {
 								select {
 								case n.calling <- req:
 								case <-req.ctx.Done():
@@ -340,7 +351,7 @@ func (n *server) callHandler() {
 							}
 							conn.Close()
 							//Retry later
-							go func(req Request) {
+							go func(req request) {
 								select {
 								case n.calling <- req:
 								case <-req.ctx.Done():
@@ -350,6 +361,8 @@ func (n *server) callHandler() {
 						}
 
 						go func() {
+							defer fmt.Println("close a calling client")
+							defer func() { n.removeCallingC <- c.remoteID }()
 							for {
 								select {
 								case pa, ok := <-c.receiver:
@@ -360,7 +373,7 @@ func (n *server) callHandler() {
 										n.messages <- m
 									}
 								case err := <-c.errc:
-									if err.Error() == "EOF" {
+									if err.Error() == "EOF" || err.Error() == "use of closed network connection" {
 										c.close()
 										return
 									}
@@ -381,17 +394,18 @@ func (n *server) callHandler() {
 							close(req.errc)
 						}
 						select {
-						case n.registerC <- c:
+						case n.addCallingC <- c:
 						case <-req.ctx.Done():
 						}
 					}(req, start)
 				}
-			case c, ok := <-n.registerC:
+			case c, ok := <-n.addCallingC:
 				if !ok {
 					return
 				}
 
 				clients[string(c.remoteID)] = c
+				n.callingNum = len(clients)
 				addrToid[c.conn.RemoteAddr().String()] = c.remoteID
 
 				delete(idTostatus, string(c.remoteID))
@@ -400,15 +414,16 @@ func (n *server) callHandler() {
 					"remoteID":   c.remoteID,
 					"RemoteAddr": c.conn.RemoteAddr().String()}
 				logger.Event("registerclient", f)
-			case id, ok := <-n.deRegisterC:
+			case id, ok := <-n.removeCallingC:
 				if !ok {
 					return
 				}
 				c := clients[string(id)]
 				if c != nil {
-					//delete(addrToid, client.conn.RemoteAddr().String())
+					delete(clients, string(id))
 					c.close()
 				}
+				n.callingNum = len(clients)
 			case _, _ = <-hangup:
 			}
 		}
@@ -430,7 +445,7 @@ func (n *server) Leave() {
 }
 
 func (n *server) DisConnectTo(id []byte) (err error) {
-	n.deRegisterC <- id
+	n.removeCallingC <- id
 	return
 }
 
@@ -439,7 +454,7 @@ This is a block call
 */
 func (n *server) ConnectTo(addr string, id []byte) ([]byte, error) {
 	var err error
-	callReq := Request{}
+	callReq := request{}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	callReq.ctx = ctx
@@ -472,9 +487,10 @@ func (n *server) ConnectTo(addr string, id []byte) ([]byte, error) {
 	}
 }
 
+// Request sends a proto message to the specific node
 func (n *server) Request(id []byte, m proto.Message) (msg P2PMessage, err error) {
 	//defer logger.TimeTrack(time.Now(), "Request", nil)
-	callReq := Request{}
+	callReq := request{}
 	callReq.ctx, callReq.cancel = context.WithTimeout(context.Background(), 5*time.Second)
 	defer callReq.cancel()
 	callReq.rType = 1
@@ -516,8 +532,9 @@ func (n *server) Request(id []byte, m proto.Message) (msg P2PMessage, err error)
 	return
 }
 
+// Reply sends a reply to the specific node
 func (n *server) Reply(id []byte, nonce uint64, response proto.Message) (err error) {
-	callReq := Request{}
+	callReq := request{}
 
 	callReq.ctx, callReq.cancel = context.WithTimeout(context.Background(), 5*time.Second)
 	callReq.id = id
@@ -534,27 +551,9 @@ func (n *server) Reply(id []byte, nonce uint64, response proto.Message) (err err
 	case <-callReq.ctx.Done():
 		return
 	}
-	/*
-		select {
-		case e, ok := <-callReq.errc:
-			if ok {
-				err = e
-				//fmt.Println(time.Now(), "Reply err ", e)
-				return
-			} else {
-				//fmt.Println(time.Now(), "server reply  done")
-
-			}
-		case <-callReq.ctx.Done():
-			err = callReq.ctx.Err()
-			//if strings.Contains(callReq.ctx.Err(), "deadline exceeded") {
-			//fmt.Println(time.Now(), "Reply ctx err ", callReq.ctx.Err())
-			//}
-			return
-
-		}*/
 	return
 }
+
 func (n *server) messageDispatch(ctx context.Context) {
 	subscriptions := make(map[string]chan P2PMessage)
 	go func() {
@@ -596,6 +595,7 @@ func (n *server) messageDispatch(ctx context.Context) {
 	}()
 }
 
+// SubscribeEvent is a message subscription operation binding the P2PMessage
 func (n *server) SubscribeEvent(chanBuffer int, messages ...interface{}) (outch chan P2PMessage, err error) {
 	if chanBuffer > 0 {
 		outch = make(chan P2PMessage, chanBuffer)
@@ -603,14 +603,15 @@ func (n *server) SubscribeEvent(chanBuffer int, messages ...interface{}) (outch 
 		outch = make(chan P2PMessage)
 	}
 	for _, m := range messages {
-		n.subscribe <- Subscription{reflect.TypeOf(m).String(), outch}
+		n.subscribe <- subscription{reflect.TypeOf(m).String(), outch}
 	}
 	return
 }
 
+// UnSubscribeEvent is a un-subscription operation
 func (n *server) UnSubscribeEvent(messages ...interface{}) {
 	for _, m := range messages {
-		n.unscribe <- Subscription{reflect.TypeOf(m).String(), nil}
+		n.unscribe <- subscription{reflect.TypeOf(m).String(), nil}
 
 	}
 	return

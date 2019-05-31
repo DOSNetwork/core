@@ -17,7 +17,7 @@ type Membership interface {
 	PeersIP() (addr []net.IP)
 }
 
-//NewserfNet creates a Serf implementation
+//NewSerfNet creates a Serf implementation
 func NewSerfNet(Addr net.IP, id []byte) (Membership, error) {
 	var err error
 	serfNet := &serfNet{}

@@ -21,9 +21,9 @@ import (
 var logger log.Logger
 
 const (
-	NONE = iota // 0
-	SWIM
-	SWIMPORT = 7946
+	nodiscover = iota // 0
+	swimDiscover
+	swimPort = 7946
 )
 
 type P2PMessage struct {
@@ -47,6 +47,7 @@ type P2PInterface interface {
 	UnSubscribeEvent(messages ...interface{})
 	Members() int
 	ConnectToAll() (memNum, connNum int)
+	numOfClient() (int, int)
 }
 
 func CreateP2PNetwork(id []byte, port string, netType int) (P2PInterface, error) {
@@ -55,8 +56,8 @@ func CreateP2PNetwork(id []byte, port string, netType int) (P2PInterface, error)
 	p := &server{
 		suite:     suite,
 		messages:  make(chan P2PMessage, 100),
-		subscribe: make(chan Subscription),
-		unscribe:  make(chan Subscription),
+		subscribe: make(chan subscription),
+		unscribe:  make(chan subscription),
 		port:      port,
 	}
 	p.ctx, p.cancel = context.WithCancel(context.Background())
@@ -97,8 +98,8 @@ func CreateP2PNetwork(id []byte, port string, netType int) (P2PInterface, error)
 				return nil, err
 			}
 
-			if netType == SWIM {
-				if err := nat.SetMapping(p.ctx, natdev, "tcp", SWIMPORT, SWIMPORT, "DosGossip"); err != nil {
+			if netType == swimDiscover {
+				if err := nat.SetMapping(p.ctx, natdev, "tcp", swimPort, swimPort, "DosGossip"); err != nil {
 					fmt.Println(err)
 					return nil, err
 				}
@@ -112,7 +113,7 @@ func CreateP2PNetwork(id []byte, port string, netType int) (P2PInterface, error)
 	}
 
 	switch netType {
-	case SWIM:
+	case swimDiscover:
 		network, err := discover.NewSerfNet(p.addr, p.id)
 		if err != nil {
 			p.cancel()

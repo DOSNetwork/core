@@ -927,6 +927,7 @@ func (e *EthAdaptor) SubscribeEvent(subscribeType int) (<-chan interface{}, <-ch
 	}
 	return e.firstEvent(e.ctx, MergeEvents(e.ctx, eventList...)), MergeErrors(e.ctx, errcs...)
 }
+
 func subscribeCREvent(ctx context.Context, cr *commitreveal.Commitreveal, subscribeType int) (<-chan interface{}, <-chan error) {
 	out := make(chan interface{})
 	errc := make(chan error)

@@ -198,6 +198,8 @@ func CheckSync(ctx context.Context, mClient *ethclient.Client, cs chan *ethclien
 	return out
 }
 
+// GetCurrentBlock returns a block number of latest known header from the
+// current canonical chain.
 func GetCurrentBlock(client *ethclient.Client) (blknum uint64, err error) {
 	var header *types.Header
 	header, err = client.HeaderByNumber(context.Background(), nil)
@@ -207,6 +209,7 @@ func GetCurrentBlock(client *ethclient.Client) (blknum uint64, err error) {
 	return
 }
 
+// CheckTransaction return an error if the transaction is failed
 func CheckTransaction(client *ethclient.Client, tx *types.Transaction) (err error) {
 	start := time.Now()
 	receipt, err := client.TransactionReceipt(context.Background(), tx.Hash())
@@ -236,6 +239,7 @@ func CheckTransaction(client *ethclient.Client, tx *types.Transaction) (err erro
 	return
 }
 
+// GetBalance returns the wei balance of the given account.
 func GetBalance(client *ethclient.Client, key *keystore.Key) (balance *big.Float) {
 	wei, err := client.BalanceAt(context.Background(), key.Address, nil)
 	if err != nil {

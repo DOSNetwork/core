@@ -19,8 +19,6 @@ import (
 	"github.com/DOSNetwork/core/suites"
 )
 
-type Suite suites.Suite
-
 // SigShare encodes a threshold BLS signature share Si = i || v where the 2-byte
 // big-endian value i corresponds to the share's index and v represents the
 // share's value. The signature share Si is a point on curve G1.
@@ -44,7 +42,7 @@ func (s *SigShare) Value() []byte {
 
 // Sign creates a threshold BLS signature Si = xi * H(m) on the given message m
 // using the provided secret key share xi.
-func Sign(suite Suite, private *share.PriShare, msg []byte) ([]byte, error) {
+func Sign(suite suites.Suite, private *share.PriShare, msg []byte) ([]byte, error) {
 	buf := new(bytes.Buffer)
 	if err := binary.Write(buf, binary.BigEndian, uint16(private.I)); err != nil {
 		return nil, err
@@ -63,7 +61,7 @@ func Sign(suite Suite, private *share.PriShare, msg []byte) ([]byte, error) {
 // the public key share Xi that is associated to the secret key share xi. This
 // public key share Xi can be computed by evaluating the public sharing
 // polynonmial at the share's index i.
-func Verify(suite Suite, public *share.PubPoly, msg, sig []byte) error {
+func Verify(suite suites.Suite, public *share.PubPoly, msg, sig []byte) error {
 	s := SigShare(sig)
 	i, err := s.Index()
 	if err != nil {
@@ -72,7 +70,7 @@ func Verify(suite Suite, public *share.PubPoly, msg, sig []byte) error {
 	return bls.Verify(suite, public.Eval(i).V, msg, s.Value())
 }
 
-func SliceUniqMap(s [][]byte) [][]byte {
+func sliceUniqMap(s [][]byte) [][]byte {
 	seen := make(map[string]struct{}, len(s))
 	j := 0
 	for _, v := range s {
@@ -91,9 +89,9 @@ func SliceUniqMap(s [][]byte) [][]byte {
 // can be verified through the regular BLS verification routine using the
 // shared public key X. The shared public key can be computed by evaluating the
 // public sharing polynomial at index 0.
-func Recover(suite Suite, public *share.PubPoly, msg []byte, sigs [][]byte, t, n int) ([]byte, error) {
+func Recover(suite suites.Suite, public *share.PubPoly, msg []byte, sigs [][]byte, t, n int) ([]byte, error) {
 	pubShares := make([]*share.PubShare, 0)
-	sigs = SliceUniqMap(sigs)
+	sigs = sliceUniqMap(sigs)
 	for _, sig := range sigs {
 		s := SigShare(sig)
 		i, err := s.Index()

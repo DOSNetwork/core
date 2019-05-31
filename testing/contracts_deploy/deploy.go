@@ -157,7 +157,7 @@ func updateBridge(client *ethclient.Client, key *keystore.Key, bridgeAddress, pr
 	return
 }
 
-func AddProxyToCRWhiteList(client *ethclient.Client, key *keystore.Key, crAddress common.Address, proxyAddress common.Address) (err error) {
+func addProxyToCRWhiteList(client *ethclient.Client, key *keystore.Key, crAddress common.Address, proxyAddress common.Address) (err error) {
 	var auth *bind.TransactOpts
 	fmt.Println("start to update proxy address to bridge...")
 	auth = bind.NewKeyedTransactor(key.PrivateKey)
@@ -299,7 +299,7 @@ func deployContract(contractPath, targetTask, configPath string, config configur
 			log.Fatal(err)
 		}
 
-		err = AddProxyToCRWhiteList(client, key, crAddress, proxyAddress)
+		err = addProxyToCRWhiteList(client, key, crAddress, proxyAddress)
 		if err != nil {
 			log.Fatal(err)
 		}
