@@ -123,6 +123,7 @@ func newClient(suite suites.Suite, secKey kyber.Scalar, localPubKey kyber.Point,
 }
 
 func (c *client) close() {
+	//close(c.sender)
 	c.cancel()
 	c.conn.Close()
 }

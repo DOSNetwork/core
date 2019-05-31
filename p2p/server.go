@@ -248,10 +248,8 @@ func (n *server) callHandler() {
 					}
 
 					id := addrToid[req.addr.String()+":"+n.port]
-
 					if id != nil {
 						if !bytes.Equal(id, []byte{'p', 'e', 'n', 'd', 'i', 'n', 'g'}) {
-
 							if client := clients[string(id)]; client != nil {
 								if req.rType == 1 {
 									client.send(req)
@@ -266,6 +264,7 @@ func (n *server) callHandler() {
 							}
 						} else {
 							go func(req request) {
+								time.Sleep(1 * time.Second)
 								select {
 								case n.calling <- req:
 								case <-req.ctx.Done():
@@ -302,13 +301,9 @@ func (n *server) callHandler() {
 							continue
 						}
 						// Find Peer from routing map
-						if n.members == nil {
-							fmt.Println("network is nil")
+						if n.members != nil {
+							req.addr = n.members.Lookup(req.id)
 						}
-						if req.id == nil {
-							fmt.Println("req is nil")
-						}
-						req.addr = n.members.Lookup(req.id)
 
 						if req.addr == nil {
 							//Retry later
@@ -321,9 +316,12 @@ func (n *server) callHandler() {
 							continue
 						}
 					}
-					idTostatus[string(req.id)] = []byte{'p', 'e', 'n', 'd', 'i', 'n', 'g'}
-					addrToid[req.addr.String()+":"+n.port] = []byte{'p', 'e', 'n', 'd', 'i', 'n', 'g'}
-
+					if req.id != nil {
+						idTostatus[string(req.id)] = []byte{'p', 'e', 'n', 'd', 'i', 'n', 'g'}
+					}
+					if req.addr != nil {
+						addrToid[req.addr.String()+":"+n.port] = []byte{'p', 'e', 'n', 'd', 'i', 'n', 'g'}
+					}
 					go func(req request, start time.Time) {
 						var conn net.Conn
 						var c *client
@@ -361,7 +359,7 @@ func (n *server) callHandler() {
 						}
 
 						go func() {
-							defer fmt.Println("close a calling client")
+							defer fmt.Println(string(n.id), "close a calling client")
 							defer func() { n.removeCallingC <- c.remoteID }()
 							for {
 								select {
@@ -372,7 +370,10 @@ func (n *server) callHandler() {
 									if m, ok := pa.(P2PMessage); ok {
 										n.messages <- m
 									}
-								case err := <-c.errc:
+								case err, ok := <-c.errc:
+									if !ok {
+										return
+									}
 									if err.Error() == "EOF" || err.Error() == "use of closed network connection" {
 										c.close()
 										return
@@ -407,19 +408,14 @@ func (n *server) callHandler() {
 				clients[string(c.remoteID)] = c
 				n.callingNum = len(clients)
 				addrToid[c.conn.RemoteAddr().String()] = c.remoteID
-
 				delete(idTostatus, string(c.remoteID))
-				f := map[string]interface{}{
-					"localID":    c.localID,
-					"remoteID":   c.remoteID,
-					"RemoteAddr": c.conn.RemoteAddr().String()}
-				logger.Event("registerclient", f)
 			case id, ok := <-n.removeCallingC:
 				if !ok {
 					return
 				}
 				c := clients[string(id)]
 				if c != nil {
+					delete(addrToid, c.conn.RemoteAddr().String())
 					delete(clients, string(id))
 					c.close()
 				}
@@ -455,7 +451,7 @@ This is a block call
 func (n *server) ConnectTo(addr string, id []byte) ([]byte, error) {
 	var err error
 	callReq := request{}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	callReq.ctx = ctx
 	callReq.rType = 0
