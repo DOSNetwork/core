@@ -166,7 +166,6 @@ func (n *server) Listen() (err error) {
 							return
 						}
 					}
-					fmt.Println(string(n.id), "c.remoteID", string(c.remoteID))
 				}(c, n.messages)
 				n.addIncomingC <- c
 			}(conn, start)

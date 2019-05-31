@@ -16,7 +16,7 @@ func TestServer(t *testing.T) {
 	os.Setenv("PUBLICIP", "127.0.0.1")
 	log.Init(listener[:])
 
-	pListener, _ := CreateP2PNetwork(listener, "9905", nodiscover)
+	pListener, _ := CreateP2PNetwork(listener, "9905", NoDiscover)
 	pListener.Listen()
 	events, _ := pListener.SubscribeEvent(1, Ping{})
 	go func(pListener P2PInterface) {
@@ -35,7 +35,7 @@ func TestServer(t *testing.T) {
 		go func(c int) {
 			defer wgForPeer.Done()
 			id := []byte(strconv.Itoa(c))
-			p, _ := CreateP2PNetwork(id, strconv.Itoa(c), nodiscover)
+			p, _ := CreateP2PNetwork(id, strconv.Itoa(c), NoDiscover)
 			p.Listen()
 
 			var count uint64
@@ -99,7 +99,7 @@ func TestAddrToid(t *testing.T) {
 	os.Setenv("PUBLICIP", "127.0.0.1")
 	log.Init(listener[:])
 
-	pListener, _ := CreateP2PNetwork(listener, "9905", nodiscover)
+	pListener, _ := CreateP2PNetwork(listener, "9905", NoDiscover)
 	pListener.Listen()
 	events, _ := pListener.SubscribeEvent(1, Ping{})
 	go func(pListener P2PInterface) {
@@ -118,7 +118,7 @@ func TestAddrToid(t *testing.T) {
 		go func(c int) {
 			defer wgForPeer.Done()
 			id := []byte(strconv.Itoa(c))
-			p, _ := CreateP2PNetwork(id, strconv.Itoa(c), nodiscover)
+			p, _ := CreateP2PNetwork(id, strconv.Itoa(c), NoDiscover)
 			p.Listen()
 
 			var count uint64

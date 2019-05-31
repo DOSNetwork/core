@@ -21,17 +21,21 @@ import (
 var logger log.Logger
 
 const (
-	nodiscover = iota // 0
-	swimDiscover
+	//NoDiscover means that p2p don't use any discover protocol
+	NoDiscover = iota // 0
+	//GossipDiscover means that p2p use gossip as a discover protocol
+	GossipDiscover
 	swimPort = 7946
 )
 
+// P2PMessage is a struct that includes message,sender and nonce
 type P2PMessage struct {
 	Msg          ptypes.DynamicAny
 	Sender       []byte
 	RequestNonce uint64
 }
 
+// P2PInterface represents a p2p network
 type P2PInterface interface {
 	GetIP() net.IP
 	GetID() []byte
@@ -50,6 +54,7 @@ type P2PInterface interface {
 	numOfClient() (int, int)
 }
 
+// CreateP2PNetwork creates a P2PInterface implementation , gets a public IP and generates a secret key
 func CreateP2PNetwork(id []byte, port string, netType int) (P2PInterface, error) {
 	suite := suites.MustFind("bn256")
 	logger = log.New("module", "p2p")
@@ -98,7 +103,7 @@ func CreateP2PNetwork(id []byte, port string, netType int) (P2PInterface, error)
 				return nil, err
 			}
 
-			if netType == swimDiscover {
+			if netType == GossipDiscover {
 				if err := nat.SetMapping(p.ctx, natdev, "tcp", swimPort, swimPort, "DosGossip"); err != nil {
 					fmt.Println(err)
 					return nil, err
@@ -113,7 +118,7 @@ func CreateP2PNetwork(id []byte, port string, netType int) (P2PInterface, error)
 	}
 
 	switch netType {
-	case swimDiscover:
+	case GossipDiscover:
 		network, err := discover.NewSerfNet(p.addr, p.id)
 		if err != nil {
 			p.cancel()
