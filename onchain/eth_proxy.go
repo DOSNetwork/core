@@ -69,7 +69,7 @@ const (
 )
 
 type getFunc func(ctx context.Context, client *ethclient.Client, proxy *dosproxy.DosproxySession, p interface{}) (chan interface{}, chan interface{})
-type setFunc func(ctx context.Context, proxy *dosproxy.DosproxySession, p []interface{}) (tx *types.Transaction, err error)
+type setFunc func(ctx context.Context, proxy *dosproxy.DosproxySession, cr *commitreveal.CommitrevealSession, p []interface{}) (tx *types.Transaction, err error)
 
 type request struct {
 	ctx    context.Context
@@ -190,7 +190,7 @@ func (e *ethAdaptor) reqLoop() {
 			select {
 			case req := <-e.reqQueue:
 				fmt.Println("reqLoop got req i", req.idx)
-				tx, err := req.f(req.ctx, req.proxy, req.params)
+				tx, err := req.f(req.ctx, req.proxy, req.cr, req.params)
 				resp := &response{req.idx, tx, err}
 				select {
 				case req.reply <- resp:
@@ -293,7 +293,7 @@ func (e *ethAdaptor) set(ctx context.Context, params []interface{}, setF setFunc
 // SetGroupToPick is a wrap function that build a pipeline to set groupToPick
 func (e *ethAdaptor) SetGroupToPick(ctx context.Context, groupToPick uint64) (err error) {
 	// define how to parse parameters and execute proxy function
-	f := func(ctx context.Context, proxy *dosproxy.DosproxySession, p []interface{}) (tx *types.Transaction, err error) {
+	f := func(ctx context.Context, proxy *dosproxy.DosproxySession, cr *commitreveal.CommitrevealSession, p []interface{}) (tx *types.Transaction, err error) {
 		if len(p) != 1 {
 			err = errors.New("Invalid parameter")
 			return
@@ -328,8 +328,7 @@ func (e *ethAdaptor) SetGroupToPick(ctx context.Context, groupToPick uint64) (er
 
 // RegisterNewNode is a wrap function that build a pipeline to call RegisterNewNode
 func (e *ethAdaptor) RegisterNewNode(ctx context.Context) (err error) {
-	// define how to parse parameters and execute proxy function
-	f := func(ctx context.Context, proxy *dosproxy.DosproxySession, p []interface{}) (tx *types.Transaction, err error) {
+	f := func(ctx context.Context, proxy *dosproxy.DosproxySession, cr *commitreveal.CommitrevealSession, p []interface{}) (tx *types.Transaction, err error) {
 		tx, err = proxy.RegisterNewNode()
 		return
 	}
@@ -354,38 +353,301 @@ func (e *ethAdaptor) RegisterNewNode(ctx context.Context) (err error) {
 }
 
 // SignalRandom is a wrap function that build a pipeline to call SignalRandom
-func (e *ethAdaptor) SignalRandom(ctx context.Context) (errc chan error) {
+func (e *ethAdaptor) SignalRandom(ctx context.Context) (err error) {
+	f := func(ctx context.Context, proxy *dosproxy.DosproxySession, cr *commitreveal.CommitrevealSession, p []interface{}) (tx *types.Transaction, err error) {
+		tx, err = proxy.SignalRandom()
+		return
+	}
 
-	return
+	reply := e.set(ctx, nil, f)
+	for {
+		select {
+		case r, ok := <-reply:
+			if ok {
+				err = r.err
+				if r.err == nil {
+					fmt.Println("RegisterNewNode response ", fmt.Sprintf("%x", r.tx.Hash()))
+				} else {
+					fmt.Println("RegisterNewNode error ", r.err)
+				}
+			}
+			return
+		case <-ctx.Done():
+			return
+		}
+	}
 }
 
 // SignalGroupFormation is a wrap function that build a pipeline to call SignalGroupFormation
-func (e *ethAdaptor) SignalGroupFormation(ctx context.Context) (errc chan error) {
+func (e *ethAdaptor) SignalGroupFormation(ctx context.Context) (err error) {
+	f := func(ctx context.Context, proxy *dosproxy.DosproxySession, cr *commitreveal.CommitrevealSession, p []interface{}) (tx *types.Transaction, err error) {
+		tx, err = proxy.SignalGroupFormation()
+		return
+	}
 
-	return
+	reply := e.set(ctx, nil, f)
+	for {
+		select {
+		case r, ok := <-reply:
+			if ok {
+				err = r.err
+				if r.err == nil {
+					fmt.Println("RegisterNewNode response ", fmt.Sprintf("%x", r.tx.Hash()))
+				} else {
+					fmt.Println("RegisterNewNode error ", r.err)
+				}
+			}
+			return
+		case <-ctx.Done():
+			return
+		}
+	}
 }
 
 // SignalGroupDissolve is a wrap function that build a pipeline to call SignalGroupDissolve
-func (e *ethAdaptor) SignalGroupDissolve(ctx context.Context) (errc chan error) {
+func (e *ethAdaptor) SignalGroupDissolve(ctx context.Context) (err error) {
+	f := func(ctx context.Context, proxy *dosproxy.DosproxySession, cr *commitreveal.CommitrevealSession, p []interface{}) (tx *types.Transaction, err error) {
+		tx, err = proxy.SignalGroupDissolve()
+		return
+	}
 
-	return
+	reply := e.set(ctx, nil, f)
+	for {
+		select {
+		case r, ok := <-reply:
+			if ok {
+				err = r.err
+				if r.err == nil {
+					fmt.Println("RegisterNewNode response ", fmt.Sprintf("%x", r.tx.Hash()))
+				} else {
+					fmt.Println("RegisterNewNode error ", r.err)
+				}
+			}
+			return
+		case <-ctx.Done():
+			return
+		}
+	}
 }
 
 // SignalBootstrap is a wrap function that build a pipeline to call SignalBootstrap
-func (e *ethAdaptor) SignalBootstrap(ctx context.Context, cid uint64) (errc chan error) {
+func (e *ethAdaptor) SignalBootstrap(ctx context.Context, cid uint64) (err error) {
+	// define how to parse parameters and execute proxy function
+	f := func(ctx context.Context, proxy *dosproxy.DosproxySession, cr *commitreveal.CommitrevealSession, p []interface{}) (tx *types.Transaction, err error) {
+		if len(p) != 1 {
+			err = errors.New("Invalid parameter")
+			return
+		}
+		if cid, ok := p[0].(*big.Int); ok {
+			tx, err = proxy.SignalBootstrap(cid)
+		}
+		return
+	}
+	// define parameters
+	var params []interface{}
+	params = append(params, big.NewInt(int64(cid)))
 
-	return
+	reply := e.set(ctx, params, f)
+	for {
+		select {
+		case r, ok := <-reply:
+			if ok {
+				err = r.err
+				if r.err == nil {
+					fmt.Println("SignalBootstrap response ", fmt.Sprintf("%x", r.tx.Hash()))
+				} else {
+					fmt.Println("SignalBootstrap error ", r.err)
+				}
+			}
+			return
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+// SetGroupSize is a wrap function that build a pipeline to call SetGroupSize
+func (e *ethAdaptor) SetGroupSize(ctx context.Context, size uint64) (err error) {
+	// define how to parse parameters and execute proxy function
+	f := func(ctx context.Context, proxy *dosproxy.DosproxySession, cr *commitreveal.CommitrevealSession, p []interface{}) (tx *types.Transaction, err error) {
+		if len(p) != 1 {
+			err = errors.New("Invalid parameter")
+			return
+		}
+		if size, ok := p[0].(*big.Int); ok {
+			tx, err = proxy.SetGroupSize(size)
+		}
+		return
+	}
+	// define parameters
+	var params []interface{}
+	params = append(params, big.NewInt(int64(size)))
+
+	reply := e.set(ctx, params, f)
+	for {
+		select {
+		case r, ok := <-reply:
+			if ok {
+				err = r.err
+				if r.err == nil {
+					fmt.Println("SetGroupSize response ", fmt.Sprintf("%x", r.tx.Hash()))
+				} else {
+					fmt.Println("SetGroupSize error ", r.err)
+				}
+			}
+			return
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+// SetGroupMaturityPeriod is a wrap function that build a pipeline to call SetGroupMaturityPeriod
+func (e *ethAdaptor) SetGroupMaturityPeriod(ctx context.Context, period uint64) (err error) {
+	// define how to parse parameters and execute proxy function
+	f := func(ctx context.Context, proxy *dosproxy.DosproxySession, cr *commitreveal.CommitrevealSession, p []interface{}) (tx *types.Transaction, err error) {
+		if len(p) != 1 {
+			err = errors.New("Invalid parameter")
+			return
+		}
+		if period, ok := p[0].(*big.Int); ok {
+			tx, err = proxy.SetGroupMaturityPeriod(period)
+		}
+		return
+	}
+	// define parameters
+	var params []interface{}
+	params = append(params, big.NewInt(int64(period)))
+
+	reply := e.set(ctx, params, f)
+	for {
+		select {
+		case r, ok := <-reply:
+			if ok {
+				err = r.err
+				if r.err == nil {
+					fmt.Println("SetGroupSize response ", fmt.Sprintf("%x", r.tx.Hash()))
+				} else {
+					fmt.Println("SetGroupSize error ", r.err)
+				}
+			}
+			return
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+// SetGroupingThreshold is a wrap function that build a pipeline to call SetGroupingThreshold
+func (e *ethAdaptor) SetGroupingThreshold(ctx context.Context, threshold uint64) (err error) {
+	// define how to parse parameters and execute proxy function
+	f := func(ctx context.Context, proxy *dosproxy.DosproxySession, cr *commitreveal.CommitrevealSession, p []interface{}) (tx *types.Transaction, err error) {
+		if len(p) != 1 {
+			err = errors.New("Invalid parameter")
+			return
+		}
+		if threshold, ok := p[0].(*big.Int); ok {
+			tx, err = proxy.SetGroupingThreshold(threshold)
+		}
+		return
+	}
+	// define parameters
+	var params []interface{}
+	params = append(params, big.NewInt(int64(threshold)))
+
+	reply := e.set(ctx, params, f)
+	for {
+		select {
+		case r, ok := <-reply:
+			if ok {
+				err = r.err
+				if r.err == nil {
+					fmt.Println("SetGroupingThreshold response ", fmt.Sprintf("%x", r.tx.Hash()))
+				} else {
+					fmt.Println("SetGroupingThreshold error ", r.err)
+				}
+			}
+			return
+		case <-ctx.Done():
+			return
+		}
+	}
 }
 
 // Commit is a wrap function that build a pipeline to call Commit
-func (e *ethAdaptor) Commit(ctx context.Context, cid *big.Int, commitment [32]byte) (errc chan error) {
-
-	return
+func (e *ethAdaptor) Commit(ctx context.Context, cid *big.Int, commitment [32]byte) (err error) {
+	// define how to parse parameters and execute proxy function
+	f := func(ctx context.Context, proxy *dosproxy.DosproxySession, cr *commitreveal.CommitrevealSession, p []interface{}) (tx *types.Transaction, err error) {
+		if len(p) != 2 {
+			err = errors.New("Invalid parameter")
+			return
+		}
+		if cid, ok := p[0].(*big.Int); ok {
+			if commitment, ok := p[1].([32]byte); ok {
+				tx, err = cr.Commit(cid, commitment)
+			}
+		}
+		return
+	}
+	// define parameters
+	var params []interface{}
+	params = append(params, cid)
+	params = append(params, commitment)
+	reply := e.set(ctx, params, f)
+	for {
+		select {
+		case r, ok := <-reply:
+			if ok {
+				err = r.err
+				if r.err == nil {
+					fmt.Println("Commit response ", fmt.Sprintf("%x", r.tx.Hash()))
+				} else {
+					fmt.Println("Commit error ", r.err)
+				}
+			}
+			return
+		case <-ctx.Done():
+			return
+		}
+	}
 }
 
 // Reveal is a wrap function that build a pipeline to call Reveal
-func (e *ethAdaptor) Reveal(ctx context.Context, cid *big.Int, secret *big.Int) (errc chan error) {
-
+func (e *ethAdaptor) Reveal(ctx context.Context, cid *big.Int, secret *big.Int) (err error) {
+	// define how to parse parameters and execute proxy function
+	f := func(ctx context.Context, proxy *dosproxy.DosproxySession, cr *commitreveal.CommitrevealSession, p []interface{}) (tx *types.Transaction, err error) {
+		if len(p) != 2 {
+			err = errors.New("Invalid parameter")
+			return
+		}
+		if cid, ok := p[0].(*big.Int); ok {
+			if secret, ok := p[1].(*big.Int); ok {
+				tx, err = cr.Reveal(cid, secret)
+			}
+		}
+		return
+	}
+	// define parameters
+	var params []interface{}
+	params = append(params, cid)
+	params = append(params, secret)
+	reply := e.set(ctx, params, f)
+	for {
+		select {
+		case r, ok := <-reply:
+			if ok {
+				err = r.err
+				if r.err == nil {
+					fmt.Println("Reveal response ", fmt.Sprintf("%x", r.tx.Hash()))
+				} else {
+					fmt.Println("Reveal error ", r.err)
+				}
+			}
+			return
+		case <-ctx.Done():
+			return
+		}
+	}
 	return
 }
 
@@ -401,23 +663,6 @@ func (e *ethAdaptor) SetRandomNum(ctx context.Context, signatures chan *vss.Sign
 
 // DataReturn is a wrap function that build a pipeline to call DataReturn
 func (e *ethAdaptor) DataReturn(ctx context.Context, signatures chan *vss.Signature) (errc chan error) {
-	return
-}
-
-// SetGroupSize is a wrap function that build a pipeline to call SetGroupSize
-func (e *ethAdaptor) SetGroupSize(ctx context.Context, size uint64) (errc chan error) {
-
-	return
-}
-
-// SetGroupMaturityPeriod is a wrap function that build a pipeline to call SetGroupMaturityPeriod
-func (e *ethAdaptor) SetGroupMaturityPeriod(ctx context.Context, period uint64) (errc chan error) {
-	return
-}
-
-// SetGroupingThreshold is a wrap function that build a pipeline to call SetGroupingThreshold
-func (e *ethAdaptor) SetGroupingThreshold(ctx context.Context, threshold uint64) (errc chan error) {
-
 	return
 }
 

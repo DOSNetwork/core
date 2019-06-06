@@ -427,8 +427,7 @@ func (d *DosNode) listen() (err error) {
 					time.Sleep(15 * time.Second)
 				}
 
-				errc := d.chain.Commit(context.Background(), cid, *hash)
-				err = <-errc
+				err = d.chain.Commit(context.Background(), cid, *hash)
 				if err != nil {
 					fmt.Println("Waiting for commit err", err)
 					return

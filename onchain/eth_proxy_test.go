@@ -14,10 +14,10 @@ const (
 )
 
 var (
-	urls           = []string{}
-	proxyAddr      = ""
-	credentialPath = ""
-	passphrase     = ""
+	urls           = []string{"ws://18.236.117.126:8546", "ws://18.237.179.193:8546", "ws://18.236.80.51:8546"}
+	proxyAddr      = "0xE41546987bf5d4737961291C3eA7F3eDd3e2fbC7"
+	credentialPath = "/Users/chenhaonien/go/src/github.com/DOSNetwork/core/testAccounts/bootCredential/fundKey/"
+	passphrase     = "123"
 )
 
 func TestGetPendingNonce(t *testing.T) {
@@ -104,6 +104,48 @@ L:
 		}
 	}
 }
+func TestSetErrorHandling(t *testing.T) {
+	adaptor, err := NewEthAdaptor(credentialPath, passphrase, proxyAddr, "", urls)
+	if err != nil {
+		t.Errorf("TestConcurrentSend Failed, got an error : %s.", err.Error())
+		return
+	}
+
+	sink, errc := adaptor.SubscribeEvent(SubscribeDosproxyUpdateGroupToPick)
+
+	ctx := context.Background()
+	for i := 3; i < 8; i++ {
+		err = adaptor.SetGroupToPick(ctx, uint64(i))
+		fmt.Println("TestConcurrentSend err ", err)
+		fmt.Println("Stop geth client to test")
+		time.Sleep(3 * time.Second)
+	}
+	result := 0
+L:
+	for {
+		select {
+		case event, ok := <-sink:
+			if ok {
+				switch content := event.(type) {
+				case *LogUpdateGroupToPick:
+					fmt.Println("DOSProxyUpdateGroupToPick ", int(content.NewNum.Uint64()), content.Removed)
+					if content.Removed != true {
+						result = result + int(content.NewNum.Uint64())
+						if result == 25 {
+							break L
+						}
+					}
+				}
+			}
+		case e, ok := <-errc:
+			if ok {
+				err = e
+				fmt.Println("TestConcurrentSend event err ", err)
+			}
+		}
+	}
+}
+
 func TestReconnect(t *testing.T) {
 S:
 	adaptor, err := NewEthAdaptor(credentialPath, passphrase, proxyAddr, "", urls)

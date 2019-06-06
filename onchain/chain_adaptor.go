@@ -20,19 +20,18 @@ type ProxyAdapter interface {
 	RegisterGroupPubKey(ctx context.Context, IdWithPubKeys chan [5]*big.Int) (errc chan error)
 	SubscribeEvent(subscribeType int) (chan interface{}, chan error)
 
-	SetGroupingThreshold(ctx context.Context, threshold uint64) (errc chan error)
+	SetGroupingThreshold(ctx context.Context, threshold uint64) (errc error)
 	SetGroupToPick(ctx context.Context, groupToPick uint64) (errc error)
-	SetGroupSize(ctx context.Context, size uint64) (errc chan error)
-	SetGroupMaturityPeriod(ctx context.Context, size uint64) (errc chan error)
-	Commit(ctx context.Context, cid *big.Int, commitment [32]byte) (errc chan error)
-	Reveal(ctx context.Context, cid *big.Int, secret *big.Int) (errc chan error)
-
+	SetGroupSize(ctx context.Context, size uint64) (errc error)
+	SetGroupMaturityPeriod(ctx context.Context, size uint64) (errc error)
+	Commit(ctx context.Context, cid *big.Int, commitment [32]byte) (errc error)
+	Reveal(ctx context.Context, cid *big.Int, secret *big.Int) (errc error)
 	//Guardian node functions
 	RegisterNewNode(ctx context.Context) (err error)
-	SignalRandom(ctx context.Context) (errc chan error)
-	SignalGroupFormation(ctx context.Context) (errc chan error)
-	SignalGroupDissolve(ctx context.Context) (errc chan error)
-	SignalBootstrap(ctx context.Context, cid uint64) (errc chan error)
+	SignalRandom(ctx context.Context) (errc error)
+	SignalGroupFormation(ctx context.Context) (errc error)
+	SignalGroupDissolve(ctx context.Context) (errc error)
+	SignalBootstrap(ctx context.Context, cid uint64) (errc error)
 
 	GetExpiredWorkingGroupSize(ctx context.Context) (r uint64, err error)
 	GroupSize(ctx context.Context) (r uint64, err error)
