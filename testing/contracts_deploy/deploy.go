@@ -384,7 +384,7 @@ func main() {
 		return
 	}
 
-	clients := onchain.DialToEth(context.Background(), chainConfig.RemoteNodeAddressPool[:1], key)
+	clients := onchain.DialToEth(context.Background(), chainConfig.RemoteNodeAddressPool[:1])
 
 	//Use first client
 	c, ok := <-clients

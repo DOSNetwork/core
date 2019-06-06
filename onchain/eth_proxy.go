@@ -616,8 +616,8 @@ func (e *ethAdaptor) Commit(ctx context.Context, cid *big.Int, commitment [32]by
 func (e *ethAdaptor) Reveal(ctx context.Context, cid *big.Int, secret *big.Int) (err error) {
 	// define how to parse parameters and execute proxy function
 	f := func(ctx context.Context, proxy *dosproxy.DosproxySession, cr *commitreveal.CommitrevealSession, p []interface{}) (tx *types.Transaction, err error) {
+		err = errors.New("Invalid parameter")
 		if len(p) != 2 {
-			err = errors.New("Invalid parameter")
 			return
 		}
 		if cid, ok := p[0].(*big.Int); ok {
@@ -648,21 +648,182 @@ func (e *ethAdaptor) Reveal(ctx context.Context, cid *big.Int, secret *big.Int) 
 			return
 		}
 	}
-	return
 }
 
 // RegisterGroupPubKey is a wrap function that build a pipeline to call RegisterGroupPubKey
 func (e *ethAdaptor) RegisterGroupPubKey(ctx context.Context, IdWithPubKeys chan [5]*big.Int) (errc chan error) {
+	errc = make(chan error)
+	go func() {
+		defer close(errc)
+		select {
+		case idPubkey, ok := <-IdWithPubKeys:
+			if !ok {
+				return
+			}
+			// define how to parse parameters and execute proxy function
+			f := func(ctx context.Context, proxy *dosproxy.DosproxySession, cr *commitreveal.CommitrevealSession, p []interface{}) (tx *types.Transaction, err error) {
+				err = errors.New("Invalid parameter")
+				if len(p) != 1 {
+					return
+				}
+				if idPubkey, ok := p[0].([5]*big.Int); ok {
+					groupId := idPubkey[0]
+					var pubKey [4]*big.Int
+					copy(pubKey[:], idPubkey[1:])
+					select {
+					default:
+						tx, err = proxy.RegisterGroupPubKey(groupId, pubKey)
+					case <-ctx.Done():
+						err = ctx.Err()
+					}
+
+				}
+				return
+			}
+			// define parameters
+			var params []interface{}
+			params = append(params, idPubkey)
+			reply := e.set(ctx, params, f)
+			for {
+				select {
+				case r, ok := <-reply:
+					if ok {
+						if r.err == nil {
+							fmt.Println("RegisterGroupPubKey response ", fmt.Sprintf("%x", r.tx.Hash()))
+						} else {
+							fmt.Println("RegisterGroupPubKey error ", r.err)
+							select {
+							case errc <- r.err:
+							case <-ctx.Done():
+							}
+						}
+					}
+					return
+				case <-ctx.Done():
+					return
+				}
+			}
+		case <-ctx.Done():
+			return
+		}
+	}()
 	return
 }
 
 // SetRandomNum is a wrap function that build a pipeline to call SetRandomNum
 func (e *ethAdaptor) SetRandomNum(ctx context.Context, signatures chan *vss.Signature) (errc chan error) {
+	errc = make(chan error)
+	go func() {
+		defer close(errc)
+		select {
+		case signature, ok := <-signatures:
+			if !ok {
+				return
+			}
+			// define how to parse parameters and execute proxy function
+			f := func(ctx context.Context, proxy *dosproxy.DosproxySession, cr *commitreveal.CommitrevealSession, p []interface{}) (tx *types.Transaction, err error) {
+				err = errors.New("Invalid parameter")
+				if len(p) != 1 {
+					return
+				}
+				if sign, ok := p[0].(*vss.Signature); ok {
+					select {
+					default:
+						x, y := sign.ToBigInt()
+						sig := [2]*big.Int{x, y}
+						tx, err = proxy.UpdateRandomness(sig, 0)
+					case <-ctx.Done():
+						err = ctx.Err()
+					}
+				}
+				return
+			}
+			var params []interface{}
+			params = append(params, signature)
+			reply := e.set(ctx, params, f)
+			for {
+				select {
+				case r, ok := <-reply:
+					if ok {
+						if r.err == nil {
+							fmt.Println("RegisterGroupPubKey response ", fmt.Sprintf("%x", r.tx.Hash()))
+						} else {
+							fmt.Println("RegisterGroupPubKey error ", r.err)
+							select {
+							case errc <- r.err:
+							case <-ctx.Done():
+							}
+						}
+					}
+					return
+				case <-ctx.Done():
+					return
+				}
+			}
+		case <-ctx.Done():
+			return
+		}
+	}()
 	return
 }
 
 // DataReturn is a wrap function that build a pipeline to call DataReturn
 func (e *ethAdaptor) DataReturn(ctx context.Context, signatures chan *vss.Signature) (errc chan error) {
+	errc = make(chan error)
+	go func() {
+		defer close(errc)
+		select {
+		case signature, ok := <-signatures:
+			if !ok {
+				return
+			}
+			// define how to parse parameters and execute proxy function
+			f := func(ctx context.Context, proxy *dosproxy.DosproxySession, cr *commitreveal.CommitrevealSession, p []interface{}) (tx *types.Transaction, err error) {
+				err = errors.New("Invalid parameter")
+				if len(p) != 1 {
+					return
+				}
+				if sign, ok := p[0].(*vss.Signature); ok {
+					select {
+					default:
+						requestId := new(big.Int).SetBytes(signature.RequestId)
+						trafficType := uint8(signature.Index)
+						result := signature.Content
+						x, y := sign.ToBigInt()
+						sig := [2]*big.Int{x, y}
+						tx, err = proxy.TriggerCallback(requestId, trafficType, result, sig, 0)
+					case <-ctx.Done():
+						err = ctx.Err()
+					}
+				}
+				return
+			}
+			var params []interface{}
+			params = append(params, signature)
+			reply := e.set(ctx, params, f)
+			for {
+				select {
+				case r, ok := <-reply:
+					if ok {
+						if r.err != nil {
+							fmt.Println("DataReturn response ", fmt.Sprintf("%x", r.tx.Hash()))
+						} else {
+							fmt.Println("DataReturn error ", r.err)
+							select {
+							case errc <- r.err:
+							case <-ctx.Done():
+							}
+						}
+					}
+					return
+				case <-ctx.Done():
+					return
+				}
+			}
+		case <-ctx.Done():
+			return
+		}
+	}()
 	return
 }
 

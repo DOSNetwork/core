@@ -74,7 +74,7 @@ func NewAMAUserSession(credentialPath, passphrase, addr string, gethUrls []strin
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	defer cancelFunc()
-	clients := onchain.DialToEth(ctx, httpUrls, key)
+	clients := onchain.DialToEth(ctx, httpUrls)
 	//Use first client
 	c, ok := <-clients
 	if !ok {
@@ -107,7 +107,7 @@ func NewAMAUserSession(credentialPath, passphrase, addr string, gethUrls []strin
 	adaptor.cancel = cancelSession
 	adaptor.reqQueue = make(chan interface{})
 
-	clients = onchain.DialToEth(ctx, wsUrls, key)
+	clients = onchain.DialToEth(ctx, wsUrls)
 	for client := range clients {
 		p, err := dosUser.NewAskMeAnything(common.HexToAddress(addr), client)
 		if err != nil {
