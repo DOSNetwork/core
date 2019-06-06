@@ -716,7 +716,7 @@ func (d *DosNode) listen() (err error) {
 					"BlockN":     content.BlockN}
 				d.logger.Event("DOS_QueryURL", f)
 				ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(40*15*time.Second))
-
+				defer cancel()
 				d.buildPipeline(ctx, cancel, groupID, content.QueryId, content.Randomness, nil, content.DataSource, content.Selector, uint32(onchain.TrafficUserQuery))
 				//}
 			}

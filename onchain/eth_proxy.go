@@ -60,8 +60,11 @@ const (
 	SubscribeCommitrevealLogRandom
 )
 const (
+	//TrafficSystemRandom is a request type to build a corresponding pipeline
 	TrafficSystemRandom = iota // 0
+	//TrafficUserRandom is a request type to build a corresponding pipeline
 	TrafficUserRandom
+	//TrafficUserQuery is a request type to build a corresponding pipeline
 	TrafficUserQuery
 )
 
@@ -84,7 +87,7 @@ type response struct {
 	err error
 }
 
-type EthAdaptor struct {
+type ethAdaptor struct {
 	proxyAddr        string
 	commitRevealAddr string
 	gethUrls         []string
@@ -101,7 +104,8 @@ type EthAdaptor struct {
 	logger     log.Logger
 }
 
-func NewEthAdaptor(credentialPath, passphrase, proxyAddr, commitRevealAddr string, urls []string) (adaptor *EthAdaptor, err error) {
+//NewEthAdaptor creates an eth implemention of ProxyAdapter
+func NewEthAdaptor(credentialPath, passphrase, proxyAddr, commitRevealAddr string, urls []string) (adaptor *ethAdaptor, err error) {
 	var httpUrls []string
 	var wsUrls []string
 	for _, url := range urls {
@@ -114,7 +118,7 @@ func NewEthAdaptor(credentialPath, passphrase, proxyAddr, commitRevealAddr strin
 	fmt.Println("gethUrls ", httpUrls)
 	fmt.Println("eventUrls ", wsUrls)
 
-	adaptor = &EthAdaptor{}
+	adaptor = &ethAdaptor{}
 	adaptor.gethUrls = httpUrls
 	adaptor.eventUrls = wsUrls
 	adaptor.proxyAddr = proxyAddr
@@ -141,13 +145,14 @@ func NewEthAdaptor(credentialPath, passphrase, proxyAddr, commitRevealAddr strin
 	return
 }
 
-func (e *EthAdaptor) End() {
+//End close the connection to eth and release all resources
+func (e *ethAdaptor) End() {
 	//e.cancel()
 	//e.c.Close()
 	return
 }
 
-func (e *EthAdaptor) start() (err error) {
+func (e *ethAdaptor) start() (err error) {
 	//
 	clients := DialToEth(context.Background(), e.eventUrls)
 	for client := range clients {
@@ -176,7 +181,7 @@ func (e *EthAdaptor) start() (err error) {
 	return
 }
 
-func (e *EthAdaptor) reqLoop() {
+func (e *ethAdaptor) reqLoop() {
 	go func() {
 		defer fmt.Println("reqLoop exit")
 		defer close(e.reqQueue)
@@ -198,7 +203,7 @@ func (e *EthAdaptor) reqLoop() {
 	}()
 }
 
-func (e *EthAdaptor) get(ctx context.Context, f getFunc, p interface{}) (interface{}, interface{}) {
+func (e *ethAdaptor) get(ctx context.Context, f getFunc, p interface{}) (interface{}, interface{}) {
 	var valList []chan interface{}
 	var errList []chan interface{}
 	for i, client := range e.clients {
@@ -229,10 +234,9 @@ func (e *EthAdaptor) get(ctx context.Context, f getFunc, p interface{}) (interfa
 			return nil, errors.New("Timeout")
 		}
 	}
-	return nil, nil
 }
 
-func (e *EthAdaptor) set(ctx context.Context, params []interface{}, setF setFunc) (reply chan *response) {
+func (e *ethAdaptor) set(ctx context.Context, params []interface{}, setF setFunc) (reply chan *response) {
 
 	f := func(ctx context.Context, idx int, pre chan *response, r *request) (out chan *response) {
 		out = make(chan *response)
@@ -287,7 +291,7 @@ func (e *EthAdaptor) set(ctx context.Context, params []interface{}, setF setFunc
 }
 
 // SetGroupToPick is a wrap function that build a pipeline to set groupToPick
-func (e *EthAdaptor) SetGroupToPick(ctx context.Context, groupToPick uint64) (err error) {
+func (e *ethAdaptor) SetGroupToPick(ctx context.Context, groupToPick uint64) (err error) {
 	// define how to parse parameters and execute proxy function
 	f := func(ctx context.Context, proxy *dosproxy.DosproxySession, p []interface{}) (tx *types.Transaction, err error) {
 		if len(p) != 1 {
@@ -320,11 +324,10 @@ func (e *EthAdaptor) SetGroupToPick(ctx context.Context, groupToPick uint64) (er
 			return
 		}
 	}
-	return
 }
 
-// SetGroupToPick is a wrap function that build a pipeline to call RegisterNewNode
-func (e *EthAdaptor) RegisterNewNode(ctx context.Context) (err error) {
+// RegisterNewNode is a wrap function that build a pipeline to call RegisterNewNode
+func (e *ethAdaptor) RegisterNewNode(ctx context.Context) (err error) {
 	// define how to parse parameters and execute proxy function
 	f := func(ctx context.Context, proxy *dosproxy.DosproxySession, p []interface{}) (tx *types.Transaction, err error) {
 		tx, err = proxy.RegisterNewNode()
@@ -348,79 +351,78 @@ func (e *EthAdaptor) RegisterNewNode(ctx context.Context) (err error) {
 			return
 		}
 	}
-	return
 }
 
 // SignalRandom is a wrap function that build a pipeline to call SignalRandom
-func (e *EthAdaptor) SignalRandom(ctx context.Context) (errc chan error) {
+func (e *ethAdaptor) SignalRandom(ctx context.Context) (errc chan error) {
 
 	return
 }
 
 // SignalGroupFormation is a wrap function that build a pipeline to call SignalGroupFormation
-func (e *EthAdaptor) SignalGroupFormation(ctx context.Context) (errc chan error) {
+func (e *ethAdaptor) SignalGroupFormation(ctx context.Context) (errc chan error) {
 
 	return
 }
 
 // SignalGroupDissolve is a wrap function that build a pipeline to call SignalGroupDissolve
-func (e *EthAdaptor) SignalGroupDissolve(ctx context.Context) (errc chan error) {
+func (e *ethAdaptor) SignalGroupDissolve(ctx context.Context) (errc chan error) {
 
 	return
 }
 
 // SignalBootstrap is a wrap function that build a pipeline to call SignalBootstrap
-func (e *EthAdaptor) SignalBootstrap(ctx context.Context, cid uint64) (errc chan error) {
+func (e *ethAdaptor) SignalBootstrap(ctx context.Context, cid uint64) (errc chan error) {
 
 	return
 }
 
 // Commit is a wrap function that build a pipeline to call Commit
-func (e *EthAdaptor) Commit(ctx context.Context, cid *big.Int, commitment [32]byte) (errc chan error) {
+func (e *ethAdaptor) Commit(ctx context.Context, cid *big.Int, commitment [32]byte) (errc chan error) {
 
 	return
 }
 
 // Reveal is a wrap function that build a pipeline to call Reveal
-func (e *EthAdaptor) Reveal(ctx context.Context, cid *big.Int, secret *big.Int) (errc chan error) {
+func (e *ethAdaptor) Reveal(ctx context.Context, cid *big.Int, secret *big.Int) (errc chan error) {
 
 	return
 }
 
 // RegisterGroupPubKey is a wrap function that build a pipeline to call RegisterGroupPubKey
-func (e *EthAdaptor) RegisterGroupPubKey(ctx context.Context, IdWithPubKeys chan [5]*big.Int) (errc chan error) {
+func (e *ethAdaptor) RegisterGroupPubKey(ctx context.Context, IdWithPubKeys chan [5]*big.Int) (errc chan error) {
 	return
 }
 
 // SetRandomNum is a wrap function that build a pipeline to call SetRandomNum
-func (e *EthAdaptor) SetRandomNum(ctx context.Context, signatures chan *vss.Signature) (errc chan error) {
+func (e *ethAdaptor) SetRandomNum(ctx context.Context, signatures chan *vss.Signature) (errc chan error) {
 	return
 }
 
 // DataReturn is a wrap function that build a pipeline to call DataReturn
-func (e *EthAdaptor) DataReturn(ctx context.Context, signatures chan *vss.Signature) (errc chan error) {
+func (e *ethAdaptor) DataReturn(ctx context.Context, signatures chan *vss.Signature) (errc chan error) {
 	return
 }
 
 // SetGroupSize is a wrap function that build a pipeline to call SetGroupSize
-func (e *EthAdaptor) SetGroupSize(ctx context.Context, size uint64) (errc chan error) {
+func (e *ethAdaptor) SetGroupSize(ctx context.Context, size uint64) (errc chan error) {
 
 	return
 }
 
 // SetGroupMaturityPeriod is a wrap function that build a pipeline to call SetGroupMaturityPeriod
-func (e *EthAdaptor) SetGroupMaturityPeriod(ctx context.Context, period uint64) (errc chan error) {
+func (e *ethAdaptor) SetGroupMaturityPeriod(ctx context.Context, period uint64) (errc chan error) {
 	return
 }
 
 // SetGroupingThreshold is a wrap function that build a pipeline to call SetGroupingThreshold
-func (e *EthAdaptor) SetGroupingThreshold(ctx context.Context, threshold uint64) (errc chan error) {
+func (e *ethAdaptor) SetGroupingThreshold(ctx context.Context, threshold uint64) (errc chan error) {
 
 	return
 }
 
 // SubscribeEvent is a log subscription operation
-func (e *EthAdaptor) SubscribeEvent(subscribeType int) (chan interface{}, chan error) {
+func (e *ethAdaptor) SubscribeEvent(subscribeType int) (chan interface{}, chan error) {
 	var eventList []chan interface{}
 	var errcs []chan interface{}
 	if subscribeType == SubscribeCommitrevealLogStartCommitreveal ||
@@ -983,7 +985,7 @@ func subscribeEvent(ctx context.Context, proxy *dosproxy.DosproxySession, subscr
 }
 
 // LastRandomness return the last system random number
-func (e *EthAdaptor) LastRandomness(ctx context.Context) (result *big.Int, err error) {
+func (e *ethAdaptor) LastRandomness(ctx context.Context) (result *big.Int, err error) {
 	f := func(ctx context.Context, client *ethclient.Client, proxy *dosproxy.DosproxySession, p interface{}) (chan interface{}, chan interface{}) {
 		outc := make(chan interface{})
 		errc := make(chan interface{})
@@ -1017,7 +1019,7 @@ func (e *EthAdaptor) LastRandomness(ctx context.Context) (result *big.Int, err e
 }
 
 // GroupSize returns the GroupSize value
-func (e *EthAdaptor) GroupSize(ctx context.Context) (result uint64, err error) {
+func (e *ethAdaptor) GroupSize(ctx context.Context) (result uint64, err error) {
 	f := func(ctx context.Context, client *ethclient.Client, proxy *dosproxy.DosproxySession, p interface{}) (chan interface{}, chan interface{}) {
 		outc := make(chan interface{})
 		errc := make(chan interface{})
@@ -1052,7 +1054,7 @@ func (e *EthAdaptor) GroupSize(ctx context.Context) (result uint64, err error) {
 }
 
 // GetWorkingGroupSize returns the number of working groups
-func (e *EthAdaptor) GetWorkingGroupSize(ctx context.Context) (result uint64, err error) {
+func (e *ethAdaptor) GetWorkingGroupSize(ctx context.Context) (result uint64, err error) {
 	f := func(ctx context.Context, client *ethclient.Client, proxy *dosproxy.DosproxySession, p interface{}) (chan interface{}, chan interface{}) {
 		outc := make(chan interface{})
 		errc := make(chan interface{})
@@ -1086,7 +1088,7 @@ func (e *EthAdaptor) GetWorkingGroupSize(ctx context.Context) (result uint64, er
 }
 
 // NumPendingGroups returns the number of pending groups
-func (e *EthAdaptor) NumPendingGroups(ctx context.Context) (result uint64, err error) {
+func (e *ethAdaptor) NumPendingGroups(ctx context.Context) (result uint64, err error) {
 	f := func(ctx context.Context, client *ethclient.Client, proxy *dosproxy.DosproxySession, p interface{}) (chan interface{}, chan interface{}) {
 		outc := make(chan interface{})
 		errc := make(chan interface{})
@@ -1120,7 +1122,7 @@ func (e *EthAdaptor) NumPendingGroups(ctx context.Context) (result uint64, err e
 }
 
 // RefreshSystemRandomHardLimit returns the RefreshSystemRandomHardLimit value
-func (e *EthAdaptor) RefreshSystemRandomHardLimit(ctx context.Context) (result uint64, err error) {
+func (e *ethAdaptor) RefreshSystemRandomHardLimit(ctx context.Context) (result uint64, err error) {
 	f := func(ctx context.Context, client *ethclient.Client, proxy *dosproxy.DosproxySession, p interface{}) (chan interface{}, chan interface{}) {
 		outc := make(chan interface{})
 		errc := make(chan interface{})
@@ -1154,7 +1156,7 @@ func (e *EthAdaptor) RefreshSystemRandomHardLimit(ctx context.Context) (result u
 }
 
 // NumPendingNodes returns the number of pending nodes
-func (e *EthAdaptor) NumPendingNodes(ctx context.Context) (result uint64, err error) {
+func (e *ethAdaptor) NumPendingNodes(ctx context.Context) (result uint64, err error) {
 	f := func(ctx context.Context, client *ethclient.Client, proxy *dosproxy.DosproxySession, p interface{}) (chan interface{}, chan interface{}) {
 		outc := make(chan interface{})
 		errc := make(chan interface{})
@@ -1188,7 +1190,7 @@ func (e *EthAdaptor) NumPendingNodes(ctx context.Context) (result uint64, err er
 }
 
 // GetExpiredWorkingGroupSize returns the expired working group size
-func (e *EthAdaptor) GetExpiredWorkingGroupSize(ctx context.Context) (result uint64, err error) {
+func (e *ethAdaptor) GetExpiredWorkingGroupSize(ctx context.Context) (result uint64, err error) {
 	f := func(ctx context.Context, client *ethclient.Client, proxy *dosproxy.DosproxySession, p interface{}) (chan interface{}, chan interface{}) {
 		outc := make(chan interface{})
 		errc := make(chan interface{})
@@ -1222,7 +1224,7 @@ func (e *EthAdaptor) GetExpiredWorkingGroupSize(ctx context.Context) (result uin
 }
 
 // GroupToPick returns the groupToPick value
-func (e *EthAdaptor) GroupToPick(ctx context.Context) (result uint64, err error) {
+func (e *ethAdaptor) GroupToPick(ctx context.Context) (result uint64, err error) {
 	f := func(ctx context.Context, client *ethclient.Client, proxy *dosproxy.DosproxySession, p interface{}) (chan interface{}, chan interface{}) {
 		outc := make(chan interface{})
 		errc := make(chan interface{})
@@ -1256,7 +1258,7 @@ func (e *EthAdaptor) GroupToPick(ctx context.Context) (result uint64, err error)
 }
 
 // LastUpdatedBlock returns the block number of the last updated system random number
-func (e *EthAdaptor) LastUpdatedBlock(ctx context.Context) (result uint64, err error) {
+func (e *ethAdaptor) LastUpdatedBlock(ctx context.Context) (result uint64, err error) {
 	f := func(ctx context.Context, client *ethclient.Client, proxy *dosproxy.DosproxySession, p interface{}) (chan interface{}, chan interface{}) {
 		outc := make(chan interface{})
 		errc := make(chan interface{})
@@ -1290,7 +1292,7 @@ func (e *EthAdaptor) LastUpdatedBlock(ctx context.Context) (result uint64, err e
 }
 
 // IsPendingNode checks to see if the node account is a pending node
-func (e *EthAdaptor) IsPendingNode(ctx context.Context, id []byte) (result bool, err error) {
+func (e *ethAdaptor) IsPendingNode(ctx context.Context, id []byte) (result bool, err error) {
 	f := func(ctx context.Context, client *ethclient.Client, proxy *dosproxy.DosproxySession, p interface{}) (chan interface{}, chan interface{}) {
 		outc := make(chan interface{})
 		errc := make(chan interface{})
@@ -1335,9 +1337,7 @@ func (e *EthAdaptor) IsPendingNode(ctx context.Context, id []byte) (result bool,
 }
 
 // GroupPubKey returns the group public key of the given index
-func (e *EthAdaptor) GroupPubKey(ctx context.Context, idx int) (result [4]*big.Int, err error) {
-	return e.proxies[0].GetGroupPubKey(big.NewInt(int64(idx)))
-
+func (e *ethAdaptor) GroupPubKey(ctx context.Context, idx int) (result [4]*big.Int, err error) {
 	f := func(ctx context.Context, client *ethclient.Client, proxy *dosproxy.DosproxySession, p interface{}) (chan interface{}, chan interface{}) {
 		outc := make(chan interface{})
 		errc := make(chan interface{})
@@ -1379,7 +1379,7 @@ func (e *EthAdaptor) GroupPubKey(ctx context.Context, idx int) (result [4]*big.I
 
 // PendingNonce returns the account nonce of the node account in the pending state.
 // This is the nonce that should be used for the next transaction.
-func (e *EthAdaptor) PendingNonce(ctx context.Context) (result uint64, err error) {
+func (e *ethAdaptor) PendingNonce(ctx context.Context) (result uint64, err error) {
 	f := func(ctx context.Context, client *ethclient.Client, proxy *dosproxy.DosproxySession, p interface{}) (chan interface{}, chan interface{}) {
 		outc := make(chan interface{})
 		errc := make(chan interface{})
@@ -1430,7 +1430,7 @@ func (e *EthAdaptor) PendingNonce(ctx context.Context) (result uint64, err error
 }
 
 // Balance returns the wei balance of the node account.
-func (e *EthAdaptor) Balance(ctx context.Context) (result *big.Float, err error) {
+func (e *ethAdaptor) Balance(ctx context.Context) (result *big.Float, err error) {
 	f := func(ctx context.Context, client *ethclient.Client, proxy *dosproxy.DosproxySession, p interface{}) (chan interface{}, chan interface{}) {
 		outc := make(chan interface{})
 		errc := make(chan interface{})
@@ -1466,7 +1466,7 @@ func (e *EthAdaptor) Balance(ctx context.Context) (result *big.Float, err error)
 }
 
 // CurrentBlock return the block number of the latest known header
-func (e *EthAdaptor) CurrentBlock(ctx context.Context) (result uint64, err error) {
+func (e *ethAdaptor) CurrentBlock(ctx context.Context) (result uint64, err error) {
 	f := func(ctx context.Context, client *ethclient.Client, proxy *dosproxy.DosproxySession, p interface{}) (chan interface{}, chan interface{}) {
 		outc := make(chan interface{})
 		errc := make(chan interface{})
@@ -1500,7 +1500,7 @@ func (e *EthAdaptor) CurrentBlock(ctx context.Context) (result uint64, err error
 }
 
 // Address gets the string representation of the underlying address.
-func (e *EthAdaptor) Address() (addr []byte) {
+func (e *ethAdaptor) Address() (addr []byte) {
 	return e.key.Address.Bytes()
 }
 

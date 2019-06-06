@@ -350,7 +350,7 @@ func MergeEvents(ctx context.Context, cs ...<-chan interface{}) chan interface{}
 	return out
 }
 
-//MergeEvents is a fan in pattern to merge all errors from all channel
+//MergeErrors is a fan in pattern to merge all errors from all channel
 func MergeErrors(ctx context.Context, cs ...<-chan error) <-chan error {
 	var wg sync.WaitGroup
 	// We must ensure that the output channel has the capacity to
