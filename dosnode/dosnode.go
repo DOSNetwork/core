@@ -592,6 +592,7 @@ func (d *DosNode) listen() (err error) {
 				d.logger.Event("DGrouping2", f)
 				//pendingGroupMaxLife = 40 block
 				ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(40*15*time.Second))
+				defer cancel()
 				outFromDkg, errc, err := d.dkg.Grouping(ctx, groupID, participants)
 				if err != nil {
 					d.logger.Error(err)
