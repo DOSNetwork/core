@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/DOSNetwork/core/log"
-	"github.com/DOSNetwork/core/onchain"
 	"github.com/DOSNetwork/core/p2p"
 	"github.com/DOSNetwork/core/share"
 	"github.com/DOSNetwork/core/share/vss/pedersen"
@@ -30,7 +29,7 @@ const (
 	addrLen        = 20
 )
 
-func mergeErrors(ctx context.Context, cs ...<-chan error) <-chan error {
+func mergeErrors(ctx context.Context, cs ...chan error) chan error {
 	var wg sync.WaitGroup
 	// We must ensure that the output channel has the capacity to
 	// hold as many errors
@@ -64,7 +63,7 @@ func mergeErrors(ctx context.Context, cs ...<-chan error) <-chan error {
 	return out
 }
 
-func fanIn(ctx context.Context, channels ...<-chan *vss.Signature) <-chan *vss.Signature {
+func fanIn(ctx context.Context, channels ...chan *vss.Signature) chan *vss.Signature {
 	var wg sync.WaitGroup
 	multiplexedStream := make(chan *vss.Signature)
 
@@ -96,7 +95,7 @@ func fanIn(ctx context.Context, channels ...<-chan *vss.Signature) <-chan *vss.S
 }
 
 //choseSubmitter choses a submitter according to the last random number and check if the submitter is reachable
-func choseSubmitter(ctx context.Context, p p2p.P2PInterface, lastSysRand *big.Int, ids [][]byte, outCount int, logger log.Logger) ([]chan []byte, <-chan error) {
+func choseSubmitter(ctx context.Context, p p2p.P2PInterface, lastSysRand *big.Int, ids [][]byte, outCount int, logger log.Logger) ([]chan []byte, chan error) {
 	errc := make(chan error)
 	var outs []chan []byte
 	for i := 0; i < outCount; i++ {
@@ -149,14 +148,14 @@ func choseSubmitter(ctx context.Context, p p2p.P2PInterface, lastSysRand *big.In
 func requestSign(
 	ctx context.Context,
 	submitterc <-chan []byte,
-	contentc <-chan []byte,
+	contentc chan []byte,
 	p p2p.P2PInterface,
 	nodeId []byte,
 	requestId []byte,
 	trafficType uint32,
 	id []byte,
 	nonce []byte,
-	logger log.Logger) (<-chan *vss.Signature, <-chan error) {
+	logger log.Logger) (chan *vss.Signature, chan error) {
 	out := make(chan *vss.Signature)
 	errc := make(chan error)
 	go func() {
@@ -212,7 +211,7 @@ func requestSign(
 
 func genSign(
 	ctx context.Context,
-	contentc <-chan []byte,
+	contentc chan []byte,
 	cSignToPeer chan *vss.Signature,
 	sec *share.PriShare,
 	suite suites.Suite,
@@ -221,7 +220,7 @@ func genSign(
 	requestId []byte,
 	index uint32,
 	nonce []byte,
-	logger log.Logger) (<-chan *vss.Signature, <-chan error) {
+	logger log.Logger) (chan *vss.Signature, chan error) {
 	out := make(chan *vss.Signature)
 	errc := make(chan error)
 	go func() {
@@ -278,12 +277,12 @@ func genSign(
 
 func genUserRandom(
 	ctx context.Context,
-	submitterc <-chan []byte,
+	submitterc chan []byte,
 	requestId []byte,
 	lastSysRand []byte,
 	userSeed []byte,
 	logger log.Logger,
-) <-chan []byte {
+) chan []byte {
 	out := make(chan []byte)
 	go func() {
 		defer close(out)
@@ -314,10 +313,10 @@ func genUserRandom(
 
 func genSysRandom(
 	ctx context.Context,
-	submitterc <-chan []byte,
+	submitterc chan []byte,
 	lastSysRand []byte,
 	logger log.Logger,
-) <-chan []byte {
+) chan []byte {
 	out := make(chan []byte)
 	go func() {
 		defer close(out)
@@ -389,7 +388,7 @@ func dataParse(rawMsg []byte, pathStr string) (msg []byte, err error) {
 	return
 }
 
-func genQueryResult(ctx context.Context, submitterc chan []byte, url string, pathStr string, logger log.Logger) (<-chan []byte, chan error) {
+func genQueryResult(ctx context.Context, submitterc chan []byte, url string, pathStr string, logger log.Logger) (chan []byte, chan error) {
 	out := make(chan []byte)
 	errc := make(chan error)
 	go func() {
@@ -432,7 +431,7 @@ func genQueryResult(ctx context.Context, submitterc chan []byte, url string, pat
 	return out, errc
 }
 
-func recoverSign(ctx context.Context, signc <-chan *vss.Signature, suite suites.Suite, pubPoly *share.PubPoly, nbThreshold int, nbParticipants int, logger log.Logger) (<-chan *vss.Signature, <-chan error) {
+func recoverSign(ctx context.Context, signc chan *vss.Signature, suite suites.Suite, pubPoly *share.PubPoly, nbThreshold int, nbParticipants int, logger log.Logger) (chan *vss.Signature, chan error) {
 	out := make(chan *vss.Signature)
 	errc := make(chan error)
 	go func() {
@@ -475,7 +474,7 @@ func recoverSign(ctx context.Context, signc <-chan *vss.Signature, suite suites.
 						errc <- err
 						continue
 					}
-					x, y := onchain.DecodeSig(sig)
+					x, y := sign.ToBigInt()
 					fmt.Println("Verify success signature ", x.String(), y.String())
 
 					//Contract will append sender address to content to verify if it is a right submitter

@@ -21,65 +21,59 @@ func TestReadEthKey(t *testing.T) {
 }
 
 func TestDialToEth(t *testing.T) {
-	ctx, cancelFunc := context.WithCancel(context.Background())
-	defer cancelFunc()
-	clients := DialToEth(ctx, urls, nil)
-	count := 0
-	for client := range clients {
-		id, err := client.NetworkID(ctx)
-		if err != nil {
-			t.Errorf("err %s.", err.Error())
-		}
-		if ID != id.Uint64() {
-			t.Errorf("ID incorrect, got: %d, want: %d.", id.Uint64(), ID)
-		}
-		client.Close()
-		count++
+	urls = []string{"http://123.123.123.123", "http://18.236.117.126:8545"}
+	var clients []*ethclient.Client
+	ctx := context.Background()
+	outc := DialToEth(ctx, urls)
+	for client := range outc {
+		clients = append(clients, client)
 	}
-	if count != len(urls) {
-		t.Errorf("Dial success count, got: %d, want: %d.", count, len(urls))
+	if len(clients) != len(urls) {
+		t.Errorf("Dial success count, got: %d, want: %d.", len(clients), len(urls)-1)
+	}
+
+	//Check to see if client is really working by getting networkID
+	count := 0
+	for _, client := range clients {
+		id, err := client.NetworkID(ctx)
+		//i/o timeout
+		if err != nil {
+			fmt.Println("NetworkID err ", err)
+			client.Close()
+		} else {
+			if ID != id.Uint64() {
+				t.Errorf("ID incorrect, got: %d, want: %d.", id.Uint64(), ID)
+			}
+			count++
+		}
+	}
+	if count != len(urls)-1 {
+		t.Errorf("Dial count, got: %d, want: %d.", count, len(urls)-1)
 	}
 	fmt.Println("TestDialToEth pass")
 }
 
-func TestCheckSync(t *testing.T) {
-	var mClient *ethclient.Client
-	ctx, cancelFunc := context.WithCancel(context.Background())
-	defer cancelFunc()
-	clients := DialToEth(ctx, urls[:1], nil)
-	mClient = <-clients
-	id, err := mClient.NetworkID(ctx)
-	if err != nil {
-		t.Errorf("err %s.", err.Error())
+func TestDialWS(t *testing.T) {
+	urls = []string{"ws://18.236.117.126:8546", "ws:18.236.115.126:8546"}
+	var clients []*ethclient.Client
+	ctx := context.Background()
+	outc := DialToEth(ctx, urls)
+	for client := range outc {
+		clients = append(clients, client)
 	}
-	if ID != id.Uint64() {
-		t.Errorf("ID incorrect, got: %d, want: %d.", id.Uint64(), ID)
+	if len(clients) != len(urls)-1 {
+		t.Errorf("Dial success count, got: %d, want: %d.", len(clients), len(urls)-1)
 	}
 
-	syncClients := CheckSync(context.Background(), mClient, DialToEth(context.Background(), urls[1:], nil))
-	count := 0
-	for client := range syncClients {
-		id, err := client.NetworkID(ctx)
-		if err != nil {
-			t.Errorf("err %s.", err.Error())
-		}
-		if ID != id.Uint64() {
-			t.Errorf("ID incorrect, got: %d, want: %d.", id.Uint64(), ID)
-		}
-		client.Close()
-		count++
-	}
-	if count != len(urls)-1 {
-		t.Errorf("Dial success count, got: %d, want: %d.", count, len(urls[1:]))
-	}
 	fmt.Println("TestDialToEth pass")
 }
 
 func TestDialToEthDeadline(t *testing.T) {
+	urls = []string{"ws://18.236.117.126:8546", "ws:18.236.115.126:8546"}
 	d := time.Now().Add(1 * time.Second)
 	ctx, cancelFunc := context.WithDeadline(context.Background(), d)
 	defer cancelFunc()
-	clients := DialToEth(ctx, urls, nil)
+	clients := DialToEth(ctx, urls)
 	time.Sleep(2 * time.Second)
 
 	for range clients {
@@ -99,11 +93,8 @@ func TestDialToEthErrHandling(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	//ctx := context.Background()
-	key, err := ReadEthKey(credentialPath, passphrase)
-	if err != nil {
-		return
-	}
-	clients := DialToEth(ctx, tUrls, key)
+
+	clients := DialToEth(ctx, tUrls)
 
 	count := 0
 	for range clients {

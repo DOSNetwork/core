@@ -47,7 +47,7 @@ type PDKGInterface interface {
 	GetShareSecurity(groupId string) *share.PriShare
 	GetGroupIDs(groupId string) [][]byte
 	GetGroupNumber() int
-	Grouping(ctx context.Context, groupId string, Participants [][]byte) (chan [5]*big.Int, <-chan error, error)
+	Grouping(ctx context.Context, groupId string, Participants [][]byte) (chan [5]*big.Int, chan error, error)
 	GroupDissolve(groupId string)
 }
 
@@ -103,7 +103,7 @@ func (d *PDKG) GetGroupIDs(groupId string) (participants [][]byte) {
 
 	return
 }
-func mergeErrors(ctx context.Context, cs ...<-chan error) <-chan error {
+func mergeErrors(ctx context.Context, cs ...chan error) chan error {
 	var wg sync.WaitGroup
 	// We must ensure that the output channel has the capacity to
 	// hold as many errors
@@ -136,9 +136,9 @@ func mergeErrors(ctx context.Context, cs ...<-chan error) <-chan error {
 	}()
 	return out
 }
-func (d *PDKG) Grouping(ctx context.Context, groupId string, participants [][]byte) (chan [5]*big.Int, <-chan error, error) {
+func (d *PDKG) Grouping(ctx context.Context, groupId string, participants [][]byte) (chan [5]*big.Int, chan error, error) {
 	group := &Group{Participants: participants}
-	var errcList []<-chan error
+	var errcList []chan error
 	if _, loaded := d.groups.LoadOrStore(groupId, group); loaded {
 		return nil, nil, errors.New("dkg: duplicate share public key")
 	}
@@ -275,7 +275,7 @@ func decodePubKey(pubKey kyber.Point) (pubKeyCoor [4]*big.Int, err error) {
 	return
 }
 
-func genPubKey(ctx context.Context, group *Group, suite suites.Suite, dkgc <-chan *DistKeyGenerator, sessionID string) (chan [5]*big.Int, <-chan error) {
+func genPubKey(ctx context.Context, group *Group, suite suites.Suite, dkgc <-chan *DistKeyGenerator, sessionID string) (chan [5]*big.Int, chan error) {
 	out := make(chan [5]*big.Int)
 	errc := make(chan error)
 	go func() {
@@ -363,7 +363,7 @@ func ByteTohex(a []byte) string {
 	return "0x" + string(result)
 }
 
-func exchangePub(ctx context.Context, suite suites.Suite, bufToNode chan interface{}, groupIds [][]byte, p p2p.P2PInterface, sessionID string) (<-chan *DistKeyGenerator, <-chan error) {
+func exchangePub(ctx context.Context, suite suites.Suite, bufToNode chan interface{}, groupIds [][]byte, p p2p.P2PInterface, sessionID string) (<-chan *DistKeyGenerator, chan error) {
 	out := make(chan *DistKeyGenerator)
 	errc := make(chan error)
 	go func() {
@@ -506,7 +506,7 @@ func exchangePub(ctx context.Context, suite suites.Suite, bufToNode chan interfa
 	return out, errc
 }
 
-func processDeal(ctx context.Context, dkgc <-chan *DistKeyGenerator, bufToNode chan interface{}, groupIds [][]byte, p p2p.P2PInterface, sessionID string) (<-chan *DistKeyGenerator, <-chan error) {
+func processDeal(ctx context.Context, dkgc <-chan *DistKeyGenerator, bufToNode chan interface{}, groupIds [][]byte, p p2p.P2PInterface, sessionID string) (<-chan *DistKeyGenerator, chan error) {
 	out := make(chan *DistKeyGenerator)
 	errc := make(chan error)
 	go func() {

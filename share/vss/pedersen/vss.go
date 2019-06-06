@@ -10,6 +10,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math/big"
 	"reflect"
 
 	"github.com/DOSNetwork/core/share"
@@ -751,4 +752,13 @@ func (j *Justification) Hash(s suites.Suite) []byte {
 	buff, _ := j.Deal.MarshalBinary()
 	_, _ = h.Write(buff)
 	return h.Sum(nil)
+}
+
+// ToBigInt covert the byte array of Signature to big.Int
+func (m *Signature) ToBigInt() (x, y *big.Int) {
+	x = new(big.Int)
+	y = new(big.Int)
+	x.SetBytes(m.Signature[0:32])
+	y.SetBytes(m.Signature[32:])
+	return
 }

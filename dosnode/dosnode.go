@@ -195,10 +195,8 @@ func (d *DosNode) Start() (err error) {
 	go http.ListenAndServe(":8080", mux)
 
 	d.state = "connecting and syncing geth node"
-	d.chain.AddEventNode()
 
-	errc := d.chain.RegisterNewNode(context.Background())
-	err = <-errc
+	err = d.chain.RegisterNewNode(context.Background())
 	if err != nil {
 		d.state = "RegisterNewNode failed"
 		fmt.Println("RegisterNewNode failed ,", err.Error())
@@ -296,8 +294,8 @@ func (d *DosNode) buildPipeline(ctx context.Context, cancel context.CancelFunc, 
 	}
 
 	//Build a pipeline
-	var signShares []<-chan *vss.Signature
-	var errcList []<-chan error
+	var signShares []chan *vss.Signature
+	var errcList []chan error
 
 	submitterc, errc := choseSubmitter(ctx, d.p, lastRand, ids, len(ids), d.logger)
 	if len(submitterc) != len(ids) || len(ids) == 0 {
@@ -306,7 +304,7 @@ func (d *DosNode) buildPipeline(ctx context.Context, cancel context.CancelFunc, 
 	}
 	errcList = append(errcList, errc)
 
-	var contentc <-chan []byte
+	var contentc chan []byte
 	switch pType {
 	case onchain.TrafficSystemRandom:
 		contentc = genSysRandom(ctx, submitterc[0], lastRand.Bytes(), d.logger)
@@ -348,7 +346,7 @@ func (d *DosNode) buildPipeline(ctx context.Context, cancel context.CancelFunc, 
 
 func (d *DosNode) listen() (err error) {
 
-	var errcList []<-chan error
+	var errcList []chan error
 	eventGrouping, errc := d.chain.SubscribeEvent(onchain.SubscribeLogGrouping)
 	errcList = append(errcList, errc)
 	eventGroupDissolve, errc := d.chain.SubscribeEvent(onchain.SubscribeLogGroupDissolve)
@@ -417,7 +415,7 @@ func (d *DosNode) listen() (err error) {
 				revealDur := RevealDuration.Uint64()
 				fmt.Println("startBlock ", startBlock, " commitDur ", commitDur, "revealDur", revealDur)
 				for {
-					cur, err := d.chain.CurrentBlock()
+					cur, err := d.chain.CurrentBlock(context.Background())
 					if err != nil {
 						d.logger.Error(err)
 						return
@@ -436,7 +434,7 @@ func (d *DosNode) listen() (err error) {
 					return
 				}
 				for {
-					cur, err := d.chain.CurrentBlock()
+					cur, err := d.chain.CurrentBlock(context.Background())
 					if err != nil {
 						fmt.Println("CurrentBlock err", err)
 
@@ -451,7 +449,7 @@ func (d *DosNode) listen() (err error) {
 				}
 				d.chain.Reveal(context.Background(), cid, sec)
 				for {
-					cur, err := d.chain.CurrentBlock()
+					cur, err := d.chain.CurrentBlock(context.Background())
 					if err != nil {
 						fmt.Println("CurrentBlock err", err)
 
@@ -478,50 +476,50 @@ func (d *DosNode) listen() (err error) {
 			*/
 		case <-watchdog.C:
 			//Let pending node as a guardian
-			isPendingNode, err := d.chain.IsPendingNode(d.id)
+			isPendingNode, err := d.chain.IsPendingNode(context.Background(), d.id)
 			if err != nil {
 				continue
 			}
 			if isPendingNode {
 				fmt.Println("watchdog")
-				currentBlockNumber, err := d.chain.CurrentBlock()
+				currentBlockNumber, err := d.chain.CurrentBlock(context.Background())
 				if err != nil {
 					d.logger.Error(err)
 				}
 
-				workingGroup, err := d.chain.GetWorkingGroupSize()
+				workingGroup, err := d.chain.GetWorkingGroupSize(context.Background())
 				if err != nil {
 					continue
 				}
-				groupToPick, err := d.chain.GetGroupToPick()
+				groupToPick, err := d.chain.GroupToPick(context.Background())
 				if err != nil {
 					continue
 				}
-				pendingNodeSize, err := d.chain.GetPengindNodeSize()
+				pendingNodeSize, err := d.chain.NumPendingNodes(context.Background())
 				if err != nil {
 					continue
 				}
-				pendingGrouSize, err := d.chain.NumPendingGroups()
+				pendingGrouSize, err := d.chain.NumPendingGroups(context.Background())
 				if err != nil {
 					continue
 				}
 
-				lastUpdatedBlock, err := d.chain.LastUpdatedBlock()
+				lastUpdatedBlock, err := d.chain.LastUpdatedBlock(context.Background())
 				if err != nil {
 					d.logger.Error(err)
 					continue
 				}
-				groupSize, err := d.chain.GroupSize()
+				groupSize, err := d.chain.GroupSize(context.Background())
 				if err != nil {
 					d.logger.Error(err)
 					continue
 				}
-				expiredWGSize, err := d.chain.GetExpiredWorkingGroupSize()
+				expiredWGSize, err := d.chain.GetExpiredWorkingGroupSize(context.Background())
 				if err != nil {
 					d.logger.Error(err)
 					continue
 				}
-				sysrandInterval, err := d.chain.RefreshSystemRandomHardLimit()
+				sysrandInterval, err := d.chain.RefreshSystemRandomHardLimit(context.Background())
 				if err != nil {
 					d.logger.Error(err)
 					continue
@@ -637,7 +635,7 @@ func (d *DosNode) listen() (err error) {
 			}
 			//			latestRandm = content.LastRandomness
 			if d.isMember(fmt.Sprintf("%x", content.DispatchedGroupId)) {
-				currentBlockNumber, err := d.chain.CurrentBlock()
+				currentBlockNumber, err := d.chain.CurrentBlock(context.Background())
 				if err != nil {
 					d.logger.Error(err)
 				}
@@ -668,7 +666,7 @@ func (d *DosNode) listen() (err error) {
 				continue
 			}
 			if d.isMember(fmt.Sprintf("%x", content.DispatchedGroupId)) {
-				currentBlockNumber, err := d.chain.CurrentBlock()
+				currentBlockNumber, err := d.chain.CurrentBlock(context.Background())
 				if err != nil {
 					d.logger.Error(err)
 				}
@@ -699,7 +697,7 @@ func (d *DosNode) listen() (err error) {
 			}
 			if d.isMember(fmt.Sprintf("%x", content.DispatchedGroupId)) {
 				//if !content.Removed {
-				currentBlockNumber, err := d.chain.CurrentBlock()
+				currentBlockNumber, err := d.chain.CurrentBlock(context.Background())
 				if err != nil {
 					d.logger.Error(err)
 				}

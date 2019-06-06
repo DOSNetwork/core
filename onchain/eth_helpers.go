@@ -29,15 +29,23 @@ func first(ctx context.Context, source <-chan interface{}) <-chan interface{} {
 		first := true
 		for val := range source {
 			if first {
-				out <- val
-				first = false
+				if val != nil {
+					first = false
+					fmt.Println("first ", val)
+					select {
+					case <-ctx.Done():
+						return
+					case out <- val:
+					}
+					return
+				}
 			}
 		}
 	}()
 	return out
 }
 
-func merge(ctx context.Context, cs ...chan interface{}) <-chan interface{} {
+func merge(ctx context.Context, cs ...chan interface{}) chan interface{} {
 	var wg sync.WaitGroup
 	out := make(chan interface{})
 
@@ -46,6 +54,11 @@ func merge(ctx context.Context, cs ...chan interface{}) <-chan interface{} {
 	output := func(c <-chan interface{}) {
 		for n := range c {
 			out <- n
+			select {
+			case <-ctx.Done():
+				return
+			case out <- n:
+			}
 		}
 		wg.Done()
 	}
@@ -84,7 +97,7 @@ func ReadEthKey(credentialPath, passphrase string) (key *keystore.Key, err error
 }
 
 //DialToEth is a utility function to dial to Ethereum
-func DialToEth(ctx context.Context, urlPool []string, key *keystore.Key) (out chan *ethclient.Client) {
+func DialToEth(ctx context.Context, urlPool []string) (out chan *ethclient.Client) {
 	out = make(chan *ethclient.Client)
 	var wg sync.WaitGroup
 
@@ -95,29 +108,18 @@ func DialToEth(ctx context.Context, urlPool []string, key *keystore.Key) (out ch
 
 		client, e = ethclient.Dial(url)
 		if e != nil {
+			//ws connect: connection timed out
 			fmt.Println(url, ":DialToEth err ", e)
 			return
 		}
-
-		//Read balance to make sure client is working
-		ticker := time.NewTicker(5 * time.Second)
-		for {
-			b := GetBalance(client, key)
-			if b != nil {
-				fmt.Println(url, ":balance ", b)
-				break
-			}
-			select {
-			case <-ticker.C:
-				fmt.Println(url, ":Retry GetBalance ")
-			case <-ctx.Done():
-				fmt.Println(url, ":ctx done ", ctx.Err())
-				ticker.Stop()
-				client.Close()
-				return
-			}
+		_, err := client.NetworkID(ctx)
+		if err != nil {
+			//Post http i/o timeout
+			fmt.Println(url, "NetworkID err ", err)
+			client.Close()
+			return
 		}
-
+		fmt.Println(url, "DialToEthr got a client")
 		select {
 		case <-ctx.Done():
 			client.Close()
@@ -214,7 +216,7 @@ func CheckTransaction(client *ethclient.Client, tx *types.Transaction) (err erro
 	start := time.Now()
 	receipt, err := client.TransactionReceipt(context.Background(), tx.Hash())
 	for err == ethereum.NotFound {
-
+		fmt.Println("ethereum.NotFound ", err)
 		if time.Since(start).Minutes() > 30 {
 			err = errors.New("transaction not found")
 			fmt.Println("transaction failed. tx ", fmt.Sprintf("%x", tx.Hash()))
