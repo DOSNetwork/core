@@ -31,7 +31,6 @@ func first(ctx context.Context, source <-chan interface{}) <-chan interface{} {
 			if first {
 				if val != nil {
 					first = false
-					fmt.Println("first ", val)
 					select {
 					case <-ctx.Done():
 						return

@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-stack/stack"
+
 	"github.com/DOSNetwork/core/share/vss/pedersen"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 
@@ -71,6 +73,593 @@ const (
 type getFunc func(ctx context.Context, client *ethclient.Client, proxy *dosproxy.DosproxySession, p interface{}) (chan interface{}, chan interface{})
 type setFunc func(ctx context.Context, proxy *dosproxy.DosproxySession, cr *commitreveal.CommitrevealSession, p []interface{}) (tx *types.Transaction, err error)
 
+var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (chan interface{}, chan interface{}){
+	SubscribeLogUpdateRandom: func(ctx context.Context, proxy *dosproxy.DosproxySession) (chan interface{}, chan interface{}) {
+		out := make(chan interface{})
+		errc := make(chan interface{})
+		opt := &bind.WatchOpts{}
+		go func() {
+			transitChan := make(chan *dosproxy.DosproxyLogUpdateRandom)
+			defer close(transitChan)
+			defer close(errc)
+			defer close(out)
+			sub, err := proxy.Contract.WatchLogUpdateRandom(opt, transitChan)
+			if err != nil {
+				return
+			}
+			for {
+				select {
+				case <-ctx.Done():
+					sub.Unsubscribe()
+					return
+				case err := <-sub.Err():
+					errc <- err
+					return
+				case i := <-transitChan:
+					out <- &LogUpdateRandom{
+						LastRandomness:    i.LastRandomness,
+						DispatchedGroupId: i.DispatchedGroupId,
+						Tx:                i.Raw.TxHash.Hex(),
+						BlockN:            i.Raw.BlockNumber,
+						Removed:           i.Raw.Removed,
+						Raw:               i.Raw,
+					}
+				}
+			}
+		}()
+		return out, errc
+	},
+	SubscribeLogUrl: func(ctx context.Context, proxy *dosproxy.DosproxySession) (chan interface{}, chan interface{}) {
+		out := make(chan interface{})
+		errc := make(chan interface{})
+		opt := &bind.WatchOpts{}
+		go func() {
+			transitChan := make(chan *dosproxy.DosproxyLogUrl)
+			defer close(transitChan)
+			defer close(errc)
+			defer close(out)
+
+			sub, err := proxy.Contract.WatchLogUrl(opt, transitChan)
+			if err != nil {
+				return
+			}
+			for {
+				select {
+				case <-ctx.Done():
+					sub.Unsubscribe()
+					return
+				case err := <-sub.Err():
+					errc <- err
+					return
+				case i := <-transitChan:
+					out <- &LogUrl{
+						QueryId:           i.QueryId,
+						Timeout:           i.Timeout,
+						DataSource:        i.DataSource,
+						Selector:          i.Selector,
+						Randomness:        i.Randomness,
+						DispatchedGroupId: i.DispatchedGroupId,
+						Tx:                i.Raw.TxHash.Hex(),
+						BlockN:            i.Raw.BlockNumber,
+						Removed:           i.Raw.Removed,
+						Raw:               i.Raw,
+					}
+				}
+			}
+		}()
+		return out, errc
+	},
+	SubscribeLogRequestUserRandom: func(ctx context.Context, proxy *dosproxy.DosproxySession) (chan interface{}, chan interface{}) {
+		out := make(chan interface{})
+		errc := make(chan interface{})
+		opt := &bind.WatchOpts{}
+		go func() {
+			transitChan := make(chan *dosproxy.DosproxyLogRequestUserRandom)
+			defer close(transitChan)
+			defer close(errc)
+			defer close(out)
+
+			sub, err := proxy.Contract.WatchLogRequestUserRandom(opt, transitChan)
+			if err != nil {
+				return
+			}
+			for {
+				select {
+				case <-ctx.Done():
+					sub.Unsubscribe()
+					return
+				case err := <-sub.Err():
+					errc <- err
+					return
+				case i := <-transitChan:
+					out <- &LogRequestUserRandom{
+						RequestId:            i.RequestId,
+						LastSystemRandomness: i.LastSystemRandomness,
+						UserSeed:             i.UserSeed,
+						DispatchedGroupId:    i.DispatchedGroupId,
+						Tx:                   i.Raw.TxHash.Hex(),
+						BlockN:               i.Raw.BlockNumber,
+						Removed:              i.Raw.Removed,
+						Raw:                  i.Raw,
+					}
+				}
+			}
+		}()
+		return out, errc
+	},
+	SubscribeLogValidationResult: func(ctx context.Context, proxy *dosproxy.DosproxySession) (chan interface{}, chan interface{}) {
+		out := make(chan interface{})
+		errc := make(chan interface{})
+		opt := &bind.WatchOpts{}
+		go func() {
+			transitChan := make(chan *dosproxy.DosproxyLogValidationResult)
+			defer close(transitChan)
+			defer close(errc)
+			defer close(out)
+
+			sub, err := proxy.Contract.WatchLogValidationResult(opt, transitChan)
+			if err != nil {
+				fmt.Println("SubscribeLogValidationResult err", err)
+				return
+			}
+			for {
+				select {
+				case <-ctx.Done():
+					fmt.Println("SubscribeLogValidationResult Done")
+
+					sub.Unsubscribe()
+					return
+				case err := <-sub.Err():
+					fmt.Println("SubscribeLogValidationResult err", err)
+
+					errc <- err
+					return
+				case i := <-transitChan:
+					out <- &LogValidationResult{
+						TrafficType: i.TrafficType,
+						TrafficId:   i.TrafficId,
+						Message:     i.Message,
+						Signature:   i.Signature,
+						PubKey:      i.PubKey,
+						Pass:        i.Pass,
+						Version:     i.Version,
+						Tx:          i.Raw.TxHash.Hex(),
+						BlockN:      i.Raw.BlockNumber,
+						Removed:     i.Raw.Removed,
+						Raw:         i.Raw,
+					}
+				}
+			}
+		}()
+		return out, errc
+	},
+	SubscribeLogInsufficientPendingNode: func(ctx context.Context, proxy *dosproxy.DosproxySession) (chan interface{}, chan interface{}) {
+		out := make(chan interface{})
+		errc := make(chan interface{})
+		opt := &bind.WatchOpts{}
+		go func() {
+			transitChan := make(chan *dosproxy.DosproxyLogInsufficientPendingNode)
+			defer close(transitChan)
+			defer close(errc)
+			defer close(out)
+			sub, err := proxy.Contract.WatchLogInsufficientPendingNode(opt, transitChan)
+			if err != nil {
+				return
+			}
+			for {
+				select {
+				case <-ctx.Done():
+					sub.Unsubscribe()
+					return
+				case err := <-sub.Err():
+					errc <- err
+					return
+				case i := <-transitChan:
+					out <- &LogInsufficientPendingNode{
+						NumPendingNodes: i.NumPendingNodes,
+						Tx:              i.Raw.TxHash.Hex(),
+						BlockN:          i.Raw.BlockNumber,
+						Removed:         i.Raw.Removed,
+						Raw:             i.Raw,
+					}
+				}
+			}
+		}()
+		return out, errc
+	},
+	SubscribeLogInsufficientWorkingGroup: func(ctx context.Context, proxy *dosproxy.DosproxySession) (chan interface{}, chan interface{}) {
+		out := make(chan interface{})
+		errc := make(chan interface{})
+		opt := &bind.WatchOpts{}
+		go func() {
+			transitChan := make(chan *dosproxy.DosproxyLogInsufficientWorkingGroup)
+			defer close(transitChan)
+			defer close(errc)
+			defer close(out)
+			sub, err := proxy.Contract.WatchLogInsufficientWorkingGroup(opt, transitChan)
+			if err != nil {
+				return
+			}
+			for {
+				select {
+				case <-ctx.Done():
+					sub.Unsubscribe()
+					return
+				case err := <-sub.Err():
+					errc <- err
+					return
+				case i := <-transitChan:
+					out <- &LogInsufficientWorkingGroup{
+						NumWorkingGroups: i.NumWorkingGroups,
+						Tx:               i.Raw.TxHash.Hex(),
+						BlockN:           i.Raw.BlockNumber,
+						Removed:          i.Raw.Removed,
+						Raw:              i.Raw,
+					}
+				}
+			}
+		}()
+		return out, errc
+	},
+	SubscribeLogGroupingInitiated: func(ctx context.Context, proxy *dosproxy.DosproxySession) (chan interface{}, chan interface{}) {
+		out := make(chan interface{})
+		errc := make(chan interface{})
+		opt := &bind.WatchOpts{}
+		go func() {
+			transitChan := make(chan *dosproxy.DosproxyLogGroupingInitiated)
+			defer close(transitChan)
+			defer close(errc)
+			defer close(out)
+			sub, err := proxy.Contract.WatchLogGroupingInitiated(opt, transitChan)
+			if err != nil {
+				return
+			}
+			for {
+				select {
+				case <-ctx.Done():
+					sub.Unsubscribe()
+					return
+				case err := <-sub.Err():
+					errc <- err
+					return
+				case i := <-transitChan:
+					out <- &LogGroupingInitiated{
+						Tx:      i.Raw.TxHash.Hex(),
+						BlockN:  i.Raw.BlockNumber,
+						Removed: i.Raw.Removed,
+						Raw:     i.Raw,
+					}
+				}
+			}
+		}()
+		return out, errc
+	},
+	SubscribeDosproxyUpdateGroupToPick: func(ctx context.Context, proxy *dosproxy.DosproxySession) (chan interface{}, chan interface{}) {
+		out := make(chan interface{})
+		errc := make(chan interface{})
+		opt := &bind.WatchOpts{}
+		go func() {
+			transitChan := make(chan *dosproxy.DosproxyUpdateGroupToPick)
+			defer close(transitChan)
+			defer close(errc)
+			defer close(out)
+			sub, err := proxy.Contract.WatchUpdateGroupToPick(opt, transitChan)
+			if err != nil {
+				fmt.Println("WatchUpdateGroupToPick err ", err)
+
+				return
+			}
+			for {
+				select {
+				case <-ctx.Done():
+					sub.Unsubscribe()
+					return
+				case err := <-sub.Err():
+					fmt.Println("SubscribeDosproxyUpdateGroupToPick err ", err)
+					errc <- err
+					return
+				case i := <-transitChan:
+					out <- &LogUpdateGroupToPick{
+						Tx:      i.Raw.TxHash.Hex(),
+						OldNum:  i.OldNum,
+						NewNum:  i.NewNum,
+						BlockN:  i.Raw.BlockNumber,
+						Removed: i.Raw.Removed,
+						Raw:     i.Raw,
+					}
+				}
+			}
+		}()
+		return out, errc
+	},
+	SubscribeLogGrouping: func(ctx context.Context, proxy *dosproxy.DosproxySession) (chan interface{}, chan interface{}) {
+		out := make(chan interface{})
+		errc := make(chan interface{})
+		opt := &bind.WatchOpts{}
+		go func() {
+			transitChan := make(chan *dosproxy.DosproxyLogGrouping)
+			defer close(transitChan)
+			defer close(errc)
+			defer close(out)
+			sub, err := proxy.Contract.WatchLogGrouping(opt, transitChan)
+			if err != nil {
+				return
+			}
+			for {
+				select {
+				case <-ctx.Done():
+					sub.Unsubscribe()
+					return
+				case err := <-sub.Err():
+					errc <- err
+					return
+				case i := <-transitChan:
+					out <- &LogGrouping{
+						GroupId: i.GroupId,
+						NodeId:  i.NodeId,
+						Tx:      i.Raw.TxHash.Hex(),
+						BlockN:  i.Raw.BlockNumber,
+						Removed: i.Raw.Removed,
+						Raw:     i.Raw,
+					}
+				}
+			}
+		}()
+		return out, errc
+	},
+	SubscribeLogPublicKeyAccepted: func(ctx context.Context, proxy *dosproxy.DosproxySession) (chan interface{}, chan interface{}) {
+		out := make(chan interface{})
+		errc := make(chan interface{})
+		opt := &bind.WatchOpts{}
+		go func() {
+			transitChan := make(chan *dosproxy.DosproxyLogPublicKeyAccepted)
+			defer close(transitChan)
+			defer close(errc)
+			defer close(out)
+			sub, err := proxy.Contract.WatchLogPublicKeyAccepted(opt, transitChan)
+			if err != nil {
+				return
+			}
+			for {
+				select {
+				case <-ctx.Done():
+					sub.Unsubscribe()
+					return
+				case err := <-sub.Err():
+					errc <- err
+					return
+				case i := <-transitChan:
+					out <- &LogPublicKeyAccepted{
+						GroupId:          i.GroupId,
+						WorkingGroupSize: i.NumWorkingGroups,
+						Tx:               i.Raw.TxHash.Hex(),
+						BlockN:           i.Raw.BlockNumber,
+						Removed:          i.Raw.Removed,
+						Raw:              i.Raw,
+					}
+				}
+			}
+		}()
+		return out, errc
+	},
+	SubscribeLogPublicKeySuggested: func(ctx context.Context, proxy *dosproxy.DosproxySession) (chan interface{}, chan interface{}) {
+		out := make(chan interface{})
+		errc := make(chan interface{})
+		opt := &bind.WatchOpts{}
+		go func() {
+			transitChan := make(chan *dosproxy.DosproxyLogPublicKeySuggested)
+			defer close(transitChan)
+			defer close(errc)
+			defer close(out)
+			sub, err := proxy.Contract.WatchLogPublicKeySuggested(opt, transitChan)
+			if err != nil {
+				return
+			}
+			for {
+				select {
+				case <-ctx.Done():
+					sub.Unsubscribe()
+					return
+				case err := <-sub.Err():
+					errc <- err
+					return
+				case i := <-transitChan:
+					out <- &LogPublicKeySuggested{
+						GroupId: i.GroupId,
+						Count:   i.PubKeyCount,
+						Tx:      i.Raw.TxHash.Hex(),
+						BlockN:  i.Raw.BlockNumber,
+						Removed: i.Raw.Removed,
+						Raw:     i.Raw,
+					}
+				}
+			}
+		}()
+		return out, errc
+	},
+	SubscribeLogGroupDissolve: func(ctx context.Context, proxy *dosproxy.DosproxySession) (chan interface{}, chan interface{}) {
+		out := make(chan interface{})
+		errc := make(chan interface{})
+		opt := &bind.WatchOpts{}
+		go func() {
+			transitChan := make(chan *dosproxy.DosproxyLogGroupDissolve)
+			defer close(transitChan)
+			defer close(errc)
+			defer close(out)
+			sub, err := proxy.Contract.WatchLogGroupDissolve(opt, transitChan)
+			if err != nil {
+				return
+			}
+			for {
+				select {
+				case <-ctx.Done():
+					sub.Unsubscribe()
+					return
+				case err := <-sub.Err():
+					errc <- err
+					return
+				case i := <-transitChan:
+					out <- &LogGroupDissolve{
+						GroupId: i.GroupId,
+						Tx:      i.Raw.TxHash.Hex(),
+						BlockN:  i.Raw.BlockNumber,
+						Removed: i.Raw.Removed,
+						Raw:     i.Raw,
+					}
+				}
+			}
+		}()
+		return out, errc
+	},
+}
+var crTable = []func(ctx context.Context, cr *commitreveal.CommitrevealSession) (chan interface{}, chan interface{}){
+	SubscribeCommitrevealLogStartCommitreveal: func(ctx context.Context, cr *commitreveal.CommitrevealSession) (chan interface{}, chan interface{}) {
+		out := make(chan interface{})
+		errc := make(chan interface{})
+		opt := &bind.WatchOpts{}
+		go func() {
+			transitChan := make(chan *commitreveal.CommitrevealLogStartCommitReveal)
+			defer close(transitChan)
+			defer close(errc)
+			defer close(out)
+			sub, err := cr.Contract.WatchLogStartCommitReveal(opt, transitChan)
+			if err != nil {
+				return
+			}
+			for {
+				select {
+				case <-ctx.Done():
+					sub.Unsubscribe()
+					return
+				case err := <-sub.Err():
+					errc <- err
+					return
+				case i := <-transitChan:
+					out <- &LogStartCommitReveal{
+						Cid:             i.Cid,
+						StartBlock:      i.StartBlock,
+						CommitDuration:  i.CommitDuration,
+						RevealDuration:  i.RevealDuration,
+						RevealThreshold: i.RevealThreshold,
+						Tx:              i.Raw.TxHash.Hex(),
+						BlockN:          i.Raw.BlockNumber,
+						Removed:         i.Raw.Removed,
+						Raw:             i.Raw,
+					}
+				}
+			}
+		}()
+		return out, errc
+	},
+	SubscribeCommitrevealLogCommit: func(ctx context.Context, cr *commitreveal.CommitrevealSession) (chan interface{}, chan interface{}) {
+		out := make(chan interface{})
+		errc := make(chan interface{})
+		opt := &bind.WatchOpts{}
+		go func() {
+			transitChan := make(chan *commitreveal.CommitrevealLogCommit)
+			defer close(transitChan)
+			defer close(errc)
+			defer close(out)
+			sub, err := cr.Contract.WatchLogCommit(opt, transitChan)
+			if err != nil {
+				return
+			}
+			for {
+				select {
+				case <-ctx.Done():
+					sub.Unsubscribe()
+					return
+				case err := <-sub.Err():
+					errc <- err
+					return
+				case i := <-transitChan:
+					out <- &LogCommit{
+						Cid:        i.Cid,
+						From:       i.From,
+						Commitment: i.Commitment,
+						Tx:         i.Raw.TxHash.Hex(),
+						BlockN:     i.Raw.BlockNumber,
+						Removed:    i.Raw.Removed,
+						Raw:        i.Raw,
+					}
+				}
+			}
+		}()
+		return out, errc
+	},
+	SubscribeCommitrevealLogReveal: func(ctx context.Context, cr *commitreveal.CommitrevealSession) (chan interface{}, chan interface{}) {
+		out := make(chan interface{})
+		errc := make(chan interface{})
+		opt := &bind.WatchOpts{}
+		go func() {
+			transitChan := make(chan *commitreveal.CommitrevealLogReveal)
+			defer close(transitChan)
+			defer close(errc)
+			defer close(out)
+			sub, err := cr.Contract.WatchLogReveal(opt, transitChan)
+			if err != nil {
+				return
+			}
+			for {
+				select {
+				case <-ctx.Done():
+					sub.Unsubscribe()
+					return
+				case err := <-sub.Err():
+					errc <- err
+					return
+				case i := <-transitChan:
+					out <- &LogReveal{
+						Cid:     i.Cid,
+						From:    i.From,
+						Secret:  i.Secret,
+						Tx:      i.Raw.TxHash.Hex(),
+						BlockN:  i.Raw.BlockNumber,
+						Removed: i.Raw.Removed,
+						Raw:     i.Raw,
+					}
+				}
+			}
+		}()
+		return out, errc
+	},
+	SubscribeCommitrevealLogRandom: func(ctx context.Context, cr *commitreveal.CommitrevealSession) (chan interface{}, chan interface{}) {
+		out := make(chan interface{})
+		errc := make(chan interface{})
+		opt := &bind.WatchOpts{}
+		go func() {
+			transitChan := make(chan *commitreveal.CommitrevealLogRandom)
+			defer close(transitChan)
+			defer close(errc)
+			defer close(out)
+			sub, err := cr.Contract.WatchLogRandom(opt, transitChan)
+			if err != nil {
+				return
+			}
+			for {
+				select {
+				case <-ctx.Done():
+					sub.Unsubscribe()
+					return
+				case err := <-sub.Err():
+					errc <- err
+					return
+				case i := <-transitChan:
+					out <- &LogRandom{
+						Cid:     i.Cid,
+						Random:  i.Random,
+						Tx:      i.Raw.TxHash.Hex(),
+						BlockN:  i.Raw.BlockNumber,
+						Removed: i.Raw.Removed,
+						Raw:     i.Raw,
+					}
+				}
+			}
+		}()
+		return out, errc
+	},
+}
+
 type request struct {
 	ctx    context.Context
 	idx    int
@@ -122,6 +711,7 @@ func NewEthAdaptor(credentialPath, passphrase, proxyAddr, commitRevealAddr strin
 	adaptor.gethUrls = httpUrls
 	adaptor.eventUrls = wsUrls
 	adaptor.proxyAddr = proxyAddr
+	adaptor.commitRevealAddr = commitRevealAddr
 	debug.FreeOSMemory()
 	//Read Ethereum keystore
 	key, err := ReadEthKey(credentialPath, passphrase)
@@ -137,7 +727,7 @@ func NewEthAdaptor(credentialPath, passphrase, proxyAddr, commitRevealAddr strin
 
 	adaptor.ctx, adaptor.cancelFunc = context.WithCancel(context.Background())
 	adaptor.auth = bind.NewKeyedTransactor(key.PrivateKey)
-	adaptor.auth.GasPrice = big.NewInt(2000000000) //0.2 Gwei
+	adaptor.auth.GasPrice = big.NewInt(20000000000) //2 Gwei
 	adaptor.auth.GasLimit = uint64(6000000)
 	adaptor.auth.Context = adaptor.ctx
 	adaptor.reqQueue = make(chan *request)
@@ -189,7 +779,6 @@ func (e *ethAdaptor) reqLoop() {
 		for {
 			select {
 			case req := <-e.reqQueue:
-				fmt.Println("reqLoop got req i", req.idx)
 				tx, err := req.f(req.ctx, req.proxy, req.cr, req.params)
 				resp := &response{req.idx, tx, err}
 				select {
@@ -218,17 +807,14 @@ func (e *ethAdaptor) get(ctx context.Context, f getFunc, p interface{}) (interfa
 		select {
 		case val, ok := <-outc:
 			if !ok {
-				fmt.Println("get !ok")
 				return nil, nil
 			}
-			fmt.Println("get ", val)
 			return val, nil
 		case err, ok := <-errc:
 			if !ok {
-				fmt.Println("get errc !ok")
 				continue
 			}
-			fmt.Println("get err", err)
+			fmt.Println("get err", err, " stack ", stack.Trace().TrimRuntime())
 			e.logger.Error(err.(error))
 		case <-ctx.Done():
 			return nil, errors.New("Timeout")
@@ -283,11 +869,90 @@ func (e *ethAdaptor) set(ctx context.Context, params []interface{}, setF setFunc
 	}
 
 	for i, proxy := range e.proxies {
-		r := &request{ctx, i, proxy, nil, setF, params, nil}
+		r := &request{ctx, i, proxy, e.crs[i], setF, params, nil}
 		reply = f(ctx, i, reply, r)
 	}
 
 	return
+}
+
+// AddToWhitelist is a wrap function that build a pipeline to set groupToPick
+func (e *ethAdaptor) AddToWhitelist(ctx context.Context, addr common.Address) (err error) {
+	// define how to parse parameters and execute proxy function
+	f := func(ctx context.Context, proxy *dosproxy.DosproxySession, cr *commitreveal.CommitrevealSession, p []interface{}) (tx *types.Transaction, err error) {
+		if len(p) != 1 {
+			err = errors.New("Invalid parameter")
+			return
+		}
+		if addr, ok := p[0].(common.Address); ok {
+			tx, err = cr.AddToWhitelist(addr)
+		}
+		return
+	}
+	// define parameters
+	var params []interface{}
+	params = append(params, addr)
+	reply := e.set(ctx, params, f)
+	for {
+		select {
+		case r, ok := <-reply:
+			if ok {
+				err = r.err
+				if r.err == nil {
+					fmt.Println("AddToWhitelist response ", fmt.Sprintf("%x", r.tx.Hash()))
+				} else {
+					fmt.Println("AddToWhitelist error ", r.err)
+				}
+			}
+			return
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+// StartCommitReveal is a wrap function that build a pipeline to set groupToPick
+func (e *ethAdaptor) StartCommitReveal(ctx context.Context, startBlock int64, commitDuration int64, revealDuration int64, revealThreshold int64) (err error) {
+	// define how to parse parameters and execute proxy function
+	f := func(ctx context.Context, proxy *dosproxy.DosproxySession, cr *commitreveal.CommitrevealSession, p []interface{}) (tx *types.Transaction, err error) {
+		if len(p) != 4 {
+			err = errors.New("Invalid parameter")
+			return
+		}
+		if startBlock, ok := p[0].(*big.Int); ok {
+			if commitDuration, ok := p[1].(*big.Int); ok {
+				if revealDuration, ok := p[2].(*big.Int); ok {
+					if revealThreshold, ok := p[3].(*big.Int); ok {
+						tx, err = cr.StartCommitReveal(startBlock, commitDuration, revealDuration, revealThreshold)
+					}
+				}
+			}
+		}
+		return
+	}
+	// define parameters
+	var params []interface{}
+	params = append(params, big.NewInt(startBlock))
+	params = append(params, big.NewInt(commitDuration))
+	params = append(params, big.NewInt(revealDuration))
+	params = append(params, big.NewInt(revealThreshold))
+	reply := e.set(ctx, params, f)
+	for {
+		select {
+		case r, ok := <-reply:
+			if ok {
+				err = r.err
+				if r.err == nil {
+					fmt.Println("StartCommitReveal response ", fmt.Sprintf("%x", r.tx.Hash()))
+				} else {
+					fmt.Println("StartCommitReveal error ", r.err)
+				}
+			}
+			return
+		case <-ctx.Done():
+			return
+		}
+	}
 }
 
 // SetGroupToPick is a wrap function that build a pipeline to set groupToPick
@@ -652,6 +1317,7 @@ func (e *ethAdaptor) Reveal(ctx context.Context, cid *big.Int, secret *big.Int) 
 
 // RegisterGroupPubKey is a wrap function that build a pipeline to call RegisterGroupPubKey
 func (e *ethAdaptor) RegisterGroupPubKey(ctx context.Context, IdWithPubKeys chan [5]*big.Int) (errc chan error) {
+	fmt.Println("RegisterGroupPubKey")
 	errc = make(chan error)
 	go func() {
 		defer close(errc)
@@ -660,12 +1326,16 @@ func (e *ethAdaptor) RegisterGroupPubKey(ctx context.Context, IdWithPubKeys chan
 			if !ok {
 				return
 			}
+			fmt.Println("RegisterGroupPubKey got pubkey")
+
 			// define how to parse parameters and execute proxy function
 			f := func(ctx context.Context, proxy *dosproxy.DosproxySession, cr *commitreveal.CommitrevealSession, p []interface{}) (tx *types.Transaction, err error) {
 				err = errors.New("Invalid parameter")
 				if len(p) != 1 {
 					return
 				}
+				fmt.Println("RegisterGroupPubKey func")
+
 				if idPubkey, ok := p[0].([5]*big.Int); ok {
 					groupId := idPubkey[0]
 					var pubKey [4]*big.Int
@@ -676,7 +1346,6 @@ func (e *ethAdaptor) RegisterGroupPubKey(ctx context.Context, IdWithPubKeys chan
 					case <-ctx.Done():
 						err = ctx.Err()
 					}
-
 				}
 				return
 			}
@@ -831,12 +1500,9 @@ func (e *ethAdaptor) DataReturn(ctx context.Context, signatures chan *vss.Signat
 func (e *ethAdaptor) SubscribeEvent(subscribeType int) (chan interface{}, chan error) {
 	var eventList []chan interface{}
 	var errcs []chan interface{}
-	if subscribeType == SubscribeCommitrevealLogStartCommitreveal ||
-		subscribeType == SubscribeCommitrevealLogCommit ||
-		subscribeType == SubscribeCommitrevealLogReveal ||
-		subscribeType == SubscribeCommitrevealLogRandom {
+	if subscribeType >= SubscribeCommitrevealLogStartCommitreveal {
 		for i := 0; i < len(e.proxies); i++ {
-			fmt.Println("SubscribeEvent ", i)
+			fmt.Println("Subscribe CR Event ", i)
 			cr := e.crs[i]
 			if cr == nil {
 				continue
@@ -845,7 +1511,7 @@ func (e *ethAdaptor) SubscribeEvent(subscribeType int) (chan interface{}, chan e
 			if ctx == nil {
 				continue
 			}
-			out, errc := subscribeCREvent(ctx, cr, subscribeType)
+			out, errc := crTable[subscribeType](ctx, cr)
 			eventList = append(eventList, out)
 			errcs = append(errcs, errc)
 		}
@@ -860,534 +1526,12 @@ func (e *ethAdaptor) SubscribeEvent(subscribeType int) (chan interface{}, chan e
 			if ctx == nil {
 				continue
 			}
-			out, errc := subscribeEvent(ctx, proxy, subscribeType)
+			out, errc := proxyTable[subscribeType](ctx, proxy)
 			eventList = append(eventList, out)
 			errcs = append(errcs, errc)
 		}
 	}
 	return firstEvent(e.ctx, merge(e.ctx, eventList...)), convertToError(e.ctx, merge(e.ctx, errcs...))
-}
-
-func subscribeCREvent(ctx context.Context, cr *commitreveal.CommitrevealSession, subscribeType int) (chan interface{}, chan interface{}) {
-	out := make(chan interface{})
-	errc := make(chan interface{})
-	opt := &bind.WatchOpts{}
-
-	switch subscribeType {
-	case SubscribeCommitrevealLogStartCommitreveal:
-		go func() {
-			transitChan := make(chan *commitreveal.CommitrevealLogStartCommitReveal)
-			defer close(transitChan)
-			defer close(errc)
-			defer close(out)
-			sub, err := cr.Contract.WatchLogStartCommitReveal(opt, transitChan)
-			if err != nil {
-				return
-			}
-			for {
-				select {
-				case <-ctx.Done():
-					sub.Unsubscribe()
-					return
-				case err := <-sub.Err():
-					errc <- err
-					return
-				case i := <-transitChan:
-					out <- &LogStartCommitReveal{
-						Cid:             i.Cid,
-						StartBlock:      i.StartBlock,
-						CommitDuration:  i.CommitDuration,
-						RevealDuration:  i.RevealDuration,
-						RevealThreshold: i.RevealThreshold,
-						Tx:              i.Raw.TxHash.Hex(),
-						BlockN:          i.Raw.BlockNumber,
-						Removed:         i.Raw.Removed,
-						Raw:             i.Raw,
-					}
-				}
-			}
-		}()
-	case SubscribeCommitrevealLogCommit:
-		go func() {
-			transitChan := make(chan *commitreveal.CommitrevealLogCommit)
-			defer close(transitChan)
-			defer close(errc)
-			defer close(out)
-			sub, err := cr.Contract.WatchLogCommit(opt, transitChan)
-			if err != nil {
-				return
-			}
-			for {
-				select {
-				case <-ctx.Done():
-					sub.Unsubscribe()
-					return
-				case err := <-sub.Err():
-					errc <- err
-					return
-				case i := <-transitChan:
-					out <- &LogCommit{
-						Cid:        i.Cid,
-						From:       i.From,
-						Commitment: i.Commitment,
-						Tx:         i.Raw.TxHash.Hex(),
-						BlockN:     i.Raw.BlockNumber,
-						Removed:    i.Raw.Removed,
-						Raw:        i.Raw,
-					}
-				}
-			}
-		}()
-	case SubscribeCommitrevealLogReveal:
-		go func() {
-			transitChan := make(chan *commitreveal.CommitrevealLogReveal)
-			defer close(transitChan)
-			defer close(errc)
-			defer close(out)
-			sub, err := cr.Contract.WatchLogReveal(opt, transitChan)
-			if err != nil {
-				return
-			}
-			for {
-				select {
-				case <-ctx.Done():
-					sub.Unsubscribe()
-					return
-				case err := <-sub.Err():
-					errc <- err
-					return
-				case i := <-transitChan:
-					out <- &LogReveal{
-						Cid:     i.Cid,
-						From:    i.From,
-						Secret:  i.Secret,
-						Tx:      i.Raw.TxHash.Hex(),
-						BlockN:  i.Raw.BlockNumber,
-						Removed: i.Raw.Removed,
-						Raw:     i.Raw,
-					}
-				}
-			}
-		}()
-	case SubscribeCommitrevealLogRandom:
-		go func() {
-			transitChan := make(chan *commitreveal.CommitrevealLogRandom)
-			defer close(transitChan)
-			defer close(errc)
-			defer close(out)
-			sub, err := cr.Contract.WatchLogRandom(opt, transitChan)
-			if err != nil {
-				return
-			}
-			for {
-				select {
-				case <-ctx.Done():
-					sub.Unsubscribe()
-					return
-				case err := <-sub.Err():
-					errc <- err
-					return
-				case i := <-transitChan:
-					out <- &LogRandom{
-						Cid:     i.Cid,
-						Random:  i.Random,
-						Tx:      i.Raw.TxHash.Hex(),
-						BlockN:  i.Raw.BlockNumber,
-						Removed: i.Raw.Removed,
-						Raw:     i.Raw,
-					}
-				}
-			}
-		}()
-	}
-	return out, errc
-}
-
-func subscribeEvent(ctx context.Context, proxy *dosproxy.DosproxySession, subscribeType int) (chan interface{}, chan interface{}) {
-	out := make(chan interface{})
-	errc := make(chan interface{})
-	opt := &bind.WatchOpts{}
-
-	switch subscribeType {
-	case SubscribeLogUpdateRandom:
-		go func() {
-			transitChan := make(chan *dosproxy.DosproxyLogUpdateRandom)
-			defer close(transitChan)
-			defer close(errc)
-			defer close(out)
-			sub, err := proxy.Contract.WatchLogUpdateRandom(opt, transitChan)
-			if err != nil {
-				return
-			}
-			for {
-				select {
-				case <-ctx.Done():
-					sub.Unsubscribe()
-					return
-				case err := <-sub.Err():
-					errc <- err
-					return
-				case i := <-transitChan:
-					out <- &LogUpdateRandom{
-						LastRandomness:    i.LastRandomness,
-						DispatchedGroupId: i.DispatchedGroupId,
-						Tx:                i.Raw.TxHash.Hex(),
-						BlockN:            i.Raw.BlockNumber,
-						Removed:           i.Raw.Removed,
-						Raw:               i.Raw,
-					}
-				}
-			}
-		}()
-	case SubscribeLogUrl:
-		go func() {
-			transitChan := make(chan *dosproxy.DosproxyLogUrl)
-			defer close(transitChan)
-			defer close(errc)
-			defer close(out)
-
-			sub, err := proxy.Contract.WatchLogUrl(opt, transitChan)
-			if err != nil {
-				return
-			}
-			for {
-				select {
-				case <-ctx.Done():
-					sub.Unsubscribe()
-					return
-				case err := <-sub.Err():
-					errc <- err
-					return
-				case i := <-transitChan:
-					out <- &LogUrl{
-						QueryId:           i.QueryId,
-						Timeout:           i.Timeout,
-						DataSource:        i.DataSource,
-						Selector:          i.Selector,
-						Randomness:        i.Randomness,
-						DispatchedGroupId: i.DispatchedGroupId,
-						Tx:                i.Raw.TxHash.Hex(),
-						BlockN:            i.Raw.BlockNumber,
-						Removed:           i.Raw.Removed,
-						Raw:               i.Raw,
-					}
-				}
-			}
-		}()
-	case SubscribeLogRequestUserRandom:
-		go func() {
-			transitChan := make(chan *dosproxy.DosproxyLogRequestUserRandom)
-			defer close(transitChan)
-			defer close(errc)
-			defer close(out)
-
-			sub, err := proxy.Contract.WatchLogRequestUserRandom(opt, transitChan)
-			if err != nil {
-				return
-			}
-			for {
-				select {
-				case <-ctx.Done():
-					sub.Unsubscribe()
-					return
-				case err := <-sub.Err():
-					errc <- err
-					return
-				case i := <-transitChan:
-					out <- &LogRequestUserRandom{
-						RequestId:            i.RequestId,
-						LastSystemRandomness: i.LastSystemRandomness,
-						UserSeed:             i.UserSeed,
-						DispatchedGroupId:    i.DispatchedGroupId,
-						Tx:                   i.Raw.TxHash.Hex(),
-						BlockN:               i.Raw.BlockNumber,
-						Removed:              i.Raw.Removed,
-						Raw:                  i.Raw,
-					}
-				}
-			}
-		}()
-	case SubscribeLogValidationResult:
-		go func() {
-			transitChan := make(chan *dosproxy.DosproxyLogValidationResult)
-			defer close(transitChan)
-			defer close(errc)
-			defer close(out)
-
-			sub, err := proxy.Contract.WatchLogValidationResult(opt, transitChan)
-			if err != nil {
-				fmt.Println("SubscribeLogValidationResult err", err)
-				return
-			}
-			for {
-				select {
-				case <-ctx.Done():
-					fmt.Println("SubscribeLogValidationResult Done")
-
-					sub.Unsubscribe()
-					return
-				case err := <-sub.Err():
-					fmt.Println("SubscribeLogValidationResult err", err)
-
-					errc <- err
-					return
-				case i := <-transitChan:
-					out <- &LogValidationResult{
-						TrafficType: i.TrafficType,
-						TrafficId:   i.TrafficId,
-						Message:     i.Message,
-						Signature:   i.Signature,
-						PubKey:      i.PubKey,
-						Pass:        i.Pass,
-						Version:     i.Version,
-						Tx:          i.Raw.TxHash.Hex(),
-						BlockN:      i.Raw.BlockNumber,
-						Removed:     i.Raw.Removed,
-						Raw:         i.Raw,
-					}
-				}
-			}
-		}()
-	case SubscribeLogInsufficientPendingNode:
-		go func() {
-			transitChan := make(chan *dosproxy.DosproxyLogInsufficientPendingNode)
-			defer close(transitChan)
-			defer close(errc)
-			defer close(out)
-			sub, err := proxy.Contract.WatchLogInsufficientPendingNode(opt, transitChan)
-			if err != nil {
-				return
-			}
-			for {
-				select {
-				case <-ctx.Done():
-					sub.Unsubscribe()
-					return
-				case err := <-sub.Err():
-					errc <- err
-					return
-				case i := <-transitChan:
-					out <- &LogInsufficientPendingNode{
-						NumPendingNodes: i.NumPendingNodes,
-						Tx:              i.Raw.TxHash.Hex(),
-						BlockN:          i.Raw.BlockNumber,
-						Removed:         i.Raw.Removed,
-						Raw:             i.Raw,
-					}
-				}
-			}
-		}()
-	case SubscribeLogInsufficientWorkingGroup:
-		go func() {
-			transitChan := make(chan *dosproxy.DosproxyLogInsufficientWorkingGroup)
-			defer close(transitChan)
-			defer close(errc)
-			defer close(out)
-			sub, err := proxy.Contract.WatchLogInsufficientWorkingGroup(opt, transitChan)
-			if err != nil {
-				return
-			}
-			for {
-				select {
-				case <-ctx.Done():
-					sub.Unsubscribe()
-					return
-				case err := <-sub.Err():
-					errc <- err
-					return
-				case i := <-transitChan:
-					out <- &LogInsufficientWorkingGroup{
-						NumWorkingGroups: i.NumWorkingGroups,
-						Tx:               i.Raw.TxHash.Hex(),
-						BlockN:           i.Raw.BlockNumber,
-						Removed:          i.Raw.Removed,
-						Raw:              i.Raw,
-					}
-				}
-			}
-		}()
-	case SubscribeLogGroupingInitiated:
-		go func() {
-			transitChan := make(chan *dosproxy.DosproxyLogGroupingInitiated)
-			defer close(transitChan)
-			defer close(errc)
-			defer close(out)
-			sub, err := proxy.Contract.WatchLogGroupingInitiated(opt, transitChan)
-			if err != nil {
-				return
-			}
-			for {
-				select {
-				case <-ctx.Done():
-					sub.Unsubscribe()
-					return
-				case err := <-sub.Err():
-					errc <- err
-					return
-				case i := <-transitChan:
-					out <- &LogGroupingInitiated{
-						Tx:      i.Raw.TxHash.Hex(),
-						BlockN:  i.Raw.BlockNumber,
-						Removed: i.Raw.Removed,
-						Raw:     i.Raw,
-					}
-				}
-			}
-		}()
-	case SubscribeDosproxyUpdateGroupToPick:
-		go func() {
-			transitChan := make(chan *dosproxy.DosproxyUpdateGroupToPick)
-			defer close(transitChan)
-			defer close(errc)
-			defer close(out)
-			sub, err := proxy.Contract.WatchUpdateGroupToPick(opt, transitChan)
-			if err != nil {
-				fmt.Println("WatchUpdateGroupToPick err ", err)
-
-				return
-			}
-			for {
-				select {
-				case <-ctx.Done():
-					sub.Unsubscribe()
-					return
-				case err := <-sub.Err():
-					fmt.Println("SubscribeDosproxyUpdateGroupToPick err ", err)
-					errc <- err
-					return
-				case i := <-transitChan:
-					out <- &LogUpdateGroupToPick{
-						Tx:      i.Raw.TxHash.Hex(),
-						OldNum:  i.OldNum,
-						NewNum:  i.NewNum,
-						BlockN:  i.Raw.BlockNumber,
-						Removed: i.Raw.Removed,
-						Raw:     i.Raw,
-					}
-				}
-			}
-		}()
-	case SubscribeLogGrouping:
-		go func() {
-			transitChan := make(chan *dosproxy.DosproxyLogGrouping)
-			defer close(transitChan)
-			defer close(errc)
-			defer close(out)
-			sub, err := proxy.Contract.WatchLogGrouping(opt, transitChan)
-			if err != nil {
-				return
-			}
-			for {
-				select {
-				case <-ctx.Done():
-					sub.Unsubscribe()
-					return
-				case err := <-sub.Err():
-					errc <- err
-					return
-				case i := <-transitChan:
-					out <- &LogGrouping{
-						GroupId: i.GroupId,
-						NodeId:  i.NodeId,
-						Tx:      i.Raw.TxHash.Hex(),
-						BlockN:  i.Raw.BlockNumber,
-						Removed: i.Raw.Removed,
-						Raw:     i.Raw,
-					}
-				}
-			}
-		}()
-	case SubscribeLogPublicKeyAccepted:
-		go func() {
-			transitChan := make(chan *dosproxy.DosproxyLogPublicKeyAccepted)
-			defer close(transitChan)
-			defer close(errc)
-			defer close(out)
-			sub, err := proxy.Contract.WatchLogPublicKeyAccepted(opt, transitChan)
-			if err != nil {
-				return
-			}
-			for {
-				select {
-				case <-ctx.Done():
-					sub.Unsubscribe()
-					return
-				case err := <-sub.Err():
-					errc <- err
-					return
-				case i := <-transitChan:
-					out <- &LogPublicKeyAccepted{
-						GroupId:          i.GroupId,
-						WorkingGroupSize: i.NumWorkingGroups,
-						Tx:               i.Raw.TxHash.Hex(),
-						BlockN:           i.Raw.BlockNumber,
-						Removed:          i.Raw.Removed,
-						Raw:              i.Raw,
-					}
-				}
-			}
-		}()
-	case SubscribeLogPublicKeySuggested:
-		go func() {
-			transitChan := make(chan *dosproxy.DosproxyLogPublicKeySuggested)
-			defer close(transitChan)
-			defer close(errc)
-			defer close(out)
-			sub, err := proxy.Contract.WatchLogPublicKeySuggested(opt, transitChan)
-			if err != nil {
-				return
-			}
-			for {
-				select {
-				case <-ctx.Done():
-					sub.Unsubscribe()
-					return
-				case err := <-sub.Err():
-					errc <- err
-					return
-				case i := <-transitChan:
-					out <- &LogPublicKeySuggested{
-						GroupId: i.GroupId,
-						Count:   i.PubKeyCount,
-						Tx:      i.Raw.TxHash.Hex(),
-						BlockN:  i.Raw.BlockNumber,
-						Removed: i.Raw.Removed,
-						Raw:     i.Raw,
-					}
-				}
-			}
-		}()
-	case SubscribeLogGroupDissolve:
-		go func() {
-			transitChan := make(chan *dosproxy.DosproxyLogGroupDissolve)
-			defer close(transitChan)
-			defer close(errc)
-			defer close(out)
-			sub, err := proxy.Contract.WatchLogGroupDissolve(opt, transitChan)
-			if err != nil {
-				return
-			}
-			for {
-				select {
-				case <-ctx.Done():
-					sub.Unsubscribe()
-					return
-				case err := <-sub.Err():
-					errc <- err
-					return
-				case i := <-transitChan:
-					out <- &LogGroupDissolve{
-						GroupId: i.GroupId,
-						Tx:      i.Raw.TxHash.Hex(),
-						BlockN:  i.Raw.BlockNumber,
-						Removed: i.Raw.Removed,
-						Raw:     i.Raw,
-					}
-				}
-			}
-		}()
-	}
-	return out, errc
 }
 
 // LastRandomness return the last system random number
@@ -1719,6 +1863,7 @@ func (e *ethAdaptor) IsPendingNode(ctx context.Context, id []byte) (result bool,
 				case outc <- val:
 				}
 			} else {
+				fmt.Printf("Type %T ", p)
 				select {
 				case <-ctx.Done():
 				case errc <- errors.New("cast error"):
@@ -1727,8 +1872,10 @@ func (e *ethAdaptor) IsPendingNode(ctx context.Context, id []byte) (result bool,
 		}()
 		return outc, errc
 	}
+	addr := common.Address{}
 
-	vr, ve := e.get(ctx, f, id)
+	addr.SetBytes(id)
+	vr, ve := e.get(ctx, f, addr)
 	if v, ok := vr.(common.Address); ok {
 		if v.Big().Cmp(big.NewInt(0)) == 0 {
 			result = false
@@ -1906,8 +2053,8 @@ func (e *ethAdaptor) CurrentBlock(ctx context.Context) (result uint64, err error
 }
 
 // Address gets the string representation of the underlying address.
-func (e *ethAdaptor) Address() (addr []byte) {
-	return e.key.Address.Bytes()
+func (e *ethAdaptor) Address() (addr common.Address) {
+	return e.key.Address
 }
 
 func convertToError(ctx context.Context, i chan interface{}) (out chan error) {

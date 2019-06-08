@@ -2,6 +2,7 @@ package dosnode
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -18,6 +19,9 @@ func (d *DosNode) status(w http.ResponseWriter, r *http.Request) {
 	}
 	html := "=================================================" + "\n|"
 	html = html + "StartTime      :" + d.startTime.Format("2006-01-02T15:04:05.999999-07:00") + "\n|"
+	html = html + "Address          : " + fmt.Sprintf("%x", d.p.GetID()) + "\n|"
+	html = html + "IP          : " + fmt.Sprintf("%s", d.p.GetIP()) + "\n|"
+
 	html = html + "State          : " + d.state + "\n|"
 	html = html + "IsPendingnNode : " + strconv.FormatBool(isPendingNode) + "\n|"
 	html = html + "TotalQuery     : " + strconv.Itoa(d.totalQuery) + "\n|"

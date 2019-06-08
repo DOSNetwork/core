@@ -161,8 +161,8 @@ func addProxyToCRWhiteList(client *ethclient.Client, key *keystore.Key, crAddres
 	var auth *bind.TransactOpts
 	fmt.Println("start to update proxy address to bridge...")
 	auth = bind.NewKeyedTransactor(key.PrivateKey)
-	auth.GasLimit = uint64(5000000)
-
+	auth.GasLimit = uint64(6000000)
+	auth.GasPrice = big.NewInt(30000000000)
 	cr, err := commitreveal.NewCommitreveal(crAddress, client)
 	if err != nil {
 		return
@@ -197,6 +197,7 @@ func deployContract(contractPath, targetTask, configPath string, config configur
 	var address common.Address
 	auth := bind.NewKeyedTransactor(key.PrivateKey)
 	auth.GasLimit = uint64(6000000)
+	auth.GasPrice = big.NewInt(30000000000)
 	var err error
 	if targetTask == "deployBridge" {
 		fmt.Println("Starting deploy DOSAddressBridge.sol...")

@@ -14,8 +14,9 @@ const (
 )
 
 var (
-	urls           = []string{"ws://18.236.117.126:8546", "ws://18.237.179.193:8546", "ws://18.236.80.51:8546"}
-	proxyAddr      = "0xE41546987bf5d4737961291C3eA7F3eDd3e2fbC7"
+	urls           = []string{"ws://51.15.0.157:8546", "ws://51.159.4.51:8546"}
+	proxyAddr      = "0x3b8Cb935bDdFAF59EFa11aFfDfc8760387624fa2"
+	crAddr         = "0xE04B34A113BB707eCF8dc01D51f8A56213Bdcb81"
 	credentialPath = "/Users/chenhaonien/go/src/github.com/DOSNetwork/core/testAccounts/bootCredential/fundKey/"
 	passphrase     = "123"
 )
@@ -61,6 +62,11 @@ func TestLastUpdatedBlock(t *testing.T) {
 		t.Errorf("LastRandomness() Failed , got an error: %s.", e.Error())
 	}
 	fmt.Println("LastRandomness()	 ", rand)
+	pending, e := adaptor.IsPendingNode(context.Background(), adaptor.Address().Bytes())
+	if e != nil {
+		t.Errorf("LastRandomness() Failed , got an error: %s.", e.Error())
+	}
+	fmt.Println("IsPendingNode()	 ", pending)
 }
 
 func TestConcurrentSend(t *testing.T) {
@@ -104,6 +110,46 @@ L:
 		}
 	}
 }
+
+func TestCommitReveal(t *testing.T) {
+	adaptor, err := NewEthAdaptor(credentialPath, passphrase, proxyAddr, crAddr, urls)
+	if err != nil {
+		t.Errorf("TestCommitReveal Failed, got an error : %s.", err.Error())
+		return
+	}
+
+	sink, errc := adaptor.SubscribeEvent(SubscribeCommitrevealLogStartCommitreveal)
+
+	ctx := context.Background()
+	err = adaptor.AddToWhitelist(ctx, adaptor.Address())
+	if err != nil {
+		t.Errorf("TestCommitReveal Failed, got an error : %s.", err.Error())
+		return
+	}
+	err = adaptor.StartCommitReveal(ctx, 1, 1, 1, 1)
+	if err != nil {
+		t.Errorf("TestCommitReveal Failed, got an error : %s.", err.Error())
+		return
+	}
+	for {
+		select {
+		case event, ok := <-sink:
+			if ok {
+				switch content := event.(type) {
+				case *LogStartCommitReveal:
+					_ = content
+					fmt.Println("LogStartCommitreveal ")
+				}
+			}
+		case e, ok := <-errc:
+			if ok {
+				err = e
+				fmt.Println("TestCommitReveal event err ", err)
+			}
+		}
+	}
+}
+
 func TestSetErrorHandling(t *testing.T) {
 	adaptor, err := NewEthAdaptor(credentialPath, passphrase, proxyAddr, "", urls)
 	if err != nil {

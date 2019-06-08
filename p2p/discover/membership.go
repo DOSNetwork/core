@@ -72,7 +72,7 @@ func (s *serfNet) PeersIP() (addr []net.IP) {
 	members := s.serf.Members()
 	for i := 0; i < len(members); i++ {
 
-		if members[i].Name != s.serf.LocalMember().Name && members[i].Status == serf.StatusAlive {
+		if members[i].Name != s.serf.LocalMember().Name {
 			fmt.Println("localMember ", []byte(s.serf.LocalMember().Name), "members[i].Name ", []byte(members[i].Name), " status ", members[i].Status, " addr ", members[i].Addr)
 
 			addr = append(addr, members[i].Addr)

@@ -126,7 +126,7 @@ func NewDosNode(credentialPath, passphrase string) (dosNode *DosNode, err error)
 	id := chainConn.Address()
 
 	//Build a p2p network
-	p, err := p2p.CreateP2PNetwork(id, port, p2p.GossipDiscover)
+	p, err := p2p.CreateP2PNetwork(id.Bytes(), port, p2p.GossipDiscover)
 	if err != nil {
 		fmt.Println("CreateP2PNetwork err ", err)
 		return
@@ -168,7 +168,7 @@ func NewDosNode(credentialPath, passphrase string) (dosNode *DosNode, err error)
 		done:              make(chan interface{}),
 		cSignToPeer:       make(chan *vss.Signature, 21),
 		cRequestDone:      make(chan [4]*big.Int),
-		id:                id,
+		id:                id.Bytes(),
 		logger:            log.New("module", "dosclient"),
 		startTime:         time.Now(),
 		state:             "Init Done",
@@ -196,12 +196,18 @@ func (d *DosNode) Start() (err error) {
 
 	d.state = "connecting and syncing geth node"
 
-	err = d.chain.RegisterNewNode(context.Background())
-	if err != nil {
-		d.state = "RegisterNewNode failed"
-		fmt.Println("RegisterNewNode failed ,", err.Error())
-		d.logger.Error(err)
-		return
+	for {
+		err = d.chain.RegisterNewNode(context.Background())
+		if err != nil {
+			if strings.Contains(err.Error(), "no suitable peers available") {
+				time.Sleep(15 * time.Second)
+				continue
+			}
+			fmt.Println("RegisterNewNode err ", err)
+			return
+		} else {
+			break
+		}
 	}
 
 	if err = d.listen(); err != nil {
@@ -242,10 +248,11 @@ func (d *DosNode) waitForRequestDone(ctx context.Context, cancel context.CancelF
 	for {
 		select {
 		case err, ok := <-errc:
-			if !ok {
-				return
+			if ok && err != nil {
+				d.logger.Event("waitForRequestError", map[string]interface{}{"Error": err.Error(), "GroupID": groupID, "RequestID": fmt.Sprintf("%x", requestID)})
 			}
-			d.logger.Event("waitForRequestError", map[string]interface{}{"Error": err.Error(), "GroupID": groupID, "RequestID": fmt.Sprintf("%x", requestID)})
+			return
+
 		case <-ctx.Done():
 			d.logger.Event("waitForRequestError", map[string]interface{}{"Error": ctx.Err(), "GroupID": groupID, "RequestID": fmt.Sprintf("%x", requestID)})
 			return
@@ -379,6 +386,7 @@ func (d *DosNode) listen() (err error) {
 	for {
 		select {
 		case msg, ok := <-commitRevealStart:
+			fmt.Println("commitRevealStart ")
 			if !ok {
 				continue
 			}

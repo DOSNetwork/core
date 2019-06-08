@@ -6,6 +6,7 @@ import (
 	"math/big"
 
 	"github.com/DOSNetwork/core/share/vss/pedersen"
+	"github.com/ethereum/go-ethereum/common"
 )
 
 const (
@@ -24,6 +25,8 @@ type ProxyAdapter interface {
 	SetGroupToPick(ctx context.Context, groupToPick uint64) (errc error)
 	SetGroupSize(ctx context.Context, size uint64) (errc error)
 	SetGroupMaturityPeriod(ctx context.Context, size uint64) (errc error)
+	AddToWhitelist(ctx context.Context, addr common.Address) (err error)
+	StartCommitReveal(ctx context.Context, startBlock int64, commitDuration int64, revealDuration int64, revealThreshold int64) (err error)
 	Commit(ctx context.Context, cid *big.Int, commitment [32]byte) (errc error)
 	Reveal(ctx context.Context, cid *big.Int, secret *big.Int) (errc error)
 	//Guardian node functions
@@ -41,7 +44,7 @@ type ProxyAdapter interface {
 	NumPendingGroups(ctx context.Context) (r uint64, err error)
 	NumPendingNodes(ctx context.Context) (r uint64, err error)
 	Balance(ctx context.Context) (balance *big.Float, err error)
-	Address() (addr []byte)
+	Address() (addr common.Address)
 	CurrentBlock(ctx context.Context) (r uint64, err error)
 	PendingNonce(ctx context.Context) (r uint64, err error)
 	RefreshSystemRandomHardLimit(ctx context.Context) (limit uint64, err error)
