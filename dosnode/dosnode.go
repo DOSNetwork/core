@@ -196,19 +196,8 @@ func (d *DosNode) Start() (err error) {
 
 	d.state = "connecting and syncing geth node"
 
-	for {
-		err = d.chain.RegisterNewNode(context.Background())
-		if err != nil {
-			if strings.Contains(err.Error(), "no suitable peers available") {
-				time.Sleep(15 * time.Second)
-				continue
-			}
-			fmt.Println("RegisterNewNode err ", err)
-			return
-		} else {
-			break
-		}
-	}
+	//TODO: Check to see if it is a valid stacking node first
+	_ = d.chain.RegisterNewNode(context.Background())
 
 	if err = d.listen(); err != nil {
 		fmt.Println("listen err ", err)
@@ -654,9 +643,9 @@ func (d *DosNode) listen() (err error) {
 					"RequestId":            requestID,
 					"GroupID":              groupID,
 					"LastSystemRandomness": lastRand,
-					"Tx":      content.Tx,
-					"CurBlkN": currentBlockNumber,
-					"BlockN":  content.BlockN}
+					"Tx":                   content.Tx,
+					"CurBlkN":              currentBlockNumber,
+					"BlockN":               content.BlockN}
 				d.logger.Event("DOS_QuerySysRandom", f)
 
 				ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(40*15*time.Second))
@@ -685,9 +674,9 @@ func (d *DosNode) listen() (err error) {
 					"RequestId":            requestID,
 					"GroupID":              groupID,
 					"LastSystemRandomness": lastRand,
-					"Tx":      content.Tx,
-					"CurBlkN": currentBlockNumber,
-					"BlockN":  content.BlockN}
+					"Tx":                   content.Tx,
+					"CurBlkN":              currentBlockNumber,
+					"BlockN":               content.BlockN}
 				d.logger.Event("DOS_QueryUserRandom", f)
 
 				ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(40*15*time.Second))

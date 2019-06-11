@@ -60,9 +60,9 @@ func (d *DosNode) signalRandom(w http.ResponseWriter, r *http.Request) {
 	d.chain.SignalRandom(context.Background())
 }
 func (d *DosNode) p2p(w http.ResponseWriter, r *http.Request) {
-	memNum, connNum := d.p.ConnectToAll()
-	html := "members length : " + strconv.Itoa(memNum) + "\n connection length : " + strconv.Itoa(connNum)
-	w.Write([]byte(html))
+	//	memNum, connNum := d.p.ConnectToAll()
+	//	html := "members length : " + strconv.Itoa(memNum) + "\n connection length : " + strconv.Itoa(connNum)
+	//	w.Write([]byte(html))
 }
 func (d *DosNode) proxy(w http.ResponseWriter, r *http.Request) {
 	ctx, cancelFunc := context.WithDeadline(context.Background(), time.Now().Add(3*time.Second))

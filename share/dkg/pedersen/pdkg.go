@@ -19,6 +19,7 @@ import (
 	"github.com/dedis/kyber"
 )
 
+// PDKGInterface is a interface for DKG
 type PDKGInterface interface {
 	GetGroupPublicPoly(groupId string) *share.PubPoly
 	GetShareSecurity(groupId string) *share.PriShare
@@ -51,6 +52,7 @@ type request struct {
 	reply      chan []interface{}
 }
 
+// NewPDKG creates a pdkg struct
 func NewPDKG(p p2p.P2PInterface, suite suites.Suite) PDKGInterface {
 	d := &pdkg{
 		p:         p,
@@ -179,7 +181,7 @@ func (d *pdkg) Grouping(ctx context.Context, sessionID string, groupIds [][]byte
 	errcList = append(errcList, errc)
 	errcList = append(errcList, sendToMembers(ctx, d.logger, respsc, d.p, groupIds))
 
-	//process responces to certify dkg and generate a group sec and pub key
+	//process response to certify dkg and generate a group sec and pub key
 	cetifiedDkgc, errc := getAndProcessResponses(ctx, d.logger, dkgcStep3, askMembers(ctx, d.logger, d.bufToNode, (len(groupIds)-1)*(len(groupIds)-1), 2, sessionID))
 	outc, errc := genGroup(ctx, d.logger, group, d.suite, cetifiedDkgc, sessionID)
 	errcList = append(errcList, errc)
@@ -595,7 +597,7 @@ func reportErr(ctx context.Context, errc chan error, err error) {
 
 func fanOut(ctx context.Context, ch chan interface{}, size int) (cs []chan interface{}) {
 	cs = make([]chan interface{}, size)
-	for i, _ := range cs {
+	for i := range cs {
 		cs[i] = make(chan interface{})
 	}
 	go func() {
