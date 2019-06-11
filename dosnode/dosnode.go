@@ -397,15 +397,12 @@ func (d *DosNode) listen() (err error) {
 				err = d.chain.Commit(context.Background(), cid, *hash)
 				if err != nil {
 					fmt.Println("Waiting for commit err", err)
-					return
 				}
 				for {
 					cur, err := d.chain.CurrentBlock(context.Background())
 					if err != nil {
 						fmt.Println("CurrentBlock err", err)
-
 						d.logger.Error(err)
-						return
 					}
 					fmt.Println("Waiting for Reveal ", cur, startBlock+commitDur)
 					if cur > startBlock+commitDur {
@@ -418,9 +415,7 @@ func (d *DosNode) listen() (err error) {
 					cur, err := d.chain.CurrentBlock(context.Background())
 					if err != nil {
 						fmt.Println("CurrentBlock err", err)
-
 						d.logger.Error(err)
-						return
 					}
 					fmt.Println("Waiting for random ", cur, startBlock+commitDur+revealDur)
 					if cur > startBlock+commitDur+revealDur {
