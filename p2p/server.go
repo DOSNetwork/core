@@ -129,6 +129,10 @@ func (n *server) SetPort(port string) {
 	n.port = port
 }
 
+func (n *server) GetPort() string {
+	return n.port
+}
+
 func (n *server) GetID() []byte {
 	return n.id
 }

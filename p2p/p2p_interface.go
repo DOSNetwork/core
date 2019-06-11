@@ -40,6 +40,7 @@ type P2PInterface interface {
 	GetIP() net.IP
 	GetID() []byte
 	SetPort(port string)
+	GetPort() string
 	Listen() error
 	Join(bootstrapIp []string) (num int, err error)
 	ConnectTo(ip string, id []byte) ([]byte, error)
