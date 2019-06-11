@@ -8,7 +8,7 @@ import (
 	"net"
 	"reflect"
 
-	//	"strings"
+	"sync"
 	"time"
 
 	"github.com/dedis/kyber"
@@ -78,19 +78,45 @@ func (n *server) Members() int {
 	return n.members.NumOfPeers()
 }
 
-func (n *server) ConnectToAll() (memNum, connNum int) {
-	addrs := n.members.PeersIP()
-	memNum = len(addrs)
-	for _, addr := range addrs {
-		if _, err := n.ConnectTo(addr.String(), nil); err != nil {
-			fmt.Println("ConnectTo ", addr, " fail", err)
-		} else {
-			connNum++
+func (n *server) ConnectToAll(ctx context.Context, groupIds [][]byte) (out chan bool, errc chan error) {
+	out = make(chan bool)
+	errc = make(chan error)
+	go func() {
+		defer close(out)
+		defer close(errc)
+		var wg sync.WaitGroup
+		wg.Add(len(groupIds) - 1)
+		for i := 0; i < len(groupIds); i++ {
+			if !bytes.Equal(n.GetID(), groupIds[i]) {
+				go func(id []byte) {
+					defer wg.Done()
+					for {
+						select {
+						case <-ctx.Done():
+						default:
+							if _, err := n.ConnectTo("", id); err != nil {
+								select {
+								case errc <- err:
+								case <-ctx.Done():
+								}
+								time.Sleep(1 * time.Second)
+								continue
+							}
+							return
+						}
+					}
+				}(groupIds[i])
+			}
 		}
-	}
-
+		wg.Wait()
+		select {
+		case out <- true:
+		case <-ctx.Done():
+		}
+	}()
 	return
 }
+
 func (n *server) numOfClient() (iNum, cNum int) {
 	return n.incomingNum, n.callingNum
 }

@@ -3,12 +3,12 @@ package dkg
 import (
 	"bytes"
 	"context"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
 	"sync"
-	"time"
+
+	"github.com/golang/protobuf/proto"
 
 	"github.com/DOSNetwork/core/log"
 	"github.com/DOSNetwork/core/p2p"
@@ -16,31 +16,7 @@ import (
 	"github.com/DOSNetwork/core/share/vss/pedersen"
 	"github.com/DOSNetwork/core/suites"
 	"github.com/dedis/kyber"
-	"golang.org/x/crypto/sha3"
 )
-
-var logger log.Logger
-
-type ReqPubs struct {
-	ctx       context.Context
-	SessionId string
-	numOfPubs int
-	Pubkeys   chan []*PublicKey
-}
-
-type ReqDeals struct {
-	ctx        context.Context
-	SessionId  string
-	numOfDeals int
-	Reply      chan []*Deal
-}
-
-type ReResps struct {
-	ctx        context.Context
-	SessionId  string
-	numOfResps int
-	Reply      chan []*Response
-}
 
 type PDKGInterface interface {
 	GetGroupPublicPoly(groupId string) *share.PubPoly
@@ -51,69 +27,592 @@ type PDKGInterface interface {
 	GroupDissolve(groupId string)
 }
 
-func NewPDKG(p p2p.P2PInterface, suite suites.Suite) PDKGInterface {
-	logger = log.New("module", "dkg")
-	pdkg := &PDKG{
-		p:         p,
-		bufToNode: make(chan interface{}, 50),
-		register:  make(chan *Group),
-		suite:     suite,
-	}
-	pdkg.Listen()
-	return pdkg
-}
-
-type PDKG struct {
+type pdkg struct {
 	p         p2p.P2PInterface
 	suite     suites.Suite
 	bufToNode chan interface{}
-	register  chan *Group
+	register  chan *group
 	groups    sync.Map
+	logger    log.Logger
 }
 
-type Group struct {
-	Participants [][]byte
-	SecShare     *DistKeyShare
-	PubPoly      *share.PubPoly
+type group struct {
+	participants [][]byte
+	secShare     *DistKeyShare
+	pubPoly      *share.PubPoly
 }
 
-func (d *PDKG) GetGroupPublicPoly(groupId string) (pubPoly *share.PubPoly) {
-	if group, loaded := d.groups.Load(groupId); loaded {
-		pubPoly = group.(*Group).PubPoly
+type request struct {
+	ctx        context.Context
+	reqType    int
+	sessionID  string
+	numOfResps int
+	reply      chan []interface{}
+}
+
+func NewPDKG(p p2p.P2PInterface, suite suites.Suite) PDKGInterface {
+	d := &pdkg{
+		p:         p,
+		bufToNode: make(chan interface{}, 50),
+		register:  make(chan *group),
+		suite:     suite,
+		logger:    log.New("module", "dkg"),
+	}
+	d.listen()
+	return d
+}
+
+func handlePeerMsg(sessionMap map[string][]interface{}, sessionReq map[string]request, p p2p.P2PInterface, sessionID string, content interface{}) {
+	sessionMap[sessionID] = append(sessionMap[sessionID], content)
+	if sessionMap[sessionID] != nil {
+		if len(sessionMap[sessionID]) == sessionReq[sessionID].numOfResps {
+			select {
+			case <-sessionReq[sessionID].ctx.Done():
+			case sessionReq[sessionID].reply <- sessionMap[sessionID]:
+			}
+			close(sessionReq[sessionID].reply)
+			delete(sessionMap, sessionID)
+			delete(sessionReq, sessionID)
+		}
+	}
+}
+
+func handleRequest(sessionMap map[string][]interface{}, sessionReq map[string]request, request request) {
+	sessionReq[request.sessionID] = request
+	if len(sessionMap[request.sessionID]) == request.numOfResps {
+		select {
+		case <-sessionReq[request.sessionID].ctx.Done():
+		case sessionReq[request.sessionID].reply <- sessionMap[request.sessionID]:
+		}
+		close(sessionReq[request.sessionID].reply)
+		delete(sessionMap, request.sessionID)
+		delete(sessionReq, request.sessionID)
+	}
+}
+func (d *pdkg) listen() {
+	peersToBuf, _ := d.p.SubscribeEvent(10, PublicKey{}, Deal{}, Responses{})
+	_ = peersToBuf
+	go func() {
+		sessionPubKeys := make(map[string][]interface{})
+		sessionDeals := make(map[string][]interface{})
+		sessionResps := make(map[string][]interface{})
+		sessionReqPubs := map[string]request{}
+		sessionReqDeals := map[string]request{}
+		sessionReResps := map[string]request{}
+		for {
+			select {
+			case msg, ok := <-peersToBuf:
+				if !ok {
+					return
+				}
+				switch content := msg.Msg.Message.(type) {
+				case *PublicKey:
+					d.p.Reply(msg.Sender, msg.RequestNonce, &PublicKey{})
+					handlePeerMsg(sessionPubKeys, sessionReqPubs, d.p, content.SessionId, content)
+				case *Deal:
+					d.p.Reply(msg.Sender, msg.RequestNonce, &Deal{})
+					handlePeerMsg(sessionDeals, sessionReqDeals, d.p, content.SessionId, content)
+				case *Responses:
+					d.p.Reply(msg.Sender, msg.RequestNonce, &Responses{})
+					//var resps []*Response
+					resps := content.Response
+					for _, resp := range resps {
+						handlePeerMsg(sessionResps, sessionReResps, d.p, content.SessionId, resp)
+					}
+				}
+
+			case req, ok := <-d.bufToNode:
+				if !ok {
+					return
+				}
+				if r, ok := req.(request); ok {
+					switch r.reqType {
+					case 0:
+						handleRequest(sessionPubKeys, sessionReqPubs, r)
+					case 1:
+						handleRequest(sessionDeals, sessionReqDeals, r)
+					case 2:
+						handleRequest(sessionResps, sessionReResps, r)
+					}
+				} else {
+					fmt.Println("handleRequest cast error")
+				}
+			}
+		}
+	}()
+}
+
+func (d *pdkg) Grouping(ctx context.Context, sessionID string, groupIds [][]byte) (chan [5]*big.Int, chan error, error) {
+	group := &group{participants: groupIds}
+	var errcList []chan error
+	if _, loaded := d.groups.LoadOrStore(sessionID, group); loaded {
+		return nil, nil, errors.New("dkg: duplicate share public key")
+	}
+
+	//Check if all members are reachable
+	connc, errc := d.p.ConnectToAll(ctx, groupIds)
+	errcList = append(errcList, errc)
+	//exchange pub key
+	selfPubc, secrc, errc := genPub(ctx, connc, d.suite, d.p.GetID(), groupIds, sessionID)
+	errcList = append(errcList, errc)
+	selfPubcs := fanOut(ctx, selfPubc, 2)
+	errcList = append(errcList, sendToMembers(ctx, selfPubcs[0], d.p, groupIds))
+	peerPubc := askMembers(ctx, d.bufToNode, len(groupIds)-1, 0, sessionID)
+	errcList = append(errcList, errc)
+	partPubsc, errc := exchangePub(ctx, selfPubcs[1], peerPubc, d.p, groupIds)
+	errcList = append(errcList, errc)
+
+	//generate a dkg
+	dkgcStep1, errc := genDistKeyGenerator(ctx, secrc, partPubsc, len(groupIds), d.suite)
+	errcList = append(errcList, errc)
+
+	//generate deals for other member and process deals from other member
+	dkgcStep2, errc := genDealsAndSend(ctx, dkgcStep1, d.p, groupIds, sessionID)
+	errcList = append(errcList, errc)
+	dkgcStep3, respsc, errc := getAndProcessDeals(ctx, dkgcStep2, askMembers(ctx, d.bufToNode, len(groupIds)-1, 1, sessionID), sessionID)
+	errcList = append(errcList, errc)
+	errcList = append(errcList, sendToMembers(ctx, respsc, d.p, groupIds))
+
+	//process responces to certify dkg and generate a group sec and pub key
+	cetifiedDkgc, errc := getAndProcessResponses(ctx, dkgcStep3, askMembers(ctx, d.bufToNode, (len(groupIds)-1)*(len(groupIds)-1), 2, sessionID))
+	outc, errc := genGroup(ctx, group, d.suite, cetifiedDkgc, sessionID)
+	errcList = append(errcList, errc)
+	errc = mergeErrors(ctx, errcList...)
+	return outc, errc, nil
+}
+
+func genPub(ctx context.Context, conn chan bool, suite suites.Suite, id []byte, groupIds [][]byte, sessionID string) (out chan interface{}, secrc chan kyber.Scalar, errc chan error) {
+	out = make(chan interface{})
+	secrc = make(chan kyber.Scalar)
+	errc = make(chan error)
+	go func() {
+		defer fmt.Println("1 ) genPub")
+		defer close(out)
+		defer close(errc)
+		select {
+		case c, ok := <-conn:
+			if ok && c == true {
+				//Index pub key
+				index := -1
+				for i, groupId := range groupIds {
+					if r := bytes.Compare(id, groupId); r == 0 {
+						index = i
+						break
+					}
+				}
+				if index == -1 {
+					reportErr(ctx, errc, errors.New("Can't find id in group IDs"))
+				}
+				//Generate secret and public key
+				sec := suite.Scalar().Pick(suite.RandomStream())
+				select {
+				case secrc <- sec:
+				case <-ctx.Done():
+				}
+				pub := suite.Point().Mul(sec, nil)
+				if bin, err := pub.MarshalBinary(); err != nil {
+					reportErr(ctx, errc, err)
+				} else {
+					pubkey := &PublicKey{SessionId: sessionID, Index: uint32(index), Publickey: &vss.PublicKey{Binary: bin}}
+					select {
+					case out <- pubkey:
+					case <-ctx.Done():
+					}
+					return
+				}
+			}
+		case <-ctx.Done():
+			return
+		}
+	}()
+	return
+}
+
+func exchangePub(ctx context.Context, selfPubc chan interface{}, peerPubc chan []interface{}, p p2p.P2PInterface, groupIds [][]byte) (out chan []*PublicKey, errc chan error) {
+	out = make(chan []*PublicKey)
+	errc = make(chan error)
+	go func() {
+		defer fmt.Println("2 ) exchangePub")
+
+		defer close(out)
+		defer close(errc)
+		var partPubs []*PublicKey
+		for {
+			select {
+			case <-ctx.Done():
+			case resp, ok := <-selfPubc:
+				if ok {
+					if pubkey, ok := resp.(*PublicKey); ok {
+						partPubs = append(partPubs, pubkey)
+					}
+				}
+			case resps, ok := <-peerPubc:
+				if ok {
+					for _, resp := range resps {
+						if pubkey, ok := resp.(*PublicKey); ok {
+							partPubs = append(partPubs, pubkey)
+						}
+					}
+				}
+			}
+			if len(partPubs) == len(groupIds) {
+				select {
+				case <-ctx.Done():
+				case out <- partPubs:
+				}
+				return
+			}
+		}
+	}()
+	return
+}
+
+func sendToMembers(ctx context.Context, msgc chan interface{}, p p2p.P2PInterface, groupIds [][]byte) (errc chan error) {
+	errc = make(chan error)
+	go func() {
+		defer close(errc)
+		select {
+		case <-ctx.Done():
+		case msg, ok := <-msgc:
+			if ok {
+				if m, ok := msg.(proto.Message); ok {
+					var wg sync.WaitGroup
+					wg.Add(len(groupIds) - 1)
+					for i, id := range groupIds {
+						if r := bytes.Compare(p.GetID(), id); r != 0 {
+							go func(i int, id []byte) {
+								defer wg.Done()
+								for {
+									//retry until success or ctx.Done
+									if _, err := p.Request(id, m); err != nil {
+										reportErr(ctx, errc, err)
+									} else {
+										return
+									}
+								}
+							}(i, id)
+						}
+					}
+					wg.Wait()
+				}
+			}
+		}
+	}()
+	return
+}
+
+func askMembers(ctx context.Context, bufToNode chan interface{}, numOfResp, reqTpe int, sessionID string) (out chan []interface{}) {
+	out = make(chan []interface{})
+	go func() {
+		req := request{ctx: ctx, reqType: reqTpe, sessionID: sessionID, numOfResps: numOfResp, reply: out}
+		select {
+		case <-ctx.Done():
+		case bufToNode <- req:
+		}
+	}()
+	return
+}
+
+func genDistKeyGenerator(ctx context.Context, secrc chan kyber.Scalar, partPubs chan []*PublicKey, numOfPubkeys int, suite suites.Suite) (out chan *DistKeyGenerator, errc chan error) {
+	out = make(chan *DistKeyGenerator)
+	errc = make(chan error)
+	go func() {
+		defer fmt.Println("3 ) genDistKeyGenerator")
+
+		defer close(out)
+		defer close(errc)
+		select {
+		case <-ctx.Done():
+		case sec, ok := <-secrc:
+			if ok {
+				select {
+				case <-ctx.Done():
+				case pubs, ok := <-partPubs:
+					if ok {
+						pubPoints := make([]kyber.Point, numOfPubkeys)
+						for _, pubkey := range pubs {
+							pubPoints[pubkey.Index] = suite.Point()
+							if err := pubPoints[pubkey.Index].UnmarshalBinary(pubkey.Publickey.Binary); err != nil {
+								reportErr(ctx, errc, err)
+								return
+							}
+						}
+						dkg, err := NewDistKeyGenerator(suite, sec, pubPoints, numOfPubkeys/2+1)
+						if err != nil {
+							reportErr(ctx, errc, err)
+						} else {
+							select {
+							case <-ctx.Done():
+							case out <- dkg:
+							}
+							return
+						}
+					}
+				}
+			}
+
+		}
+	}()
+	return
+}
+
+func genDealsAndSend(ctx context.Context, dkgc chan *DistKeyGenerator, p p2p.P2PInterface, groupIds [][]byte, sessionID string) (out chan *DistKeyGenerator, errc chan error) {
+	out = make(chan *DistKeyGenerator)
+	errc = make(chan error)
+	go func() {
+		defer fmt.Println("4 ) genDealsAndSend")
+
+		defer close(out)
+		defer close(errc)
+		select {
+		case <-ctx.Done():
+		case dkg, ok := <-dkgc:
+			if ok {
+				if deals, err := dkg.Deals(); err == nil {
+					var wg sync.WaitGroup
+					wg.Add(len(groupIds) - 1)
+					for i, d := range deals {
+						d.SessionId = sessionID
+						go func(id []byte, d *Deal) {
+							defer wg.Done()
+							if _, err := p.Request(id, d); err != nil {
+								fmt.Println("4 ) genDealsAndSend err id ", string(p.GetID()), string(id), err)
+								reportErr(ctx, errc, err)
+								return
+							}
+						}(groupIds[i], d)
+					}
+					wg.Wait()
+					select {
+					case <-ctx.Done():
+					case out <- dkg:
+					}
+				} else {
+					reportErr(ctx, errc, err)
+				}
+			}
+		}
+	}()
+	return
+}
+func getAndProcessDeals(ctx context.Context, dkgc chan *DistKeyGenerator, dealsc chan []interface{}, sessionID string) (dkgOut chan *DistKeyGenerator, out chan interface{}, errc chan error) {
+	dkgOut = make(chan *DistKeyGenerator)
+	out = make(chan interface{})
+	errc = make(chan error)
+	go func() {
+		defer fmt.Println("5 ) getAndProcessDeals")
+
+		defer close(dkgOut)
+		defer close(out)
+		defer close(errc)
+		select {
+		case <-ctx.Done():
+		case dkg, ok := <-dkgc:
+			if ok {
+				select {
+				case <-ctx.Done():
+				case deals, ok := <-dealsc:
+					if ok {
+						var resps []*Response
+						for _, d := range deals {
+							if deal, ok := d.(*Deal); ok {
+								if resp, err := dkg.ProcessDeal(deal); err == nil {
+									resp.SessionId = sessionID
+									if vss.StatusApproval == resp.Response.Status {
+										resps = append(resps, resp)
+									} else {
+										reportErr(ctx, errc, errors.New("resp StatusNotApproval"))
+									}
+								} else {
+									reportErr(ctx, errc, err)
+								}
+							}
+						}
+
+						select {
+						case out <- &Responses{SessionId: sessionID, Response: resps}:
+						case <-ctx.Done():
+						}
+						select {
+						case dkgOut <- dkg:
+						case <-ctx.Done():
+						}
+					}
+				}
+			}
+		}
+	}()
+	return
+}
+
+func getAndProcessResponses(ctx context.Context, dkgc chan *DistKeyGenerator, respsc chan []interface{}) (out chan *DistKeyGenerator, errc chan error) {
+	out = make(chan *DistKeyGenerator)
+	errc = make(chan error)
+	go func() {
+		defer fmt.Println("6 ) getAndProcessResponses")
+
+		defer close(out)
+		defer close(errc)
+		select {
+		case <-ctx.Done():
+		case dkg, ok := <-dkgc:
+			if ok {
+				select {
+				case <-ctx.Done():
+				case resps, ok := <-respsc:
+					if ok {
+						for _, r := range resps {
+							if resp, ok := r.(*Response); ok {
+								if _, err := dkg.ProcessResponse(resp); err != nil {
+									reportErr(ctx, errc, err)
+								}
+							} else {
+								reportErr(ctx, errc, errors.New("Response cast error"))
+							}
+						}
+
+						select {
+						case <-ctx.Done():
+						case out <- dkg:
+						}
+					}
+
+				}
+			}
+		}
+	}()
+	return
+}
+func genGroup(ctx context.Context, group *group, suite suites.Suite, dkgc <-chan *DistKeyGenerator, sessionID string) (out chan [5]*big.Int, errc chan error) {
+	out = make(chan [5]*big.Int)
+	errc = make(chan error)
+	go func() {
+		defer fmt.Println("7 ) genGroup")
+
+		defer close(out)
+		defer close(errc)
+		select {
+		case <-ctx.Done():
+		case dkg, ok := <-dkgc:
+			if ok {
+				if !dkg.Certified() {
+					reportErr(ctx, errc, errors.New("dkg is not certified"))
+				}
+				if secShare, err := dkg.DistKeyShare(); err == nil {
+					group.secShare = secShare
+					group.pubPoly = share.NewPubPoly(suite, suite.Point().Base(), group.secShare.Commitments())
+					pubKey := group.pubPoly.Commit()
+					if pubKeyCoor, err := decodePubKey(pubKey); err == nil {
+						if groupId, ok := new(big.Int).SetString(sessionID, 16); ok {
+							dataReturn := [5]*big.Int{groupId}
+							copy(dataReturn[1:], pubKeyCoor[:])
+							select {
+							case <-ctx.Done():
+							case out <- dataReturn:
+							}
+						} else {
+							reportErr(ctx, errc, errors.New("sessionID cast error "))
+						}
+					} else {
+						reportErr(ctx, errc, err)
+					}
+				} else {
+					reportErr(ctx, errc, err)
+				}
+			}
+		}
+	}()
+	return
+}
+
+func (d *pdkg) GetGroupPublicPoly(groupId string) (pubPoly *share.PubPoly) {
+	if g, loaded := d.groups.Load(groupId); loaded {
+		pubPoly = g.(*group).pubPoly
 	}
 	return
 }
 
-func (d *PDKG) GetShareSecurity(groupId string) (secShare *share.PriShare) {
-	if group, loaded := d.groups.Load(groupId); loaded {
-		secShare = group.(*Group).SecShare.Share
+func (d *pdkg) GetShareSecurity(groupId string) (secShare *share.PriShare) {
+	if g, loaded := d.groups.Load(groupId); loaded {
+		secShare = g.(*group).secShare.Share
 	}
 	return
 }
 
-func (d *PDKG) GetGroupIDs(groupId string) (participants [][]byte) {
-	if group, loaded := d.groups.Load(groupId); loaded {
-		participants = group.(*Group).Participants
-		logger.Event("GetGroupIDsSucc", map[string]interface{}{"GroupID": groupId, "GroupNumber": d.GetGroupNumber()})
-
+func (d *pdkg) GetGroupIDs(groupId string) (participants [][]byte) {
+	if g, loaded := d.groups.Load(groupId); loaded {
+		participants = g.(*group).participants
+		d.logger.Event("GetGroupIDsSucc", map[string]interface{}{"GroupID": groupId, "GroupNumber": d.GetGroupNumber()})
 	} else {
-		logger.Event("GetGroupIDsFail", map[string]interface{}{"GroupID": groupId, "GroupNumber": d.GetGroupNumber()})
+		d.logger.Event("GetGroupIDsFail", map[string]interface{}{"GroupID": groupId, "GroupNumber": d.GetGroupNumber()})
 
 	}
 
 	return
 }
+
+func (d *pdkg) GetGroupNumber() int {
+	length := 0
+	d.groups.Range(func(_, _ interface{}) bool {
+		length++
+		return true
+	})
+	return length
+}
+
+func (d *pdkg) GroupDissolve(groupId string) {
+	d.groups.Delete(groupId)
+	d.logger.Event("GroupDissolve", map[string]interface{}{"GroupID": groupId, "GroupNumber": d.GetGroupNumber()})
+}
+
+func decodePubKey(pubKey kyber.Point) (pubKeyCoor [4]*big.Int, err error) {
+	pubKeyMar, err := pubKey.MarshalBinary()
+	if err != nil {
+		return
+	}
+
+	for i := 0; i < 4; i++ {
+		pubKeyCoor[i] = new(big.Int).SetBytes(pubKeyMar[32*i+1 : 32*i+33])
+	}
+
+	return
+}
+
+func reportErr(ctx context.Context, errc chan error, err error) {
+	fmt.Println("reportErr err ", err)
+	select {
+	case errc <- err:
+	case <-ctx.Done():
+	}
+	return
+}
+
+func fanOut(ctx context.Context, ch chan interface{}, size int) (cs []chan interface{}) {
+	cs = make([]chan interface{}, size)
+	for i, _ := range cs {
+		cs[i] = make(chan interface{})
+	}
+	go func() {
+		for i := range ch {
+			for _, c := range cs {
+				select {
+				case c <- i:
+				case <-ctx.Done():
+				}
+			}
+		}
+		for _, c := range cs {
+			// close all our fanOut channels when the input channel is exhausted.
+			close(c)
+		}
+	}()
+	return
+}
+
 func mergeErrors(ctx context.Context, cs ...chan error) chan error {
 	var wg sync.WaitGroup
-	// We must ensure that the output channel has the capacity to
-	// hold as many errors
-	// as there are error channels.
-	// This will ensure that it never blocks, even
-	// if WaitForPipeline returns early.
+
 	out := make(chan error, len(cs))
-	// Start an output goroutine for each input channel in cs.  output
-	// copies values from c to out until c is closed, then calls
-	// wg.Done.
 	output := func(c <-chan error) {
 		for n := range c {
 			select {
@@ -128,520 +627,11 @@ func mergeErrors(ctx context.Context, cs ...chan error) chan error {
 	for _, c := range cs {
 		go output(c)
 	}
-	// Start a goroutine to close out once all the output goroutines
-	// are done.  This must start after the wg.Add call.
+
 	go func() {
 		wg.Wait()
+		fmt.Println("mergeErrors done")
 		close(out)
 	}()
 	return out
-}
-func (d *PDKG) Grouping(ctx context.Context, groupId string, participants [][]byte) (chan [5]*big.Int, chan error, error) {
-	group := &Group{Participants: participants}
-	var errcList []chan error
-	if _, loaded := d.groups.LoadOrStore(groupId, group); loaded {
-		return nil, nil, errors.New("dkg: duplicate share public key")
-	}
-	dkgc, errc := exchangePub(ctx, d.suite, d.bufToNode, participants, d.p, groupId)
-	errcList = append(errcList, errc)
-	dkgCetifiedc, errc := processDeal(ctx, dkgc, d.bufToNode, participants, d.p, groupId)
-	errcList = append(errcList, errc)
-	outc, errc := genPubKey(ctx, group, d.suite, dkgCetifiedc, groupId)
-	errcList = append(errcList, errc)
-	errc = mergeErrors(ctx, errcList...)
-	return outc, errc, nil
-}
-
-func (d *PDKG) GetGroupNumber() int {
-	length := 0
-	d.groups.Range(func(_, _ interface{}) bool {
-		length++
-		return true
-	})
-	return length
-}
-
-func (d *PDKG) GroupDissolve(groupId string) {
-	d.groups.Delete(groupId)
-	logger.Event("GroupDissolve", map[string]interface{}{"GroupID": groupId, "GroupNumber": d.GetGroupNumber()})
-}
-
-func (d *PDKG) Listen() {
-	peersToBuf, _ := d.p.SubscribeEvent(10, PublicKey{}, Deal{}, Responses{})
-	go func() {
-		sessionPubKeys := map[string][]*PublicKey{}
-		sessionDeals := map[string][]*Deal{}
-		sessionResps := map[string][]*Response{}
-		sessionReqPubs := map[string]*ReqPubs{}
-		sessionReqDeals := map[string]*ReqDeals{}
-		sessionReResps := map[string]*ReResps{}
-
-		for {
-			select {
-			case msg, ok := <-peersToBuf:
-				if !ok {
-					return
-				}
-				switch content := msg.Msg.Message.(type) {
-				case *PublicKey:
-					sessionPubKeys[content.SessionId] = append(sessionPubKeys[content.SessionId], content)
-					d.p.Reply(msg.Sender, msg.RequestNonce, &PublicKey{})
-
-					logger.Event("PublicKeyFromPeer", map[string]interface{}{"GroupID": content.SessionId})
-					if sessionReqPubs[content.SessionId] != nil {
-						if len(sessionPubKeys[content.SessionId]) == sessionReqPubs[content.SessionId].numOfPubs {
-							pubkeys := sessionPubKeys[content.SessionId]
-							sessionPubKeys[content.SessionId] = nil
-							sessionReqPubs[content.SessionId].Pubkeys <- pubkeys
-
-							close(sessionReqPubs[content.SessionId].Pubkeys)
-							sessionReqPubs[content.SessionId] = nil
-						}
-					}
-				case *Deal:
-					sessionDeals[content.SessionId] = append(sessionDeals[content.SessionId], content)
-					d.p.Reply(msg.Sender, msg.RequestNonce, &Deal{})
-
-					if sessionReqDeals[content.SessionId] != nil {
-						if len(sessionDeals[content.SessionId]) == sessionReqDeals[content.SessionId].numOfDeals {
-							deals := sessionDeals[content.SessionId]
-							sessionDeals[content.SessionId] = nil
-							sessionReqDeals[content.SessionId].Reply <- deals
-							close(sessionReqDeals[content.SessionId].Reply)
-							sessionReqDeals[content.SessionId] = nil
-						}
-					}
-				case *Responses:
-					sessionResps[content.SessionId] = append(sessionResps[content.SessionId], content.Response...)
-					d.p.Reply(msg.Sender, msg.RequestNonce, &Responses{})
-
-					if sessionReResps[content.SessionId] != nil {
-						if len(sessionResps[content.SessionId]) == sessionReResps[content.SessionId].numOfResps {
-							resps := sessionResps[content.SessionId]
-							sessionResps[content.SessionId] = nil
-							sessionReResps[content.SessionId].Reply <- resps
-							close(sessionReResps[content.SessionId].Reply)
-							sessionReResps[content.SessionId] = nil
-						}
-					}
-				}
-			case msg, ok := <-d.bufToNode:
-				if !ok {
-					return
-				}
-				switch content := msg.(type) {
-				case *ReqPubs:
-					sessionReqPubs[content.SessionId] = content
-					if len(sessionPubKeys[content.SessionId]) == content.numOfPubs {
-						pubkeys := sessionPubKeys[content.SessionId]
-						sessionPubKeys[content.SessionId] = nil
-						sessionReqPubs[content.SessionId].Pubkeys <- pubkeys
-						close(content.Pubkeys)
-					}
-				case *ReqDeals:
-					sessionReqDeals[content.SessionId] = content
-
-					if len(sessionDeals[content.SessionId]) == content.numOfDeals {
-						deals := sessionDeals[content.SessionId]
-						sessionDeals[content.SessionId] = nil
-						sessionReqDeals[content.SessionId].Reply <- deals
-						close(content.Reply)
-					}
-				case *ReResps:
-					sessionReResps[content.SessionId] = content
-
-					if len(sessionResps[content.SessionId]) == content.numOfResps {
-						deals := sessionResps[content.SessionId]
-						sessionResps[content.SessionId] = nil
-						sessionReResps[content.SessionId].Reply <- deals
-						close(content.Reply)
-					}
-				}
-			}
-		}
-	}()
-	return
-}
-func decodePubKey(pubKey kyber.Point) (pubKeyCoor [4]*big.Int, err error) {
-	pubKeyMar, err := pubKey.MarshalBinary()
-	if err != nil {
-		return
-	}
-
-	for i := 0; i < 4; i++ {
-		pubKeyCoor[i] = new(big.Int).SetBytes(pubKeyMar[32*i+1 : 32*i+33])
-	}
-
-	return
-}
-
-func genPubKey(ctx context.Context, group *Group, suite suites.Suite, dkgc <-chan *DistKeyGenerator, sessionID string) (chan [5]*big.Int, chan error) {
-	out := make(chan [5]*big.Int)
-	errc := make(chan error)
-	go func() {
-
-		defer close(out)
-		defer close(errc)
-		logger.Event("genPubKey", map[string]interface{}{"GroupID": sessionID})
-		var dkg *DistKeyGenerator
-		var ok bool
-		select {
-		case dkg, ok = <-dkgc:
-			if !ok {
-				return
-			}
-		case <-ctx.Done():
-			return
-		}
-		defer logger.TimeTrack(time.Now(), "genPubKeyDone", map[string]interface{}{"GroupID": sessionID})
-
-		if !dkg.Certified() {
-			err := errors.New("!dkg.Certified")
-			logger.Error(err)
-			errc <- err
-			return
-		}
-		var err error
-		group.SecShare, err = dkg.DistKeyShare()
-		if err != nil {
-			logger.Error(err)
-			errc <- err
-			return
-		}
-		group.PubPoly = share.NewPubPoly(suite, suite.Point().Base(), group.SecShare.Commitments())
-		pubKey := group.PubPoly.Commit()
-		pubKeyCoor, err := decodePubKey(pubKey)
-		if err != nil {
-			select {
-			case <-ctx.Done():
-				return
-			case errc <- err:
-				logger.Error(err)
-			}
-			return
-		}
-		groupId, ok := new(big.Int).SetString(sessionID, 16)
-		if !ok {
-			select {
-			case <-ctx.Done():
-				return
-			case errc <- err:
-				logger.Error(err)
-			}
-			return
-		}
-		dataReturn := [5]*big.Int{groupId}
-		copy(dataReturn[1:], pubKeyCoor[:])
-
-		select {
-		case <-ctx.Done():
-			return
-		case out <- dataReturn:
-		}
-	}()
-	return out, errc
-}
-
-func ByteTohex(a []byte) string {
-	unchecksummed := hex.EncodeToString(a[:])
-	sha := sha3.NewLegacyKeccak256()
-	sha.Write([]byte(unchecksummed))
-	hash := sha.Sum(nil)
-
-	result := []byte(unchecksummed)
-	for i := 0; i < len(result); i++ {
-		hashByte := hash[i/2]
-		if i%2 == 0 {
-			hashByte = hashByte >> 4
-		} else {
-			hashByte &= 0xf
-		}
-		if result[i] > '9' && hashByte > 7 {
-			result[i] -= 32
-		}
-	}
-	return "0x" + string(result)
-}
-
-func exchangePub(ctx context.Context, suite suites.Suite, bufToNode chan interface{}, groupIds [][]byte, p p2p.P2PInterface, sessionID string) (<-chan *DistKeyGenerator, chan error) {
-	out := make(chan *DistKeyGenerator)
-	errc := make(chan error)
-	go func() {
-		//defer logger.TimeTrack(time.Now(), "exchangePubDone", map[string]interface{}{"GroupID": sessionID})
-		defer close(out)
-		defer close(errc)
-		logger.Event("exchangePub", map[string]interface{}{"GroupID": sessionID})
-		start := time.Now()
-		for i := 0; i < len(groupIds); i++ {
-			start := time.Now()
-			if !bytes.Equal(p.GetID(), groupIds[i]) {
-				retry := 0
-				for {
-					if retry >= 10 {
-						break
-					}
-					if _, err := p.ConnectTo("", groupIds[i]); err != nil {
-						fmt.Println("ConnectTo done retry=", retry, err)
-						retry++
-						time.Sleep(1 * time.Second)
-					} else {
-						break
-					}
-				}
-
-				f := map[string]interface{}{
-					"GroupID":  sessionID,
-					"retry":    retry,
-					"costTime": time.Since(start).Nanoseconds() / 1000,
-					"From":     ByteTohex(p.GetID()),
-					"To":       ByteTohex(groupIds[i])}
-				if retry >= 10 {
-					logger.Event("DKGConnectToFaile", f)
-				} else {
-					logger.Event("DKGConnectToSuccess", f)
-				}
-			}
-		}
-		logger.TimeTrack(start, "exchangePubConnectTo", map[string]interface{}{"GroupID": sessionID})
-		start = time.Now()
-		//Generate secret and public key
-		sec := suite.Scalar().Pick(suite.RandomStream())
-		pub := suite.Point().Mul(sec, nil)
-		bin, err := pub.MarshalBinary()
-		if err != nil {
-			fmt.Println(err)
-			logger.Error(err)
-			return
-		}
-		//Index pub key
-		index := 0
-		for i, id := range groupIds {
-			if r := bytes.Compare(p.GetID(), id); r == 0 {
-				index = i
-				break
-			}
-		}
-
-		pubkey := &PublicKey{SessionId: sessionID, Index: uint32(index), Publickey: &vss.PublicKey{Binary: bin}}
-		var partPubs []*PublicKey
-		partPubs = append(partPubs, pubkey)
-
-		var wg sync.WaitGroup
-		wg.Add(len(groupIds) - 1)
-		for i, id := range groupIds {
-			if r := bytes.Compare(p.GetID(), id); r != 0 {
-				go func(i int, id []byte) {
-					defer wg.Done()
-
-					_, err := p.Request(id, pubkey)
-					if err != nil {
-						select {
-						case <-ctx.Done():
-							return
-						case errc <- err:
-							logger.Error(err)
-						}
-						return
-					}
-
-				}(i, id)
-			}
-		}
-		wg.Wait()
-		logger.TimeTrack(start, "exchangePubSendPub", map[string]interface{}{"GroupID": sessionID})
-		start = time.Now()
-		select {
-		case err := <-errc:
-			logger.Error(err)
-			return
-		default:
-		}
-
-		reqChan := make(chan []*PublicKey)
-		req := &ReqPubs{ctx: ctx, SessionId: sessionID, numOfPubs: len(groupIds) - 1, Pubkeys: reqChan}
-		select {
-		case <-ctx.Done():
-			return
-		case bufToNode <- req:
-		}
-
-		select {
-		case <-ctx.Done():
-			return
-		case pubs, ok := <-reqChan:
-			if ok {
-				fmt.Println("Got pubkeys!!")
-				partPubs = append(partPubs, pubs...)
-			}
-		}
-		logger.TimeTrack(start, "exchangePubReqChan", map[string]interface{}{"GroupID": sessionID})
-		if err == nil {
-			pubPoints := make([]kyber.Point, len(groupIds))
-			for _, pub := range partPubs {
-				pubPoints[pub.Index] = suite.Point()
-				if err := pubPoints[pub.Index].UnmarshalBinary(pub.Publickey.Binary); err != nil {
-					select {
-					case <-ctx.Done():
-						return
-					case errc <- err:
-						logger.Error(err)
-					}
-					return
-				}
-			}
-
-			dkg, err := NewDistKeyGenerator(suite, sec, pubPoints, len(groupIds)/2+1)
-			if err != nil {
-				fmt.Println("NewDistKeyGenerator err ", err)
-				logger.Error(err)
-				errc <- err
-				return
-			}
-			out <- dkg
-		} else {
-			logger.Error(err)
-			errc <- err
-		}
-	}()
-	return out, errc
-}
-
-func processDeal(ctx context.Context, dkgc <-chan *DistKeyGenerator, bufToNode chan interface{}, groupIds [][]byte, p p2p.P2PInterface, sessionID string) (<-chan *DistKeyGenerator, chan error) {
-	out := make(chan *DistKeyGenerator)
-	errc := make(chan error)
-	go func() {
-		defer close(out)
-		defer close(errc)
-		logger.Event("processDeal", map[string]interface{}{"GroupID": sessionID})
-
-		var dkg *DistKeyGenerator
-		var ok bool
-		select {
-		case dkg, ok = <-dkgc:
-			if !ok {
-				return
-			}
-		case <-ctx.Done():
-			return
-		}
-		defer logger.TimeTrack(time.Now(), "processDealDone", map[string]interface{}{"GroupID": sessionID})
-
-		deals, err := dkg.Deals()
-		if err != nil {
-			logger.Error(err)
-			select {
-			case <-ctx.Done():
-				return
-			case errc <- err:
-			}
-		}
-		var wg sync.WaitGroup
-		wg.Add(len(groupIds) - 1)
-		for i, d := range deals {
-			d.SessionId = sessionID
-			go func(id []byte, d *Deal) {
-				defer wg.Done()
-				_, err := p.Request(id, d)
-				if err != nil {
-					logger.Error(err)
-					select {
-					case <-ctx.Done():
-						return
-					case errc <- err:
-					}
-					return
-				}
-			}(groupIds[i], d)
-		}
-		wg.Wait()
-		reply := make(chan []*Deal)
-		req := &ReqDeals{ctx: ctx, SessionId: sessionID, numOfDeals: len(groupIds) - 1, Reply: reply}
-		select {
-		case <-ctx.Done():
-			return
-		case bufToNode <- req:
-		}
-
-		var resps []*Response
-		select {
-		case <-ctx.Done():
-			return
-		case deals := <-reply:
-			for _, d := range deals {
-				resp, err := dkg.ProcessDeal(d)
-				resp.SessionId = sessionID
-				if err != nil {
-					logger.Error(err)
-					return
-				}
-				if vss.StatusApproval != resp.Response.Status {
-					var err = errors.New("resp StatusNotApproval")
-					logger.Error(err)
-					select {
-					case <-ctx.Done():
-						return
-					case errc <- err:
-						return
-					}
-				}
-				resps = append(resps, resp)
-			}
-		}
-
-		wg.Add(len(groupIds) - 1)
-		for i, id := range groupIds {
-			if r := bytes.Compare(p.GetID(), id); r != 0 {
-				go func(i int, id []byte) {
-					defer wg.Done()
-					_, err := p.Request(id, &Responses{SessionId: sessionID, Response: resps})
-					if err != nil {
-						logger.Error(err)
-						select {
-						case <-ctx.Done():
-							return
-						case errc <- err:
-						}
-						return
-					}
-				}(i, id)
-			}
-		}
-		wg.Wait()
-
-		replyResp := make(chan []*Response)
-		reqResp := &ReResps{ctx: ctx, SessionId: sessionID, numOfResps: (len(groupIds) - 1) * (len(groupIds) - 1), Reply: replyResp}
-		select {
-		case <-ctx.Done():
-			return
-		case bufToNode <- reqResp:
-		}
-		select {
-		case <-ctx.Done():
-			return
-		case resps := <-replyResp:
-			for _, r := range resps {
-				_, err := dkg.ProcessResponse(r)
-				if err != nil {
-					logger.Error(err)
-					fmt.Println("ProcessResponse err ", err)
-				}
-			}
-		}
-		if dkg.Certified() {
-			select {
-			case <-ctx.Done():
-				return
-			case out <- dkg:
-			}
-		} else {
-			err = errors.New("dkg not cetified")
-			logger.Error(err)
-			select {
-			case <-ctx.Done():
-				return
-			case errc <- err:
-			}
-		}
-	}()
-	return out, errc
 }
