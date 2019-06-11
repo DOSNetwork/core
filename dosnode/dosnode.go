@@ -75,43 +75,13 @@ func NewDosNode(credentialPath, passphrase string) (dosNode *DosNode, err error)
 	if err != nil {
 		return
 	}
+
 	if workingDir == "/" {
 		workingDir = "."
 	}
 
 	chainConfig := config.GetChainConfig()
-	if config.NodeRole == "testNode" {
-		var rspBytes []byte
-		var resp *http.Response
-		ip := config.BootStrapIp[0]
-		tServer := "http://" + ip + ":8080/getCredential"
-		resp, err = http.Get(tServer)
-		for err != nil {
-			time.Sleep(1 * time.Second)
-			resp, err = http.Get(tServer)
-		}
-
-		rspBytes, err = ioutil.ReadAll(resp.Body)
-		if err != nil {
-			return
-		}
-
-		if err = resp.Body.Close(); err != nil {
-			return
-		}
-
-		respArray := strings.Split(string(rspBytes), ",")
-		if len(respArray) < 1 {
-			return nil, errors.New("cannot get credential from bootNode")
-		}
-
-		credentialPath = workingDir + "/testAccounts/" + respArray[0] + "/credential"
-		chainConfig.RemoteNodeAddressPool = chainConfig.RemoteNodeAddressPool[:1]
-		for _, address := range respArray[1:] {
-			chainConfig.RemoteNodeAddressPool = append(chainConfig.RemoteNodeAddressPool, address)
-		}
-		fmt.Println("RemoteNodeAddressPool", chainConfig.RemoteNodeAddressPool)
-	} else if credentialPath == "" {
+	if credentialPath == "" {
 		credentialPath = workingDir + "/credential"
 	}
 
