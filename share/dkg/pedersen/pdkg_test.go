@@ -9,6 +9,8 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/DOSNetwork/core/log"
+
 	//"github.com/DOSNetwork/core/log"
 	"github.com/DOSNetwork/core/p2p"
 	bls "github.com/DOSNetwork/core/sign/bls"
@@ -32,7 +34,11 @@ func TestPDKG(t *testing.T) {
 	groupIds = append(groupIds, []byte("Participant0"))
 	groupIds = append(groupIds, []byte("Participant1"))
 	groupIds = append(groupIds, []byte("Participant2"))
+	os.Setenv("APPSESSION", "test")
+	os.Setenv("LOGIP", "163.172.36.173:9500")
 	os.Setenv("PUBLICIP", "0.0.0.0")
+	id := []byte("Participant0")
+	log.Init(id[:])
 	p1, err := p2p.CreateP2PNetwork(groupIds[0], "9905", 0)
 	if err != nil {
 		t.Errorf("CreateP2PNetwork err %s", err)
@@ -61,8 +67,8 @@ func TestPDKG(t *testing.T) {
 	pdkg2 := NewPDKG(p2, suite)
 	pdkg3 := NewPDKG(p3, suite)
 	var wg sync.WaitGroup
-	wg.Add(3)
-	for i := 0; i < 3; i++ {
+	wg.Add(10)
+	for i := 0; i < 10; i++ {
 		go func(groupID string) {
 			defer wg.Done()
 			ctx := context.Background()

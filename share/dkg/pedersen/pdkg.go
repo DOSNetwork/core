@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math/big"
 	"sync"
+	"time"
 
 	"github.com/golang/protobuf/proto"
 
@@ -53,7 +54,7 @@ type request struct {
 func NewPDKG(p p2p.P2PInterface, suite suites.Suite) PDKGInterface {
 	d := &pdkg{
 		p:         p,
-		bufToNode: make(chan interface{}, 50),
+		bufToNode: make(chan interface{}, 1),
 		register:  make(chan *group),
 		suite:     suite,
 		logger:    log.New("module", "dkg"),
@@ -66,32 +67,37 @@ func handlePeerMsg(sessionMap map[string][]interface{}, sessionReq map[string]re
 	sessionMap[sessionID] = append(sessionMap[sessionID], content)
 	if sessionMap[sessionID] != nil {
 		if len(sessionMap[sessionID]) == sessionReq[sessionID].numOfResps {
-			select {
-			case <-sessionReq[sessionID].ctx.Done():
-			case sessionReq[sessionID].reply <- sessionMap[sessionID]:
-			}
-			close(sessionReq[sessionID].reply)
+			go func(req request, m []interface{}) {
+				select {
+				case <-req.ctx.Done():
+				case req.reply <- m:
+				}
+				close(req.reply)
+			}(sessionReq[sessionID], sessionMap[sessionID])
+
 			delete(sessionMap, sessionID)
 			delete(sessionReq, sessionID)
 		}
 	}
 }
 
-func handleRequest(sessionMap map[string][]interface{}, sessionReq map[string]request, request request) {
-	sessionReq[request.sessionID] = request
-	if len(sessionMap[request.sessionID]) == request.numOfResps {
-		select {
-		case <-sessionReq[request.sessionID].ctx.Done():
-		case sessionReq[request.sessionID].reply <- sessionMap[request.sessionID]:
-		}
-		close(sessionReq[request.sessionID].reply)
-		delete(sessionMap, request.sessionID)
-		delete(sessionReq, request.sessionID)
+func handleRequest(sessionMap map[string][]interface{}, sessionReq map[string]request, req request) {
+	sessionReq[req.sessionID] = req
+	if len(sessionMap[req.sessionID]) == req.numOfResps {
+		go func(req request, m []interface{}) {
+			select {
+			case <-req.ctx.Done():
+			case req.reply <- m:
+			}
+			close(req.reply)
+		}(sessionReq[req.sessionID], sessionMap[req.sessionID])
+
+		delete(sessionMap, req.sessionID)
+		delete(sessionReq, req.sessionID)
 	}
 }
 func (d *pdkg) listen() {
-	peersToBuf, _ := d.p.SubscribeEvent(10, PublicKey{}, Deal{}, Responses{})
-	_ = peersToBuf
+	peersToBuf, _ := d.p.SubscribeEvent(50, PublicKey{}, Deal{}, Responses{})
 	go func() {
 		sessionPubKeys := make(map[string][]interface{})
 		sessionDeals := make(map[string][]interface{})
@@ -114,7 +120,6 @@ func (d *pdkg) listen() {
 					handlePeerMsg(sessionDeals, sessionReqDeals, d.p, content.SessionId, content)
 				case *Responses:
 					d.p.Reply(msg.Sender, msg.RequestNonce, &Responses{})
-					//var resps []*Response
 					resps := content.Response
 					for _, resp := range resps {
 						handlePeerMsg(sessionResps, sessionReResps, d.p, content.SessionId, resp)
@@ -136,6 +141,7 @@ func (d *pdkg) listen() {
 					}
 				} else {
 					fmt.Println("handleRequest cast error")
+
 				}
 			}
 		}
@@ -153,45 +159,46 @@ func (d *pdkg) Grouping(ctx context.Context, sessionID string, groupIds [][]byte
 	connc, errc := d.p.ConnectToAll(ctx, groupIds)
 	errcList = append(errcList, errc)
 	//exchange pub key
-	selfPubc, secrc, errc := genPub(ctx, connc, d.suite, d.p.GetID(), groupIds, sessionID)
+	selfPubc, secrc, errc := genPub(ctx, d.logger, connc, d.suite, d.p.GetID(), groupIds, sessionID)
 	errcList = append(errcList, errc)
 	selfPubcs := fanOut(ctx, selfPubc, 2)
-	errcList = append(errcList, sendToMembers(ctx, selfPubcs[0], d.p, groupIds))
-	peerPubc := askMembers(ctx, d.bufToNode, len(groupIds)-1, 0, sessionID)
+	errcList = append(errcList, sendToMembers(ctx, d.logger, selfPubcs[0], d.p, groupIds))
+	peerPubc := askMembers(ctx, d.logger, d.bufToNode, len(groupIds)-1, 0, sessionID)
 	errcList = append(errcList, errc)
-	partPubsc, errc := exchangePub(ctx, selfPubcs[1], peerPubc, d.p, groupIds)
+	partPubsc, errc := exchangePub(ctx, d.logger, selfPubcs[1], peerPubc, d.p, groupIds)
 	errcList = append(errcList, errc)
 
 	//generate a dkg
-	dkgcStep1, errc := genDistKeyGenerator(ctx, secrc, partPubsc, len(groupIds), d.suite)
+	dkgcStep1, errc := genDistKeyGenerator(ctx, d.logger, secrc, partPubsc, len(groupIds), d.suite)
 	errcList = append(errcList, errc)
 
 	//generate deals for other member and process deals from other member
-	dkgcStep2, errc := genDealsAndSend(ctx, dkgcStep1, d.p, groupIds, sessionID)
+	dkgcStep2, errc := genDealsAndSend(ctx, d.logger, dkgcStep1, d.p, groupIds, sessionID)
 	errcList = append(errcList, errc)
-	dkgcStep3, respsc, errc := getAndProcessDeals(ctx, dkgcStep2, askMembers(ctx, d.bufToNode, len(groupIds)-1, 1, sessionID), sessionID)
+	dkgcStep3, respsc, errc := getAndProcessDeals(ctx, d.logger, dkgcStep2, askMembers(ctx, d.logger, d.bufToNode, len(groupIds)-1, 1, sessionID), sessionID)
 	errcList = append(errcList, errc)
-	errcList = append(errcList, sendToMembers(ctx, respsc, d.p, groupIds))
+	errcList = append(errcList, sendToMembers(ctx, d.logger, respsc, d.p, groupIds))
 
 	//process responces to certify dkg and generate a group sec and pub key
-	cetifiedDkgc, errc := getAndProcessResponses(ctx, dkgcStep3, askMembers(ctx, d.bufToNode, (len(groupIds)-1)*(len(groupIds)-1), 2, sessionID))
-	outc, errc := genGroup(ctx, group, d.suite, cetifiedDkgc, sessionID)
+	cetifiedDkgc, errc := getAndProcessResponses(ctx, d.logger, dkgcStep3, askMembers(ctx, d.logger, d.bufToNode, (len(groupIds)-1)*(len(groupIds)-1), 2, sessionID))
+	outc, errc := genGroup(ctx, d.logger, group, d.suite, cetifiedDkgc, sessionID)
 	errcList = append(errcList, errc)
-	errc = mergeErrors(ctx, errcList...)
+	errc = mergeErrors(ctx, d.logger, errcList...)
 	return outc, errc, nil
 }
 
-func genPub(ctx context.Context, conn chan bool, suite suites.Suite, id []byte, groupIds [][]byte, sessionID string) (out chan interface{}, secrc chan kyber.Scalar, errc chan error) {
+func genPub(ctx context.Context, logger log.Logger, conn chan bool, suite suites.Suite, id []byte, groupIds [][]byte, sessionID string) (out chan interface{}, secrc chan kyber.Scalar, errc chan error) {
 	out = make(chan interface{})
 	secrc = make(chan kyber.Scalar)
 	errc = make(chan error)
 	go func() {
-		defer fmt.Println("1 ) genPub")
+		//defer fmt.Println("1 ) genPub")
 		defer close(out)
 		defer close(errc)
 		select {
 		case c, ok := <-conn:
 			if ok && c == true {
+				defer logger.TimeTrack(time.Now(), "genPub", nil)
 				//Index pub key
 				index := -1
 				for i, groupId := range groupIds {
@@ -228,12 +235,11 @@ func genPub(ctx context.Context, conn chan bool, suite suites.Suite, id []byte, 
 	return
 }
 
-func exchangePub(ctx context.Context, selfPubc chan interface{}, peerPubc chan []interface{}, p p2p.P2PInterface, groupIds [][]byte) (out chan []*PublicKey, errc chan error) {
+func exchangePub(ctx context.Context, logger log.Logger, selfPubc chan interface{}, peerPubc chan []interface{}, p p2p.P2PInterface, groupIds [][]byte) (out chan []*PublicKey, errc chan error) {
 	out = make(chan []*PublicKey)
 	errc = make(chan error)
 	go func() {
-		defer fmt.Println("2 ) exchangePub")
-
+		defer logger.TimeTrack(time.Now(), "exchangePub", nil)
 		defer close(out)
 		defer close(errc)
 		var partPubs []*PublicKey
@@ -267,7 +273,7 @@ func exchangePub(ctx context.Context, selfPubc chan interface{}, peerPubc chan [
 	return
 }
 
-func sendToMembers(ctx context.Context, msgc chan interface{}, p p2p.P2PInterface, groupIds [][]byte) (errc chan error) {
+func sendToMembers(ctx context.Context, logger log.Logger, msgc chan interface{}, p p2p.P2PInterface, groupIds [][]byte) (errc chan error) {
 	errc = make(chan error)
 	go func() {
 		defer close(errc)
@@ -275,6 +281,8 @@ func sendToMembers(ctx context.Context, msgc chan interface{}, p p2p.P2PInterfac
 		case <-ctx.Done():
 		case msg, ok := <-msgc:
 			if ok {
+				defer logger.TimeTrack(time.Now(), "sendToMembers", nil)
+
 				if m, ok := msg.(proto.Message); ok {
 					var wg sync.WaitGroup
 					wg.Add(len(groupIds) - 1)
@@ -301,9 +309,11 @@ func sendToMembers(ctx context.Context, msgc chan interface{}, p p2p.P2PInterfac
 	return
 }
 
-func askMembers(ctx context.Context, bufToNode chan interface{}, numOfResp, reqTpe int, sessionID string) (out chan []interface{}) {
+func askMembers(ctx context.Context, logger log.Logger, bufToNode chan interface{}, numOfResp, reqTpe int, sessionID string) (out chan []interface{}) {
 	out = make(chan []interface{})
 	go func() {
+		defer logger.TimeTrack(time.Now(), "askMembers", nil)
+
 		req := request{ctx: ctx, reqType: reqTpe, sessionID: sessionID, numOfResps: numOfResp, reply: out}
 		select {
 		case <-ctx.Done():
@@ -313,18 +323,18 @@ func askMembers(ctx context.Context, bufToNode chan interface{}, numOfResp, reqT
 	return
 }
 
-func genDistKeyGenerator(ctx context.Context, secrc chan kyber.Scalar, partPubs chan []*PublicKey, numOfPubkeys int, suite suites.Suite) (out chan *DistKeyGenerator, errc chan error) {
+func genDistKeyGenerator(ctx context.Context, logger log.Logger, secrc chan kyber.Scalar, partPubs chan []*PublicKey, numOfPubkeys int, suite suites.Suite) (out chan *DistKeyGenerator, errc chan error) {
 	out = make(chan *DistKeyGenerator)
 	errc = make(chan error)
 	go func() {
-		defer fmt.Println("3 ) genDistKeyGenerator")
-
 		defer close(out)
 		defer close(errc)
 		select {
 		case <-ctx.Done():
 		case sec, ok := <-secrc:
 			if ok {
+				defer logger.TimeTrack(time.Now(), "genDistKeyGenerator", nil)
+
 				select {
 				case <-ctx.Done():
 				case pubs, ok := <-partPubs:
@@ -356,27 +366,26 @@ func genDistKeyGenerator(ctx context.Context, secrc chan kyber.Scalar, partPubs 
 	return
 }
 
-func genDealsAndSend(ctx context.Context, dkgc chan *DistKeyGenerator, p p2p.P2PInterface, groupIds [][]byte, sessionID string) (out chan *DistKeyGenerator, errc chan error) {
+func genDealsAndSend(ctx context.Context, logger log.Logger, dkgc chan *DistKeyGenerator, p p2p.P2PInterface, groupIds [][]byte, sessionID string) (out chan *DistKeyGenerator, errc chan error) {
 	out = make(chan *DistKeyGenerator)
 	errc = make(chan error)
 	go func() {
-		defer fmt.Println("4 ) genDealsAndSend")
-
 		defer close(out)
 		defer close(errc)
 		select {
 		case <-ctx.Done():
 		case dkg, ok := <-dkgc:
 			if ok {
+				defer logger.TimeTrack(time.Now(), "genDealsAndSend", nil)
+
 				if deals, err := dkg.Deals(); err == nil {
 					var wg sync.WaitGroup
 					wg.Add(len(groupIds) - 1)
 					for i, d := range deals {
 						d.SessionId = sessionID
-						go func(id []byte, d *Deal) {
+						func(id []byte, d *Deal) {
 							defer wg.Done()
 							if _, err := p.Request(id, d); err != nil {
-								fmt.Println("4 ) genDealsAndSend err id ", string(p.GetID()), string(id), err)
 								reportErr(ctx, errc, err)
 								return
 							}
@@ -395,13 +404,11 @@ func genDealsAndSend(ctx context.Context, dkgc chan *DistKeyGenerator, p p2p.P2P
 	}()
 	return
 }
-func getAndProcessDeals(ctx context.Context, dkgc chan *DistKeyGenerator, dealsc chan []interface{}, sessionID string) (dkgOut chan *DistKeyGenerator, out chan interface{}, errc chan error) {
+func getAndProcessDeals(ctx context.Context, logger log.Logger, dkgc chan *DistKeyGenerator, dealsc chan []interface{}, sessionID string) (dkgOut chan *DistKeyGenerator, out chan interface{}, errc chan error) {
 	dkgOut = make(chan *DistKeyGenerator)
 	out = make(chan interface{})
 	errc = make(chan error)
 	go func() {
-		defer fmt.Println("5 ) getAndProcessDeals")
-
 		defer close(dkgOut)
 		defer close(out)
 		defer close(errc)
@@ -409,6 +416,7 @@ func getAndProcessDeals(ctx context.Context, dkgc chan *DistKeyGenerator, dealsc
 		case <-ctx.Done():
 		case dkg, ok := <-dkgc:
 			if ok {
+				defer logger.TimeTrack(time.Now(), "getAndProcessDeals", nil)
 				select {
 				case <-ctx.Done():
 				case deals, ok := <-dealsc:
@@ -445,18 +453,17 @@ func getAndProcessDeals(ctx context.Context, dkgc chan *DistKeyGenerator, dealsc
 	return
 }
 
-func getAndProcessResponses(ctx context.Context, dkgc chan *DistKeyGenerator, respsc chan []interface{}) (out chan *DistKeyGenerator, errc chan error) {
+func getAndProcessResponses(ctx context.Context, logger log.Logger, dkgc chan *DistKeyGenerator, respsc chan []interface{}) (out chan *DistKeyGenerator, errc chan error) {
 	out = make(chan *DistKeyGenerator)
 	errc = make(chan error)
 	go func() {
-		defer fmt.Println("6 ) getAndProcessResponses")
-
 		defer close(out)
 		defer close(errc)
 		select {
 		case <-ctx.Done():
 		case dkg, ok := <-dkgc:
 			if ok {
+				defer logger.TimeTrack(time.Now(), "getAndProcessResponses", nil)
 				select {
 				case <-ctx.Done():
 				case resps, ok := <-respsc:
@@ -483,18 +490,17 @@ func getAndProcessResponses(ctx context.Context, dkgc chan *DistKeyGenerator, re
 	}()
 	return
 }
-func genGroup(ctx context.Context, group *group, suite suites.Suite, dkgc <-chan *DistKeyGenerator, sessionID string) (out chan [5]*big.Int, errc chan error) {
+func genGroup(ctx context.Context, logger log.Logger, group *group, suite suites.Suite, dkgc <-chan *DistKeyGenerator, sessionID string) (out chan [5]*big.Int, errc chan error) {
 	out = make(chan [5]*big.Int)
 	errc = make(chan error)
 	go func() {
-		defer fmt.Println("7 ) genGroup")
-
 		defer close(out)
 		defer close(errc)
 		select {
 		case <-ctx.Done():
 		case dkg, ok := <-dkgc:
 			if ok {
+				defer logger.TimeTrack(time.Now(), "genGroup", nil)
 				if !dkg.Certified() {
 					reportErr(ctx, errc, errors.New("dkg is not certified"))
 				}
@@ -609,7 +615,7 @@ func fanOut(ctx context.Context, ch chan interface{}, size int) (cs []chan inter
 	return
 }
 
-func mergeErrors(ctx context.Context, cs ...chan error) chan error {
+func mergeErrors(ctx context.Context, logger log.Logger, cs ...chan error) chan error {
 	var wg sync.WaitGroup
 
 	out := make(chan error, len(cs))
@@ -629,8 +635,8 @@ func mergeErrors(ctx context.Context, cs ...chan error) chan error {
 	}
 
 	go func() {
+		defer logger.TimeTrack(time.Now(), "Grouping", nil)
 		wg.Wait()
-		fmt.Println("mergeErrors done")
 		close(out)
 	}()
 	return out

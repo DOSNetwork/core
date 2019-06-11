@@ -589,16 +589,17 @@ func (n *server) messageDispatch(ctx context.Context) {
 					continue
 				}
 				messagetype := reflect.TypeOf(msg.Msg.Message).String()
+
 				if len(messagetype) > 0 && messagetype[0] == '*' {
 					messagetype = messagetype[1:]
 				}
 				out := subscriptions[messagetype]
 				if out != nil {
-
-					select {
-					case out <- msg:
-					}
-				} else {
+					go func(msg P2PMessage) {
+						select {
+						case out <- msg:
+						}
+					}(msg)
 				}
 			case sub, ok := <-n.subscribe:
 				if !ok {
