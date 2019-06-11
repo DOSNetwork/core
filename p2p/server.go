@@ -233,19 +233,11 @@ func (n *server) receiveHandler() {
 				if !ok || req.id == nil {
 					return
 				}
-
 				client := clients[string(req.id)]
-				if client == nil {
-					select {
-					case n.replying <- req:
-						if req.ctx == nil || req.reply == nil {
-						}
-					case <-req.ctx.Done():
-					}
-				} else {
-					if req.ctx == nil {
-					}
+				if client != nil {
 					client.send(req)
+				} else {
+					logger.Error(errors.New("p2p reply can't find client"))
 				}
 			}
 		}
