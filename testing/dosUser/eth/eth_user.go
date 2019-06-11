@@ -150,16 +150,13 @@ func (e *EthUserAdaptor) SubscribeEvent(subscribeType int) (<-chan interface{}, 
 	return e.first(e.ctx, MergeEvents(e.ctx, eventList...)), MergeErrors(e.ctx, errcs...)
 }
 
-func subscribeEvent(ctx context.Context, proxy *dosUser.AskMeAnything, subscribeType int) (<-chan interface{}, <-chan error) {
-	out := make(chan interface{})
-	errc := make(chan error)
-	opt := &bind.WatchOpts{}
-
-	switch subscribeType {
-	case SubscribeAskMeAnythingRandomReady:
+var proxyTable = []func(ctx context.Context, proxy *dosUser.AskMeAnything) (<-chan interface{}, <-chan error){
+	SubscribeAskMeAnythingRandomReady: func(ctx context.Context, proxy *dosUser.AskMeAnything) (<-chan interface{}, <-chan error) {
+		fmt.Println("AskMeAnythingRandomReady")
+		out := make(chan interface{})
+		errc := make(chan error)
+		opt := &bind.WatchOpts{}
 		go func() {
-			fmt.Println("AskMeAnythingRandomReady")
-
 			transitChan := make(chan *dosUser.AskMeAnythingRandomReady)
 			defer close(transitChan)
 			defer close(errc)
@@ -188,9 +185,13 @@ func subscribeEvent(ctx context.Context, proxy *dosUser.AskMeAnything, subscribe
 				}
 			}
 		}()
-	case SubscribeAskMeAnythingQueryResponseReady:
+		return out, errc
+	},
+	SubscribeAskMeAnythingQueryResponseReady: func(ctx context.Context, proxy *dosUser.AskMeAnything) (<-chan interface{}, <-chan error) {
+		out := make(chan interface{})
+		errc := make(chan error)
+		opt := &bind.WatchOpts{}
 		go func() {
-
 			transitChan := make(chan *dosUser.AskMeAnythingQueryResponseReady)
 			defer close(transitChan)
 			defer close(errc)
@@ -219,7 +220,12 @@ func subscribeEvent(ctx context.Context, proxy *dosUser.AskMeAnything, subscribe
 				}
 			}
 		}()
-	case SubscribeAskMeAnythingRequestSent:
+		return out, errc
+	},
+	SubscribeAskMeAnythingRequestSent: func(ctx context.Context, proxy *dosUser.AskMeAnything) (<-chan interface{}, <-chan error) {
+		out := make(chan interface{})
+		errc := make(chan error)
+		opt := &bind.WatchOpts{}
 		go func() {
 			transitChan := make(chan *dosUser.AskMeAnythingRequestSent)
 			defer close(transitChan)
@@ -253,7 +259,13 @@ func subscribeEvent(ctx context.Context, proxy *dosUser.AskMeAnything, subscribe
 				}
 			}
 		}()
-	}
+		return out, errc
+	},
+}
+
+func subscribeEvent(ctx context.Context, proxy *dosUser.AskMeAnything, subscribeType int) (<-chan interface{}, <-chan error) {
+
+	out, errc := proxyTable[subscribeType](ctx, proxy)
 	return out, errc
 }
 
