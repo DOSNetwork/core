@@ -781,10 +781,13 @@ func (e *ethAdaptor) reqLoop() {
 			case req := <-e.reqQueue:
 				tx, err := req.f(req.ctx, req.proxy, req.cr, req.params)
 				resp := &response{req.idx, tx, err}
-				select {
-				case req.reply <- resp:
-				case <-req.ctx.Done():
-				}
+				go func(req *request, resp *response) {
+					select {
+					case req.reply <- resp:
+					case <-req.ctx.Done():
+					}
+					close(req.reply)
+				}(req, resp)
 			case <-e.ctx.Done():
 				return
 			}
@@ -848,7 +851,6 @@ func (e *ethAdaptor) set(ctx context.Context, params []interface{}, setF setFunc
 				}
 			}
 			r.reply = make(chan *response)
-			defer close(r.reply)
 			select {
 			case e.reqQueue <- r:
 			case <-ctx.Done():
