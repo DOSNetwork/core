@@ -7,11 +7,9 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"math/big"
 	"net/http"
 	"os"
-	"strings"
 	"time"
 	"unsafe"
 
