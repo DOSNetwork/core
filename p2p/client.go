@@ -173,17 +173,13 @@ func (c *client) receiveID(wg *sync.WaitGroup) (err error) {
 
 	// Decode message size.
 	size := binary.BigEndian.Uint32(header)
-
 	header = nil
-	if size > msgSizeLimit {
-		err = errors.New("p2p message size is too big " + strconv.Itoa(int(size)))
+	if size > msgSizeLimit || size <= 0 {
+		err = errors.New("p2p message size is not valid " + strconv.Itoa(int(size)))
 		return
 	}
 	// Read until all message bytes have been read.
 	buffer := make([]byte, size)
-	if size == 0 {
-		return
-	}
 
 	contentBytesRead, totalContentBytesRead := 0, 0
 	for totalContentBytesRead < int(size) && err == nil {
