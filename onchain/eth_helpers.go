@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	checkSyncInterval = 1
+	checkSyncInterval = 15
 	syncBlockDiff     = 3
 )
 

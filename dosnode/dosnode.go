@@ -32,15 +32,16 @@ const (
 
 // DosNode is a strcut that represents a offchain dos client
 type DosNode struct {
-	suite        suites.Suite
-	chain        onchain.ProxyAdapter
-	dkg          dkg.PDKGInterface
-	p            p2p.P2PInterface
-	done         chan interface{}
-	cSignToPeer  chan *vss.Signature
-	cRequestDone chan [4]*big.Int
-	id           []byte
-	logger       log.Logger
+	suite         suites.Suite
+	chain         onchain.ProxyAdapter
+	dkg           dkg.PDKGInterface
+	p             p2p.P2PInterface
+	done          chan interface{}
+	cSignToPeer   chan *vss.Signature
+	cRequestDone  chan [4]*big.Int
+	eventGrouping chan interface{}
+	id            []byte
+	logger        log.Logger
 	//For REST API
 	startTime         time.Time
 	state             string
@@ -159,6 +160,7 @@ func (d *DosNode) Start() (err error) {
 	mux.HandleFunc("/guardian", d.guardian)
 	mux.HandleFunc("/p2p", d.p2p)
 	mux.HandleFunc("/signalRandom", d.signalRandom)
+	mux.HandleFunc("/grouping", d.grouping)
 
 	go http.ListenAndServe(":8080", mux)
 
@@ -311,7 +313,8 @@ func (d *DosNode) buildPipeline(ctx context.Context, cancel context.CancelFunc, 
 func (d *DosNode) listen() (err error) {
 
 	var errcList []chan error
-	eventGrouping, errc := d.chain.SubscribeEvent(onchain.SubscribeLogGrouping)
+	var errc chan error
+	d.eventGrouping, errc = d.chain.SubscribeEvent(onchain.SubscribeLogGrouping)
 	errcList = append(errcList, errc)
 	eventGroupDissolve, errc := d.chain.SubscribeEvent(onchain.SubscribeLogGroupDissolve)
 	errcList = append(errcList, errc)
@@ -490,7 +493,7 @@ func (d *DosNode) listen() (err error) {
 					"PendingNodeSize":     pendingNodeSize,
 					"PendingGrouSize":     pendingGrouSize,
 					"expiredWorkingGSize": expiredWGSize,
-					"Members":             d.p.Members(),
+					"Members":             d.p.NumOfMembers(),
 					"sysrandInterval":     sysrandInterval}
 				d.logger.Event("DWatchdog", f)
 				//Let pendingNode be a guardian
@@ -523,7 +526,7 @@ func (d *DosNode) listen() (err error) {
 				}
 				d.p.Reply(msg.Sender, msg.RequestNonce, peerSignMap[string(content.Nonce)])
 			}
-		case msg, ok := <-eventGrouping:
+		case msg, ok := <-d.eventGrouping:
 			if !ok {
 				continue
 			}
@@ -533,14 +536,15 @@ func (d *DosNode) listen() (err error) {
 				continue
 			}
 			isMember := false
-			var participants [][]byte
-			for _, p := range content.NodeId {
-				id := p.Bytes()
+
+			for _, id := range content.NodeId {
 				if r := bytes.Compare(d.id, id); r == 0 {
 					isMember = true
 				}
-				participants = append(participants, id)
+				fmt.Println(fmt.Sprintf("%x", d.id), " member : ", fmt.Sprintf("%x", id), " isMember ", isMember)
 			}
+
+			participants := content.NodeId
 			groupID := fmt.Sprintf("%x", content.GroupId)
 			f := map[string]interface{}{
 				"GroupID": groupID,

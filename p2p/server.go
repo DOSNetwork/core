@@ -74,16 +74,21 @@ func (n *server) Join(bootstrapIP []string) (num int, err error) {
 	return n.members.Join(bootstrapIP)
 }
 
-func (n *server) Members() int {
+func (n *server) NumOfMembers() int {
 	return n.members.NumOfPeers()
 }
 
-func (n *server) ConnectToAll(ctx context.Context, groupIds [][]byte) (out chan bool, errc chan error) {
+func (n *server) MemberList() [][]byte {
+	return n.members.MemberList()
+}
+
+func (n *server) ConnectToAll(ctx context.Context, groupIds [][]byte, sessionID string) (out chan bool, errc chan error) {
 	out = make(chan bool)
 	errc = make(chan error)
 	go func() {
 		defer close(out)
 		defer close(errc)
+		defer logger.TimeTrack(time.Now(), "ConnectToAll", map[string]interface{}{"GroupID": sessionID})
 		var wg sync.WaitGroup
 		wg.Add(len(groupIds) - 1)
 		for i := 0; i < len(groupIds); i++ {
@@ -162,9 +167,8 @@ func (n *server) Listen() (err error) {
 				return
 			}
 			start := time.Now()
-			//fmt.Println("new conn ")
+			//fmt.Println("new conn ", conn.RemoteAddr().String())
 			go func(conn net.Conn, start time.Time) {
-				fmt.Println(string(n.id), "Got a conn")
 				c, err := newClient(n.suite, n.secKey, n.pubKey, n.id, conn, true)
 				if err != nil {
 					//fmt.Println("listen to client err", err)
@@ -508,7 +512,7 @@ func (n *server) ConnectTo(addr string, id []byte) ([]byte, error) {
 func (n *server) Request(id []byte, m proto.Message) (msg P2PMessage, err error) {
 	//defer logger.TimeTrack(time.Now(), "Request", nil)
 	callReq := request{}
-	callReq.ctx, callReq.cancel = context.WithTimeout(context.Background(), 5*time.Second)
+	callReq.ctx, callReq.cancel = context.WithTimeout(context.Background(), 30*time.Second)
 	defer callReq.cancel()
 	callReq.rType = 1
 	callReq.id = id

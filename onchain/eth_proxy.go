@@ -394,9 +394,14 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 					errc <- err
 					return
 				case i := <-transitChan:
+					var participants [][]byte
+					for _, p := range i.NodeId {
+						id := p.Bytes()
+						participants = append(participants, id)
+					}
 					out <- &LogGrouping{
 						GroupId: i.GroupId,
-						NodeId:  i.NodeId,
+						NodeId:  participants,
 						Tx:      i.Raw.TxHash.Hex(),
 						BlockN:  i.Raw.BlockNumber,
 						Removed: i.Raw.Removed,
@@ -744,8 +749,13 @@ func (e *ethAdaptor) End() {
 
 func (e *ethAdaptor) start() (err error) {
 	//
+	infuraClientC := DialToEth(context.Background(), e.gethUrls)
+	infuraClient := <-infuraClientC
 	clients := DialToEth(context.Background(), e.eventUrls)
-	for client := range clients {
+
+	synClients := CheckSync(context.Background(), infuraClient, clients)
+
+	for client := range synClients {
 		p, er := dosproxy.NewDosproxy(common.HexToAddress(e.proxyAddr), client)
 		if er != nil {
 			fmt.Println("NewDosproxy err ", er)
@@ -840,7 +850,6 @@ func (e *ethAdaptor) set(ctx context.Context, params []interface{}, setF setFunc
 					//transaction failed so delete the whole requestSend chain
 					if resp.err == nil ||
 						strings.Contains(resp.err.Error(), "transaction failed") {
-						fmt.Println("set err e ,", resp.err)
 						select {
 						case out <- resp:
 						case <-ctx.Done():
@@ -999,7 +1008,7 @@ func (e *ethAdaptor) RegisterNewNode(ctx context.Context) (err error) {
 		tx, err = proxy.RegisterNewNode()
 		return
 	}
-
+	defer e.logger.TimeTrack(time.Now(), "RegisterNewNode", nil)
 	reply := e.set(ctx, nil, f)
 	for {
 		select {
@@ -1328,6 +1337,8 @@ func (e *ethAdaptor) RegisterGroupPubKey(ctx context.Context, IdWithPubKeys chan
 			if !ok {
 				return
 			}
+			defer e.logger.TimeTrack(time.Now(), "RegisterGroupPubKey", map[string]interface{}{"GroupID": fmt.Sprintf("%x", idPubkey[0])})
+			//			defer logger.TimeTrack(time.Now(), "askMembers", nil)
 			fmt.Println("RegisterGroupPubKey got pubkey")
 
 			// define how to parse parameters and execute proxy function

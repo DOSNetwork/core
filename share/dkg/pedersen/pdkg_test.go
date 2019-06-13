@@ -19,7 +19,7 @@ import (
 )
 
 func buildConn(s, d p2p.P2PInterface, port string, t *testing.T) {
-	fmt.Println(string(s.GetID()), " connect ", string(d.GetID()), " port ", port)
+	//Println(string(s.GetID()), " connect ", string(d.GetID()), " port ", port)
 	oldPort := s.GetPort()
 	s.SetPort(port)
 	connected, err := s.ConnectTo("0.0.0.0", nil)
@@ -74,7 +74,7 @@ func TestPDKG(t *testing.T) {
 	id := []byte("Participant0")
 	log.Init(id[:])
 
-	pdkgs, groupIds := buildPdkg(21, t)
+	pdkgs, groupIds := buildPdkg(11, t)
 
 	var wg sync.WaitGroup
 	wg.Add(1)

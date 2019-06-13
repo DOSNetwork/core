@@ -15,6 +15,7 @@ type Membership interface {
 	Lookup(id []byte) (addr net.IP)
 	NumOfPeers() int
 	PeersIP() (addr []net.IP)
+	MemberList() (list [][]byte)
 }
 
 //NewSerfNet creates a Serf implementation
@@ -77,6 +78,18 @@ func (s *serfNet) PeersIP() (addr []net.IP) {
 
 			addr = append(addr, members[i].Addr)
 		}
+	}
+	return
+}
+
+// PeersIP return the all IP address of an existing cluster
+func (s *serfNet) MemberList() (list [][]byte) {
+	members := s.serf.Members()
+	for i := 0; i < len(members); i++ {
+		if members[i].Status == serf.StatusAlive {
+			list = append(list, []byte(members[i].Name))
+		}
+
 	}
 	return
 }

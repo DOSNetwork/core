@@ -3,11 +3,18 @@ package dosnode
 import (
 	"context"
 	"fmt"
+	//"math/big"
+	//"math/rand"
 	"net/http"
+	//"sort"
 	"strconv"
 	"time"
+	//"github.com/DOSNetwork/core/onchain"
 )
 
+func (d *DosNode) grouping(w http.ResponseWriter, r *http.Request) {
+
+}
 func (d *DosNode) status(w http.ResponseWriter, r *http.Request) {
 	ctx, cancelFunc := context.WithDeadline(context.Background(), time.Now().Add(3*time.Second))
 	defer cancelFunc()

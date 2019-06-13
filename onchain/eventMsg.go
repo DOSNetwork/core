@@ -90,7 +90,7 @@ type LogInsufficientPendingNode struct {
 //LogGrouping is an onchain event that DOSProxy requests the specified nodes to start DKG to generate a new pubkey
 type LogGrouping struct {
 	GroupId *big.Int
-	NodeId  []common.Address
+	NodeId  [][]byte
 	Tx      string
 	BlockN  uint64
 	Removed bool
