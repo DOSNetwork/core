@@ -8,7 +8,6 @@ import (
 	"net"
 	"reflect"
 
-	"sync"
 	"time"
 
 	"github.com/dedis/kyber"
@@ -89,31 +88,31 @@ func (n *server) ConnectToAll(ctx context.Context, groupIds [][]byte, sessionID 
 		defer close(out)
 		defer close(errc)
 		defer logger.TimeTrack(time.Now(), "ConnectToAll", map[string]interface{}{"GroupID": sessionID})
-		var wg sync.WaitGroup
-		wg.Add(len(groupIds) - 1)
+		//var wg sync.WaitGroup
+		//wg.Add(len(groupIds) - 1)
 		for i := 0; i < len(groupIds); i++ {
 			if !bytes.Equal(n.GetID(), groupIds[i]) {
-				go func(id []byte) {
-					defer wg.Done()
-					for {
+				//go func(id []byte) {
+				//defer wg.Done()
+				//for {
+				select {
+				case <-ctx.Done():
+				default:
+					if _, err := n.ConnectTo("", groupIds[i]); err != nil {
+						fmt.Println("ConnectTo ", err)
 						select {
+						case errc <- err:
 						case <-ctx.Done():
-						default:
-							if _, err := n.ConnectTo("", id); err != nil {
-								select {
-								case errc <- err:
-								case <-ctx.Done():
-								}
-								time.Sleep(1 * time.Second)
-								continue
-							}
-							return
 						}
+						return
 					}
-				}(groupIds[i])
+
+				}
+				//}
+				//}(groupIds[i])
 			}
 		}
-		wg.Wait()
+		//wg.Wait()
 		select {
 		case out <- true:
 		case <-ctx.Done():
@@ -476,7 +475,7 @@ This is a block call
 func (n *server) ConnectTo(addr string, id []byte) ([]byte, error) {
 	var err error
 	callReq := request{}
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
 	callReq.ctx = ctx
 	callReq.rType = 0
@@ -512,7 +511,7 @@ func (n *server) ConnectTo(addr string, id []byte) ([]byte, error) {
 func (n *server) Request(id []byte, m proto.Message) (msg P2PMessage, err error) {
 	//defer logger.TimeTrack(time.Now(), "Request", nil)
 	callReq := request{}
-	callReq.ctx, callReq.cancel = context.WithTimeout(context.Background(), 30*time.Second)
+	callReq.ctx, callReq.cancel = context.WithTimeout(context.Background(), 120*time.Second)
 	defer callReq.cancel()
 	callReq.rType = 1
 	callReq.id = id
@@ -557,7 +556,7 @@ func (n *server) Request(id []byte, m proto.Message) (msg P2PMessage, err error)
 func (n *server) Reply(id []byte, nonce uint64, response proto.Message) (err error) {
 	callReq := request{}
 
-	callReq.ctx, callReq.cancel = context.WithTimeout(context.Background(), 5*time.Second)
+	callReq.ctx, callReq.cancel = context.WithTimeout(context.Background(), 120*time.Second)
 	callReq.id = id
 	callReq.rType = 2
 	callReq.nonce = nonce

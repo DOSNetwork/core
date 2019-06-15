@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/go-stack/stack"
 	"github.com/golang/protobuf/proto"
 
 	"github.com/DOSNetwork/core/log"
@@ -246,23 +247,30 @@ func exchangePub(ctx context.Context, logger log.Logger, selfPubc chan interface
 		defer close(out)
 		defer close(errc)
 		var partPubs []*PublicKey
+		fmt.Println("exchangePub")
+		select {
+		case <-ctx.Done():
+		case resp, ok := <-selfPubc:
+			if ok {
+				fmt.Println("exchangePub selfPubc")
+				logger.TimeTrack(time.Now(), "exchangePubselfPubc", map[string]interface{}{"GroupID": sessionID})
+				if pubkey, ok := resp.(*PublicKey); ok {
+					partPubs = append(partPubs, pubkey)
+				}
+			}
+		}
 		for {
 			select {
 			case <-ctx.Done():
-			case resp, ok := <-selfPubc:
-				if ok {
-					logger.TimeTrack(time.Now(), "exchangePubselfPubc", map[string]interface{}{"GroupID": sessionID})
+			case resps, ok := <-peerPubc:
+				if !ok {
+					return
+				}
+				fmt.Println("exchangePub peerPubc ", len(resps))
+				logger.TimeTrack(time.Now(), "exchangePubpeerPubc", map[string]interface{}{"GroupID": sessionID})
+				for _, resp := range resps {
 					if pubkey, ok := resp.(*PublicKey); ok {
 						partPubs = append(partPubs, pubkey)
-					}
-				}
-			case resps, ok := <-peerPubc:
-				if ok {
-					logger.TimeTrack(time.Now(), "exchangePubpeerPubc", map[string]interface{}{"GroupID": sessionID})
-					for _, resp := range resps {
-						if pubkey, ok := resp.(*PublicKey); ok {
-							partPubs = append(partPubs, pubkey)
-						}
 					}
 				}
 			}
@@ -536,6 +544,8 @@ func genGroup(ctx context.Context, logger log.Logger, group *group, suite suites
 }
 
 func (d *pdkg) GetGroupPublicPoly(groupId string) (pubPoly *share.PubPoly) {
+	d.logger.Event("GetGroupPublicPoly", map[string]interface{}{"GroupID": groupId, "GroupNumber": d.GetGroupNumber()})
+
 	if g, loaded := d.groups.Load(groupId); loaded {
 		pubPoly = g.(*group).pubPoly
 	}
@@ -543,8 +553,18 @@ func (d *pdkg) GetGroupPublicPoly(groupId string) (pubPoly *share.PubPoly) {
 }
 
 func (d *pdkg) GetShareSecurity(groupId string) (secShare *share.PriShare) {
+	d.logger.Event("GetShareSecurity", map[string]interface{}{"GroupID": groupId, "GroupNumber": d.GetGroupNumber()})
 	if g, loaded := d.groups.Load(groupId); loaded {
-		secShare = g.(*group).secShare.Share
+		if g != nil {
+			if dks := g.(*group).secShare; dks != nil {
+				secShare = dks.Share
+			} else {
+				d.logger.Error(errors.New("can't load sec "))
+			}
+		} else {
+			d.logger.Error(errors.New("can't load sec "))
+
+		}
 	}
 	return
 }
@@ -589,7 +609,9 @@ func decodePubKey(pubKey kyber.Point) (pubKeyCoor [4]*big.Int, err error) {
 }
 
 func reportErr(ctx context.Context, errc chan error, err error) {
-	fmt.Println("reportErr err ", err)
+	s := stack.Trace().TrimRuntime()
+	//d.logger.Error(err)
+	fmt.Println("reportErr err ", err, s)
 	select {
 	case errc <- err:
 	case <-ctx.Done():

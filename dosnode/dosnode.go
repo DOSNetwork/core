@@ -230,7 +230,10 @@ func (d *DosNode) buildPipeline(ctx context.Context, cancel context.CancelFunc, 
 		return
 	}
 	pubPoly := d.dkg.GetGroupPublicPoly(groupID)
-
+	sec := d.dkg.GetShareSecurity(groupID)
+	if pubPoly == nil || sec == nil {
+		return
+	}
 	//Generate an unique id
 	switch pType {
 	case onchain.TrafficSystemRandom:
@@ -281,7 +284,7 @@ func (d *DosNode) buildPipeline(ctx context.Context, cancel context.CancelFunc, 
 		errcList = append(errcList, errc)
 	}
 
-	signc, errc := genSign(ctx, contentc, d.cSignToPeer, d.dkg.GetShareSecurity(groupID), d.suite, d.id, groupID, requestID.Bytes(), pType, nonce, d.logger)
+	signc, errc := genSign(ctx, contentc, d.cSignToPeer, sec, d.suite, d.id, groupID, requestID.Bytes(), pType, nonce, d.logger)
 	errcList = append(errcList, errc)
 	signShares = append(signShares, signc)
 
@@ -554,8 +557,10 @@ func (d *DosNode) listen() (err error) {
 			if isMember {
 				d.logger.Event("DGrouping2", f)
 				//pendingGroupMaxLife = 40 block
-				ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(40*15*time.Second))
+				//ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(40*15*time.Second))
+				ctx, cancel := context.WithCancel(context.Background())
 				defer cancel()
+				//ctx := context.Background()
 				outFromDkg, errc, err := d.dkg.Grouping(ctx, groupID, participants)
 				if err != nil {
 					d.logger.Error(err)
@@ -563,8 +568,8 @@ func (d *DosNode) listen() (err error) {
 				}
 				errcList = append(errcList, errc)
 
-				pubErrc := d.chain.RegisterGroupPubKey(ctx, outFromDkg)
-				errcList = append(errcList, pubErrc)
+				_ = d.chain.RegisterGroupPubKey(ctx, outFromDkg)
+				//errcList = append(errcList, pubErrc)
 				allErrc := mergeErrors(ctx, errcList...)
 				go d.waitForGrouping(ctx, cancel, groupID, allErrc)
 				//}
@@ -610,9 +615,9 @@ func (d *DosNode) listen() (err error) {
 					"RequestId":            requestID,
 					"GroupID":              groupID,
 					"LastSystemRandomness": lastRand,
-					"Tx":                   content.Tx,
-					"CurBlkN":              currentBlockNumber,
-					"BlockN":               content.BlockN}
+					"Tx":      content.Tx,
+					"CurBlkN": currentBlockNumber,
+					"BlockN":  content.BlockN}
 				d.logger.Event("DOS_QuerySysRandom", f)
 
 				ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(40*15*time.Second))
@@ -641,9 +646,9 @@ func (d *DosNode) listen() (err error) {
 					"RequestId":            requestID,
 					"GroupID":              groupID,
 					"LastSystemRandomness": lastRand,
-					"Tx":                   content.Tx,
-					"CurBlkN":              currentBlockNumber,
-					"BlockN":               content.BlockN}
+					"Tx":      content.Tx,
+					"CurBlkN": currentBlockNumber,
+					"BlockN":  content.BlockN}
 				d.logger.Event("DOS_QueryUserRandom", f)
 
 				ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(40*15*time.Second))

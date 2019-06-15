@@ -138,7 +138,7 @@ func (c *client) exchangeID() (err error) {
 		wg.Wait()
 		ch <- struct{}{}
 	}()
-	timeout := time.Duration(10) * time.Second
+	timeout := time.Duration(60) * time.Second
 	select {
 	case <-ch:
 		f := map[string]interface{}{

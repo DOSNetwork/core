@@ -77,8 +77,8 @@ func TestPDKG(t *testing.T) {
 	pdkgs, groupIds := buildPdkg(11, t)
 
 	var wg sync.WaitGroup
-	wg.Add(1)
-	for i := 0; i < 1; i++ {
+	wg.Add(11)
+	for i := 0; i < 11; i++ {
 		go func(groupID string, pdkgs []PDKGInterface, groupIds [][]byte) {
 			defer wg.Done()
 			ctx := context.Background()
