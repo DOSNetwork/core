@@ -732,7 +732,7 @@ func NewEthAdaptor(credentialPath, passphrase, proxyAddr, commitRevealAddr strin
 
 	adaptor.ctx, adaptor.cancelFunc = context.WithCancel(context.Background())
 	adaptor.auth = bind.NewKeyedTransactor(key.PrivateKey)
-	adaptor.auth.GasPrice = big.NewInt(20000000000) //2 Gwei
+	adaptor.auth.GasPrice = big.NewInt(1000000000) //1 Gwei
 	adaptor.auth.GasLimit = uint64(6000000)
 	adaptor.auth.Context = adaptor.ctx
 	adaptor.reqQueue = make(chan *request)
@@ -1483,24 +1483,23 @@ func (e *ethAdaptor) DataReturn(ctx context.Context, signatures chan *vss.Signat
 			var params []interface{}
 			params = append(params, signature)
 			reply := e.set(ctx, params, f)
-			for {
-				select {
-				case r, ok := <-reply:
-					if ok {
-						if r.err != nil {
-							fmt.Println("DataReturn response ", fmt.Sprintf("%x", r.tx.Hash()))
-						} else {
-							fmt.Println("DataReturn error ", r.err)
-							select {
-							case errc <- r.err:
-							case <-ctx.Done():
-							}
+
+			select {
+			case r, ok := <-reply:
+				if ok {
+					if r.err == nil {
+						fmt.Println("DataReturn response ", fmt.Sprintf("%x", r.tx.Hash()))
+					} else {
+						fmt.Println("DataReturn error ", r.err)
+						select {
+						case errc <- r.err:
+						case <-ctx.Done():
 						}
 					}
-					return
-				case <-ctx.Done():
-					return
 				}
+				return
+			case <-ctx.Done():
+				return
 			}
 		case <-ctx.Done():
 			return

@@ -87,29 +87,28 @@ func (n *server) ConnectToAll(ctx context.Context, groupIds [][]byte, sessionID 
 	go func() {
 		defer close(out)
 		defer close(errc)
-		defer logger.TimeTrack(time.Now(), "ConnectToAll", map[string]interface{}{"GroupID": sessionID})
+		//defer logger.TimeTrack(time.Now(), "ConnectToAll", map[string]interface{}{"GroupID": sessionID})
 		//var wg sync.WaitGroup
 		//wg.Add(len(groupIds) - 1)
 		for i := 0; i < len(groupIds); i++ {
 			if !bytes.Equal(n.GetID(), groupIds[i]) {
-				//go func(id []byte) {
-				//defer wg.Done()
-				//for {
+				fmt.Println("ConnectToAll ", fmt.Sprintf("%x", groupIds[i]))
 				select {
 				case <-ctx.Done():
 				default:
 					if _, err := n.ConnectTo("", groupIds[i]); err != nil {
 						fmt.Println("ConnectTo ", err)
+						logger.TimeTrack(time.Now(), "ConnectToAllFail", map[string]interface{}{"GroupID": sessionID, "ConnectToID": fmt.Sprintf("%x", groupIds[i])})
 						select {
 						case errc <- err:
 						case <-ctx.Done():
 						}
 						return
-					}
+					} else {
+						logger.TimeTrack(time.Now(), "ConnectToAllSucc", map[string]interface{}{"GroupID": sessionID, "ConnectToID": fmt.Sprintf("%x", groupIds[i])})
 
+					}
 				}
-				//}
-				//}(groupIds[i])
 			}
 		}
 		//wg.Wait()

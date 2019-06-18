@@ -202,7 +202,7 @@ func genPub(ctx context.Context, logger log.Logger, conn chan bool, suite suites
 		select {
 		case c, ok := <-conn:
 			if ok && c == true {
-				defer logger.TimeTrack(time.Now(), "genPub", nil)
+				defer logger.TimeTrack(time.Now(), "genPub", map[string]interface{}{"GroupID": sessionID})
 				//Index pub key
 				index := -1
 				for i, groupId := range groupIds {
@@ -231,6 +231,8 @@ func genPub(ctx context.Context, logger log.Logger, conn chan bool, suite suites
 					}
 					return
 				}
+			} else {
+				logger.TimeTrack(time.Now(), "genPubStop", map[string]interface{}{"GroupID": sessionID})
 			}
 		case <-ctx.Done():
 			return
