@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"net/http"
 	"os"
 	"time"
 	"unsafe"
@@ -70,19 +69,7 @@ func NewDosNode(credentialPath, passphrase string) (dosNode *DosNode, err error)
 	port := config.Port
 	bootstrapIP := config.BootStrapIp
 
-	workingDir, err := os.Getwd()
-	if err != nil {
-		return
-	}
-
-	if workingDir == "/" {
-		workingDir = "."
-	}
-
 	chainConfig := config.GetChainConfig()
-	if credentialPath == "" {
-		credentialPath = workingDir + "/credential"
-	}
 
 	//Set up an onchain adapter
 	chainConn, err := onchain.NewProxyAdapter(config.GetCurrentType(), credentialPath, passphrase, chainConfig.DOSProxyAddress, chainConfig.CommitReveal, chainConfig.RemoteNodeAddressPool)
@@ -152,19 +139,9 @@ func NewDosNode(credentialPath, passphrase string) (dosNode *DosNode, err error)
 // Start registers to onchain and listen to p2p events
 func (d *DosNode) Start() (err error) {
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("/", d.status)
-	mux.HandleFunc("/balance", d.balance)
-	mux.HandleFunc("/groupSize", d.groupSize)
-	mux.HandleFunc("/proxy", d.proxy)
-	mux.HandleFunc("/guardian", d.guardian)
-	mux.HandleFunc("/p2p", d.p2p)
-	mux.HandleFunc("/signalRandom", d.signalRandom)
-	mux.HandleFunc("/grouping", d.grouping)
+	d.startRESTServer()
 
-	go http.ListenAndServe(":8080", mux)
-
-	d.state = "connecting and syncing geth node"
+	d.state = "Working"
 
 	//TODO: Check to see if it is a valid stacking node first
 	_ = d.chain.RegisterNewNode(context.Background())
@@ -172,10 +149,7 @@ func (d *DosNode) Start() (err error) {
 	if err = d.listen(); err != nil {
 		fmt.Println("listen err ", err)
 		d.logger.Error(err)
-		return
 	}
-	d.state = "running"
-
 	return
 }
 

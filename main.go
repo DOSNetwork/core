@@ -1,7 +1,7 @@
 package main
 
 import (
-	"bytes"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -13,12 +13,15 @@ import (
 	"syscall"
 
 	"github.com/DOSNetwork/core/dosnode"
+	"github.com/DOSNetwork/core/onchain"
 	"github.com/urfave/cli"
 	"golang.org/x/crypto/ssh/terminal"
 )
 
 // Caching running node's process id.
-const pidFile string = "./dosclient.pid"
+const pidFile string = "./dos/dosclient.pid"
+const logFile string = "./dos/doslog"
+const dosPath string = "./dos"
 
 func savePID(pid int) {
 
@@ -68,7 +71,7 @@ func runDos(credentialPath, passphrase string) {
 	if workingDir == "/" {
 		workingDir = "."
 	}
-	fErr, err := os.OpenFile(workingDir+"/dos/doslog", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0666)
+	fErr, err := os.OpenFile(logFile, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0666)
 	if err != nil {
 		fmt.Println("runDos err ", err)
 		return
@@ -76,7 +79,7 @@ func runDos(credentialPath, passphrase string) {
 	syscall.Dup2(int(fErr.Fd()), 1) /* -- stdout */
 	syscall.Dup2(int(fErr.Fd()), 2) /* -- stderr */
 
-	dosclient, err := dosnode.NewDosNode(credentialPath, passphrase)
+	dosclient, err := dosnode.NewDosNode(dosPath, passphrase)
 	if err != nil {
 		fmt.Println(" err", err)
 		return
@@ -85,11 +88,11 @@ func runDos(credentialPath, passphrase string) {
 
 }
 
-func makeRequest(f string, args []byte) ([]byte, error) {
+func makeRequest(f string) ([]byte, error) {
 
 	tServer := "http://localhost:8080/" + f
 
-	req, err := http.NewRequest("POST", tServer, bytes.NewBuffer(args))
+	req, err := http.NewRequest("GET", tServer, nil)
 	if err != nil {
 		fmt.Println("makeRequest err ", err)
 		return nil, err
@@ -109,6 +112,7 @@ func makeRequest(f string, args []byte) ([]byte, error) {
 	}
 	return r, err
 }
+
 func actionStart(c *cli.Context) error {
 	// check if daemon already running.
 	if _, err := os.Stat(pidFile); err == nil {
@@ -125,10 +129,10 @@ func actionStart(c *cli.Context) error {
 	cmd := exec.Command(os.Args[0], "run")
 	cmd.Stdout = os.Stdout
 	cmd.Start()
-	//runDos(c.String("credential.path"), password)
 	savePID(cmd.Process.Pid)
 	return nil
 }
+
 func actionStop(c *cli.Context) error {
 	_, err := os.Stat(pidFile)
 	if err == nil {
@@ -166,42 +170,90 @@ func actionStop(c *cli.Context) error {
 	fmt.Println("Not running.")
 	return err
 }
+
+func readPasswordFromTerm() (password string) {
+	for password == "" {
+		bytePassword, _ := terminal.ReadPassword(0)
+		password = strings.TrimSpace(string(bytePassword))
+	}
+	return
+}
+
 func actionShowStatus(c *cli.Context) error {
-	r, err := makeRequest("/", []byte{})
+	r, err := makeRequest("/")
 	if err == nil {
 		fmt.Println(string(r))
 		return nil
 	}
 	return err
 }
-func actionShowBalance(c *cli.Context) error {
-	r, err := makeRequest("/", []byte{})
-	if err == nil {
-		fmt.Println("show balance: ", string(r))
-		return nil
-	}
-	return err
-}
-func actionShowGroups(c *cli.Context) error {
-	r, err := makeRequest("/", []byte{})
-	if err == nil {
-		fmt.Println("show group number: ", string(r))
-		return nil
-	}
-	return err
-}
-func actionShowProxy(c *cli.Context) error {
-	r, err := makeRequest("/", []byte{})
-	if err == nil {
-		fmt.Println("show proxy status : \n", string(r))
-		return nil
-	}
-	return err
-}
-func actionTriggerGuardian(c *cli.Context) error {
-	r, err := makeRequest("/", []byte{})
+
+func actionGroupFormation(c *cli.Context) error {
+	r, err := makeRequest("/signalGroupFormation")
 	if err == nil {
 		fmt.Println("trigger guardian functions : \n", string(r))
+		return nil
+	}
+	return err
+}
+
+func actionGroupDissolve(c *cli.Context) error {
+	r, err := makeRequest("/signalGroupDissolve")
+	if err == nil {
+		fmt.Println("trigger guardian functions : \n", string(r))
+		return nil
+	}
+	return err
+}
+
+func actionBootstrap(c *cli.Context) error {
+	c.String("cid")
+	r, err := makeRequest("/signalBootstrap?cid=" + c.String("cid"))
+	if err == nil {
+		fmt.Println("trigger guardian functions : \n", string(r))
+		return nil
+	}
+	return err
+}
+
+func actionRnadom(c *cli.Context) error {
+	r, err := makeRequest("/signalRandom")
+	if err == nil {
+		fmt.Println("trigger guardian functions : \n", string(r))
+		return nil
+	}
+	return err
+}
+
+func actionCreateWallet(c *cli.Context) error {
+
+	fmt.Print("Enter Password: ")
+	first := readPasswordFromTerm()
+
+	fmt.Print("\nRe-enter Password: ")
+	second := readPasswordFromTerm()
+
+	if first != second {
+		fmt.Print("\nUnmatched Password")
+		return errors.New("Unmatched Password")
+	}
+	err := onchain.GenEthkey(dosPath, first)
+	if err != nil {
+		fmt.Println("\n", err)
+	} else {
+		fmt.Println("\nwallet keystore is in ", dosPath)
+	}
+	return nil
+}
+
+func actionWalletInfo(c *cli.Context) error {
+	return nil
+}
+
+func actionWalletBalance(c *cli.Context) error {
+	r, err := makeRequest("/balance")
+	if err == nil {
+		fmt.Println("show balance: ", string(r))
 		return nil
 	}
 	return err
@@ -222,59 +274,72 @@ func main() {
 
 	app := cli.NewApp()
 	app.Name = "client"
-	app.Usage = "the dos-client command line interface"
+	app.Version = "beta"
+	app.Usage = "CLI for dos client"
 
 	app.Commands = []cli.Command{
 		{
-			Name:  "start",
-			Usage: "Start a dos-client daemon",
-			Flags: []cli.Flag{
-				cli.StringFlag{
-					Name:   "credential.path,c",
-					Usage:  "credential.path",
-					EnvVar: "CREDENTIALPATH",
-				},
-				cli.StringFlag{
-					Name:   "credential.passphrase,p",
-					Usage:  "credential.passPhrase",
-					EnvVar: "PASSPHRASE",
-				},
-			},
+			Name:   "start",
+			Usage:  "Start a dos client daemon",
 			Action: actionStart,
 		},
 		{
 			Name:   "stop",
-			Usage:  "Stop a daemon",
+			Usage:  "Stop a dos client daemon",
 			Action: actionStop,
 		},
 		{
-			Name:  "cmd",
-			Usage: "cmd",
+			Name:   "status",
+			Usage:  "show dos client status",
+			Action: actionShowStatus,
+		},
+		{
+			Name:  "guardian",
+			Usage: "Guardian fucntions",
 			Subcommands: []cli.Command{
 				{
-					Name:   "showStatus",
-					Usage:  "show status",
-					Action: actionShowStatus,
+					Name:   "groupFormation",
+					Usage:  "signal proxy to generate a new group",
+					Action: actionGroupFormation,
 				},
 				{
-					Name:   "showBalance",
-					Usage:  "show balance",
-					Action: actionShowBalance,
+					Name:   "groupDissolve",
+					Usage:  "signal proxy to dissolve expired groups",
+					Action: actionGroupDissolve,
 				},
 				{
-					Name:   "showGroups",
-					Usage:  "show how many group this client belong to",
-					Action: actionShowGroups,
+					Name:   "bootStrap",
+					Usage:  "signal proxy to bootstrape",
+					Action: actionBootstrap,
+					Flags: []cli.Flag{
+						cli.StringFlag{Name: "cid, bootstrap campaign id"},
+					},
 				},
 				{
-					Name:   "showProxyStatus",
-					Usage:  "show proxy status",
-					Action: actionShowProxy,
+					Name:   "random",
+					Usage:  "signal proxy to generate a random number",
+					Action: actionRnadom,
+				},
+			},
+		},
+		{
+			Name:  "wallet",
+			Usage: "Manage Node Wallet",
+			Subcommands: []cli.Command{
+				{
+					Name:   "create",
+					Usage:  "show wallet status",
+					Action: actionCreateWallet,
 				},
 				{
-					Name:   "triggerGuardian",
-					Usage:  "trigger guardian functions",
-					Action: actionTriggerGuardian,
+					Name:   "balance",
+					Usage:  "show wallet balance",
+					Action: actionWalletBalance,
+				},
+				{
+					Name:   "info",
+					Usage:  "show wallet info",
+					Action: actionWalletInfo,
 				},
 			},
 		},

@@ -75,6 +75,18 @@ func merge(ctx context.Context, cs ...chan interface{}) chan interface{} {
 	return out
 }
 
+func GenEthkey(credentialPath, passPhrase string) (err error) {
+	newKeyStore := keystore.NewKeyStore(credentialPath, keystore.StandardScryptN, keystore.StandardScryptP)
+	if len(newKeyStore.Accounts()) >= 1 {
+		fmt.Println("", newKeyStore.Accounts()[0].URL.Path)
+		err = errors.New("Found an existing key in " + credentialPath)
+		return
+	}
+	_, err = newKeyStore.NewAccount(passPhrase)
+
+	return
+}
+
 //ReadEthKey is a utility function to read a keystore file
 func ReadEthKey(credentialPath, passphrase string) (key *keystore.Key, err error) {
 	newKeyStore := keystore.NewKeyStore(credentialPath, keystore.StandardScryptN, keystore.StandardScryptP)

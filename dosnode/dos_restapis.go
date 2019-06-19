@@ -12,82 +12,20 @@ import (
 	"github.com/DOSNetwork/core/onchain"
 )
 
-func (d *DosNode) p2p(w http.ResponseWriter, r *http.Request) {
-	members := d.p.MemberList()
-	fmt.Println("p2p test ", len(members))
-	for i := 0; i < len(members); i++ {
-		fmt.Println("p2p ConnectTo ", members[i])
-		id, err := d.p.ConnectTo("", members[i])
-		if err != nil {
-			fmt.Println("ConnectTo ", id, " err ", err)
-		}
-	}
+func (d *DosNode) startRESTServer() {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/", d.status)
+	mux.HandleFunc("/balance", d.balance)
+	mux.HandleFunc("/signalGroupFormation", d.signalGroupFormation)
+	mux.HandleFunc("/signalGroupDissolve", d.signalGroupDissolve)
+	mux.HandleFunc("/signalBootstrap", d.signalBootstrap)
+	mux.HandleFunc("/signalRandom", d.signalRandom)
+	//TODO : Remove after beta .Only used for dev test
+	mux.HandleFunc("/p2pTest", d.p2pTest)
+	mux.HandleFunc("/dkgTest", d.dkgTest)
+	go http.ListenAndServe(":8080", mux)
 }
 
-func (d *DosNode) grouping(w http.ResponseWriter, r *http.Request) {
-	groupId := big.NewInt(0)
-	members := d.p.MemberList()
-	start := -1
-	end := -1
-	switch r.Method {
-	case "GET":
-		for k, v := range r.URL.Query() {
-			fmt.Printf("%s: %s\n", k, v)
-			if k == "start" {
-				i, err := strconv.Atoi(v[0])
-				if err == nil && i >= 0 {
-					start = i
-				}
-			} else if k == "end" {
-				i, err := strconv.Atoi(v[0])
-				if err == nil && i >= 0 {
-					end = i
-				}
-			} else if k == "gid" {
-				i, err := strconv.Atoi(v[0])
-				if err == nil && i >= 0 {
-					groupId = groupId.SetInt64(int64(i))
-				}
-			}
-		}
-	case "POST":
-		/*
-			reqBody, err := ioutil.ReadAll(r.Body)
-			if err != nil {
-				log.Fatal(err)
-			}
-			fmt.Printf("%s\n", reqBody)
-			w.Write([]byte("Received a POST request\n"))*/
-	}
-	if start >= 0 && end >= 0 {
-		if len(members) < (end - start) {
-			fmt.Println("members size not enough:", len(members))
-			return
-		}
-		fmt.Println("members size:", len(members))
-		sort.SliceStable(members, func(i, j int) bool {
-			a := big.NewInt(0)
-			a = a.SetBytes(members[i])
-			b := big.NewInt(0)
-			b = b.SetBytes(members[j])
-			r := a.Cmp(b)
-			if r == -1 {
-				return true
-			} else {
-				return false
-			}
-		})
-		var participants [][]byte
-		for i := start; i < end; i++ {
-			participants = append(participants, members[i])
-		}
-
-		d.eventGrouping <- &onchain.LogGrouping{
-			GroupId: groupId,
-			NodeId:  participants,
-		}
-	}
-}
 func (d *DosNode) status(w http.ResponseWriter, r *http.Request) {
 	ctx, cancelFunc := context.WithDeadline(context.Background(), time.Now().Add(3*time.Second))
 	defer cancelFunc()
@@ -109,58 +47,6 @@ func (d *DosNode) status(w http.ResponseWriter, r *http.Request) {
 	html = html + "Group Number   : " + strconv.Itoa(d.numOfworkingGroup) + "\n|"
 	html = html + "Group Number   : " + strconv.Itoa(d.numOfworkingGroup) + "\n"
 	html = html + "=================================================" + "\n"
-	w.Write([]byte(html))
-}
-
-func (d *DosNode) balance(w http.ResponseWriter, r *http.Request) {
-	html := "Balance :"
-	ctx, cancelFunc := context.WithDeadline(context.Background(), time.Now().Add(3*time.Second))
-	defer cancelFunc()
-	result, err := d.chain.Balance(ctx)
-	if err != nil {
-		html = html + result.String()
-	} else {
-		html = html + err.Error()
-	}
-	w.Write([]byte(html))
-}
-
-func (d *DosNode) groupSize(w http.ResponseWriter, r *http.Request) {
-	html := "Group Size :"
-
-	w.Write([]byte(html))
-}
-
-func (d *DosNode) guardian(w http.ResponseWriter, r *http.Request) {
-	d.chain.SignalGroupFormation(context.Background())
-	d.chain.SignalGroupDissolve(context.Background())
-	cid := -1
-	switch r.Method {
-	case "GET":
-		for k, v := range r.URL.Query() {
-			fmt.Printf("%s: %s\n", k, v)
-			if k == "cid" {
-				i, err := strconv.Atoi(v[0])
-				if err == nil && i >= 0 {
-					cid = i
-				}
-			}
-		}
-	default:
-	}
-	if cid >= 0 {
-		d.chain.SignalBootstrap(context.Background(), uint64(cid))
-	}
-}
-
-func (d *DosNode) signalRandom(w http.ResponseWriter, r *http.Request) {
-	d.chain.SignalRandom(context.Background())
-}
-
-func (d *DosNode) proxy(w http.ResponseWriter, r *http.Request) {
-	ctx, cancelFunc := context.WithDeadline(context.Background(), time.Now().Add(3*time.Second))
-	defer cancelFunc()
-	html := "=================================================" + "\n|"
 	//	result := d.dkg.GetGroupNumber()
 	workingGroupNum, err := d.chain.GetWorkingGroupSize(ctx)
 	if err != nil {
@@ -194,6 +80,119 @@ func (d *DosNode) proxy(w http.ResponseWriter, r *http.Request) {
 		html = html + "CurrentBlock     :" + strconv.FormatUint(curBlk, 10) + "\n"
 	}
 	html = html + "=================================================" + "\n"
-
 	w.Write([]byte(html))
+}
+
+func (d *DosNode) balance(w http.ResponseWriter, r *http.Request) {
+	html := "Balance :"
+	ctx, cancelFunc := context.WithDeadline(context.Background(), time.Now().Add(3*time.Second))
+	defer cancelFunc()
+	result, err := d.chain.Balance(ctx)
+	if err != nil {
+		html = html + result.String()
+	} else {
+		html = html + err.Error()
+	}
+	w.Write([]byte(html))
+}
+
+func (d *DosNode) signalBootstrap(w http.ResponseWriter, r *http.Request) {
+	cid := -1
+	switch r.Method {
+	case "GET":
+		for k, v := range r.URL.Query() {
+			fmt.Printf("%s: %s\n", k, v)
+			if k == "cid" {
+				i, err := strconv.Atoi(v[0])
+				if err == nil && i >= 0 {
+					cid = i
+				}
+			}
+		}
+	default:
+	}
+	if cid >= 0 {
+		d.chain.SignalBootstrap(context.Background(), uint64(cid))
+	}
+}
+
+func (d *DosNode) signalRandom(w http.ResponseWriter, r *http.Request) {
+	d.chain.SignalRandom(context.Background())
+}
+
+func (d *DosNode) signalGroupFormation(w http.ResponseWriter, r *http.Request) {
+	d.chain.SignalGroupFormation(context.Background())
+}
+
+func (d *DosNode) signalGroupDissolve(w http.ResponseWriter, r *http.Request) {
+	d.chain.SignalGroupDissolve(context.Background())
+}
+
+func (d *DosNode) p2pTest(w http.ResponseWriter, r *http.Request) {
+	members := d.p.MemberList()
+	fmt.Println("p2p test ", len(members))
+	for i := 0; i < len(members); i++ {
+		fmt.Println("p2p ConnectTo ", members[i])
+		id, err := d.p.ConnectTo("", members[i])
+		if err != nil {
+			fmt.Println("ConnectTo ", id, " err ", err)
+		}
+	}
+}
+
+func (d *DosNode) dkgTest(w http.ResponseWriter, r *http.Request) {
+	groupId := big.NewInt(0)
+	members := d.p.MemberList()
+	start := -1
+	end := -1
+	switch r.Method {
+	case "GET":
+		for k, v := range r.URL.Query() {
+			fmt.Printf("%s: %s\n", k, v)
+			if k == "start" {
+				i, err := strconv.Atoi(v[0])
+				if err == nil && i >= 0 {
+					start = i
+				}
+			} else if k == "end" {
+				i, err := strconv.Atoi(v[0])
+				if err == nil && i >= 0 {
+					end = i
+				}
+			} else if k == "gid" {
+				i, err := strconv.Atoi(v[0])
+				if err == nil && i >= 0 {
+					groupId = groupId.SetInt64(int64(i))
+				}
+			}
+		}
+	}
+	if start >= 0 && end >= 0 {
+		if len(members) < (end - start) {
+			fmt.Println("members size not enough:", len(members))
+			return
+		}
+		fmt.Println("members size:", len(members))
+		sort.SliceStable(members, func(i, j int) bool {
+			a := big.NewInt(0)
+			a = a.SetBytes(members[i])
+			b := big.NewInt(0)
+			b = b.SetBytes(members[j])
+			r := a.Cmp(b)
+			if r == -1 {
+				return true
+			} else {
+				return false
+			}
+		})
+		var participants [][]byte
+		for i := start; i < end; i++ {
+			participants = append(participants, members[i])
+		}
+
+		d.eventGrouping <- &onchain.LogGrouping{
+			GroupId: groupId,
+			NodeId:  participants,
+		}
+	}
 }
