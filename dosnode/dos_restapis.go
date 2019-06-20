@@ -50,7 +50,6 @@ func (d *DosNode) status(w http.ResponseWriter, r *http.Request) {
 	//	result := d.dkg.GetGroupNumber()
 	workingGroupNum, err := d.chain.GetWorkingGroupSize(ctx)
 	if err != nil {
-		"Group Number      :"
 		html = html + "WorkingGroupSize  :" + err.Error() + "\n|"
 	} else {
 		html = html + "WorkingGroupSize  :" + strconv.FormatUint(workingGroupNum, 10) + "\n|"
