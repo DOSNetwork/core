@@ -699,7 +699,7 @@ type ethAdaptor struct {
 }
 
 //NewEthAdaptor creates an eth implemention of ProxyAdapter
-func NewEthAdaptor(credentialPath, passphrase, proxyAddr, commitRevealAddr string, urls []string) (adaptor *ethAdaptor, err error) {
+func NewEthAdaptor(key *keystore.Key, proxyAddr, commitRevealAddr string, urls []string) (adaptor *ethAdaptor, err error) {
 	var httpUrls []string
 	var wsUrls []string
 	for _, url := range urls {
@@ -718,11 +718,6 @@ func NewEthAdaptor(credentialPath, passphrase, proxyAddr, commitRevealAddr strin
 	adaptor.proxyAddr = proxyAddr
 	adaptor.commitRevealAddr = commitRevealAddr
 	debug.FreeOSMemory()
-	//Read Ethereum keystore
-	key, err := ReadEthKey(credentialPath, passphrase)
-	if err != nil {
-		return
-	}
 	adaptor.key = key
 	debug.FreeOSMemory()
 
@@ -904,22 +899,19 @@ func (e *ethAdaptor) AddToWhitelist(ctx context.Context, addr common.Address) (e
 	var params []interface{}
 	params = append(params, addr)
 	reply := e.set(ctx, params, f)
-	for {
-		select {
-		case r, ok := <-reply:
-			if ok {
-				err = r.err
-				if r.err == nil {
-					fmt.Println("AddToWhitelist response ", fmt.Sprintf("%x", r.tx.Hash()))
-				} else {
-					fmt.Println("AddToWhitelist error ", r.err)
-				}
+	select {
+	case r, ok := <-reply:
+		if ok {
+			err = r.err
+			if r.err == nil {
+				fmt.Println("AddToWhitelist response ", fmt.Sprintf("%x", r.tx.Hash()))
+			} else {
+				fmt.Println("AddToWhitelist error ", r.err)
 			}
-			return
-		case <-ctx.Done():
-			return
 		}
+	case <-ctx.Done():
 	}
+	return
 }
 
 // StartCommitReveal is a wrap function that build a pipeline to set groupToPick
@@ -948,22 +940,20 @@ func (e *ethAdaptor) StartCommitReveal(ctx context.Context, startBlock int64, co
 	params = append(params, big.NewInt(revealDuration))
 	params = append(params, big.NewInt(revealThreshold))
 	reply := e.set(ctx, params, f)
-	for {
-		select {
-		case r, ok := <-reply:
-			if ok {
-				err = r.err
-				if r.err == nil {
-					fmt.Println("StartCommitReveal response ", fmt.Sprintf("%x", r.tx.Hash()))
-				} else {
-					fmt.Println("StartCommitReveal error ", r.err)
-				}
+
+	select {
+	case r, ok := <-reply:
+		if ok {
+			err = r.err
+			if r.err == nil {
+				fmt.Println("StartCommitReveal response ", fmt.Sprintf("%x", r.tx.Hash()))
+			} else {
+				fmt.Println("StartCommitReveal error ", r.err)
 			}
-			return
-		case <-ctx.Done():
-			return
 		}
+	case <-ctx.Done():
 	}
+	return
 }
 
 // SetGroupToPick is a wrap function that build a pipeline to set groupToPick
@@ -984,22 +974,21 @@ func (e *ethAdaptor) SetGroupToPick(ctx context.Context, groupToPick uint64) (er
 	params = append(params, big.NewInt(int64(groupToPick)))
 
 	reply := e.set(ctx, params, f)
-	for {
-		select {
-		case r, ok := <-reply:
-			if ok {
-				err = r.err
-				if r.err == nil {
-					fmt.Println("SeGroupToPick response ", fmt.Sprintf("%x", r.tx.Hash()))
-				} else {
-					fmt.Println("SeGroupToPick error ", r.err)
-				}
+
+	select {
+	case r, ok := <-reply:
+		if ok {
+			err = r.err
+			if r.err == nil {
+				fmt.Println("SeGroupToPick response ", fmt.Sprintf("%x", r.tx.Hash()))
+			} else {
+				fmt.Println("SeGroupToPick error ", r.err)
 			}
-			return
-		case <-ctx.Done():
-			return
 		}
+	case <-ctx.Done():
 	}
+	return
+
 }
 
 // RegisterNewNode is a wrap function that build a pipeline to call RegisterNewNode
@@ -1010,22 +999,19 @@ func (e *ethAdaptor) RegisterNewNode(ctx context.Context) (err error) {
 	}
 	defer e.logger.TimeTrack(time.Now(), "RegisterNewNode", nil)
 	reply := e.set(ctx, nil, f)
-	for {
-		select {
-		case r, ok := <-reply:
-			if ok {
-				err = r.err
-				if r.err == nil {
-					fmt.Println("RegisterNewNode response ", fmt.Sprintf("%x", r.tx.Hash()))
-				} else {
-					fmt.Println("RegisterNewNode error ", r.err)
-				}
+	select {
+	case r, ok := <-reply:
+		if ok {
+			err = r.err
+			if r.err == nil {
+				fmt.Println("RegisterNewNode response ", fmt.Sprintf("%x", r.tx.Hash()))
+			} else {
+				fmt.Println("RegisterNewNode error ", r.err)
 			}
-			return
-		case <-ctx.Done():
-			return
 		}
+	case <-ctx.Done():
 	}
+	return
 }
 
 // SignalRandom is a wrap function that build a pipeline to call SignalRandom
@@ -1036,22 +1022,20 @@ func (e *ethAdaptor) SignalRandom(ctx context.Context) (err error) {
 	}
 
 	reply := e.set(ctx, nil, f)
-	for {
-		select {
-		case r, ok := <-reply:
-			if ok {
-				err = r.err
-				if r.err == nil {
-					fmt.Println("RegisterNewNode response ", fmt.Sprintf("%x", r.tx.Hash()))
-				} else {
-					fmt.Println("RegisterNewNode error ", r.err)
-				}
+
+	select {
+	case r, ok := <-reply:
+		if ok {
+			err = r.err
+			if r.err == nil {
+				fmt.Println("SignalRandom response ", fmt.Sprintf("%x", r.tx.Hash()))
+			} else {
+				fmt.Println("SignalRandom error ", r.err)
 			}
-			return
-		case <-ctx.Done():
-			return
 		}
+	case <-ctx.Done():
 	}
+	return
 }
 
 // SignalGroupFormation is a wrap function that build a pipeline to call SignalGroupFormation
@@ -1062,22 +1046,19 @@ func (e *ethAdaptor) SignalGroupFormation(ctx context.Context) (err error) {
 	}
 
 	reply := e.set(ctx, nil, f)
-	for {
-		select {
-		case r, ok := <-reply:
-			if ok {
-				err = r.err
-				if r.err == nil {
-					fmt.Println("RegisterNewNode response ", fmt.Sprintf("%x", r.tx.Hash()))
-				} else {
-					fmt.Println("RegisterNewNode error ", r.err)
-				}
+	select {
+	case r, ok := <-reply:
+		if ok {
+			err = r.err
+			if r.err == nil {
+				fmt.Println("SignalGroupFormation response ", fmt.Sprintf("%x", r.tx.Hash()))
+			} else {
+				fmt.Println("SignalGroupFormation error ", r.err)
 			}
-			return
-		case <-ctx.Done():
-			return
 		}
+	case <-ctx.Done():
 	}
+	return
 }
 
 // SignalGroupDissolve is a wrap function that build a pipeline to call SignalGroupDissolve
@@ -1088,22 +1069,20 @@ func (e *ethAdaptor) SignalGroupDissolve(ctx context.Context) (err error) {
 	}
 
 	reply := e.set(ctx, nil, f)
-	for {
-		select {
-		case r, ok := <-reply:
-			if ok {
-				err = r.err
-				if r.err == nil {
-					fmt.Println("RegisterNewNode response ", fmt.Sprintf("%x", r.tx.Hash()))
-				} else {
-					fmt.Println("RegisterNewNode error ", r.err)
-				}
+	select {
+	case r, ok := <-reply:
+		if ok {
+			err = r.err
+			if r.err == nil {
+				fmt.Println("SignalGroupDissolve response ", fmt.Sprintf("%x", r.tx.Hash()))
+			} else {
+				fmt.Println("SignalGroupDissolve error ", r.err)
 			}
-			return
-		case <-ctx.Done():
-			return
 		}
+	case <-ctx.Done():
 	}
+	return
+
 }
 
 // SignalBootstrap is a wrap function that build a pipeline to call SignalBootstrap
@@ -1124,22 +1103,20 @@ func (e *ethAdaptor) SignalBootstrap(ctx context.Context, cid uint64) (err error
 	params = append(params, big.NewInt(int64(cid)))
 
 	reply := e.set(ctx, params, f)
-	for {
-		select {
-		case r, ok := <-reply:
-			if ok {
-				err = r.err
-				if r.err == nil {
-					fmt.Println("SignalBootstrap response ", fmt.Sprintf("%x", r.tx.Hash()))
-				} else {
-					fmt.Println("SignalBootstrap error ", r.err)
-				}
+	select {
+	case r, ok := <-reply:
+		if ok {
+			err = r.err
+			if r.err == nil {
+				fmt.Println("SignalBootstrap response ", fmt.Sprintf("%x", r.tx.Hash()))
+			} else {
+				fmt.Println("SignalBootstrap error ", r.err)
 			}
-			return
-		case <-ctx.Done():
-			return
 		}
+	case <-ctx.Done():
 	}
+	return
+
 }
 
 // SetGroupSize is a wrap function that build a pipeline to call SetGroupSize
