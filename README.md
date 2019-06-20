@@ -92,16 +92,16 @@
 
 
 ## Status
-- ☑️ Verifiable Secret Sharing
-- ☑️ Distributed Key Generation (Pedersen's DKG approach)
-- ☑️ Paring Library and Threshold BLS Signature
-- ☑️ Distributed Randomness Generation
-- ☑️ Gossip & DHT Implementation
-- ☑️ P2P NAT Support
-- ☑️ Json / Xml / Html Request Parser
-- ☑️ Dockerization and Client Deployment Script
-- ☑️ Integration with Ethereum On-chain [System Contracts](https://github.com/DOSNetwork/eth-contracts)
-- :white_large_square: Test with geth lightnode mode and experiment with parity clients
-- :white_large_square: P2P Network Performance Tuning
-- :white_large_square: Staking & Delegation Contracts with a User-friendly Dashboard
-- :white_large_square: Network Status Scanner/Explorer
+- [x] Verifiable Secret Sharing
+- [x] Distributed Key Generation (Pedersen's DKG approach)
+- [x] Paring Library and Threshold BLS Signature
+- [x] Distributed Randomness Generation
+- [x] Gossip & DHT Implementation
+- [x] P2P NAT Support
+- [x] Json / Xml / Html Request Parser
+- [x] Dockerization and Client Deployment Script
+- [x] Integration with Ethereum On-chain [System Contracts](https://github.com/DOSNetwork/eth-contracts)
+- [x] P2P Network Performance Tuning
+- [ ] Test with geth lightnode mode and experiment with parity clients
+- [ ] Staking & Delegation Contracts with a User-friendly Dashboard
+- [ ] Network Status Scanner/Explorer
