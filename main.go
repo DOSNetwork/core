@@ -20,9 +20,9 @@ import (
 )
 
 // Caching running node's process id.
-const pidFile string = "./dos/dosclient.pid"
-const logFile string = "./dos/doslog"
-const dosPath string = "./dos"
+const pidFile string = "./vault/dosclient.pid"
+const logFile string = "./vault/doslog.txt"
+const walletPath string = "./vault"
 
 func savePID(pid int) {
 
@@ -47,7 +47,7 @@ func savePID(pid int) {
 func runDos() {
 	defer os.Remove(pidFile)
 	// check if there is a account
-	n := onchain.NumOfAccounts(dosPath)
+	n := onchain.NumOfAccounts(walletPath)
 	if n == 0 {
 		fmt.Println("Please run 'client wallet create' to create a new wallet for the node")
 		os.Exit(1)
@@ -58,7 +58,7 @@ func runDos() {
 		fmt.Println("Please run 'client start' to start a client daemon and provide a password")
 		return
 	}
-	key, err := onchain.ReadEthKey(dosPath, password)
+	key, err := onchain.ReadEthKey(walletPath, password)
 	if err != nil {
 		fmt.Println("Error : ", err)
 		return
@@ -120,7 +120,7 @@ func makeRequest(f string) ([]byte, error) {
 func getkey() (key *keystore.Key, err error) {
 	//Check if there is a keystore
 	password := ""
-	key, err = onchain.ReadEthKey(dosPath, password)
+	key, err = onchain.ReadEthKey(walletPath, password)
 	if err != nil && err.Error() == "No Account" {
 		return
 	}
@@ -130,7 +130,7 @@ func getkey() (key *keystore.Key, err error) {
 		//Get password from terminal
 		password = getPassword("Enter password :")
 	}
-	key, err = onchain.ReadEthKey(dosPath, password)
+	key, err = onchain.ReadEthKey(walletPath, password)
 
 	return
 }
@@ -150,7 +150,7 @@ func actionStart(c *cli.Context) error {
 		os.Exit(1)
 	}
 	// check if there is a account
-	n := onchain.NumOfAccounts(dosPath)
+	n := onchain.NumOfAccounts(walletPath)
 	if n == 0 {
 		fmt.Println("Please run 'client wallet create' to create a new wallet for the node")
 		os.Exit(1)
@@ -255,24 +255,23 @@ func actionRnadom(c *cli.Context) error {
 
 func actionCreateWallet(c *cli.Context) error {
 
-	first := getPassword("Enter passphrase (empty is not allowed):")
-	second := getPassword("Enter same passphrase again:")
+	first := getPassword("Generating node wallet...\nEnter passphrase (empty is not allowed): ")
+	second := getPassword("Confirm passphrase again: ")
 	if first != second {
-		fmt.Println("Unmatched Password")
-		return errors.New("Unmatched Password")
+		fmt.Println("Unmatched Password\n")
+		return errors.New("Unmatched Password\n")
 	}
-	err := onchain.GenEthkey(dosPath, first)
+	err := onchain.GenEthkey(walletPath, first)
 	if err != nil {
 		fmt.Println("GenEthkey error : ", err)
 	} else {
-		key, err := onchain.ReadEthKey(dosPath, first)
+		key, err := onchain.ReadEthKey(walletPath, first)
 		if err != nil {
 			fmt.Println("Error :", err)
 			return err
 		}
-		fmt.Println("Your keystore has been saved in", dosPath)
-		fmt.Println("The key adress is:")
-		fmt.Println(fmt.Sprintf("%x", key.Address))
+		fmt.Println("wallet keystore file has been saved under", walletPath)
+		fmt.Println("Your node wallet adress is:", fmt.Sprintf("0x%x", key.Address))
 	}
 	return nil
 }
