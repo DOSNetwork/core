@@ -87,13 +87,20 @@ func GenEthkey(credentialPath, passPhrase string) (err error) {
 	return
 }
 
+func NumOfAccounts(credentialPath string) (n int) {
+	newKeyStore := keystore.NewKeyStore(credentialPath, keystore.StandardScryptN, keystore.StandardScryptP)
+	if newKeyStore != nil {
+		n = len(newKeyStore.Accounts())
+	}
+	return
+}
+
 //ReadEthKey is a utility function to read a keystore file
 func ReadEthKey(credentialPath, passphrase string) (key *keystore.Key, err error) {
 	newKeyStore := keystore.NewKeyStore(credentialPath, keystore.StandardScryptN, keystore.StandardScryptP)
 	if len(newKeyStore.Accounts()) < 1 {
 		return nil, errors.New("No Account")
 	}
-
 	usrKeyPath := newKeyStore.Accounts()[0].URL.Path
 
 	keyJson, err := ioutil.ReadFile(usrKeyPath)
@@ -123,6 +130,7 @@ func DialToEth(ctx context.Context, urlPool []string) (out chan *ethclient.Clien
 			fmt.Println(url, ":DialToEth err ", e)
 			return
 		}
+
 		_, err := client.NetworkID(ctx)
 		if err != nil {
 			//Post http i/o timeout

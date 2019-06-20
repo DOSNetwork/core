@@ -68,7 +68,7 @@ func byteTohex(a []byte) string {
 			result[i] -= 32
 		}
 	}
-	return "0x" + string(result)
+	return "" + string(result)
 }
 
 // AddField is a convenient alias for Root().AddField

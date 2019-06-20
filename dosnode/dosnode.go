@@ -5,14 +5,13 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
-	"errors"
 	"fmt"
 	"math/big"
-	"os"
 	"time"
 	"unsafe"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/crypto/sha3"
 
 	"github.com/DOSNetwork/core/configuration"
@@ -50,14 +49,7 @@ type DosNode struct {
 }
 
 //NewDosNode creates a DosNode struct
-func NewDosNode(credentialPath, passphrase string) (dosNode *DosNode, err error) {
-	if passphrase == "" {
-		passphrase = os.Getenv(envPassPhrase)
-		if passphrase == "" {
-			err = errors.New("No passphrase")
-			return
-		}
-	}
+func NewDosNode(key *keystore.Key) (dosNode *DosNode, err error) {
 
 	//Read Configuration
 	config := configuration.Config{}
@@ -72,7 +64,7 @@ func NewDosNode(credentialPath, passphrase string) (dosNode *DosNode, err error)
 	chainConfig := config.GetChainConfig()
 
 	//Set up an onchain adapter
-	chainConn, err := onchain.NewProxyAdapter(config.GetCurrentType(), credentialPath, passphrase, chainConfig.DOSProxyAddress, chainConfig.CommitReveal, chainConfig.RemoteNodeAddressPool)
+	chainConn, err := onchain.NewProxyAdapter(config.GetCurrentType(), key, chainConfig.DOSProxyAddress, chainConfig.CommitReveal, chainConfig.RemoteNodeAddressPool)
 	if err != nil {
 		if err.Error() != "No any working eth client for event tracking" {
 			fmt.Println("NewDosNode failed ", err)

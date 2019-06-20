@@ -6,6 +6,7 @@ import (
 	"math/big"
 
 	"github.com/DOSNetwork/core/share/vss/pedersen"
+	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
 )
 
@@ -53,10 +54,10 @@ type ProxyAdapter interface {
 }
 
 //NewProxyAdapter constructs a new ProxyAdapter with the given type of blockchain and contract addresses
-func NewProxyAdapter(ChainType, credentialPath, passphrase, proxyAddr, crAddress string, urls []string) (ProxyAdapter, error) {
+func NewProxyAdapter(ChainType string, key *keystore.Key, proxyAddr, crAddress string, urls []string) (ProxyAdapter, error) {
 	switch ChainType {
 	case ETH:
-		adaptor, err := NewEthAdaptor(credentialPath, passphrase, proxyAddr, crAddress, urls)
+		adaptor, err := NewEthAdaptor(key, proxyAddr, crAddress, urls)
 		return adaptor, err
 	default:
 		err := fmt.Errorf("Chain %s not supported error\n", ChainType)

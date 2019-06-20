@@ -14,6 +14,7 @@ import (
 
 	"github.com/DOSNetwork/core/dosnode"
 	"github.com/DOSNetwork/core/onchain"
+	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/urfave/cli"
 	"golang.org/x/crypto/ssh/terminal"
 )
@@ -43,34 +44,38 @@ func savePID(pid int) {
 
 }
 
-func runDos(credentialPath, passphrase string) {
+func runDos() {
+	defer os.Remove(pidFile)
+	// check if there is a account
+	n := onchain.NumOfAccounts(dosPath)
+	if n == 0 {
+		fmt.Println("Please run 'client wallet create' to create a new wallet for the node")
+		os.Exit(1)
+	}
+	// check if password is in env variable
+	password := os.Getenv("PASSPHRASE")
+	if len(password) == 0 {
+		fmt.Println("Please run 'client start' to start a client daemon and provide a password")
+		return
+	}
+	key, err := onchain.ReadEthKey(dosPath, password)
+	if err != nil {
+		fmt.Println("Error : ", err)
+		return
+	}
 
 	// Make arrangement to remove PID file upon receiving the SIGTERM from kill command
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, os.Interrupt, os.Kill, syscall.SIGTERM)
-
 	go func() {
 		//defer profile.Start().Stop()
-
-		//defer os.Exit(0)
+		defer os.Exit(0)
 		signalType := <-ch
 		signal.Stop(ch)
-
 		fmt.Println("Received signal type : ", signalType)
-
-		// remove PID file
 		os.Remove(pidFile)
-
 	}()
 
-	workingDir, err := os.Getwd()
-	if err != nil {
-		fmt.Println("runDos err ", err)
-		return
-	}
-	if workingDir == "/" {
-		workingDir = "."
-	}
 	fErr, err := os.OpenFile(logFile, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0666)
 	if err != nil {
 		fmt.Println("runDos err ", err)
@@ -79,13 +84,12 @@ func runDos(credentialPath, passphrase string) {
 	syscall.Dup2(int(fErr.Fd()), 1) /* -- stdout */
 	syscall.Dup2(int(fErr.Fd()), 2) /* -- stderr */
 
-	dosclient, err := dosnode.NewDosNode(dosPath, passphrase)
+	dosclient, err := dosnode.NewDosNode(key)
 	if err != nil {
 		fmt.Println(" err", err)
 		return
 	}
 	dosclient.Start()
-
 }
 
 func makeRequest(f string) ([]byte, error) {
@@ -113,19 +117,51 @@ func makeRequest(f string) ([]byte, error) {
 	return r, err
 }
 
+func getkey() (key *keystore.Key, err error) {
+	//Check if there is a keystore
+	password := ""
+	key, err = onchain.ReadEthKey(dosPath, password)
+	if err != nil && err.Error() == "No Account" {
+		return
+	}
+	//Get password from env variable
+	password = os.Getenv("PASSPHRASE")
+	if len(password) == 0 {
+		//Get password from terminal
+		password = getPassword("Enter password :")
+	}
+	key, err = onchain.ReadEthKey(dosPath, password)
+
+	return
+}
+func getPassword(s string) (p string) {
+	for p == "" {
+		fmt.Print(s)
+		bytePassword, _ := terminal.ReadPassword(0)
+		p = strings.TrimSpace(string(bytePassword))
+	}
+	fmt.Println("")
+	return
+}
 func actionStart(c *cli.Context) error {
 	// check if daemon already running.
 	if _, err := os.Stat(pidFile); err == nil {
 		fmt.Println("Already running or ${PWD}/dosclient.pid file exist.")
 		os.Exit(1)
 	}
-	password := os.Getenv("PASSPHRASE")
-	for password == "" {
-		fmt.Print("Enter Password: ")
-		bytePassword, _ := terminal.ReadPassword(0)
-		password = strings.TrimSpace(string(bytePassword))
+	// check if there is a account
+	n := onchain.NumOfAccounts(dosPath)
+	if n == 0 {
+		fmt.Println("Please run 'client wallet create' to create a new wallet for the node")
+		os.Exit(1)
 	}
-	os.Setenv("PASSPHRASE", password)
+
+	// check if password is in env variable
+	password := os.Getenv("PASSPHRASE")
+	if len(password) == 0 {
+		os.Setenv("PASSPHRASE", getPassword("Enter Password: "))
+	}
+
 	cmd := exec.Command(os.Args[0], "run")
 	cmd.Stdout = os.Stdout
 	cmd.Start()
@@ -169,14 +205,6 @@ func actionStop(c *cli.Context) error {
 	}
 	fmt.Println("Not running.")
 	return err
-}
-
-func readPasswordFromTerm() (password string) {
-	for password == "" {
-		bytePassword, _ := terminal.ReadPassword(0)
-		password = strings.TrimSpace(string(bytePassword))
-	}
-	return
 }
 
 func actionShowStatus(c *cli.Context) error {
@@ -227,21 +255,24 @@ func actionRnadom(c *cli.Context) error {
 
 func actionCreateWallet(c *cli.Context) error {
 
-	fmt.Print("Enter Password: ")
-	first := readPasswordFromTerm()
-
-	fmt.Print("\nRe-enter Password: ")
-	second := readPasswordFromTerm()
-
+	first := getPassword("Enter passphrase (empty is not allowed):")
+	second := getPassword("Enter same passphrase again:")
 	if first != second {
-		fmt.Print("\nUnmatched Password")
+		fmt.Println("Unmatched Password")
 		return errors.New("Unmatched Password")
 	}
 	err := onchain.GenEthkey(dosPath, first)
 	if err != nil {
-		fmt.Println("\n", err)
+		fmt.Println("GenEthkey error : ", err)
 	} else {
-		fmt.Println("\nwallet keystore is in ", dosPath)
+		key, err := onchain.ReadEthKey(dosPath, first)
+		if err != nil {
+			fmt.Println("Error :", err)
+			return err
+		}
+		fmt.Println("Your keystore has been saved in", dosPath)
+		fmt.Println("The key adress is:")
+		fmt.Println(fmt.Sprintf("%x", key.Address))
 	}
 	return nil
 }
@@ -262,14 +293,8 @@ func actionWalletBalance(c *cli.Context) error {
 // main
 func main() {
 	if len(os.Args) > 1 && strings.ToLower(os.Args[1]) == "run" {
-		password := os.Getenv("PASSPHRASE")
-		for password == "" {
-			fmt.Print("Enter Password: ")
-			bytePassword, _ := terminal.ReadPassword(0)
-			password = strings.TrimSpace(string(bytePassword))
-		}
-
-		runDos("", password)
+		runDos()
+		return
 	}
 
 	app := cli.NewApp()
