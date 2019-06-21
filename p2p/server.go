@@ -77,8 +77,12 @@ func (n *server) NumOfMembers() int {
 	return n.members.NumOfPeers()
 }
 
-func (n *server) MemberList() [][]byte {
-	return n.members.MemberList()
+func (n *server) MembersIP() []net.IP {
+	return n.members.MembersIP()
+}
+
+func (n *server) MembersID() [][]byte {
+	return n.members.MembersID()
 }
 
 func (n *server) ConnectToAll(ctx context.Context, groupIds [][]byte, sessionID string) (out chan bool, errc chan error) {
@@ -92,7 +96,6 @@ func (n *server) ConnectToAll(ctx context.Context, groupIds [][]byte, sessionID 
 		//wg.Add(len(groupIds) - 1)
 		for i := 0; i < len(groupIds); i++ {
 			if !bytes.Equal(n.GetID(), groupIds[i]) {
-				fmt.Println("ConnectToAll ", fmt.Sprintf("%x", groupIds[i]))
 				select {
 				case <-ctx.Done():
 				default:
@@ -174,7 +177,6 @@ func (n *server) Listen() (err error) {
 					return
 				}
 				go func(c *client, messages chan P2PMessage) {
-					defer fmt.Println(string(n.id), "Close a Incoming Client")
 					defer func() { n.removeIncomingC <- c.remoteID }()
 					for {
 						select {
@@ -382,7 +384,6 @@ func (n *server) callHandler() {
 						}
 
 						go func() {
-							defer fmt.Println(string(n.id), "close a calling client")
 							defer func() { n.removeCallingC <- c.remoteID }()
 							for {
 								select {

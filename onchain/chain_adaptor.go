@@ -17,10 +17,13 @@ const (
 
 //ProxyAdapter represents an unified adapter interface for different blockchain
 type ProxyAdapter interface {
+	Start() error
+	End()
+	UpdateWsUrls(urls []string)
 	SetRandomNum(ctx context.Context, signatures chan *vss.Signature) (errc chan error)
 	DataReturn(ctx context.Context, signatures chan *vss.Signature) (errc chan error)
 	RegisterGroupPubKey(ctx context.Context, IdWithPubKeys chan [5]*big.Int) (errc chan error)
-	SubscribeEvent(subscribeType int) (chan interface{}, chan error)
+	SubscribeEvent(subscribeTypes []int) (chan interface{}, chan error)
 
 	SetGroupingThreshold(ctx context.Context, threshold uint64) (errc error)
 	SetGroupToPick(ctx context.Context, groupToPick uint64) (errc error)
@@ -35,7 +38,7 @@ type ProxyAdapter interface {
 	SignalRandom(ctx context.Context) (errc error)
 	SignalGroupFormation(ctx context.Context) (errc error)
 	SignalGroupDissolve(ctx context.Context) (errc error)
-	SignalBootstrap(ctx context.Context, cid uint64) (errc error)
+	SignalBootstrap(ctx context.Context, cid *big.Int) (errc error)
 
 	GetExpiredWorkingGroupSize(ctx context.Context) (r uint64, err error)
 	GroupSize(ctx context.Context) (r uint64, err error)

@@ -52,7 +52,6 @@ func merge(ctx context.Context, cs ...chan interface{}) chan interface{} {
 	// copies values from c to out until c is closed, then calls wg.Done.
 	output := func(c <-chan interface{}) {
 		for n := range c {
-			out <- n
 			select {
 			case <-ctx.Done():
 				return

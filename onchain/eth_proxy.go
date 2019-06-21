@@ -52,6 +52,8 @@ const (
 	SubscribeLogGroupingInitiated
 	//SubscribeDosproxyUpdateGroupToPick is a log type to subscribe the event UpdateGroupToPick
 	SubscribeDosproxyUpdateGroupToPick
+	//SubscribeDosproxyUpdateGroupSize is a log type to subscribe the event UpdateGroupSize
+	SubscribeDosproxyUpdateGroupSize
 	//SubscribeCommitrevealLogStartCommitreveal is a log type to subscribe the event StartCommitreveal
 	SubscribeCommitrevealLogStartCommitreveal
 	//SubscribeCommitrevealLogCommit is a log type to subscribe the event LogCommit
@@ -88,6 +90,7 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 				return
 			}
 			for {
+				var log *LogCommon
 				select {
 				case <-ctx.Done():
 					sub.Unsubscribe()
@@ -96,14 +99,23 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 					errc <- err
 					return
 				case i := <-transitChan:
-					out <- &LogUpdateRandom{
+					l := &LogUpdateRandom{
 						LastRandomness:    i.LastRandomness,
 						DispatchedGroupId: i.DispatchedGroupId,
-						Tx:                i.Raw.TxHash.Hex(),
-						BlockN:            i.Raw.BlockNumber,
-						Removed:           i.Raw.Removed,
-						Raw:               i.Raw,
 					}
+					log = &LogCommon{
+						Tx:      i.Raw.TxHash.Hex(),
+						BlockN:  i.Raw.BlockNumber,
+						Removed: i.Raw.Removed,
+						Raw:     i.Raw,
+						log:     l,
+					}
+				}
+				select {
+				case <-ctx.Done():
+					sub.Unsubscribe()
+					return
+				case out <- log:
 				}
 			}
 		}()
@@ -124,6 +136,7 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 				return
 			}
 			for {
+				var log *LogCommon
 				select {
 				case <-ctx.Done():
 					sub.Unsubscribe()
@@ -132,18 +145,27 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 					errc <- err
 					return
 				case i := <-transitChan:
-					out <- &LogUrl{
+					l := &LogUrl{
 						QueryId:           i.QueryId,
 						Timeout:           i.Timeout,
 						DataSource:        i.DataSource,
 						Selector:          i.Selector,
 						Randomness:        i.Randomness,
 						DispatchedGroupId: i.DispatchedGroupId,
-						Tx:                i.Raw.TxHash.Hex(),
-						BlockN:            i.Raw.BlockNumber,
-						Removed:           i.Raw.Removed,
-						Raw:               i.Raw,
 					}
+					log = &LogCommon{
+						Tx:      i.Raw.TxHash.Hex(),
+						BlockN:  i.Raw.BlockNumber,
+						Removed: i.Raw.Removed,
+						Raw:     i.Raw,
+						log:     l,
+					}
+				}
+				select {
+				case <-ctx.Done():
+					sub.Unsubscribe()
+					return
+				case out <- log:
 				}
 			}
 		}()
@@ -164,6 +186,7 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 				return
 			}
 			for {
+				var log *LogCommon
 				select {
 				case <-ctx.Done():
 					sub.Unsubscribe()
@@ -172,16 +195,25 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 					errc <- err
 					return
 				case i := <-transitChan:
-					out <- &LogRequestUserRandom{
+					l := &LogRequestUserRandom{
 						RequestId:            i.RequestId,
 						LastSystemRandomness: i.LastSystemRandomness,
 						UserSeed:             i.UserSeed,
 						DispatchedGroupId:    i.DispatchedGroupId,
-						Tx:                   i.Raw.TxHash.Hex(),
-						BlockN:               i.Raw.BlockNumber,
-						Removed:              i.Raw.Removed,
-						Raw:                  i.Raw,
 					}
+					log = &LogCommon{
+						Tx:      i.Raw.TxHash.Hex(),
+						BlockN:  i.Raw.BlockNumber,
+						Removed: i.Raw.Removed,
+						Raw:     i.Raw,
+						log:     l,
+					}
+				}
+				select {
+				case <-ctx.Done():
+					sub.Unsubscribe()
+					return
+				case out <- log:
 				}
 			}
 		}()
@@ -203,6 +235,7 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 				return
 			}
 			for {
+				var log *LogCommon
 				select {
 				case <-ctx.Done():
 					fmt.Println("SubscribeLogValidationResult Done")
@@ -215,7 +248,7 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 					errc <- err
 					return
 				case i := <-transitChan:
-					out <- &LogValidationResult{
+					l := &LogValidationResult{
 						TrafficType: i.TrafficType,
 						TrafficId:   i.TrafficId,
 						Message:     i.Message,
@@ -223,11 +256,20 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 						PubKey:      i.PubKey,
 						Pass:        i.Pass,
 						Version:     i.Version,
-						Tx:          i.Raw.TxHash.Hex(),
-						BlockN:      i.Raw.BlockNumber,
-						Removed:     i.Raw.Removed,
-						Raw:         i.Raw,
 					}
+					log = &LogCommon{
+						Tx:      i.Raw.TxHash.Hex(),
+						BlockN:  i.Raw.BlockNumber,
+						Removed: i.Raw.Removed,
+						Raw:     i.Raw,
+						log:     l,
+					}
+				}
+				select {
+				case <-ctx.Done():
+					sub.Unsubscribe()
+					return
+				case out <- log:
 				}
 			}
 		}()
@@ -247,6 +289,7 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 				return
 			}
 			for {
+				var log *LogCommon
 				select {
 				case <-ctx.Done():
 					sub.Unsubscribe()
@@ -255,13 +298,22 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 					errc <- err
 					return
 				case i := <-transitChan:
-					out <- &LogInsufficientPendingNode{
+					l := &LogInsufficientPendingNode{
 						NumPendingNodes: i.NumPendingNodes,
-						Tx:              i.Raw.TxHash.Hex(),
-						BlockN:          i.Raw.BlockNumber,
-						Removed:         i.Raw.Removed,
-						Raw:             i.Raw,
 					}
+					log = &LogCommon{
+						Tx:      i.Raw.TxHash.Hex(),
+						BlockN:  i.Raw.BlockNumber,
+						Removed: i.Raw.Removed,
+						Raw:     i.Raw,
+						log:     l,
+					}
+				}
+				select {
+				case <-ctx.Done():
+					sub.Unsubscribe()
+					return
+				case out <- log:
 				}
 			}
 		}()
@@ -281,6 +333,7 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 				return
 			}
 			for {
+				var log *LogCommon
 				select {
 				case <-ctx.Done():
 					sub.Unsubscribe()
@@ -289,13 +342,22 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 					errc <- err
 					return
 				case i := <-transitChan:
-					out <- &LogInsufficientWorkingGroup{
+					l := &LogInsufficientWorkingGroup{
 						NumWorkingGroups: i.NumWorkingGroups,
-						Tx:               i.Raw.TxHash.Hex(),
-						BlockN:           i.Raw.BlockNumber,
-						Removed:          i.Raw.Removed,
-						Raw:              i.Raw,
 					}
+					log = &LogCommon{
+						Tx:      i.Raw.TxHash.Hex(),
+						BlockN:  i.Raw.BlockNumber,
+						Removed: i.Raw.Removed,
+						Raw:     i.Raw,
+						log:     l,
+					}
+				}
+				select {
+				case <-ctx.Done():
+					sub.Unsubscribe()
+					return
+				case out <- log:
 				}
 			}
 		}()
@@ -315,6 +377,7 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 				return
 			}
 			for {
+				var log *LogCommon
 				select {
 				case <-ctx.Done():
 					sub.Unsubscribe()
@@ -323,12 +386,66 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 					errc <- err
 					return
 				case i := <-transitChan:
-					out <- &LogGroupingInitiated{
+					l := &LogGroupingInitiated{}
+					log = &LogCommon{
 						Tx:      i.Raw.TxHash.Hex(),
 						BlockN:  i.Raw.BlockNumber,
 						Removed: i.Raw.Removed,
 						Raw:     i.Raw,
+						log:     l,
 					}
+				}
+				select {
+				case <-ctx.Done():
+					sub.Unsubscribe()
+					return
+				case out <- log:
+				}
+			}
+		}()
+		return out, errc
+	},
+	SubscribeDosproxyUpdateGroupSize: func(ctx context.Context, proxy *dosproxy.DosproxySession) (chan interface{}, chan interface{}) {
+		out := make(chan interface{})
+		errc := make(chan interface{})
+		opt := &bind.WatchOpts{}
+		go func() {
+			transitChan := make(chan *dosproxy.DosproxyUpdateGroupSize)
+			defer close(transitChan)
+			defer close(errc)
+			defer close(out)
+			sub, err := proxy.Contract.WatchUpdateGroupSize(opt, transitChan)
+			if err != nil {
+				fmt.Println("WatchUpdateGroupSize err ", err)
+				return
+			}
+			for {
+				var log *LogCommon
+				select {
+				case <-ctx.Done():
+					sub.Unsubscribe()
+					return
+				case err := <-sub.Err():
+					errc <- err
+					return
+				case i := <-transitChan:
+					l := &LogUpdateGroupSize{
+						OldSize: i.OldSize,
+						NewSize: i.NewSize,
+					}
+					log = &LogCommon{
+						Tx:      i.Raw.TxHash.Hex(),
+						BlockN:  i.Raw.BlockNumber,
+						Removed: i.Raw.Removed,
+						Raw:     i.Raw,
+						log:     l,
+					}
+				}
+				select {
+				case <-ctx.Done():
+					sub.Unsubscribe()
+					return
+				case out <- log:
 				}
 			}
 		}()
@@ -350,23 +467,32 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 				return
 			}
 			for {
+				var log *LogCommon
 				select {
 				case <-ctx.Done():
 					sub.Unsubscribe()
 					return
 				case err := <-sub.Err():
-					fmt.Println("SubscribeDosproxyUpdateGroupToPick err ", err)
 					errc <- err
 					return
 				case i := <-transitChan:
-					out <- &LogUpdateGroupToPick{
+					l := &LogUpdateGroupToPick{
+						OldNum: i.OldNum,
+						NewNum: i.NewNum,
+					}
+					log = &LogCommon{
 						Tx:      i.Raw.TxHash.Hex(),
-						OldNum:  i.OldNum,
-						NewNum:  i.NewNum,
 						BlockN:  i.Raw.BlockNumber,
 						Removed: i.Raw.Removed,
 						Raw:     i.Raw,
+						log:     l,
 					}
+				}
+				select {
+				case <-ctx.Done():
+					sub.Unsubscribe()
+					return
+				case out <- log:
 				}
 			}
 		}()
@@ -386,6 +512,7 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 				return
 			}
 			for {
+				var log *LogCommon
 				select {
 				case <-ctx.Done():
 					sub.Unsubscribe()
@@ -399,14 +526,23 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 						id := p.Bytes()
 						participants = append(participants, id)
 					}
-					out <- &LogGrouping{
+					l := &LogGrouping{
 						GroupId: i.GroupId,
 						NodeId:  participants,
+					}
+					log = &LogCommon{
 						Tx:      i.Raw.TxHash.Hex(),
 						BlockN:  i.Raw.BlockNumber,
 						Removed: i.Raw.Removed,
 						Raw:     i.Raw,
+						log:     l,
 					}
+				}
+				select {
+				case <-ctx.Done():
+					sub.Unsubscribe()
+					return
+				case out <- log:
 				}
 			}
 		}()
@@ -426,6 +562,7 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 				return
 			}
 			for {
+				var log *LogCommon
 				select {
 				case <-ctx.Done():
 					sub.Unsubscribe()
@@ -434,14 +571,23 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 					errc <- err
 					return
 				case i := <-transitChan:
-					out <- &LogPublicKeyAccepted{
+					l := &LogPublicKeyAccepted{
 						GroupId:          i.GroupId,
 						WorkingGroupSize: i.NumWorkingGroups,
-						Tx:               i.Raw.TxHash.Hex(),
-						BlockN:           i.Raw.BlockNumber,
-						Removed:          i.Raw.Removed,
-						Raw:              i.Raw,
 					}
+					log = &LogCommon{
+						Tx:      i.Raw.TxHash.Hex(),
+						BlockN:  i.Raw.BlockNumber,
+						Removed: i.Raw.Removed,
+						Raw:     i.Raw,
+						log:     l,
+					}
+				}
+				select {
+				case <-ctx.Done():
+					sub.Unsubscribe()
+					return
+				case out <- log:
 				}
 			}
 		}()
@@ -461,6 +607,7 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 				return
 			}
 			for {
+				var log *LogCommon
 				select {
 				case <-ctx.Done():
 					sub.Unsubscribe()
@@ -469,14 +616,23 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 					errc <- err
 					return
 				case i := <-transitChan:
-					out <- &LogPublicKeySuggested{
+					l := &LogPublicKeySuggested{
 						GroupId: i.GroupId,
 						Count:   i.PubKeyCount,
+					}
+					log = &LogCommon{
 						Tx:      i.Raw.TxHash.Hex(),
 						BlockN:  i.Raw.BlockNumber,
 						Removed: i.Raw.Removed,
 						Raw:     i.Raw,
+						log:     l,
 					}
+				}
+				select {
+				case <-ctx.Done():
+					sub.Unsubscribe()
+					return
+				case out <- log:
 				}
 			}
 		}()
@@ -496,6 +652,7 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 				return
 			}
 			for {
+				var log *LogCommon
 				select {
 				case <-ctx.Done():
 					sub.Unsubscribe()
@@ -504,13 +661,22 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 					errc <- err
 					return
 				case i := <-transitChan:
-					out <- &LogGroupDissolve{
+					l := &LogGroupDissolve{
 						GroupId: i.GroupId,
+					}
+					log = &LogCommon{
 						Tx:      i.Raw.TxHash.Hex(),
 						BlockN:  i.Raw.BlockNumber,
 						Removed: i.Raw.Removed,
 						Raw:     i.Raw,
+						log:     l,
 					}
+				}
+				select {
+				case <-ctx.Done():
+					sub.Unsubscribe()
+					return
+				case out <- log:
 				}
 			}
 		}()
@@ -532,6 +698,7 @@ var crTable = []func(ctx context.Context, cr *commitreveal.CommitrevealSession) 
 				return
 			}
 			for {
+				var log *LogCommon
 				select {
 				case <-ctx.Done():
 					sub.Unsubscribe()
@@ -540,17 +707,26 @@ var crTable = []func(ctx context.Context, cr *commitreveal.CommitrevealSession) 
 					errc <- err
 					return
 				case i := <-transitChan:
-					out <- &LogStartCommitReveal{
+					l := &LogStartCommitReveal{
 						Cid:             i.Cid,
 						StartBlock:      i.StartBlock,
 						CommitDuration:  i.CommitDuration,
 						RevealDuration:  i.RevealDuration,
 						RevealThreshold: i.RevealThreshold,
-						Tx:              i.Raw.TxHash.Hex(),
-						BlockN:          i.Raw.BlockNumber,
-						Removed:         i.Raw.Removed,
-						Raw:             i.Raw,
 					}
+					log = &LogCommon{
+						Tx:      i.Raw.TxHash.Hex(),
+						BlockN:  i.Raw.BlockNumber,
+						Removed: i.Raw.Removed,
+						Raw:     i.Raw,
+						log:     l,
+					}
+				}
+				select {
+				case <-ctx.Done():
+					sub.Unsubscribe()
+					return
+				case out <- log:
 				}
 			}
 		}()
@@ -570,6 +746,7 @@ var crTable = []func(ctx context.Context, cr *commitreveal.CommitrevealSession) 
 				return
 			}
 			for {
+				var log *LogCommon
 				select {
 				case <-ctx.Done():
 					sub.Unsubscribe()
@@ -578,15 +755,24 @@ var crTable = []func(ctx context.Context, cr *commitreveal.CommitrevealSession) 
 					errc <- err
 					return
 				case i := <-transitChan:
-					out <- &LogCommit{
+					l := &LogCommit{
 						Cid:        i.Cid,
 						From:       i.From,
 						Commitment: i.Commitment,
-						Tx:         i.Raw.TxHash.Hex(),
-						BlockN:     i.Raw.BlockNumber,
-						Removed:    i.Raw.Removed,
-						Raw:        i.Raw,
 					}
+					log = &LogCommon{
+						Tx:      i.Raw.TxHash.Hex(),
+						BlockN:  i.Raw.BlockNumber,
+						Removed: i.Raw.Removed,
+						Raw:     i.Raw,
+						log:     l,
+					}
+				}
+				select {
+				case <-ctx.Done():
+					sub.Unsubscribe()
+					return
+				case out <- log:
 				}
 			}
 		}()
@@ -606,6 +792,7 @@ var crTable = []func(ctx context.Context, cr *commitreveal.CommitrevealSession) 
 				return
 			}
 			for {
+				var log *LogCommon
 				select {
 				case <-ctx.Done():
 					sub.Unsubscribe()
@@ -614,15 +801,24 @@ var crTable = []func(ctx context.Context, cr *commitreveal.CommitrevealSession) 
 					errc <- err
 					return
 				case i := <-transitChan:
-					out <- &LogReveal{
-						Cid:     i.Cid,
-						From:    i.From,
-						Secret:  i.Secret,
+					l := &LogReveal{
+						Cid:    i.Cid,
+						From:   i.From,
+						Secret: i.Secret,
+					}
+					log = &LogCommon{
 						Tx:      i.Raw.TxHash.Hex(),
 						BlockN:  i.Raw.BlockNumber,
 						Removed: i.Raw.Removed,
 						Raw:     i.Raw,
+						log:     l,
 					}
+				}
+				select {
+				case <-ctx.Done():
+					sub.Unsubscribe()
+					return
+				case out <- log:
 				}
 			}
 		}()
@@ -642,6 +838,7 @@ var crTable = []func(ctx context.Context, cr *commitreveal.CommitrevealSession) 
 				return
 			}
 			for {
+				var log *LogCommon
 				select {
 				case <-ctx.Done():
 					sub.Unsubscribe()
@@ -650,14 +847,23 @@ var crTable = []func(ctx context.Context, cr *commitreveal.CommitrevealSession) 
 					errc <- err
 					return
 				case i := <-transitChan:
-					out <- &LogRandom{
-						Cid:     i.Cid,
-						Random:  i.Random,
+					l := &LogRandom{
+						Cid:    i.Cid,
+						Random: i.Random,
+					}
+					log = &LogCommon{
 						Tx:      i.Raw.TxHash.Hex(),
 						BlockN:  i.Raw.BlockNumber,
 						Removed: i.Raw.Removed,
 						Raw:     i.Raw,
+						log:     l,
 					}
+				}
+				select {
+				case <-ctx.Done():
+					sub.Unsubscribe()
+					return
+				case out <- log:
 				}
 			}
 		}()
@@ -684,8 +890,8 @@ type response struct {
 type ethAdaptor struct {
 	proxyAddr        string
 	commitRevealAddr string
-	gethUrls         []string
-	eventUrls        []string
+	httpUrls         []string
+	wsUrls           []string
 	key              *keystore.Key
 	auth             *bind.TransactOpts
 
@@ -709,12 +915,12 @@ func NewEthAdaptor(key *keystore.Key, proxyAddr, commitRevealAddr string, urls [
 			wsUrls = append(wsUrls, url)
 		}
 	}
-	fmt.Println("gethUrls ", httpUrls)
-	fmt.Println("eventUrls ", wsUrls)
+	fmt.Println("httpUrls ", httpUrls)
+	fmt.Println("wsUrls ", wsUrls)
 
 	adaptor = &ethAdaptor{}
-	adaptor.gethUrls = httpUrls
-	adaptor.eventUrls = wsUrls
+	adaptor.httpUrls = httpUrls
+	adaptor.wsUrls = wsUrls
 	adaptor.proxyAddr = proxyAddr
 	adaptor.commitRevealAddr = commitRevealAddr
 	debug.FreeOSMemory()
@@ -724,31 +930,33 @@ func NewEthAdaptor(key *keystore.Key, proxyAddr, commitRevealAddr string, urls [
 	//Use account address as ID to init log module
 	log.Init(key.Address.Bytes()[:])
 	adaptor.logger = log.New("module", "EthProxy")
-
-	adaptor.ctx, adaptor.cancelFunc = context.WithCancel(context.Background())
-	adaptor.auth = bind.NewKeyedTransactor(key.PrivateKey)
-	adaptor.auth.GasPrice = big.NewInt(1000000000) //1 Gwei
-	adaptor.auth.GasLimit = uint64(6000000)
-	adaptor.auth.Context = adaptor.ctx
-	adaptor.reqQueue = make(chan *request)
-	adaptor.start()
 	return
 }
 
 //End close the connection to eth and release all resources
 func (e *ethAdaptor) End() {
-	//e.cancel()
-	//e.c.Close()
+	e.cancelFunc()
+	e.clients = nil
+	e.proxies = nil
+	e.crs = nil
+	e.reqQueue = nil
 	return
 }
 
-func (e *ethAdaptor) start() (err error) {
+func (e *ethAdaptor) Start() (err error) {
 	//
-	infuraClientC := DialToEth(context.Background(), e.gethUrls)
-	infuraClient := <-infuraClientC
-	clients := DialToEth(context.Background(), e.eventUrls)
+	e.ctx, e.cancelFunc = context.WithCancel(context.Background())
+	e.auth = bind.NewKeyedTransactor(e.key.PrivateKey)
+	e.auth.GasPrice = big.NewInt(20000000000) //1 Gwei
+	e.auth.GasLimit = uint64(6000000)
+	e.auth.Context = e.ctx
 
-	synClients := CheckSync(context.Background(), infuraClient, clients)
+	infuraClientC := DialToEth(context.Background(), e.httpUrls)
+	infuraClient := <-infuraClientC
+	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(300*time.Second))
+	defer cancel()
+	clients := DialToEth(ctx, e.wsUrls)
+	synClients := CheckSync(ctx, infuraClient, clients)
 
 	for client := range synClients {
 		p, er := dosproxy.NewDosproxy(common.HexToAddress(e.proxyAddr), client)
@@ -776,9 +984,15 @@ func (e *ethAdaptor) start() (err error) {
 	return
 }
 
+func (e *ethAdaptor) UpdateWsUrls(urls []string) {
+	e.wsUrls = nil
+	e.wsUrls = urls
+}
+
 func (e *ethAdaptor) reqLoop() {
 	go func() {
 		defer fmt.Println("reqLoop exit")
+		e.reqQueue = make(chan *request)
 		defer close(e.reqQueue)
 
 		for {
@@ -1086,7 +1300,7 @@ func (e *ethAdaptor) SignalGroupDissolve(ctx context.Context) (err error) {
 }
 
 // SignalBootstrap is a wrap function that build a pipeline to call SignalBootstrap
-func (e *ethAdaptor) SignalBootstrap(ctx context.Context, cid uint64) (err error) {
+func (e *ethAdaptor) SignalBootstrap(ctx context.Context, cid *big.Int) (err error) {
 	// define how to parse parameters and execute proxy function
 	f := func(ctx context.Context, proxy *dosproxy.DosproxySession, cr *commitreveal.CommitrevealSession, p []interface{}) (tx *types.Transaction, err error) {
 		if len(p) != 1 {
@@ -1100,7 +1314,7 @@ func (e *ethAdaptor) SignalBootstrap(ctx context.Context, cid uint64) (err error
 	}
 	// define parameters
 	var params []interface{}
-	params = append(params, big.NewInt(int64(cid)))
+	params = append(params, cid)
 
 	reply := e.set(ctx, params, f)
 	select {
@@ -1486,38 +1700,40 @@ func (e *ethAdaptor) DataReturn(ctx context.Context, signatures chan *vss.Signat
 }
 
 // SubscribeEvent is a log subscription operation
-func (e *ethAdaptor) SubscribeEvent(subscribeType int) (chan interface{}, chan error) {
+func (e *ethAdaptor) SubscribeEvent(subscribeTypes []int) (chan interface{}, chan error) {
 	var eventList []chan interface{}
 	var errcs []chan interface{}
-	if subscribeType >= SubscribeCommitrevealLogStartCommitreveal {
-		for i := 0; i < len(e.proxies); i++ {
-			fmt.Println("Subscribe CR Event ", i)
-			cr := e.crs[i]
-			if cr == nil {
-				continue
+	for _, subscribeType := range subscribeTypes {
+		if subscribeType >= SubscribeCommitrevealLogStartCommitreveal {
+			for i := 0; i < len(e.proxies); i++ {
+				fmt.Println("Subscribe CR Event ", i)
+				cr := e.crs[i]
+				if cr == nil {
+					continue
+				}
+				ctx := e.ctx
+				if ctx == nil {
+					continue
+				}
+				out, errc := crTable[subscribeType](ctx, cr)
+				eventList = append(eventList, out)
+				errcs = append(errcs, errc)
 			}
-			ctx := e.ctx
-			if ctx == nil {
-				continue
+		} else {
+			for i := 0; i < len(e.proxies); i++ {
+				fmt.Println("SubscribeEvent ", i, subscribeType)
+				proxy := e.proxies[i]
+				if proxy == nil {
+					continue
+				}
+				ctx := e.ctx
+				if ctx == nil {
+					continue
+				}
+				out, errc := proxyTable[subscribeType](ctx, proxy)
+				eventList = append(eventList, out)
+				errcs = append(errcs, errc)
 			}
-			out, errc := crTable[subscribeType](ctx, cr)
-			eventList = append(eventList, out)
-			errcs = append(errcs, errc)
-		}
-	} else {
-		for i := 0; i < len(e.proxies); i++ {
-			fmt.Println("SubscribeEvent ", i)
-			proxy := e.proxies[i]
-			if proxy == nil {
-				continue
-			}
-			ctx := e.ctx
-			if ctx == nil {
-				continue
-			}
-			out, errc := proxyTable[subscribeType](ctx, proxy)
-			eventList = append(eventList, out)
-			errcs = append(errcs, errc)
 		}
 	}
 	return firstEvent(e.ctx, merge(e.ctx, eventList...)), convertToError(e.ctx, merge(e.ctx, errcs...))
@@ -2077,104 +2293,38 @@ func firstEvent(ctx context.Context, source chan interface{}) (out chan interfac
 		defer close(out)
 		visited := make(map[string]uint64)
 		for {
-			var bytes []byte
-			var blkNum uint64
-			var event interface{}
-			var ok bool
-			var removed bool
 			select {
-			case event, ok = <-source:
-				if ok {
-					switch content := event.(type) {
-					case *LogUpdateRandom:
-						bytes = append(bytes, content.Raw.Data...)
-						blkNum = content.BlockN
-						removed = content.Removed
-						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
-					case *LogRequestUserRandom:
-						bytes = append(bytes, content.Raw.Data...)
-						blkNum = content.BlockN
-						removed = content.Removed
-						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
-					case *LogUrl:
-						bytes = append(bytes, content.Raw.Data...)
-						blkNum = content.BlockN
-						removed = content.Removed
-						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
-					case *LogValidationResult:
-						bytes = append(bytes, content.Raw.Data...)
-						blkNum = content.BlockN
-						removed = content.Removed
-						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
-					case *LogGrouping:
-						bytes = append(bytes, content.Raw.Data...)
-						blkNum = content.BlockN
-						removed = content.Removed
-						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
-					case *LogPublicKeyAccepted:
-						bytes = append(bytes, content.Raw.Data...)
-						blkNum = content.BlockN
-						removed = content.Removed
-						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
-					case *LogPublicKeySuggested:
-						bytes = append(bytes, content.Raw.Data...)
-						blkNum = content.BlockN
-						removed = content.Removed
-						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
-					case *LogGroupDissolve:
-						bytes = append(bytes, content.Raw.Data...)
-						blkNum = content.BlockN
-						removed = content.Removed
-						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
-					case *LogUpdateGroupToPick:
-						bytes = append(bytes, content.Raw.Data...)
-						blkNum = content.BlockN
-						removed = content.Removed
-						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
-					case *LogStartCommitReveal:
-						bytes = append(bytes, content.Raw.Data...)
-						blkNum = content.BlockN
-						removed = content.Removed
-						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
-					case *LogCommit:
-						bytes = append(bytes, content.Raw.Data...)
-						blkNum = content.BlockN
-						removed = content.Removed
-						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
-					case *LogReveal:
-						bytes = append(bytes, content.Raw.Data...)
-						blkNum = content.BlockN
-						removed = content.Removed
-						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
-					case *LogRandom:
-						bytes = append(bytes, content.Raw.Data...)
-						blkNum = content.BlockN
-						removed = content.Removed
-						bytes = append(bytes, new(big.Int).SetUint64(blkNum).Bytes()...)
-					}
-				} else {
+			case <-ctx.Done():
+				return
+			case event, ok := <-source:
+				if !ok {
 					return
 				}
-			}
-			if removed {
-				continue
-			}
-			nHash := sha256.Sum256(bytes)
-			identity := string(nHash[:])
-
-			if visited[identity] == 0 {
-				visited[identity] = blkNum
-				select {
-				case out <- event:
-				case <-ctx.Done():
-				}
-				go func(identity string) {
-					select {
-					case <-ctx.Done():
-					case <-time.After(100 * 15 * time.Second):
-						delete(visited, identity)
+				if content, ok := event.(*LogCommon); ok {
+					if content.Removed {
+						continue
 					}
-				}(identity)
+					var bytes []byte
+					bytes = append(bytes, content.Raw.Data...)
+					bytes = append(bytes, new(big.Int).SetUint64(content.BlockN).Bytes()...)
+					nHash := sha256.Sum256(bytes)
+
+					identity := string(nHash[:])
+					if visited[identity] == 0 {
+						visited[identity] = content.BlockN
+						select {
+						case out <- content.log:
+						case <-ctx.Done():
+						}
+						go func(identity string) {
+							select {
+							case <-ctx.Done():
+							case <-time.After(100 * 15 * time.Second):
+								delete(visited, identity)
+							}
+						}(identity)
+					}
+				}
 			}
 		}
 	}()

@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"math/big"
 	"time"
@@ -18,6 +19,7 @@ import (
 	"github.com/DOSNetwork/core/log"
 	"github.com/DOSNetwork/core/onchain"
 	"github.com/DOSNetwork/core/p2p"
+	"github.com/DOSNetwork/core/share"
 	"github.com/DOSNetwork/core/share/dkg/pedersen"
 	"github.com/DOSNetwork/core/share/vss/pedersen"
 	"github.com/DOSNetwork/core/suites"
@@ -47,6 +49,13 @@ type DosNode struct {
 	fulfilledQuery    int
 	numOfworkingGroup int
 }
+type crDurations struct {
+	cid        *big.Int
+	startBlock *big.Int
+	commitDur  *big.Int
+	revealDur  *big.Int
+	sec        *big.Int
+}
 
 //NewDosNode creates a DosNode struct
 func NewDosNode(key *keystore.Key) (dosNode *DosNode, err error) {
@@ -71,7 +80,8 @@ func NewDosNode(key *keystore.Key) (dosNode *DosNode, err error) {
 			return
 		}
 	}
-	id := chainConn.Address()
+
+	id := key.Address
 
 	//Build a p2p network
 	p, err := p2p.CreateP2PNetwork(id.Bytes(), port, p2p.GossipDiscover)
@@ -130,7 +140,7 @@ func NewDosNode(key *keystore.Key) (dosNode *DosNode, err error) {
 
 // Start registers to onchain and listen to p2p events
 func (d *DosNode) Start() (err error) {
-
+	go d.onchainLoop()
 	d.startRESTServer()
 
 	d.state = "Working"
@@ -150,56 +160,11 @@ func (d *DosNode) End() {
 	close(d.done)
 }
 
-func (d *DosNode) waitForGrouping(ctx context.Context, cancel context.CancelFunc, groupID string, errc <-chan error) {
-	defer d.logger.TimeTrack(time.Now(), "waitForGrouping", map[string]interface{}{"GroupID": groupID})
+func (d *DosNode) handleQuery(ids [][]byte, pubPoly *share.PubPoly, sec *share.PriShare, groupID string, requestID, lastRand, useSeed *big.Int, url, selector string, pType uint32) {
+	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(40*15*time.Second))
+	defer d.logger.TimeTrack(time.Now(), "TimeHandleQuery", map[string]interface{}{"GroupID": groupID, "RequestID": fmt.Sprintf("%x", requestID)})
 	defer cancel()
-	for {
-		select {
-		case err, ok := <-errc:
-			if !ok {
-				return
-			}
-			d.logger.Event("waitForGroupingError", map[string]interface{}{"Error": err.Error(), "GroupID": groupID})
-		case <-ctx.Done():
-			d.logger.Event("waitForGroupingError", map[string]interface{}{"Error": ctx.Err(), "GroupID": groupID})
-			return
-		}
-	}
-}
-
-func (d *DosNode) waitForRequestDone(ctx context.Context, cancel context.CancelFunc, groupID string, requestID *big.Int, errc <-chan error) {
-	defer d.logger.TimeTrack(time.Now(), "WaitForRequestDone", map[string]interface{}{"GroupID": groupID, "RequestID": fmt.Sprintf("%x", requestID)})
-	defer cancel()
-	for {
-		select {
-		case err, ok := <-errc:
-			if ok && err != nil {
-				d.logger.Event("waitForRequestError", map[string]interface{}{"Error": err.Error(), "GroupID": groupID, "RequestID": fmt.Sprintf("%x", requestID)})
-			}
-			return
-
-		case <-ctx.Done():
-			d.logger.Event("waitForRequestError", map[string]interface{}{"Error": ctx.Err(), "GroupID": groupID, "RequestID": fmt.Sprintf("%x", requestID)})
-			return
-		}
-	}
-}
-
-func (d *DosNode) buildPipeline(ctx context.Context, cancel context.CancelFunc, groupID string, requestID, lastRand, useSeed *big.Int, url, selector string, pType uint32) {
-	defer d.logger.TimeTrack(time.Now(), "BuildPipeline", map[string]interface{}{"GroupID": groupID, "RequestId": fmt.Sprintf("%x", requestID)})
-	d.totalQuery++
-
 	var nonce []byte
-	ids := d.dkg.GetGroupIDs(groupID)
-	if len(ids) == 0 {
-		d.logger.Event("EuildPipeError", map[string]interface{}{"GroupID": groupID, "RequestId": fmt.Sprintf("%x", requestID)})
-		return
-	}
-	pubPoly := d.dkg.GetGroupPublicPoly(groupID)
-	sec := d.dkg.GetShareSecurity(groupID)
-	if pubPoly == nil || sec == nil {
-		return
-	}
 	//Generate an unique id
 	switch pType {
 	case onchain.TrafficSystemRandom:
@@ -275,431 +240,330 @@ func (d *DosNode) buildPipeline(ctx context.Context, cancel context.CancelFunc, 
 		errc := d.chain.DataReturn(ctx, recoveredSignc)
 		errcList = append(errcList, errc)
 	}
+	allErrc := mergeErrors(ctx, errcList...)
+	for {
+		select {
+		case err, ok := <-allErrc:
+			if !ok {
+				return
+			}
+			d.logger.Event("handleQueryError", map[string]interface{}{"Error": err.Error(), "GroupID": groupID})
+		case <-ctx.Done():
+			d.logger.Event("handleQueryError", map[string]interface{}{"Error": ctx.Err(), "GroupID": groupID})
+			return
+		}
+	}
+}
 
-	go d.waitForRequestDone(ctx, cancel, groupID, requestID, mergeErrors(ctx, errcList...))
+func (d *DosNode) handleGrouping(participants [][]byte, groupID string) {
+	isMember := false
+	for _, id := range participants {
+		if r := bytes.Compare(d.id, id); r == 0 {
+			isMember = true
+			break
+		}
+	}
+	if !isMember {
+		return
+	}
+	d.logger.Event("Grouping", map[string]interface{}{"GroupID": groupID})
+	defer d.logger.TimeTrack(time.Now(), "TimeGrouping", map[string]interface{}{"GroupID": groupID})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var errcList []chan error
+	outFromDkg, errc, err := d.dkg.Grouping(ctx, groupID, participants)
+	if err != nil {
+		d.logger.Error(err)
+		return
+	}
+	errcList = append(errcList, errc)
+	errcList = append(errcList, d.chain.RegisterGroupPubKey(ctx, outFromDkg))
+	allErrc := mergeErrors(ctx, errcList...)
+	for {
+		select {
+		case err, ok := <-allErrc:
+			if !ok {
+				return
+			}
+			d.logger.Event("waitForGroupingError", map[string]interface{}{"Error": err.Error(), "GroupID": groupID})
+		case <-ctx.Done():
+			d.logger.Event("waitForGroupingError", map[string]interface{}{"Error": ctx.Err(), "GroupID": groupID})
+			return
+		}
+	}
+}
+
+func (d *DosNode) groupInfo(groupID string) (ids [][]byte, pubPoly *share.PubPoly, sec *share.PriShare, err error) {
+	//Get group members id
+	ids = d.dkg.GetGroupIDs(groupID)
+	//Get group pub key
+	pubPoly = d.dkg.GetGroupPublicPoly(groupID)
+	//Get group partial sec key
+	sec = d.dkg.GetShareSecurity(groupID)
+	if len(ids) == 0 || pubPoly == nil || sec == nil {
+		err = errors.New("No Group info")
+	}
+	return
+}
+
+func (d *DosNode) handleCR(crMap map[string]crDurations, currentBlockNumber uint64) {
+	// Handle commit reveal
+	for key, cr := range crMap {
+		cid := cr.cid
+		startBlock := cr.startBlock.Uint64()
+		commitDur := cr.commitDur.Uint64()
+		revealDur := cr.revealDur.Uint64()
+
+		if currentBlockNumber > startBlock+commitDur+revealDur {
+			if err := d.chain.SignalBootstrap(context.Background(), cid); err != nil {
+				d.logger.Error(err)
+			}
+			delete(crMap, key)
+		} else if currentBlockNumber > startBlock+commitDur {
+			if err := d.chain.Reveal(context.Background(), cid, cr.sec); err != nil {
+				d.logger.Error(err)
+			}
+		} else if currentBlockNumber > startBlock {
+			h := sha3.NewKeccak256()
+			h.Write(abi.U256(cr.sec))
+			b := h.Sum(nil)
+			hash := byte32(b)
+			if err := d.chain.Commit(context.Background(), cid, *hash); err != nil {
+				d.logger.Error(err)
+			}
+		}
+	}
+}
+
+func (d *DosNode) handleGroupFormation(currentBlockNumber uint64) {
+	groupSize, err := d.chain.GroupSize(context.Background())
+	if err != nil {
+		d.logger.Error(err)
+		return
+	}
+	pendingNodeSize, err := d.chain.NumPendingNodes(context.Background())
+	if err != nil {
+		d.logger.Error(err)
+		return
+	}
+
+	if pendingNodeSize >= groupSize+(groupSize/2) {
+		d.chain.SignalGroupFormation(context.Background())
+	}
+}
+
+func (d *DosNode) handleRandom(currentBlockNumber uint64) {
+	groupToPick, err := d.chain.GroupToPick(context.Background())
+	if err != nil {
+		return
+	}
+	workingGroup, err := d.chain.GetWorkingGroupSize(context.Background())
+	if err != nil {
+		d.logger.Error(err)
+		return
+	}
+	lastUpdatedBlock, err := d.chain.LastUpdatedBlock(context.Background())
+	if err != nil {
+		d.logger.Error(err)
+		return
+	}
+	sysrandInterval, err := d.chain.RefreshSystemRandomHardLimit(context.Background())
+	if err != nil {
+		d.logger.Error(err)
+		return
+	}
+	if workingGroup >= groupToPick {
+		diff := currentBlockNumber - lastUpdatedBlock
+		if diff > sysrandInterval {
+			d.chain.SignalRandom(context.Background())
+		}
+	}
+}
+
+func (d *DosNode) handleGroupDissolve() {
+	pendingGrouSize, err := d.chain.NumPendingGroups(context.Background())
+	if err != nil {
+		d.logger.Error(err)
+		return
+	}
+	expiredWGSize, err := d.chain.GetExpiredWorkingGroupSize(context.Background())
+	if err != nil {
+		d.logger.Error(err)
+		return
+	}
+	if expiredWGSize > 0 || pendingGrouSize > 0 {
+		d.chain.SignalGroupDissolve(context.Background())
+	}
+}
+
+func (d *DosNode) onchainLoop() (err error) {
+	watchdog := time.NewTicker(watchdogInterval * time.Minute)
+	defer watchdog.Stop()
+	subescriptions := []int{onchain.SubscribeLogGrouping, onchain.SubscribeLogGroupDissolve, onchain.SubscribeLogUrl,
+		onchain.SubscribeLogUpdateRandom, onchain.SubscribeLogRequestUserRandom,
+		onchain.SubscribeLogPublicKeyAccepted, onchain.SubscribeCommitrevealLogStartCommitreveal}
+	var crMap = map[string]crDurations{}
+	randSeed, _ := new(big.Int).SetString("21888242871839275222246405745257275088548364400416034343698204186575808495617", 10)
+
+S:
+	d.chain.Start()
+	sink, errc := d.chain.SubscribeEvent(subescriptions)
+L:
+	for {
+		select {
+		case <-watchdog.C:
+			if isPendingNode, _ := d.chain.IsPendingNode(context.Background(), d.id); isPendingNode {
+				//Let pending node as a guardian
+				currentBlockNumber, err := d.chain.CurrentBlock(context.Background())
+				if err != nil {
+					d.logger.Error(err)
+					continue
+				}
+				switch index := currentBlockNumber % 4; index {
+				case 0:
+					d.handleCR(crMap, currentBlockNumber)
+				case 1:
+					d.handleRandom(currentBlockNumber)
+				case 2:
+					d.handleGroupFormation(currentBlockNumber)
+				case 3:
+					d.handleGroupDissolve()
+				}
+			}
+		case event, ok := <-sink:
+			if ok {
+				switch content := event.(type) {
+				case *onchain.LogGrouping:
+					groupID := fmt.Sprintf("%x", content.GroupId)
+					go d.handleGrouping(content.NodeId, groupID)
+				case *onchain.LogGroupDissolve:
+					groupID := fmt.Sprintf("%x", content.GroupId)
+					if d.isMember(groupID) {
+						d.logger.Event("DGroupDismiss", map[string]interface{}{"GroupID": groupID})
+						d.dkg.GroupDissolve(groupID)
+					}
+				case *onchain.LogPublicKeyAccepted:
+					groupID := fmt.Sprintf("%x", content.GroupId)
+					if d.isMember(groupID) {
+						d.logger.Event("keyAccepted", map[string]interface{}{"GroupID": groupID})
+					}
+				case *onchain.LogUpdateRandom:
+					randSeed = content.LastRandomness
+					groupID := fmt.Sprintf("%x", content.DispatchedGroupId)
+					if d.isMember(groupID) {
+						requestID := fmt.Sprintf("%x", content.LastRandomness)
+						groupID := fmt.Sprintf("%x", content.DispatchedGroupId)
+						lastRand := fmt.Sprintf("%x", content.LastRandomness)
+						ids, pub, sec, err := d.groupInfo(groupID)
+						if err != nil {
+							d.logger.Error(err)
+							continue
+						}
+						f := map[string]interface{}{
+							"RequestId":            requestID,
+							"GroupID":              groupID,
+							"LastSystemRandomness": lastRand}
+						d.logger.Event("LogUpdateRandom", f)
+						go d.handleQuery(ids, pub, sec, groupID, content.LastRandomness, content.LastRandomness, nil, "", "", uint32(onchain.TrafficSystemRandom))
+					}
+				case *onchain.LogRequestUserRandom:
+					randSeed = content.LastSystemRandomness
+					groupID := fmt.Sprintf("%x", content.DispatchedGroupId)
+					if d.isMember(groupID) {
+						requestID := fmt.Sprintf("%x", content.RequestId)
+						groupID := fmt.Sprintf("%x", content.DispatchedGroupId)
+						lastRand := fmt.Sprintf("%x", content.LastSystemRandomness)
+						ids, pub, sec, err := d.groupInfo(groupID)
+						if err != nil {
+							d.logger.Error(err)
+							continue
+						}
+						f := map[string]interface{}{
+							"RequestId":            requestID,
+							"GroupID":              groupID,
+							"LastSystemRandomness": lastRand}
+						d.logger.Event("LogRequestUserRandom", f)
+						go d.handleQuery(ids, pub, sec, groupID, content.RequestId, content.LastSystemRandomness, content.UserSeed, "", "", uint32(onchain.TrafficUserRandom))
+					}
+				case *onchain.LogUrl:
+					randSeed = content.Randomness
+					groupID := fmt.Sprintf("%x", content.DispatchedGroupId)
+					if d.isMember(groupID) {
+						requestID := fmt.Sprintf("%x", content.QueryId)
+						groupID := fmt.Sprintf("%x", content.DispatchedGroupId)
+						rand := fmt.Sprintf("%x", content.Randomness)
+						ids, pub, sec, err := d.groupInfo(groupID)
+						if err != nil {
+							d.logger.Error(err)
+							continue
+						}
+						f := map[string]interface{}{
+							"RequestId":  requestID,
+							"Randomness": rand,
+							"DataSource": content.DataSource,
+							"GroupID":    groupID}
+						d.logger.Event("LogUrl", f)
+						go d.handleQuery(ids, pub, sec, groupID, content.QueryId, content.Randomness, nil, content.DataSource, content.Selector, uint32(onchain.TrafficUserQuery))
+					}
+				case *onchain.LogStartCommitReveal:
+					// Generate random numbers in range [0..randSeed]
+					if sec, err := rand.Int(rand.Reader, randSeed); err == nil {
+						fmt.Println("startBlock ", content.StartBlock.String(), " commitDur ", content.CommitDuration.String(), "revealDur", content.RevealDuration.String())
+						crMap[content.Cid.String()] = crDurations{content.Cid, content.StartBlock, content.CommitDuration, content.RevealDuration, sec}
+					}
+				}
+			} else {
+				break L
+			}
+		case e, ok := <-errc:
+			if ok {
+				fmt.Println("errc event err ", e)
+			} else {
+				break L
+			}
+		}
+	}
+	d.chain.End()
+	ips := d.p.MembersIP()
+	var urls = []string{}
+	urls = append(urls, "wss://rinkeby.infura.io/ws/v3/db19cf9028054762865cb9ce883c6ab8")
+	urls = append(urls, "wss://rinkeby.infura.io/ws/v3/3a3e5d776961418e93a8b33fef2f6642")
+	for _, ip := range ips {
+		urls = append(urls, "ws://"+ip.String()+":8546")
+		if len(urls) >= 5 {
+			break
+		}
+	}
+	d.chain.UpdateWsUrls(urls)
+	goto S
 }
 
 func (d *DosNode) listen() (err error) {
 
-	var errcList []chan error
-	var errc chan error
-	d.eventGrouping, errc = d.chain.SubscribeEvent(onchain.SubscribeLogGrouping)
-	errcList = append(errcList, errc)
-	eventGroupDissolve, errc := d.chain.SubscribeEvent(onchain.SubscribeLogGroupDissolve)
-	errcList = append(errcList, errc)
-	chURL, errc := d.chain.SubscribeEvent(onchain.SubscribeLogUrl)
-	errcList = append(errcList, errc)
-	chRandom, errc := d.chain.SubscribeEvent(onchain.SubscribeLogUpdateRandom)
-	errcList = append(errcList, errc)
-	chUsrRandom, errc := d.chain.SubscribeEvent(onchain.SubscribeLogRequestUserRandom)
-	errcList = append(errcList, errc)
-	eventValidation, errc := d.chain.SubscribeEvent(onchain.SubscribeLogValidationResult)
-	errcList = append(errcList, errc)
-	keyAccepted, errc := d.chain.SubscribeEvent(onchain.SubscribeLogPublicKeyAccepted)
-	errcList = append(errcList, errc)
-	keySuggested, errc := d.chain.SubscribeEvent(onchain.SubscribeLogPublicKeySuggested)
-	errcList = append(errcList, errc)
-	commitRevealStart, errc := d.chain.SubscribeEvent(onchain.SubscribeCommitrevealLogStartCommitreveal)
-	errcList = append(errcList, errc)
-
 	peerEvent, err := d.p.SubscribeEvent(50, vss.Signature{})
-	errcList = append(errcList, errc)
-	errc = mergeErrors(context.Background(), errcList...)
-
 	peerSignMap := make(map[string]*vss.Signature)
-	watchdog := time.NewTicker(watchdogInterval * time.Minute)
 	//	latestRandm := big.NewInt(0)
-	defer watchdog.Stop()
 	defer d.p.UnSubscribeEvent(vss.Signature{})
 
 	for {
 		select {
-		case msg, ok := <-commitRevealStart:
-			fmt.Println("commitRevealStart ")
-			if !ok {
-				continue
-			}
-			content, ok := msg.(*onchain.LogStartCommitReveal)
-			if !ok {
-				log.Error(err)
-				continue
-			}
-			go func(cid, StartBlock, CommitDuration, RevealDuration, RevealThreshold *big.Int) {
-				f := map[string]interface{}{
-					"cid": cid.Uint64()}
-				d.logger.Event("commitRevealStart", f)
-
-				var hash *[32]byte
-				_ = hash
-				var prime1 *big.Int
-				// Generate random numbers in range [0..prime1]
-				prime1, ok = new(big.Int).SetString("21888242871839275222246405745257275088548364400416034343698204186575808495617", 10)
-				if !ok {
-					return
-				}
-				sec, err := rand.Int(rand.Reader, prime1)
-				if err != nil {
-					sec.SetInt64(0)
-					return
-				}
-
-				h := sha3.NewKeccak256()
-				h.Write(abi.U256(sec))
-				b := h.Sum(nil)
-				hash = byte32(b)
-				startBlock := StartBlock.Uint64()
-				commitDur := CommitDuration.Uint64()
-				revealDur := RevealDuration.Uint64()
-				fmt.Println("startBlock ", startBlock, " commitDur ", commitDur, "revealDur", revealDur)
-				for {
-					cur, err := d.chain.CurrentBlock(context.Background())
-					if err != nil {
-						d.logger.Error(err)
-						return
-					}
-					fmt.Println("Waiting for commit ", cur, startBlock)
-					if cur >= startBlock {
-						break
-					}
-					time.Sleep(15 * time.Second)
-				}
-
-				err = d.chain.Commit(context.Background(), cid, *hash)
-				if err != nil {
-					fmt.Println("Waiting for commit err", err)
-				}
-				for {
-					cur, err := d.chain.CurrentBlock(context.Background())
-					if err != nil {
-						fmt.Println("CurrentBlock err", err)
-						d.logger.Error(err)
-					}
-					fmt.Println("Waiting for Reveal ", cur, startBlock+commitDur)
-					if cur > startBlock+commitDur {
-						break
-					}
-					time.Sleep(15 * time.Second)
-				}
-				d.chain.Reveal(context.Background(), cid, sec)
-				for {
-					cur, err := d.chain.CurrentBlock(context.Background())
-					if err != nil {
-						fmt.Println("CurrentBlock err", err)
-						d.logger.Error(err)
-					}
-					fmt.Println("Waiting for random ", cur, startBlock+commitDur+revealDur)
-					if cur > startBlock+commitDur+revealDur {
-						break
-					}
-					time.Sleep(15 * time.Second)
-				}
-				d.chain.SignalBootstrap(context.Background(), cid.Uint64())
-			}(content.Cid, content.StartBlock, content.CommitDuration, content.RevealDuration, content.RevealThreshold)
-
-		case err, ok := <-errc:
-			if ok && err.Error() == "EOF" {
-				fmt.Println("!!!dosnode err ", err)
-			}
-			d.logger.Error(err)
-			/*
-				TODO: subscribe again and push err to errc,
-				TODO: otherwise possibly closed errc will keep consuming "select",
-			*/
-		case <-watchdog.C:
-			//Let pending node as a guardian
-			isPendingNode, err := d.chain.IsPendingNode(context.Background(), d.id)
-			if err != nil {
-				continue
-			}
-			if isPendingNode {
-				fmt.Println("watchdog")
-				currentBlockNumber, err := d.chain.CurrentBlock(context.Background())
-				if err != nil {
-					d.logger.Error(err)
-				}
-
-				workingGroup, err := d.chain.GetWorkingGroupSize(context.Background())
-				if err != nil {
-					continue
-				}
-				groupToPick, err := d.chain.GroupToPick(context.Background())
-				if err != nil {
-					continue
-				}
-				pendingNodeSize, err := d.chain.NumPendingNodes(context.Background())
-				if err != nil {
-					continue
-				}
-				pendingGrouSize, err := d.chain.NumPendingGroups(context.Background())
-				if err != nil {
-					continue
-				}
-
-				lastUpdatedBlock, err := d.chain.LastUpdatedBlock(context.Background())
-				if err != nil {
-					d.logger.Error(err)
-					continue
-				}
-				groupSize, err := d.chain.GroupSize(context.Background())
-				if err != nil {
-					d.logger.Error(err)
-					continue
-				}
-				expiredWGSize, err := d.chain.GetExpiredWorkingGroupSize(context.Background())
-				if err != nil {
-					d.logger.Error(err)
-					continue
-				}
-				sysrandInterval, err := d.chain.RefreshSystemRandomHardLimit(context.Background())
-				if err != nil {
-					d.logger.Error(err)
-					continue
-				}
-				f := map[string]interface{}{
-					"WorkingGroupSize":    workingGroup,
-					"GroupToPick":         groupToPick,
-					"currentBlockNumber":  currentBlockNumber,
-					"PendingNodeSize":     pendingNodeSize,
-					"PendingGrouSize":     pendingGrouSize,
-					"expiredWorkingGSize": expiredWGSize,
-					"Members":             d.p.NumOfMembers(),
-					"sysrandInterval":     sysrandInterval}
-				d.logger.Event("DWatchdog", f)
-				//Let pendingNode be a guardian
-				//Signal random if there are enough working groups
-				if workingGroup >= groupToPick {
-					diff := currentBlockNumber - lastUpdatedBlock
-					if diff > sysrandInterval {
-						d.chain.SignalRandom(context.Background())
-					}
-				}
-
-				if pendingNodeSize >= groupSize+(groupSize/2) {
-					d.chain.SignalGroupFormation(context.Background())
-				}
-
-				if expiredWGSize > 0 || pendingGrouSize > 0 {
-					d.chain.SignalGroupDissolve(context.Background())
-				}
-			}
 		case msg, ok := <-d.cSignToPeer:
 			if !ok {
-				continue
+				return
 			}
 			peerSignMap[string(msg.Nonce)] = msg
-		case msg := <-peerEvent:
+		case msg, ok := <-peerEvent:
+			if !ok {
+				return
+			}
 			switch content := msg.Msg.Message.(type) {
 			case *vss.Signature:
 				if peerSignMap[string(content.Nonce)] != nil {
 					fmt.Println("Got Sign ", peerSignMap[string(content.Nonce)].RequestId)
 				}
 				d.p.Reply(msg.Sender, msg.RequestNonce, peerSignMap[string(content.Nonce)])
-			}
-		case msg, ok := <-d.eventGrouping:
-			if !ok {
-				continue
-			}
-			content, ok := msg.(*onchain.LogGrouping)
-			if !ok {
-				log.Error(err)
-				continue
-			}
-			isMember := false
-
-			for _, id := range content.NodeId {
-				if r := bytes.Compare(d.id, id); r == 0 {
-					isMember = true
-				}
-				fmt.Println(fmt.Sprintf("%x", d.id), " member : ", fmt.Sprintf("%x", id), " isMember ", isMember)
-			}
-
-			participants := content.NodeId
-			groupID := fmt.Sprintf("%x", content.GroupId)
-			f := map[string]interface{}{
-				"GroupID": groupID,
-				"Removed": content.Removed,
-				"Tx":      content.Tx}
-			d.logger.Event("DGrouping1", f)
-			if isMember {
-				d.logger.Event("DGrouping2", f)
-				//pendingGroupMaxLife = 40 block
-				//ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(40*15*time.Second))
-				ctx, cancel := context.WithCancel(context.Background())
-				defer cancel()
-				//ctx := context.Background()
-				outFromDkg, errc, err := d.dkg.Grouping(ctx, groupID, participants)
-				if err != nil {
-					d.logger.Error(err)
-					continue
-				}
-				errcList = append(errcList, errc)
-
-				_ = d.chain.RegisterGroupPubKey(ctx, outFromDkg)
-				//errcList = append(errcList, pubErrc)
-				allErrc := mergeErrors(ctx, errcList...)
-				go d.waitForGrouping(ctx, cancel, groupID, allErrc)
-				//}
-			}
-		case msg, ok := <-eventGroupDissolve:
-			if !ok {
-				continue
-			}
-			content, ok := msg.(*onchain.LogGroupDissolve)
-			if !ok {
-				e, ok := msg.(error)
-				if ok {
-					d.logger.Error(e)
-				}
-				continue
-			}
-			groupID := fmt.Sprintf("%x", content.GroupId)
-			f := map[string]interface{}{
-				"GroupID": fmt.Sprintf("%x", content.GroupId)}
-			d.logger.Event("DGroupDismiss1", f)
-			if d.isMember(groupID) {
-				d.dkg.GroupDissolve(groupID)
-				d.logger.Event("DGroupDismiss2", f)
-			}
-		case msg, ok := <-chRandom:
-			if !ok {
-				continue
-			}
-			content, ok := msg.(*onchain.LogUpdateRandom)
-			if !ok {
-				log.Error(err)
-			}
-			//			latestRandm = content.LastRandomness
-			if d.isMember(fmt.Sprintf("%x", content.DispatchedGroupId)) {
-				currentBlockNumber, err := d.chain.CurrentBlock(context.Background())
-				if err != nil {
-					d.logger.Error(err)
-				}
-				requestID := fmt.Sprintf("%x", content.LastRandomness)
-				groupID := fmt.Sprintf("%x", content.DispatchedGroupId)
-				lastRand := fmt.Sprintf("%x", content.LastRandomness)
-				f := map[string]interface{}{
-					"RequestId":            requestID,
-					"GroupID":              groupID,
-					"LastSystemRandomness": lastRand,
-					"Tx":      content.Tx,
-					"CurBlkN": currentBlockNumber,
-					"BlockN":  content.BlockN}
-				d.logger.Event("DOS_QuerySysRandom", f)
-
-				ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(40*15*time.Second))
-
-				d.buildPipeline(ctx, cancel, groupID, content.LastRandomness, content.LastRandomness, nil, "", "", uint32(onchain.TrafficSystemRandom))
-
-			}
-		case msg, ok := <-chUsrRandom:
-			if !ok {
-				continue
-			}
-			content, ok := msg.(*onchain.LogRequestUserRandom)
-			if !ok {
-				log.Error(err)
-				continue
-			}
-			if d.isMember(fmt.Sprintf("%x", content.DispatchedGroupId)) {
-				currentBlockNumber, err := d.chain.CurrentBlock(context.Background())
-				if err != nil {
-					d.logger.Error(err)
-				}
-				requestID := fmt.Sprintf("%x", content.RequestId)
-				groupID := fmt.Sprintf("%x", content.DispatchedGroupId)
-				lastRand := fmt.Sprintf("%x", content.LastSystemRandomness)
-				f := map[string]interface{}{
-					"RequestId":            requestID,
-					"GroupID":              groupID,
-					"LastSystemRandomness": lastRand,
-					"Tx":      content.Tx,
-					"CurBlkN": currentBlockNumber,
-					"BlockN":  content.BlockN}
-				d.logger.Event("DOS_QueryUserRandom", f)
-
-				ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(40*15*time.Second))
-				d.buildPipeline(ctx, cancel, groupID, content.RequestId, content.LastSystemRandomness, content.UserSeed, "", "", uint32(onchain.TrafficUserRandom))
-
-			}
-		case msg, ok := <-chURL:
-			if !ok {
-				continue
-			}
-			content, ok := msg.(*onchain.LogUrl)
-			if !ok {
-				log.Error(err)
-				continue
-			}
-			if d.isMember(fmt.Sprintf("%x", content.DispatchedGroupId)) {
-				//if !content.Removed {
-				currentBlockNumber, err := d.chain.CurrentBlock(context.Background())
-				if err != nil {
-					d.logger.Error(err)
-				}
-				startTime := time.Now()
-				fmt.Println("set up time ", startTime)
-				requestID := fmt.Sprintf("%x", content.QueryId)
-				groupID := fmt.Sprintf("%x", content.DispatchedGroupId)
-				rand := fmt.Sprintf("%x", content.Randomness)
-				f := map[string]interface{}{
-					"RequestId":  requestID,
-					"Randomness": rand,
-					"DataSource": content.DataSource,
-					"GroupID":    groupID,
-					"Tx":         content.Tx,
-					"CurBlkN":    currentBlockNumber,
-					"BlockN":     content.BlockN}
-				d.logger.Event("DOS_QueryURL", f)
-				ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(40*15*time.Second))
-				defer cancel()
-				d.buildPipeline(ctx, cancel, groupID, content.QueryId, content.Randomness, nil, content.DataSource, content.Selector, uint32(onchain.TrafficUserQuery))
-				//}
-			}
-		case _, ok := <-eventValidation:
-			if !ok {
-				continue
-			}
-		case msg, ok := <-keySuggested:
-			if !ok {
-				continue
-			}
-			content, ok := msg.(*onchain.LogPublicKeySuggested)
-			if !ok {
-				e, ok := msg.(error)
-				if ok {
-					d.logger.Error(e)
-				}
-				continue
-			}
-			if d.isMember(fmt.Sprintf("%x", content.GroupId)) {
-				d.logger.TimeTrack(time.Now(), "keySuggested", map[string]interface{}{
-					"GroupID": fmt.Sprintf("%x", content.GroupId.Bytes()),
-					"Count":   content.Count,
-					"Removed": content.Removed,
-					"Tx":      content.Tx,
-					"BlockN":  content.BlockN,
-				})
-			}
-		case msg, ok := <-keyAccepted:
-			if !ok {
-				continue
-			}
-			content, ok := msg.(*onchain.LogPublicKeyAccepted)
-			if !ok {
-				e, ok := msg.(error)
-				if ok {
-					d.logger.Error(e)
-				}
-				continue
-			}
-			if d.isMember(fmt.Sprintf("%x", content.GroupId)) {
-				d.logger.TimeTrack(time.Now(), "keyAccepted", map[string]interface{}{
-					"GroupId":          fmt.Sprintf("%x", content.GroupId.Bytes()),
-					"workingGroupSize": content.WorkingGroupSize,
-					"Removed":          content.Removed,
-					"Tx":               content.Tx,
-					"BlockN":           content.BlockN,
-				})
 			}
 		case <-d.done:
 			return

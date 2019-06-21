@@ -112,7 +112,7 @@ func (d *DosNode) signalBootstrap(w http.ResponseWriter, r *http.Request) {
 	default:
 	}
 	if cid >= 0 {
-		d.chain.SignalBootstrap(context.Background(), uint64(cid))
+		d.chain.SignalBootstrap(context.Background(), big.NewInt(int64(cid)))
 	}
 }
 
@@ -129,7 +129,7 @@ func (d *DosNode) signalGroupDissolve(w http.ResponseWriter, r *http.Request) {
 }
 
 func (d *DosNode) p2pTest(w http.ResponseWriter, r *http.Request) {
-	members := d.p.MemberList()
+	members := d.p.MembersID()
 	fmt.Println("p2p test ", len(members))
 	for i := 0; i < len(members); i++ {
 		fmt.Println("p2p ConnectTo ", members[i])
@@ -142,7 +142,7 @@ func (d *DosNode) p2pTest(w http.ResponseWriter, r *http.Request) {
 
 func (d *DosNode) dkgTest(w http.ResponseWriter, r *http.Request) {
 	groupId := big.NewInt(0)
-	members := d.p.MemberList()
+	members := d.p.MembersID()
 	start := -1
 	end := -1
 	switch r.Method {

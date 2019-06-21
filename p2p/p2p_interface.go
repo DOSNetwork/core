@@ -51,7 +51,8 @@ type P2PInterface interface {
 	SubscribeEvent(chanBuffer int, messages ...interface{}) (outch chan P2PMessage, err error)
 	UnSubscribeEvent(messages ...interface{})
 	NumOfMembers() int
-	MemberList() [][]byte
+	MembersID() [][]byte
+	MembersIP() []net.IP
 	ConnectToAll(ctx context.Context, groupIds [][]byte, sessionID string) (out chan bool, errc chan error)
 	numOfClient() (int, int)
 }

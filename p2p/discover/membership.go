@@ -1,7 +1,6 @@
 package discover
 
 import (
-	"fmt"
 	"io/ioutil"
 	"net"
 
@@ -14,8 +13,8 @@ type Membership interface {
 	Leave()
 	Lookup(id []byte) (addr net.IP)
 	NumOfPeers() int
-	PeersIP() (addr []net.IP)
-	MemberList() (list [][]byte)
+	MembersIP() (addr []net.IP)
+	MembersID() (list [][]byte)
 }
 
 //NewSerfNet creates a Serf implementation
@@ -66,15 +65,15 @@ func (s *serfNet) Lookup(id []byte) (addr net.IP) {
 	return
 }
 
-// PeersIP return the all IP address of an existing cluster
-func (s *serfNet) PeersIP() (addr []net.IP) {
-	fmt.Println("members len ", len(s.serf.Members()))
+// MembersIP return the all IP address of an existing cluster
+func (s *serfNet) MembersIP() (addr []net.IP) {
+	//fmt.Println("members len ", len(s.serf.Members()))
 
 	members := s.serf.Members()
 	for i := 0; i < len(members); i++ {
 
 		if members[i].Name != s.serf.LocalMember().Name {
-			fmt.Println("localMember ", []byte(s.serf.LocalMember().Name), "members[i].Name ", []byte(members[i].Name), " status ", members[i].Status, " addr ", members[i].Addr)
+			//fmt.Println("localMember ", []byte(s.serf.LocalMember().Name), "members[i].Name ", []byte(members[i].Name), " status ", members[i].Status, " addr ", members[i].Addr)
 
 			addr = append(addr, members[i].Addr)
 		}
@@ -82,8 +81,8 @@ func (s *serfNet) PeersIP() (addr []net.IP) {
 	return
 }
 
-// PeersIP return the all IP address of an existing cluster
-func (s *serfNet) MemberList() (list [][]byte) {
+// MembersID return the all ID of an existing cluster
+func (s *serfNet) MembersID() (list [][]byte) {
 	members := s.serf.Members()
 	for i := 0; i < len(members); i++ {
 		if members[i].Status == serf.StatusAlive {

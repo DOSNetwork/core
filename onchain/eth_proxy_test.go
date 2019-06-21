@@ -14,15 +14,20 @@ const (
 )
 
 var (
-	urls           = []string{"ws://51.15.0.157:8546", "ws://51.159.4.51:8546"}
-	proxyAddr      = "0x3b8Cb935bDdFAF59EFa11aFfDfc8760387624fa2"
-	crAddr         = "0xE04B34A113BB707eCF8dc01D51f8A56213Bdcb81"
-	credentialPath = "/Users/chenhaonien/go/src/github.com/DOSNetwork/core/testAccounts/bootCredential/fundKey/"
-	passphrase     = "123"
+	urls           = []string{}
+	proxyAddr      = ""
+	crAddr         = ""
+	credentialPath = ""
+	passphrase     = ""
 )
 
 func TestGetPendingNonce(t *testing.T) {
-	adaptor, err := NewEthAdaptor(credentialPath, passphrase, proxyAddr, "", urls)
+	key, err := ReadEthKey(credentialPath, passphrase)
+	if err != nil {
+		t.Errorf("TestCommitReveal Failed, got an error : %s.", err.Error())
+		return
+	}
+	adaptor, err := NewEthAdaptor(key, proxyAddr, crAddr, urls)
 	if err != nil {
 		t.Errorf("TestConcurrentSend Failed, got an Error : %s.", err.Error())
 		return
@@ -39,7 +44,12 @@ func TestGetPendingNonce(t *testing.T) {
 }
 
 func TestLastUpdatedBlock(t *testing.T) {
-	adaptor, err := NewEthAdaptor(credentialPath, passphrase, proxyAddr, "", urls)
+	key, err := ReadEthKey(credentialPath, passphrase)
+	if err != nil {
+		t.Errorf("TestCommitReveal Failed, got an error : %s.", err.Error())
+		return
+	}
+	adaptor, err := NewEthAdaptor(key, proxyAddr, crAddr, urls)
 	if err != nil {
 		t.Errorf("TestConcurrentSend Failed, got an Error : %s.", err.Error())
 		return
@@ -70,19 +80,27 @@ func TestLastUpdatedBlock(t *testing.T) {
 }
 
 func TestConcurrentSend(t *testing.T) {
-	adaptor, err := NewEthAdaptor(credentialPath, passphrase, proxyAddr, "", urls)
+	key, err := ReadEthKey(credentialPath, passphrase)
+	if err != nil {
+		t.Errorf("TestCommitReveal Failed, got an error : %s.", err.Error())
+		return
+	}
+	adaptor, err := NewEthAdaptor(key, proxyAddr, crAddr, urls)
 	if err != nil {
 		t.Errorf("TestConcurrentSend Failed, got an error : %s.", err.Error())
 		return
 	}
 
-	sink, errc := adaptor.SubscribeEvent(SubscribeDosproxyUpdateGroupToPick)
+	sink, errc := adaptor.SubscribeEvent([]int{SubscribeDosproxyUpdateGroupToPick})
 
 	ctx := context.Background()
 	for i := 3; i < 8; i++ {
 		go func(i int) {
 			err = adaptor.SetGroupToPick(ctx, uint64(i))
-			fmt.Println("TestConcurrentSend err ", err)
+			if err != nil {
+				t.Errorf("TestConcurrentSend Failed, got an error : %s.", err.Error())
+				return
+			}
 		}(i)
 	}
 	result := 0
@@ -93,13 +111,12 @@ L:
 			if ok {
 				switch content := event.(type) {
 				case *LogUpdateGroupToPick:
-					fmt.Println("DOSProxyUpdateGroupToPick ", int(content.NewNum.Uint64()), content.Removed)
-					if content.Removed != true {
-						result = result + int(content.NewNum.Uint64())
-						if result == 25 {
-							break L
-						}
+					fmt.Println("DOSProxyUpdateGroupToPick ", int(content.NewNum.Uint64()))
+					result = result + int(content.NewNum.Uint64())
+					if result == 25 {
+						break L
 					}
+
 				}
 			}
 		case e, ok := <-errc:
@@ -112,13 +129,18 @@ L:
 }
 
 func TestCommitReveal(t *testing.T) {
-	adaptor, err := NewEthAdaptor(credentialPath, passphrase, proxyAddr, crAddr, urls)
+	key, err := ReadEthKey(credentialPath, passphrase)
+	if err != nil {
+		t.Errorf("TestCommitReveal Failed, got an error : %s.", err.Error())
+		return
+	}
+	adaptor, err := NewEthAdaptor(key, proxyAddr, crAddr, urls)
 	if err != nil {
 		t.Errorf("TestCommitReveal Failed, got an error : %s.", err.Error())
 		return
 	}
 
-	sink, errc := adaptor.SubscribeEvent(SubscribeCommitrevealLogStartCommitreveal)
+	sink, errc := adaptor.SubscribeEvent([]int{SubscribeCommitrevealLogStartCommitreveal})
 
 	ctx := context.Background()
 	err = adaptor.AddToWhitelist(ctx, adaptor.Address())
@@ -151,13 +173,18 @@ func TestCommitReveal(t *testing.T) {
 }
 
 func TestSetErrorHandling(t *testing.T) {
-	adaptor, err := NewEthAdaptor(credentialPath, passphrase, proxyAddr, "", urls)
+	key, err := ReadEthKey(credentialPath, passphrase)
+	if err != nil {
+		t.Errorf("TestCommitReveal Failed, got an error : %s.", err.Error())
+		return
+	}
+	adaptor, err := NewEthAdaptor(key, proxyAddr, crAddr, urls)
 	if err != nil {
 		t.Errorf("TestConcurrentSend Failed, got an error : %s.", err.Error())
 		return
 	}
 
-	sink, errc := adaptor.SubscribeEvent(SubscribeDosproxyUpdateGroupToPick)
+	sink, errc := adaptor.SubscribeEvent([]int{SubscribeDosproxyUpdateGroupToPick})
 
 	ctx := context.Background()
 	for i := 3; i < 8; i++ {
@@ -174,13 +201,12 @@ L:
 			if ok {
 				switch content := event.(type) {
 				case *LogUpdateGroupToPick:
-					fmt.Println("DOSProxyUpdateGroupToPick ", int(content.NewNum.Uint64()), content.Removed)
-					if content.Removed != true {
-						result = result + int(content.NewNum.Uint64())
-						if result == 25 {
-							break L
-						}
+					fmt.Println("DOSProxyUpdateGroupToPick ", int(content.NewNum.Uint64()))
+					result = result + int(content.NewNum.Uint64())
+					if result == 25 {
+						break L
 					}
+
 				}
 			}
 		case e, ok := <-errc:
@@ -193,24 +219,33 @@ L:
 }
 
 func TestReconnect(t *testing.T) {
-S:
-	adaptor, err := NewEthAdaptor(credentialPath, passphrase, proxyAddr, "", urls)
+
+	key, err := ReadEthKey(credentialPath, passphrase)
+	if err != nil {
+		t.Errorf("TestCommitReveal Failed, got an error : %s.", err.Error())
+		return
+	}
+
+	adaptor, err := NewEthAdaptor(key, proxyAddr, crAddr, urls)
 	if err != nil {
 		t.Errorf("TestConcurrentSend Failed, got an error : %s.", err.Error())
 		return
 	}
-
+S:
+	adaptor.Start()
 	var errcList []chan error
-	sink, errc := adaptor.SubscribeEvent(SubscribeDosproxyUpdateGroupToPick)
+	sink, errc := adaptor.SubscribeEvent([]int{SubscribeDosproxyUpdateGroupToPick, SubscribeDosproxyUpdateGroupSize})
 	errcList = append(errcList, errc)
 
 	ctx := context.Background()
 	for i := 3; i < 8; i++ {
-		//go func(i int) {
-		err = adaptor.SetGroupToPick(ctx, uint64(i))
+		if err = adaptor.SetGroupSize(ctx, uint64(i)); err != nil {
+			fmt.Println(" err ", err)
+		}
+		if err = adaptor.SetGroupToPick(ctx, uint64(i)); err != nil {
+			fmt.Println(" err ", err)
+		}
 		time.Sleep(2 * time.Second)
-		fmt.Println(" err ", err)
-		//}(i)
 	}
 	errc = errcList[0]
 	result := 0
@@ -221,14 +256,10 @@ L:
 			if ok {
 				switch content := event.(type) {
 				case *LogUpdateGroupToPick:
-					fmt.Println("DOSProxyUpdateGroupToPick ", int(content.NewNum.Uint64()), content.Removed)
-					if content.Removed != true {
-						result = result + int(content.NewNum.Uint64())
-						if result == 25 {
-							time.Sleep(15 * time.Second)
-							break L
-						}
-					}
+					fmt.Println("DOSProxyUpdateGroupToPick ", int(content.OldNum.Uint64()), "->", int(content.NewNum.Uint64()))
+					result = result + int(content.NewNum.Uint64())
+				case *LogUpdateGroupSize:
+					fmt.Println("LogUpdateGroupSize ", int(content.OldSize.Uint64()), "->", int(content.NewSize.Uint64()))
 				}
 			} else {
 				fmt.Println("sink event !ok err ", err)
@@ -244,7 +275,8 @@ L:
 			}
 		}
 	}
-	time.Sleep(5 * time.Second)
+	adaptor.End()
+	adaptor.UpdateWsUrls([]string{"ws://52.24.205.11:8546"})
 	goto S
 }
 
