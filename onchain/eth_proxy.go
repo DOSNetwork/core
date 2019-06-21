@@ -75,6 +75,39 @@ const (
 type getFunc func(ctx context.Context, client *ethclient.Client, proxy *dosproxy.DosproxySession, p interface{}) (chan interface{}, chan interface{})
 type setFunc func(ctx context.Context, proxy *dosproxy.DosproxySession, cr *commitreveal.CommitrevealSession, p []interface{}) (tx *types.Transaction, err error)
 
+type request struct {
+	ctx    context.Context
+	idx    int
+	proxy  *dosproxy.DosproxySession
+	cr     *commitreveal.CommitrevealSession
+	f      setFunc
+	params []interface{}
+	reply  chan *response
+}
+
+type response struct {
+	idx int
+	tx  *types.Transaction
+	err error
+}
+
+type ethAdaptor struct {
+	proxyAddr        string
+	commitRevealAddr string
+	httpUrls         []string
+	wsUrls           []string
+	key              *keystore.Key
+	auth             *bind.TransactOpts
+
+	proxies    []*dosproxy.DosproxySession
+	crs        []*commitreveal.CommitrevealSession
+	clients    []*ethclient.Client
+	ctx        context.Context
+	cancelFunc context.CancelFunc
+	reqQueue   chan *request
+	logger     log.Logger
+}
+
 var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (chan interface{}, chan interface{}){
 	SubscribeLogUpdateRandom: func(ctx context.Context, proxy *dosproxy.DosproxySession) (chan interface{}, chan interface{}) {
 		out := make(chan interface{})
@@ -871,39 +904,6 @@ var crTable = []func(ctx context.Context, cr *commitreveal.CommitrevealSession) 
 	},
 }
 
-type request struct {
-	ctx    context.Context
-	idx    int
-	proxy  *dosproxy.DosproxySession
-	cr     *commitreveal.CommitrevealSession
-	f      setFunc
-	params []interface{}
-	reply  chan *response
-}
-
-type response struct {
-	idx int
-	tx  *types.Transaction
-	err error
-}
-
-type ethAdaptor struct {
-	proxyAddr        string
-	commitRevealAddr string
-	httpUrls         []string
-	wsUrls           []string
-	key              *keystore.Key
-	auth             *bind.TransactOpts
-
-	proxies    []*dosproxy.DosproxySession
-	crs        []*commitreveal.CommitrevealSession
-	clients    []*ethclient.Client
-	ctx        context.Context
-	cancelFunc context.CancelFunc
-	reqQueue   chan *request
-	logger     log.Logger
-}
-
 //NewEthAdaptor creates an eth implemention of ProxyAdapter
 func NewEthAdaptor(key *keystore.Key, proxyAddr, commitRevealAddr string, urls []string) (adaptor *ethAdaptor, err error) {
 	var httpUrls []string
@@ -982,6 +982,10 @@ func (e *ethAdaptor) Start() (err error) {
 	}
 	e.reqLoop()
 	return
+}
+
+func (e *ethAdaptor) GetTimeoutCtx(t time.Duration) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(e.ctx, t)
 }
 
 func (e *ethAdaptor) UpdateWsUrls(urls []string) {

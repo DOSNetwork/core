@@ -13,6 +13,7 @@ import (
 )
 
 func (d *DosNode) startRESTServer() {
+	fmt.Println("startRESTServer")
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", d.status)
 	mux.HandleFunc("/balance", d.balance)
@@ -36,7 +37,7 @@ func (d *DosNode) status(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	html := "=================================================" + "\n|"
-	html = html + "StartTime         :" + d.startTime.Format("2006-01-02T15:04:05.999999-07:00") + "\n|"
+	html = html + "StartTime         : " + d.startTime.Format("2006-01-02T15:04:05.999999-07:00") + "\n|"
 	html = html + "Address           : " + fmt.Sprintf("%x", d.p.GetID()) + "\n|"
 	html = html + "IP                : " + fmt.Sprintf("%s", d.p.GetIP()) + "\n|"
 	html = html + "NumOfMembers      : " + strconv.Itoa(d.p.NumOfMembers()) + "\n|"
@@ -50,34 +51,34 @@ func (d *DosNode) status(w http.ResponseWriter, r *http.Request) {
 	//	result := d.dkg.GetGroupNumber()
 	workingGroupNum, err := d.chain.GetWorkingGroupSize(ctx)
 	if err != nil {
-		html = html + "WorkingGroupSize  :" + err.Error() + "\n|"
+		html = html + "WorkingGroupSize  : " + err.Error() + "\n|"
 	} else {
-		html = html + "WorkingGroupSize  :" + strconv.FormatUint(workingGroupNum, 10) + "\n|"
+		html = html + "WorkingGroupSize  : " + strconv.FormatUint(workingGroupNum, 10) + "\n|"
 	}
 	expiredGroupNum, err := d.chain.GetExpiredWorkingGroupSize(ctx)
 	if err != nil {
-		html = html + "ExpiredGroupSize  :" + err.Error() + "\n|"
+		html = html + "ExpiredGroupSize  : " + err.Error() + "\n|"
 	} else {
-		html = html + "ExpiredGroupSize  :" + strconv.FormatUint(expiredGroupNum, 10) + "\n|"
+		html = html + "ExpiredGroupSize  : " + strconv.FormatUint(expiredGroupNum, 10) + "\n|"
 	}
 	pendingGroupNum, err := d.chain.NumPendingGroups(ctx)
 	if err != nil {
-		html = html + "PendingGroupSize  :" + err.Error() + "\n|"
+		html = html + "PendingGroupSize  : " + err.Error() + "\n|"
 	} else {
-		html = html + "PendingGroupSize  :" + strconv.FormatUint(pendingGroupNum, 10) + "\n|"
+		html = html + "PendingGroupSize  : " + strconv.FormatUint(pendingGroupNum, 10) + "\n|"
 	}
 	pendingNodeNum, err := d.chain.NumPendingNodes(ctx)
 	if err != nil {
-		html = html + "PendingNodeSize   :" + err.Error() + "\n|"
+		html = html + "PendingNodeSize   : " + err.Error() + "\n|"
 	} else {
-		html = html + "PendingNodeSize   :" + strconv.FormatUint(pendingNodeNum, 10) + "\n|"
+		html = html + "PendingNodeSize   : " + strconv.FormatUint(pendingNodeNum, 10) + "\n|"
 	}
 
 	curBlk, err := d.chain.CurrentBlock(ctx)
 	if err != nil {
-		html = html + "CurrentBlock     :" + err.Error() + "\n"
+		html = html + "CurrentBlock      : " + err.Error() + "\n"
 	} else {
-		html = html + "CurrentBlock     :" + strconv.FormatUint(curBlk, 10) + "\n"
+		html = html + "CurrentBlock      : " + strconv.FormatUint(curBlk, 10) + "\n"
 	}
 	html = html + "=================================================" + "\n"
 	w.Write([]byte(html))

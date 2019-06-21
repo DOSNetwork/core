@@ -30,6 +30,8 @@ const (
 	envPassPhrase    = "PASSPHRASE"
 )
 
+type ctxKey string
+
 // DosNode is a strcut that represents a offchain dos client
 type DosNode struct {
 	suite         suites.Suite
@@ -140,18 +142,11 @@ func NewDosNode(key *keystore.Key) (dosNode *DosNode, err error) {
 
 // Start registers to onchain and listen to p2p events
 func (d *DosNode) Start() (err error) {
-	go d.onchainLoop()
 	d.startRESTServer()
 
 	d.state = "Working"
 
-	//TODO: Check to see if it is a valid stacking node first
-	_ = d.chain.RegisterNewNode(context.Background())
-
-	if err = d.listen(); err != nil {
-		fmt.Println("listen err ", err)
-		d.logger.Error(err)
-	}
+	d.listen()
 	return
 }
 
@@ -161,7 +156,10 @@ func (d *DosNode) End() {
 }
 
 func (d *DosNode) handleQuery(ids [][]byte, pubPoly *share.PubPoly, sec *share.PriShare, groupID string, requestID, lastRand, useSeed *big.Int, url, selector string, pType uint32) {
-	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(40*15*time.Second))
+	queryCtx, cancel := d.chain.GetTimeoutCtx(time.Duration(60 * 15 * time.Second))
+	defer cancel()
+	queryCtxWithValue := context.WithValue(context.WithValue(queryCtx, ctxKey("RequestID"), fmt.Sprintf("%x", requestID)), ctxKey("GroupID"), groupID)
+
 	defer d.logger.TimeTrack(time.Now(), "TimeHandleQuery", map[string]interface{}{"GroupID": groupID, "RequestID": fmt.Sprintf("%x", requestID)})
 	defer cancel()
 	var nonce []byte
@@ -197,7 +195,7 @@ func (d *DosNode) handleQuery(ids [][]byte, pubPoly *share.PubPoly, sec *share.P
 	var signShares []chan *vss.Signature
 	var errcList []chan error
 
-	submitterc, errc := choseSubmitter(ctx, d.p, lastRand, ids, len(ids), d.logger)
+	submitterc, errc := choseSubmitter(queryCtxWithValue, d.p, lastRand, ids, len(ids), d.logger)
 	if len(submitterc) != len(ids) || len(ids) == 0 {
 		d.logger.Event("EuildPipeError2", map[string]interface{}{"GroupID": groupID, "RequestId": fmt.Sprintf("%x", requestID), "lenSubmitter": len(submitterc)})
 		return
@@ -207,40 +205,40 @@ func (d *DosNode) handleQuery(ids [][]byte, pubPoly *share.PubPoly, sec *share.P
 	var contentc chan []byte
 	switch pType {
 	case onchain.TrafficSystemRandom:
-		contentc = genSysRandom(ctx, submitterc[0], lastRand.Bytes(), d.logger)
+		contentc = genSysRandom(queryCtxWithValue, submitterc[0], lastRand.Bytes(), d.logger)
 	case onchain.TrafficUserRandom:
-		contentc = genUserRandom(ctx, submitterc[0], requestID.Bytes(), lastRand.Bytes(), useSeed.Bytes(), d.logger)
+		contentc = genUserRandom(queryCtxWithValue, submitterc[0], requestID.Bytes(), lastRand.Bytes(), useSeed.Bytes(), d.logger)
 	case onchain.TrafficUserQuery:
-		contentc, errc = genQueryResult(ctx, submitterc[0], url, selector, d.logger)
+		contentc, errc = genQueryResult(queryCtxWithValue, submitterc[0], url, selector, d.logger)
 		errcList = append(errcList, errc)
 	}
 
-	signc, errc := genSign(ctx, contentc, d.cSignToPeer, sec, d.suite, d.id, groupID, requestID.Bytes(), pType, nonce, d.logger)
+	signc, errc := genSign(queryCtxWithValue, contentc, d.cSignToPeer, sec, d.suite, d.id, groupID, requestID.Bytes(), pType, nonce, d.logger)
 	errcList = append(errcList, errc)
 	signShares = append(signShares, signc)
 
 	idx := 1
 	for _, id := range ids {
 		if r := bytes.Compare(d.id, id); r != 0 {
-			signc, errc := requestSign(ctx, submitterc[idx], contentc, d.p, d.id, requestID.Bytes(), pType, id, nonce, d.logger)
+			signc, errc := requestSign(queryCtxWithValue, submitterc[idx], contentc, d.p, d.id, requestID.Bytes(), pType, id, nonce, d.logger)
 			signShares = append(signShares, signc)
 			errcList = append(errcList, errc)
 			idx++
 		}
 	}
 
-	recoveredSignc, errc := recoverSign(ctx, fanIn(ctx, signShares...), d.suite, pubPoly, (len(ids)/2 + 1), len(ids), d.logger)
+	recoveredSignc, errc := recoverSign(queryCtxWithValue, fanIn(queryCtxWithValue, signShares...), d.suite, pubPoly, (len(ids)/2 + 1), len(ids), d.logger)
 	errcList = append(errcList, errc)
 
 	switch pType {
 	case onchain.TrafficSystemRandom:
-		errc := d.chain.SetRandomNum(ctx, recoveredSignc)
+		errc := d.chain.SetRandomNum(queryCtxWithValue, recoveredSignc)
 		errcList = append(errcList, errc)
 	default:
-		errc := d.chain.DataReturn(ctx, recoveredSignc)
+		errc := d.chain.DataReturn(queryCtxWithValue, recoveredSignc)
 		errcList = append(errcList, errc)
 	}
-	allErrc := mergeErrors(ctx, errcList...)
+	allErrc := mergeErrors(queryCtxWithValue, errcList...)
 	for {
 		select {
 		case err, ok := <-allErrc:
@@ -248,8 +246,8 @@ func (d *DosNode) handleQuery(ids [][]byte, pubPoly *share.PubPoly, sec *share.P
 				return
 			}
 			d.logger.Event("handleQueryError", map[string]interface{}{"Error": err.Error(), "GroupID": groupID})
-		case <-ctx.Done():
-			d.logger.Event("handleQueryError", map[string]interface{}{"Error": ctx.Err(), "GroupID": groupID})
+		case <-queryCtxWithValue.Done():
+			d.logger.Event("handleQueryError", map[string]interface{}{"Error": queryCtxWithValue.Err(), "GroupID": groupID})
 			return
 		}
 	}
@@ -269,7 +267,7 @@ func (d *DosNode) handleGrouping(participants [][]byte, groupID string) {
 	d.logger.Event("Grouping", map[string]interface{}{"GroupID": groupID})
 	defer d.logger.TimeTrack(time.Now(), "TimeGrouping", map[string]interface{}{"GroupID": groupID})
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := d.chain.GetTimeoutCtx(time.Duration(60 * 60 * time.Second))
 	defer cancel()
 
 	var errcList []chan error
@@ -308,36 +306,66 @@ func (d *DosNode) groupInfo(groupID string) (ids [][]byte, pubPoly *share.PubPol
 	return
 }
 
-func (d *DosNode) handleCR(crMap map[string]crDurations, currentBlockNumber uint64) {
-	// Handle commit reveal
-	for key, cr := range crMap {
-		cid := cr.cid
-		startBlock := cr.startBlock.Uint64()
-		commitDur := cr.commitDur.Uint64()
-		revealDur := cr.revealDur.Uint64()
+func (d *DosNode) handleCR(cr *onchain.LogStartCommitReveal, randSeed *big.Int) {
 
-		if currentBlockNumber > startBlock+commitDur+revealDur {
-			if err := d.chain.SignalBootstrap(context.Background(), cid); err != nil {
-				d.logger.Error(err)
-			}
-			delete(crMap, key)
-		} else if currentBlockNumber > startBlock+commitDur {
-			if err := d.chain.Reveal(context.Background(), cid, cr.sec); err != nil {
-				d.logger.Error(err)
-			}
-		} else if currentBlockNumber > startBlock {
-			h := sha3.NewKeccak256()
-			h.Write(abi.U256(cr.sec))
-			b := h.Sum(nil)
-			hash := byte32(b)
-			if err := d.chain.Commit(context.Background(), cid, *hash); err != nil {
-				d.logger.Error(err)
-			}
-		}
+	ctx, cancel := d.chain.GetTimeoutCtx(time.Duration(160 * 15 * time.Second))
+	defer cancel()
+
+	// Generate random numbers in range [0..randSeed]
+	sec, err := rand.Int(rand.Reader, randSeed)
+	if err != nil {
+		d.logger.Error(err)
+		return
 	}
+	h := sha3.NewKeccak256()
+	h.Write(abi.U256(sec))
+	b := h.Sum(nil)
+	hash := byte32(b)
+
+	currentBlockNumber, err := d.chain.CurrentBlock(ctx)
+	if err != nil {
+		d.logger.Error(err)
+		return
+	}
+
+	cid := cr.Cid
+	waitCommit := cr.StartBlock.Uint64() - currentBlockNumber + 1
+	if waitCommit < 0 {
+		waitCommit = 0
+	}
+	go func(cid *big.Int, hash *[32]byte) {
+		time.Sleep(time.Duration(waitCommit*15) * time.Second)
+		if err := d.chain.Commit(ctx, cid, *hash); err != nil {
+			d.logger.Error(err)
+		}
+	}(cid, hash)
+
+	waitReveal := (cr.StartBlock.Uint64() + cr.CommitDuration.Uint64()) - currentBlockNumber + 1
+	if waitReveal < 0 {
+		waitReveal = 0
+	}
+	go func(cid *big.Int, sec *big.Int) {
+		time.Sleep(time.Duration(waitReveal*15) * time.Second)
+		if err := d.chain.Reveal(ctx, cid, sec); err != nil {
+			d.logger.Error(err)
+		}
+	}(cid, sec)
+
+	waitRandom := (cr.StartBlock.Uint64() + cr.CommitDuration.Uint64() + cr.RevealDuration.Uint64()) - currentBlockNumber + 1
+	if waitRandom < 0 {
+		waitRandom = 0
+	}
+	go func(cid *big.Int) {
+		time.Sleep(time.Duration(waitRandom*15) * time.Second)
+		if err := d.chain.SignalBootstrap(ctx, cid); err != nil {
+			d.logger.Error(err)
+		}
+	}(cid)
+
 }
 
 func (d *DosNode) handleGroupFormation(currentBlockNumber uint64) {
+
 	groupSize, err := d.chain.GroupSize(context.Background())
 	if err != nil {
 		d.logger.Error(err)
@@ -355,6 +383,7 @@ func (d *DosNode) handleGroupFormation(currentBlockNumber uint64) {
 }
 
 func (d *DosNode) handleRandom(currentBlockNumber uint64) {
+
 	groupToPick, err := d.chain.GroupToPick(context.Background())
 	if err != nil {
 		return
@@ -398,17 +427,22 @@ func (d *DosNode) handleGroupDissolve() {
 	}
 }
 
-func (d *DosNode) onchainLoop() (err error) {
+func (d *DosNode) listen() {
 	watchdog := time.NewTicker(watchdogInterval * time.Minute)
 	defer watchdog.Stop()
+	peerEvent, _ := d.p.SubscribeEvent(50, vss.Signature{})
+	peerSignMap := make(map[string]*vss.Signature)
+	//	latestRandm := big.NewInt(0)
+	defer d.p.UnSubscribeEvent(vss.Signature{})
 	subescriptions := []int{onchain.SubscribeLogGrouping, onchain.SubscribeLogGroupDissolve, onchain.SubscribeLogUrl,
 		onchain.SubscribeLogUpdateRandom, onchain.SubscribeLogRequestUserRandom,
 		onchain.SubscribeLogPublicKeyAccepted, onchain.SubscribeCommitrevealLogStartCommitreveal}
-	var crMap = map[string]crDurations{}
 	randSeed, _ := new(big.Int).SetString("21888242871839275222246405745257275088548364400416034343698204186575808495617", 10)
-
-S:
 	d.chain.Start()
+	//TODO: Check to see if it is a valid stacking node first
+	_ = d.chain.RegisterNewNode(context.Background())
+	fmt.Println("(d *DosNode) listen()")
+S:
 	sink, errc := d.chain.SubscribeEvent(subescriptions)
 L:
 	for {
@@ -419,16 +453,14 @@ L:
 				currentBlockNumber, err := d.chain.CurrentBlock(context.Background())
 				if err != nil {
 					d.logger.Error(err)
-					continue
+					return
 				}
-				switch index := currentBlockNumber % 4; index {
+				switch index := currentBlockNumber % 3; index {
 				case 0:
-					d.handleCR(crMap, currentBlockNumber)
-				case 1:
 					d.handleRandom(currentBlockNumber)
-				case 2:
+				case 1:
 					d.handleGroupFormation(currentBlockNumber)
-				case 3:
+				case 2:
 					d.handleGroupDissolve()
 				}
 			}
@@ -508,12 +540,10 @@ L:
 						go d.handleQuery(ids, pub, sec, groupID, content.QueryId, content.Randomness, nil, content.DataSource, content.Selector, uint32(onchain.TrafficUserQuery))
 					}
 				case *onchain.LogStartCommitReveal:
-					// Generate random numbers in range [0..randSeed]
-					if sec, err := rand.Int(rand.Reader, randSeed); err == nil {
-						fmt.Println("startBlock ", content.StartBlock.String(), " commitDur ", content.CommitDuration.String(), "revealDur", content.RevealDuration.String())
-						crMap[content.Cid.String()] = crDurations{content.Cid, content.StartBlock, content.CommitDuration, content.RevealDuration, sec}
-					}
+					fmt.Println("startBlock ", content.StartBlock.String(), " commitDur ", content.CommitDuration.String(), "revealDur", content.RevealDuration.String())
+					d.handleCR(content, randSeed)
 				}
+
 			} else {
 				break L
 			}
@@ -523,32 +553,6 @@ L:
 			} else {
 				break L
 			}
-		}
-	}
-	d.chain.End()
-	ips := d.p.MembersIP()
-	var urls = []string{}
-	urls = append(urls, "wss://rinkeby.infura.io/ws/v3/db19cf9028054762865cb9ce883c6ab8")
-	urls = append(urls, "wss://rinkeby.infura.io/ws/v3/3a3e5d776961418e93a8b33fef2f6642")
-	for _, ip := range ips {
-		urls = append(urls, "ws://"+ip.String()+":8546")
-		if len(urls) >= 5 {
-			break
-		}
-	}
-	d.chain.UpdateWsUrls(urls)
-	goto S
-}
-
-func (d *DosNode) listen() (err error) {
-
-	peerEvent, err := d.p.SubscribeEvent(50, vss.Signature{})
-	peerSignMap := make(map[string]*vss.Signature)
-	//	latestRandm := big.NewInt(0)
-	defer d.p.UnSubscribeEvent(vss.Signature{})
-
-	for {
-		select {
 		case msg, ok := <-d.cSignToPeer:
 			if !ok {
 				return
@@ -569,6 +573,20 @@ func (d *DosNode) listen() (err error) {
 			return
 		}
 	}
+	d.chain.End()
+	ips := d.p.MembersIP()
+	var urls = []string{}
+	urls = append(urls, "wss://rinkeby.infura.io/ws/v3/db19cf9028054762865cb9ce883c6ab8")
+	urls = append(urls, "wss://rinkeby.infura.io/ws/v3/3a3e5d776961418e93a8b33fef2f6642")
+	for _, ip := range ips {
+		urls = append(urls, "ws://"+ip.String()+":8546")
+		if len(urls) >= 5 {
+			break
+		}
+	}
+	d.chain.UpdateWsUrls(urls)
+	d.chain.Start()
+	goto S
 }
 
 func (d *DosNode) isMember(groupID string) bool {

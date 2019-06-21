@@ -139,7 +139,7 @@ func choseSubmitter(ctx context.Context, p p2p.P2PInterface, lastSysRand *big.In
 		for _, out := range outs {
 			close(out)
 		}
-		logger.TimeTrack(start, "ChoseSubmitter", map[string]interface{}{"submitter": submitter, "GroupID": ctx.Value("GroupID"), "RequestID": ctx.Value("RequestID")})
+		logger.TimeTrack(start, "ChoseSubmitter", map[string]interface{}{"GroupID": ctx.Value(ctxKey("GroupID")), "RequestID": ctx.Value(ctxKey("RequestID"))})
 		return
 	}()
 	return outs, errc
@@ -170,7 +170,7 @@ func requestSign(
 			if r := bytes.Compare(nodeId, submitter); r != 0 {
 				return
 			}
-			defer logger.TimeTrack(time.Now(), "RequestSign", map[string]interface{}{"GroupID": ctx.Value("GroupID"), "RequestID": ctx.Value("RequestID")})
+			defer logger.TimeTrack(time.Now(), "RequestSign", map[string]interface{}{"GroupID": ctx.Value(ctxKey("GroupID")), "RequestID": ctx.Value(ctxKey("RequestID"))})
 			fmt.Println("requestSign nonce ", nonce)
 			sign := &vss.Signature{
 				Index:     trafficType,
@@ -234,7 +234,8 @@ func genSign(
 			if !ok {
 				return
 			}
-			defer logger.TimeTrack(time.Now(), "GenSign", map[string]interface{}{"GroupID": ctx.Value("GroupID"), "RequestID": ctx.Value("RequestID")})
+			defer logger.TimeTrack(time.Now(), "GenSign", map[string]interface{}{"GroupID": ctx.Value(ctxKey("GroupID")), "RequestID": ctx.Value(ctxKey("RequestID"))})
+			fmt.Println("GenSign ")
 
 			content = value
 			submitter = content[len(content)-20:]
@@ -292,7 +293,8 @@ func genUserRandom(
 			if !ok {
 				return
 			}
-			defer logger.TimeTrack(time.Now(), "GenUserRandom", map[string]interface{}{"GroupID": ctx.Value("GroupID"), "RequestID": ctx.Value("RequestID")})
+			defer logger.TimeTrack(time.Now(), "GenUserRandom", map[string]interface{}{"GroupID": ctx.Value(ctxKey("GroupID")), "RequestID": ctx.Value(ctxKey("RequestID"))})
+			fmt.Println("GenUserRandom ")
 
 			// signed message: concat(requestId, lastSystemRandom, userSeed, submitter address)
 			random := append(requestId, lastSysRand...)
@@ -326,8 +328,8 @@ func genSysRandom(
 			if !ok {
 				return
 			}
-			defer logger.TimeTrack(time.Now(), "GenSysRandom", map[string]interface{}{"GroupID": ctx.Value("GroupID"), "RequestID": ctx.Value("RequestID")})
-
+			defer logger.TimeTrack(time.Now(), "GenSysRandom", map[string]interface{}{"GroupID": ctx.Value(ctxKey("GroupID")), "RequestID": ctx.Value(ctxKey("RequestID"))})
+			fmt.Println("genSysRandom ")
 			// signed message: concat(lastSystemRandom, submitter address)
 			paddedLastSysRand := padOrTrim(lastSysRand, randNumberSize)
 			random := append(paddedLastSysRand, submitter...)
@@ -409,13 +411,13 @@ func genQueryResult(ctx context.Context, submitterc chan []byte, url string, pat
 			errc <- err
 			return
 		}
-		logger.TimeTrack(startTime, "TFetch", map[string]interface{}{"GroupID": ctx.Value("GroupID"), "RequestID": ctx.Value("RequestID")})
+		logger.TimeTrack(startTime, "TFetch", map[string]interface{}{"GroupID": ctx.Value(ctxKey("GroupID")), "RequestID": ctx.Value(ctxKey("RequestID"))})
 		select {
 		case submitter, ok := <-submitterc:
 			if !ok {
 				return
 			}
-			defer logger.TimeTrack(time.Now(), "GenQueryResult", map[string]interface{}{"RequestID": ctx.Value("RequestID")})
+			defer logger.TimeTrack(time.Now(), "GenQueryResult", map[string]interface{}{"GroupID": ctx.Value(ctxKey("GroupID")), "RequestID": ctx.Value(ctxKey("RequestID"))})
 
 			// signed message = concat(msgReturn, submitter address)
 			msgReturn = append(msgReturn, submitter...)
@@ -445,8 +447,9 @@ func recoverSign(ctx context.Context, signc chan *vss.Signature, suite suites.Su
 				if !ok {
 					return
 				}
+				fmt.Println("recoverSign ", len(signShares))
 				if len(signShares) == 0 {
-					defer logger.TimeTrack(time.Now(), "RecoverSign", map[string]interface{}{"GroupID": ctx.Value("GroupID"), "RequestID": ctx.Value("RequestID")})
+					defer logger.TimeTrack(time.Now(), "RecoverSign", map[string]interface{}{"GroupID": ctx.Value(ctxKey("GroupID")), "RequestID": ctx.Value(ctxKey("RequestID"))})
 				}
 
 				signShares = append(signShares, sign.Signature)
