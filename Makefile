@@ -1,10 +1,5 @@
-# Usage:
-# $ make == $ make build
-# $ make install
-
-.PHONY: dep build client devClient install clean gen
-
 .DEFAULT_GOAL := build
+
 DOSPROXY_PATH := onchain/eth/contracts/DOSProxy.sol
 DOSPROXY_GOPATH := onchain/dosproxy
 DOSPAYMENT_GOPATH := onchain/dospayment
@@ -17,36 +12,44 @@ BOOT_CREDENTIAL := testAccounts/bootCredential
 UNAME_S := $(shell uname -s)
 
 
-build: dep client
+.PHONY: build
+build: vendor client
 
 
-dep:
-	dep ensure -vendor-only
+.PHONY: vendor
+vendor:
+	@ dep ensure -vendor-only
 
 
+.PHONY: devClient
 # Build a development version client node
 devClient: gen
 	go build -o client.dev
 
 
+.PHONY: client
 # Build a prod/release version client node
 client:
 	go build -o client
 
 
+.PHONY: client-docker
 client-docker:
 	docker build -t dosnode -f Dockerfile .
 
 
-install: dep client
+.PHONY: install
+install: vendor client
 	go install
 
 
+.PHONY: updateSubmodule
 updateSubmodule:
 	test -f $(DOSPROXY_PATH) || git submodule update --init --recursive
 	git submodule update --remote
 
 
+.PHONY: gen
 gen: updateSubmodule
 	solc --optimize --overwrite --abi  --bin $(ETH_CONTRACTS)/DOSAddressBridge.sol -o $(DOSBRIDGE_GOPATH)
 	abigen --abi="$(DOSBRIDGE_GOPATH)/DOSAddressBridge.abi" --bin="$(DOSBRIDGE_GOPATH)/DOSAddressBridge.bin" --pkg dosbridge --out $(DOSBRIDGE_GOPATH)/DOSAddressBridge.go
@@ -58,6 +61,7 @@ gen: updateSubmodule
 	abigen --abi="$(COMMITREVEAL_GOPATH)/CommitReveal.abi" --bin="$(COMMITREVEAL_GOPATH)/CommitReveal.bin" --pkg commitreveal --out $(COMMITREVEAL_GOPATH)/CommitReveal.go
 
 
+.PHONY: clean
 clean:
-	rm -f client*
-	# rm -f $(GENERATED_FILES)
+	@ rm -f client*
+	@ # rm -f $(GENERATED_FILES)
