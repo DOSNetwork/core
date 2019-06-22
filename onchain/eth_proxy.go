@@ -1355,22 +1355,19 @@ func (e *ethAdaptor) SetGroupSize(ctx context.Context, size uint64) (err error) 
 	params = append(params, big.NewInt(int64(size)))
 
 	reply := e.set(ctx, params, f)
-	for {
-		select {
-		case r, ok := <-reply:
-			if ok {
-				err = r.err
-				if r.err == nil {
-					fmt.Println("SetGroupSize response ", fmt.Sprintf("%x", r.tx.Hash()))
-				} else {
-					fmt.Println("SetGroupSize error ", r.err)
-				}
+	select {
+	case r, ok := <-reply:
+		if ok {
+			err = r.err
+			if r.err == nil {
+				fmt.Println("SetGroupSize response ", fmt.Sprintf("%x", r.tx.Hash()))
+			} else {
+				fmt.Println("SetGroupSize error ", r.err)
 			}
-			return
-		case <-ctx.Done():
-			return
 		}
+	case <-ctx.Done():
 	}
+	return
 }
 
 // SetGroupMaturityPeriod is a wrap function that build a pipeline to call SetGroupMaturityPeriod
@@ -1391,22 +1388,19 @@ func (e *ethAdaptor) SetGroupMaturityPeriod(ctx context.Context, period uint64) 
 	params = append(params, big.NewInt(int64(period)))
 
 	reply := e.set(ctx, params, f)
-	for {
-		select {
-		case r, ok := <-reply:
-			if ok {
-				err = r.err
-				if r.err == nil {
-					fmt.Println("SetGroupSize response ", fmt.Sprintf("%x", r.tx.Hash()))
-				} else {
-					fmt.Println("SetGroupSize error ", r.err)
-				}
+	select {
+	case r, ok := <-reply:
+		if ok {
+			err = r.err
+			if r.err == nil {
+				fmt.Println("SetGroupSize response ", fmt.Sprintf("%x", r.tx.Hash()))
+			} else {
+				fmt.Println("SetGroupSize error ", r.err)
 			}
-			return
-		case <-ctx.Done():
-			return
 		}
+	case <-ctx.Done():
 	}
+	return
 }
 
 // SetGroupingThreshold is a wrap function that build a pipeline to call SetGroupingThreshold
@@ -1427,28 +1421,26 @@ func (e *ethAdaptor) SetGroupingThreshold(ctx context.Context, threshold uint64)
 	params = append(params, big.NewInt(int64(threshold)))
 
 	reply := e.set(ctx, params, f)
-	for {
-		select {
-		case r, ok := <-reply:
-			if ok {
-				err = r.err
-				if r.err == nil {
-					fmt.Println("SetGroupingThreshold response ", fmt.Sprintf("%x", r.tx.Hash()))
-				} else {
-					fmt.Println("SetGroupingThreshold error ", r.err)
-				}
+	select {
+	case r, ok := <-reply:
+		if ok {
+			err = r.err
+			if r.err == nil {
+				fmt.Println("SetGroupingThreshold response ", fmt.Sprintf("%x", r.tx.Hash()))
+			} else {
+				fmt.Println("SetGroupingThreshold error ", r.err)
 			}
-			return
-		case <-ctx.Done():
-			return
 		}
+	case <-ctx.Done():
 	}
+	return
 }
 
 // Commit is a wrap function that build a pipeline to call Commit
 func (e *ethAdaptor) Commit(ctx context.Context, cid *big.Int, commitment [32]byte) (err error) {
 	// define how to parse parameters and execute proxy function
 	f := func(ctx context.Context, proxy *dosproxy.DosproxySession, cr *commitreveal.CommitrevealSession, p []interface{}) (tx *types.Transaction, err error) {
+		fmt.Println("inter Commit")
 		if len(p) != 2 {
 			err = errors.New("Invalid parameter")
 			return
@@ -1456,6 +1448,11 @@ func (e *ethAdaptor) Commit(ctx context.Context, cid *big.Int, commitment [32]by
 		if cid, ok := p[0].(*big.Int); ok {
 			if commitment, ok := p[1].([32]byte); ok {
 				tx, err = cr.Commit(cid, commitment)
+				if err != nil {
+					fmt.Println("inter Commit err ", err)
+				} else {
+					fmt.Println("inter Commit tx ", fmt.Sprintf("%x", tx.Hash()))
+				}
 			}
 		}
 		return
@@ -1465,22 +1462,20 @@ func (e *ethAdaptor) Commit(ctx context.Context, cid *big.Int, commitment [32]by
 	params = append(params, cid)
 	params = append(params, commitment)
 	reply := e.set(ctx, params, f)
-	for {
-		select {
-		case r, ok := <-reply:
-			if ok {
-				err = r.err
-				if r.err == nil {
-					fmt.Println("Commit response ", fmt.Sprintf("%x", r.tx.Hash()))
-				} else {
-					fmt.Println("Commit error ", r.err)
-				}
+	select {
+	case r, ok := <-reply:
+		if ok {
+			err = r.err
+			if r.err == nil {
+				fmt.Println("Commit response ", fmt.Sprintf("%x", r.tx.Hash()))
+			} else {
+				fmt.Println("Commit error ", r.err)
 			}
-			return
-		case <-ctx.Done():
-			return
 		}
+	case <-ctx.Done():
+		fmt.Println("Commit ctx.Done")
 	}
+	return
 }
 
 // Reveal is a wrap function that build a pipeline to call Reveal
@@ -1503,22 +1498,19 @@ func (e *ethAdaptor) Reveal(ctx context.Context, cid *big.Int, secret *big.Int) 
 	params = append(params, cid)
 	params = append(params, secret)
 	reply := e.set(ctx, params, f)
-	for {
-		select {
-		case r, ok := <-reply:
-			if ok {
-				err = r.err
-				if r.err == nil {
-					fmt.Println("Reveal response ", fmt.Sprintf("%x", r.tx.Hash()))
-				} else {
-					fmt.Println("Reveal error ", r.err)
-				}
+	select {
+	case r, ok := <-reply:
+		if ok {
+			err = r.err
+			if r.err == nil {
+				fmt.Println("Reveal response ", fmt.Sprintf("%x", r.tx.Hash()))
+			} else {
+				fmt.Println("Reveal error ", r.err)
 			}
-			return
-		case <-ctx.Done():
-			return
 		}
+	case <-ctx.Done():
 	}
+	return
 }
 
 // RegisterGroupPubKey is a wrap function that build a pipeline to call RegisterGroupPubKey
@@ -1561,25 +1553,23 @@ func (e *ethAdaptor) RegisterGroupPubKey(ctx context.Context, IdWithPubKeys chan
 			var params []interface{}
 			params = append(params, idPubkey)
 			reply := e.set(ctx, params, f)
-			for {
-				select {
-				case r, ok := <-reply:
-					if ok {
-						if r.err == nil {
-							fmt.Println("RegisterGroupPubKey response ", fmt.Sprintf("%x", r.tx.Hash()))
-						} else {
-							fmt.Println("RegisterGroupPubKey error ", r.err)
-							select {
-							case errc <- r.err:
-							case <-ctx.Done():
-							}
+
+			select {
+			case r, ok := <-reply:
+				if ok {
+					if r.err == nil {
+						fmt.Println("RegisterGroupPubKey response ", fmt.Sprintf("%x", r.tx.Hash()))
+					} else {
+						fmt.Println("RegisterGroupPubKey error ", r.err)
+						select {
+						case errc <- r.err:
+						case <-ctx.Done():
 						}
 					}
-					return
-				case <-ctx.Done():
-					return
 				}
+			case <-ctx.Done():
 			}
+			return
 		case <-ctx.Done():
 			return
 		}

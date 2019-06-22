@@ -312,6 +312,7 @@ func (d *DosNode) handleCR(cr *onchain.LogStartCommitReveal, randSeed *big.Int) 
 	defer cancel()
 
 	// Generate random numbers in range [0..randSeed]
+
 	sec, err := rand.Int(rand.Reader, randSeed)
 	if err != nil {
 		d.logger.Error(err)
@@ -321,7 +322,6 @@ func (d *DosNode) handleCR(cr *onchain.LogStartCommitReveal, randSeed *big.Int) 
 	h.Write(abi.U256(sec))
 	b := h.Sum(nil)
 	hash := byte32(b)
-
 	currentBlockNumber, err := d.chain.CurrentBlock(ctx)
 	if err != nil {
 		d.logger.Error(err)
@@ -330,38 +330,38 @@ func (d *DosNode) handleCR(cr *onchain.LogStartCommitReveal, randSeed *big.Int) 
 
 	cid := cr.Cid
 	waitCommit := cr.StartBlock.Uint64() - currentBlockNumber + 1
+	waitReveal := cr.CommitDuration.Uint64() + 1
+	waitRandom := cr.RevealDuration.Uint64() + 1
 	if waitCommit < 0 {
+		waitReveal = waitReveal - waitCommit
+		waitRandom = waitRandom - waitCommit
 		waitCommit = 0
 	}
-	go func(cid *big.Int, hash *[32]byte) {
-		time.Sleep(time.Duration(waitCommit*15) * time.Second)
-		if err := d.chain.Commit(ctx, cid, *hash); err != nil {
-			d.logger.Error(err)
-		}
-	}(cid, hash)
 
-	waitReveal := (cr.StartBlock.Uint64() + cr.CommitDuration.Uint64()) - currentBlockNumber + 1
-	if waitReveal < 0 {
-		waitReveal = 0
+	time.Sleep(time.Duration(waitCommit*15) * time.Second)
+	fmt.Println("Commit", *hash)
+	d.logger.Event("Commit", map[string]interface{}{"CID": fmt.Sprintf("%x", cid)})
+	if err := d.chain.Commit(ctx, cid, *hash); err != nil {
+		fmt.Println("Commit err ", err)
+		d.logger.Error(err)
 	}
-	go func(cid *big.Int, sec *big.Int) {
-		time.Sleep(time.Duration(waitReveal*15) * time.Second)
-		if err := d.chain.Reveal(ctx, cid, sec); err != nil {
-			d.logger.Error(err)
-		}
-	}(cid, sec)
+	<-time.After(time.Duration(waitReveal*15) * time.Second)
 
-	waitRandom := (cr.StartBlock.Uint64() + cr.CommitDuration.Uint64() + cr.RevealDuration.Uint64()) - currentBlockNumber + 1
-	if waitRandom < 0 {
-		waitRandom = 0
+	fmt.Println("Reveal", fmt.Sprintf("%x", sec))
+	d.logger.Event("Reveal", map[string]interface{}{"CID": fmt.Sprintf("%x", cid)})
+	if err := d.chain.Reveal(ctx, cid, sec); err != nil {
+		fmt.Println("Reveal err ", err)
+		d.logger.Error(err)
 	}
-	go func(cid *big.Int) {
-		time.Sleep(time.Duration(waitRandom*15) * time.Second)
-		if err := d.chain.SignalBootstrap(ctx, cid); err != nil {
-			d.logger.Error(err)
-		}
-	}(cid)
+	<-time.After(time.Duration(waitRandom*15) * time.Second)
 
+	fmt.Println("SignalBootstrap")
+	d.logger.Event("SignalBootstrap", map[string]interface{}{"CID": fmt.Sprintf("%x", cid)})
+	if err := d.chain.SignalBootstrap(ctx, cid); err != nil {
+		fmt.Println("SignalBootstrap err ", err)
+
+		d.logger.Error(err)
+	}
 }
 
 func (d *DosNode) handleGroupFormation(currentBlockNumber uint64) {
@@ -541,7 +541,7 @@ L:
 					}
 				case *onchain.LogStartCommitReveal:
 					fmt.Println("startBlock ", content.StartBlock.String(), " commitDur ", content.CommitDuration.String(), "revealDur", content.RevealDuration.String())
-					d.handleCR(content, randSeed)
+					go d.handleCR(content, randSeed)
 				}
 
 			} else {
