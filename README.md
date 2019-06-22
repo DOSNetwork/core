@@ -5,13 +5,31 @@
 [![](https://img.shields.io/static/v1.svg?label=chat&message=Telegram&color=brightgreen)](https://t.me/joinchat/KhcP5BQXgWLyojui9BCGfQ)
 
 ## Development Setup:
-- [Install](https://golang.org/doc/install) Go (recommended version 1.10+) and setup golang workingspace, specifically by adding environment variable [GOPATH](https://golang.org/doc/code.html#GOPATH) into PATH.
-- Install [dep](https://golang.github.io/dep/docs/daily-dep.html#key-takeaways) to manage package dependencies and versions.
+- [Install](https://golang.org/doc/install) Go and setup golang workingspace like below:
+    ```sh
+    $ cd /usr/local
+    $ wget https://dl.google.com/go/go1.12.6.linux-amd64.tar.gz
+    $ tar -C /usr/local -xzf go1.12.6.linux-amd64.tar.gz
+    ```
+    
+- Open `~/.bashrc` and put in `$PATH` and `$GOPATH` environmental variables:
+    ```sh
+    $ vim ~/.bashrc
+      export GOPATH=$HOME/go
+      export PATH=$PATH:/usr/local/go/bin:$GOPATH/bin
+    $ source ~/.bashrc
+    ```
+
+- Install [dep](https://golang.github.io/dep/docs/installation.html#binary-installation) to manage package dependencies.
   - Run `$ dep ensure` to update missing dependencies/packages.
   - [Visualize package dependencies](https://golang.github.io/dep/docs/daily-dep.html#visualizing-dependencies)
-- Download:
-  - `$ go get -d github.com/DOSNetwork/core/...` or
-  - `$ git clone git@github.com:DOSNetwork/core.git`
+- Download source code:
+    ```sh
+    $ mkdir -p $GOPATH/src/github.com/DOSNetwork
+    $ git clone git@github.com:DOSNetwork/core.git
+    $ cd core
+    ```
+    
 - Build:
   - `$ make` or `$ make client` to build release version client.
   - `$ make devClient` to build develoment version client.
@@ -35,7 +53,9 @@
 
 - **Verified and recommended installation environment**
   - Ubuntu 16.04 x64 LTS or higher 
-  - An IPv4 address (usually )
+  - An IPv4 address
+    - Run `$ curl ipconfig.me`
+    - Or get it from cloud server providers. Most vps / cloud server 
   - With below ports open:
     - **udp** port `7946`,`30303`
     - **tcp** port `7946`,`30303`,`8545`,`8546`,`9501`
@@ -47,6 +67,17 @@
   - Acquire testnet ether from rinkeby [faucet](https://faucet.rinkeby.io/).
   - Acquire 50,000 [testnet DOS token](https://rinkeby.etherscan.io/address/0x214e79c85744cd2ebbc64ddc0047131496871bee), (and optional - acquire several [testnet DropBurn token](https://rinkeby.etherscan.io/address/0x9bfe8f5749d90eb4049ad94cc4de9b6c4c31f822)).
   - Please fill in [this](https://docs.google.com/forms/d/e/1FAIpQLSdiWuVdyxpVozEC0uWZIj9HCBX9COBYFj8Dxp2C2qX4Qv5U9g/viewform) form to request testnet tokens.
+
+### Building from source
+To building from source code, you need first to check out [development-setup](#development-setup) section above to setup golang environment and package dependency tool `dep`.
+* Download github repo: `$ git clone https://github.com/DOSNetwork/core.git`
+    ```sh
+    $ cd $GOPATH/src/github.com/DOSNetwork && git clone git@github.com:DOSNetwork/core.git
+    $ cd core
+    $ make vendor
+    ```
+
+### Building using Docker
 
 
 
