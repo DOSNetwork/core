@@ -142,7 +142,7 @@ func (d *DosNode) p2pTest(w http.ResponseWriter, r *http.Request) {
 }
 
 func (d *DosNode) dkgTest(w http.ResponseWriter, r *http.Request) {
-	groupId := big.NewInt(0)
+	groupID := big.NewInt(0)
 	members := d.p.MembersID()
 	start := -1
 	end := -1
@@ -163,7 +163,7 @@ func (d *DosNode) dkgTest(w http.ResponseWriter, r *http.Request) {
 			} else if k == "gid" {
 				i, err := strconv.Atoi(v[0])
 				if err == nil && i >= 0 {
-					groupId = groupId.SetInt64(int64(i))
+					groupID = groupID.SetInt64(int64(i))
 				}
 			}
 		}
@@ -182,9 +182,8 @@ func (d *DosNode) dkgTest(w http.ResponseWriter, r *http.Request) {
 			r := a.Cmp(b)
 			if r == -1 {
 				return true
-			} else {
-				return false
 			}
+			return false
 		})
 		var participants [][]byte
 		for i := start; i < end; i++ {
@@ -192,7 +191,7 @@ func (d *DosNode) dkgTest(w http.ResponseWriter, r *http.Request) {
 		}
 
 		d.eventGrouping <- &onchain.LogGrouping{
-			GroupId: groupId,
+			GroupId: groupID,
 			NodeId:  participants,
 		}
 	}

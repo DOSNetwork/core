@@ -99,7 +99,8 @@ func (n *server) ConnectToAll(ctx context.Context, groupIds [][]byte, sessionID 
 				select {
 				case <-ctx.Done():
 				default:
-					if _, err := n.ConnectTo("", groupIds[i]); err != nil {
+					_, err := n.ConnectTo("", groupIds[i])
+					if err != nil {
 						fmt.Println("ConnectTo ", err)
 						logger.TimeTrack(time.Now(), "ConnectToAllFail", map[string]interface{}{"GroupID": sessionID, "ConnectToID": fmt.Sprintf("%x", groupIds[i])})
 						select {
@@ -107,10 +108,8 @@ func (n *server) ConnectToAll(ctx context.Context, groupIds [][]byte, sessionID 
 						case <-ctx.Done():
 						}
 						return
-					} else {
-						logger.TimeTrack(time.Now(), "ConnectToAllSucc", map[string]interface{}{"GroupID": sessionID, "ConnectToID": fmt.Sprintf("%x", groupIds[i])})
-
 					}
+					logger.TimeTrack(time.Now(), "ConnectToAllSucc", map[string]interface{}{"GroupID": sessionID, "ConnectToID": fmt.Sprintf("%x", groupIds[i])})
 				}
 			}
 		}

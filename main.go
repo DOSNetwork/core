@@ -258,7 +258,7 @@ func actionCreateWallet(c *cli.Context) error {
 	first := getPassword("Generating node wallet...\nEnter passphrase (empty is not allowed): ")
 	second := getPassword("Confirm passphrase again: ")
 	if first != second {
-		fmt.Println("Unmatched Password\n")
+		fmt.Println("Unmatched Password")
 		return errors.New("Unmatched Password\n")
 	}
 	err := onchain.GenEthkey(walletPath, first)
@@ -271,7 +271,7 @@ func actionCreateWallet(c *cli.Context) error {
 			return err
 		}
 		fmt.Println("wallet keystore file has been saved under", walletPath)
-		fmt.Println("Your node wallet adress is:", fmt.Sprintf("0x%x", key.Address))
+		fmt.Println("Your node wallet address is:", fmt.Sprintf("0x%x", key.Address))
 	}
 	return nil
 }
@@ -319,7 +319,7 @@ func main() {
 		},
 		{
 			Name:  "guardian",
-			Usage: "Guardian fucntions",
+			Usage: "Guardian functions",
 			Subcommands: []cli.Command{
 				{
 					Name:   "groupFormation",
