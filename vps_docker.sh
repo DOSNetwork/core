@@ -75,45 +75,33 @@ install_docker(){
 }
 
 install_dos(){
-  ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $SSHKEY $USER@$IP 'mkdir -p '$DIR'/dos'
-  ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $SSHKEY $USER@$IP 'mkdir -p '$DIR'/credential'
-  echo $KEYSTORE
-  scp -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i $SSHKEY $KEYSTORE $USER@$IP:$DIR'/credential/'
+  ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $SSHKEY ubuntu@$USER@$IP 'mkdir -p vault'
+  scp -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i $SSHKEY $KEYSTORE $USER@$IP:~/vault/
 }
 
 run(){
-  result=$(ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $SSHKEY $USER@$IP docker container ls | awk '(index($2, "dos") != 0) {print $2}')
-  newlog="doslog_$IP"
-  if [ -z "$result" ]; then
-    ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $SSHKEY $USER@$IP 'sudo rm dos/doslog'
-    ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $SSHKEY $USER@$IP 'docker pull '$DOSIMAGE
-    echo -n Password:;read -s password ;
-    ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $SSHKEY $USER@$IP 'docker run -it -d \
-      -p 7946:7946 \
-      -p 8080:8080 \
-      -p 9501:9501 \
-      --mount type=bind,source='$DIR'/credential,target=/credential  \
-      --mount type=bind,source='$DIR'/dos,target=/dos  \
-      -e PUBLICIP="'$IP'" \
-      -e GETHPOOL="'$GETHPOOL'" \
-      -e PASSPHRASE='$password'  \
-      -e CHAINNODE=rinkeby  \
-      -e APPSESSION="'$DOSVERSION'" \
-      -e APPNAME=DosClient  \
-      '$DOSIMAGE
-  else
-    echo "client is running";
-  fi
+  ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $SSHKEY $USER@$IP 'sudo rm vault/doslog.txt'
+  GETHPOOL="https://rinkeby.infura.io/v3/db19cf9028054762865cb9ce883c6ab8;https://rinkeby.infura.io/v3/3a3e5d776961418e93a8b33fef2f6642;wss://rinkeby.infura.io/ws/v3/db19cf9028054762865cb9ce883c6ab8;wss://rinkeby.infura.io/ws/v3/3a3e5d776961418e93a8b33fef2f6642"
+  ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $SSHKEY $USER@$IP 'docker pull '$DOSIMAGE
+  echo -n KEYSTORE Password:;read -s password ;
+  ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $SSHKEY $USER@$IP 'docker run -it -d \
+-p 7946:7946 \
+-p 6060:6060 \
+-p 8080:8080 \
+-p 9501:9501 \
+--mount type=bind,source='$DIR'/vault,target=/vault  \
+-e CHAINNODE=rinkeby  \
+-e PUBLICIP="'$IP'" \
+-e GETHPOOL="'$GETHPOOL'" \
+-e PASSPHRASE='$password'  \
+-e APPSESSION="beta" \
+'$DOSIMAGE
+
 }
 
 stop(){
-  result=$(ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $SSHKEY $USER@$IP docker container ls | awk '(index($2, "dos") != 0) {print $2}')
-  newlog="doslog_$IP"
-  if [ -z "$result" ]; then echo "client is not running"
-  else
-    ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $SSHKEY $USER@$IP  'docker stop $(docker ps -a -q)'
-    ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $SSHKEY $USER@$IP  'docker rm $(docker ps -a -q)'
-  fi
+	ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $SSHKEY $USER@$IP 'docker stop $(docker ps -a -q)'
+	ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $SSHKEY $USER@$IP 'docker rm $(docker ps -a -q)'
 }
 
 check(){
@@ -126,12 +114,23 @@ check(){
   fi
 }
 
+check(){
+	result=$(ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $SSHKEY $USER@$IP docker container ls | awk '(index($2, "dos") != 0) {print $2}')
+	newlog="doslog_$IP"
+	if [ -z "$result" ]; 
+	  then scp -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i $SSHKEY $USER@$IP:~/vault/doslog.txt $newlog;
+	else 
+	  echo "client is running";
+	fi
+	ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $SSHKEY $USER@$IP 'cat vault/doslog.txt'
+}
+
 proxyInfo(){
   ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $SSHKEY $USER@$IP 'curl http://localhost:8080/proxy'
 }
 
 clientInfo(){
-  ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $SSHKEY $USER@$IP 'curl http://localhost:8080/status'
+  ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -tt -i $SSHKEY $USER@$IP 'curl http://localhost:8080/'
 }
 
 guardian(){
@@ -140,7 +139,6 @@ guardian(){
 
 case "$1" in
   "install")
-    install_lightnode
     install_docker
     install_dos
     ;;
