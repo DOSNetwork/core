@@ -37,10 +37,7 @@ type Config struct {
 
 // ChainConfig is the configuration for connecting to onchan contracts.
 type ChainConfig struct {
-	DOSProxyAddress         string
-	DOSPaymentAddress       string
 	DOSAddressBridgeAddress string
-	CommitReveal            string
 	RemoteNodeAddressPool   []string
 }
 

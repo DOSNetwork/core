@@ -18,8 +18,8 @@ const (
 
 //ProxyAdapter represents an unified adapter interface for different blockchain
 type ProxyAdapter interface {
-	Start() error
-	End()
+	Connect(ctx context.Context) error
+	Close()
 	UpdateWsUrls(urls []string)
 	SetRandomNum(ctx context.Context, signatures chan *vss.Signature) (errc chan error)
 	DataReturn(ctx context.Context, signatures chan *vss.Signature) (errc chan error)
@@ -58,10 +58,10 @@ type ProxyAdapter interface {
 }
 
 //NewProxyAdapter constructs a new ProxyAdapter with the given type of blockchain and contract addresses
-func NewProxyAdapter(ChainType string, key *keystore.Key, proxyAddr, crAddress string, urls []string) (ProxyAdapter, error) {
+func NewProxyAdapter(ChainType string, key *keystore.Key, beidgeAddr string, urls []string) (ProxyAdapter, error) {
 	switch ChainType {
 	case ETH:
-		adaptor, err := NewEthAdaptor(key, proxyAddr, crAddress, urls)
+		adaptor, err := NewEthAdaptor(key, beidgeAddr, urls)
 		return adaptor, err
 	default:
 		err := fmt.Errorf("Chain %s not supported error\n", ChainType)

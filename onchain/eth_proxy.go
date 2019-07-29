@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"math"
 	"math/big"
-	"runtime/debug"
+	//	"runtime/debug"
 	"strings"
 	"time"
 
@@ -18,6 +18,7 @@ import (
 
 	"github.com/DOSNetwork/core/log"
 	"github.com/DOSNetwork/core/onchain/commitreveal"
+	"github.com/DOSNetwork/core/onchain/dosbridge"
 	"github.com/DOSNetwork/core/onchain/dosproxy"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -93,8 +94,9 @@ type response struct {
 }
 
 type ethAdaptor struct {
-	proxyAddr        string
-	commitRevealAddr string
+	bridgeAddr       common.Address
+	proxyAddr        common.Address
+	commitRevealAddr common.Address
 	httpUrls         []string
 	wsUrls           []string
 	key              *keystore.Key
@@ -906,7 +908,7 @@ var crTable = []func(ctx context.Context, cr *commitreveal.CommitrevealSession) 
 }
 
 //NewEthAdaptor creates an eth implemention of ProxyAdapter
-func NewEthAdaptor(key *keystore.Key, proxyAddr, commitRevealAddr string, urls []string) (adaptor *ethAdaptor, err error) {
+func NewEthAdaptor(key *keystore.Key, bridgeAddr string, urls []string) (adaptor *ethAdaptor, err error) {
 	var httpUrls []string
 	var wsUrls []string
 	for _, url := range urls {
@@ -919,23 +921,26 @@ func NewEthAdaptor(key *keystore.Key, proxyAddr, commitRevealAddr string, urls [
 	fmt.Println("httpUrls ", httpUrls)
 	fmt.Println("wsUrls ", wsUrls)
 
+	if !common.IsHexAddress(bridgeAddr) {
+		return nil, errors.New("bridge address is not a valid hex address")
+	}
 	adaptor = &ethAdaptor{}
 	adaptor.httpUrls = httpUrls
 	adaptor.wsUrls = wsUrls
-	adaptor.proxyAddr = proxyAddr
-	adaptor.commitRevealAddr = commitRevealAddr
-	debug.FreeOSMemory()
+	adaptor.bridgeAddr = common.HexToAddress(bridgeAddr)
 	adaptor.key = key
-	debug.FreeOSMemory()
-
-	//Use account address as ID to init log module
-	log.Init(key.Address.Bytes()[:])
 	adaptor.logger = log.New("module", "EthProxy")
+	//
+	adaptor.ctx, adaptor.cancelFunc = context.WithCancel(context.Background())
+	adaptor.auth = bind.NewKeyedTransactor(adaptor.key.PrivateKey)
+	adaptor.auth.GasPrice = big.NewInt(20000000000) //1 Gwei
+	adaptor.auth.GasLimit = uint64(6000000)
+	adaptor.auth.Context = adaptor.ctx
 	return
 }
 
 //End close the connection to eth and release all resources
-func (e *ethAdaptor) End() {
+func (e *ethAdaptor) Close() {
 	e.cancelFunc()
 	e.clients = nil
 	e.proxies = nil
@@ -944,29 +949,40 @@ func (e *ethAdaptor) End() {
 	return
 }
 
-func (e *ethAdaptor) Start() (err error) {
-	//
-	e.ctx, e.cancelFunc = context.WithCancel(context.Background())
-	e.auth = bind.NewKeyedTransactor(e.key.PrivateKey)
-	e.auth.GasPrice = big.NewInt(20000000000) //1 Gwei
-	e.auth.GasLimit = uint64(6000000)
-	e.auth.Context = e.ctx
-
-	//infuraClientC := DialToEth(context.Background(), e.httpUrls)
-	//infuraClient := <-infuraClientC
-	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(300*time.Second))
-	defer cancel()
+func (e *ethAdaptor) Connect(ctx context.Context) (err error) {
 	clients := DialToEth(ctx, e.wsUrls)
-	//synClients := CheckSync(ctx, infuraClient, clients)
+	if len(clients) == 0 {
+		return errors.New("No reachable geth client")
+	}
 
+	var bridge *dosbridge.Dosbridge
 	for client := range clients {
-		p, er := dosproxy.NewDosproxy(common.HexToAddress(e.proxyAddr), client)
+		var err error
+		if bridge == nil {
+			bridge, err = dosbridge.NewDosbridge(e.bridgeAddr, client)
+			if err != nil {
+				e.logger.Error(err)
+				continue
+			}
+			e.proxyAddr, err = bridge.GetProxyAddress(&bind.CallOpts{Context: ctx})
+			if err != nil {
+				e.logger.Error(err)
+				continue
+			}
+			e.commitRevealAddr, err = bridge.GetCommitRevealAddress(&bind.CallOpts{Context: ctx})
+			if err != nil {
+				e.logger.Error(err)
+				continue
+			}
+		}
+
+		p, er := dosproxy.NewDosproxy(e.proxyAddr, client)
 		if er != nil {
 			fmt.Println("NewDosproxy err ", er)
 			e.logger.Error(er)
 			continue
 		}
-		c, er := commitreveal.NewCommitreveal(common.HexToAddress(e.commitRevealAddr), client)
+		c, er := commitreveal.NewCommitreveal(e.commitRevealAddr, client)
 		if er != nil {
 			e.logger.Error(er)
 			err = er
@@ -977,9 +993,8 @@ func (e *ethAdaptor) Start() (err error) {
 		e.crs = append(e.crs, &commitreveal.CommitrevealSession{Contract: c, CallOpts: bind.CallOpts{Context: e.ctx}, TransactOpts: *e.auth})
 	}
 
-	if len(e.proxies) == 0 {
-		fmt.Println("No any working eth client ", len(e.clients), len(e.proxies))
-		return
+	if len(e.proxies) == 0 || len(e.crs) == 0 {
+		return errors.New("No reachable proxy or cr client")
 	}
 	e.reqLoop()
 	return

@@ -13,6 +13,7 @@ import (
 	"syscall"
 
 	"github.com/DOSNetwork/core/dosnode"
+	"github.com/DOSNetwork/core/log"
 	"github.com/DOSNetwork/core/onchain"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/urfave/cli"
@@ -63,7 +64,7 @@ func runDos() {
 		fmt.Println("Error : ", err)
 		return
 	}
-
+	log.Init(key.Address.Bytes()[:])
 	// Make arrangement to remove PID file upon receiving the SIGTERM from kill command
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, os.Interrupt, os.Kill, syscall.SIGTERM)
@@ -90,6 +91,7 @@ func runDos() {
 		return
 	}
 	dosclient.Start()
+	dosclient.Listen()
 }
 
 func makeRequest(f string) ([]byte, error) {

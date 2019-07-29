@@ -75,7 +75,7 @@ func NewDosNode(key *keystore.Key) (dosNode *DosNode, err error) {
 	chainConfig := config.GetChainConfig()
 
 	//Set up an onchain adapter
-	chainConn, err := onchain.NewProxyAdapter(config.GetCurrentType(), key, chainConfig.DOSProxyAddress, chainConfig.CommitReveal, chainConfig.RemoteNodeAddressPool)
+	chainConn, err := onchain.NewProxyAdapter(config.GetCurrentType(), key, chainConfig.DOSAddressBridgeAddress, chainConfig.RemoteNodeAddressPool)
 	if err != nil {
 		if err.Error() != "No any working eth client for event tracking" {
 			fmt.Println("NewDosNode failed ", err)
@@ -142,11 +142,14 @@ func NewDosNode(key *keystore.Key) (dosNode *DosNode, err error) {
 
 // Start registers to onchain and listen to p2p events
 func (d *DosNode) Start() (err error) {
+	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(300*time.Second))
+	defer cancel()
+
 	d.startRESTServer()
+	d.chain.Connect(ctx)
 
 	d.state = "Working"
 
-	d.listen()
 	return
 }
 
@@ -425,9 +428,12 @@ type request struct {
 	reply     chan *vss.Signature
 }
 
-func (d *DosNode) listen() {
+func (d *DosNode) Listen() {
+	d.startRESTServer()
+
 	watchdog := time.NewTicker(watchdogInterval * time.Minute)
 	defer watchdog.Stop()
+
 	var errc chan error
 	peerEvent, _ := d.p.SubscribeEvent(50, vss.Signature{})
 	bufSign := make(map[string][]*vss.Signature)
@@ -439,11 +445,18 @@ func (d *DosNode) listen() {
 		onchain.SubscribeLogUpdateRandom, onchain.SubscribeLogRequestUserRandom,
 		onchain.SubscribeLogPublicKeyAccepted, onchain.SubscribeCommitrevealLogStartCommitreveal}
 	randSeed, _ := new(big.Int).SetString("21888242871839275222246405745257275088548364400416034343698204186575808495617", 10)
-	d.chain.Start()
+
+S:
+	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(300*time.Second))
+	defer cancel()
+	err := d.chain.Connect(ctx)
+	if err != nil {
+		log.Fatal(err)
+	}
 	//TODO: Check to see if it is a valid stacking node first
 	_ = d.chain.RegisterNewNode(context.Background())
 	fmt.Println("(d *DosNode) listen()")
-S:
+
 	d.onchainEvent, errc = d.chain.SubscribeEvent(subescriptions)
 L:
 	for {
@@ -602,7 +615,7 @@ L:
 			return
 		}
 	}
-	d.chain.End()
+	d.chain.Close()
 	ips := d.p.MembersIP()
 	var urls = []string{}
 	urls = append(urls, "wss://rinkeby.infura.io/ws/v3/db19cf9028054762865cb9ce883c6ab8")
@@ -614,7 +627,6 @@ L:
 		}
 	}
 	d.chain.UpdateWsUrls(urls)
-	d.chain.Start()
 	goto S
 }
 

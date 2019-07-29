@@ -15,8 +15,7 @@ const (
 
 var (
 	urls           = []string{"https://rinkeby.infura.io/v3/2a6901876ca54406960499e888e70439", "ws://34.220.59.83:8546"}
-	proxyAddr      = "0x3b8Cb935bDdFAF59EFa11aFfDfc8760387624fa2"
-	crAddr         = "0xE04B34A113BB707eCF8dc01D51f8A56213Bdcb81"
+	bridgeAddr     = "0xf0CEFfc4209e38EA3Cd1926DDc2bC641cbFFd1cF"
 	credentialPath = "/Users/chenhaonien/go/src/github.com/DOSNetwork/core/testAccounts/bootCredential/fundKey/"
 	passphrase     = "123"
 )
@@ -27,7 +26,7 @@ func TestGetPendingNonce(t *testing.T) {
 		t.Errorf("TestCommitReveal Failed, got an error : %s.", err.Error())
 		return
 	}
-	adaptor, err := NewEthAdaptor(key, proxyAddr, crAddr, urls)
+	adaptor, err := NewEthAdaptor(key, bridgeAddr, urls)
 	if err != nil {
 		t.Errorf("TestConcurrentSend Failed, got an Error : %s.", err.Error())
 		return
@@ -49,7 +48,7 @@ func TestLastUpdatedBlock(t *testing.T) {
 		t.Errorf("TestCommitReveal Failed, got an error : %s.", err.Error())
 		return
 	}
-	adaptor, err := NewEthAdaptor(key, proxyAddr, crAddr, urls)
+	adaptor, err := NewEthAdaptor(key, bridgeAddr, urls)
 	if err != nil {
 		t.Errorf("TestConcurrentSend Failed, got an Error : %s.", err.Error())
 		return
@@ -85,7 +84,7 @@ func TestConcurrentSend(t *testing.T) {
 		t.Errorf("TestCommitReveal Failed, got an error : %s.", err.Error())
 		return
 	}
-	adaptor, err := NewEthAdaptor(key, proxyAddr, crAddr, urls)
+	adaptor, err := NewEthAdaptor(key, bridgeAddr, urls)
 	if err != nil {
 		t.Errorf("TestConcurrentSend Failed, got an error : %s.", err.Error())
 		return
@@ -134,7 +133,7 @@ func TestCommitReveal(t *testing.T) {
 		t.Errorf("TestCommitReveal Failed, got an error : %s.", err.Error())
 		return
 	}
-	adaptor, err := NewEthAdaptor(key, proxyAddr, crAddr, urls)
+	adaptor, err := NewEthAdaptor(key, bridgeAddr, urls)
 	if err != nil {
 		t.Errorf("TestCommitReveal Failed, got an error : %s.", err.Error())
 		return
@@ -178,7 +177,7 @@ func TestSetErrorHandling(t *testing.T) {
 		t.Errorf("TestCommitReveal Failed, got an error : %s.", err.Error())
 		return
 	}
-	adaptor, err := NewEthAdaptor(key, proxyAddr, crAddr, urls)
+	adaptor, err := NewEthAdaptor(key, bridgeAddr, urls)
 	if err != nil {
 		t.Errorf("TestConcurrentSend Failed, got an error : %s.", err.Error())
 		return
@@ -226,7 +225,7 @@ func TestReconnect(t *testing.T) {
 		return
 	}
 
-	adaptor, err := NewEthAdaptor(key, proxyAddr, crAddr, urls)
+	adaptor, err := NewEthAdaptor(key, bridgeAddr, urls)
 	if err != nil {
 		t.Errorf("TestConcurrentSend Failed, got an error : %s.", err.Error())
 		return
