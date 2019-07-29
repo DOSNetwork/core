@@ -43,10 +43,10 @@ type P2PInterface interface {
 	GetPort() string
 	Listen() error
 	Join(bootstrapIp []string) (num int, err error)
-	ConnectTo(ip string, id []byte) ([]byte, error)
+	ConnectTo(ctx context.Context, ip string, id []byte) ([]byte, error)
 	DisConnectTo(id []byte) error
 	Leave()
-	Request(id []byte, m proto.Message) (msg P2PMessage, err error)
+	Request(ctx context.Context, id []byte, m proto.Message) (msg P2PMessage, err error)
 	Reply(id []byte, nonce uint64, m proto.Message) (err error)
 	SubscribeEvent(chanBuffer int, messages ...interface{}) (outch chan P2PMessage, err error)
 	UnSubscribeEvent(messages ...interface{})

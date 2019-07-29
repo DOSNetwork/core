@@ -259,7 +259,7 @@ func actionCreateWallet(c *cli.Context) error {
 	second := getPassword("Confirm passphrase again: ")
 	if first != second {
 		fmt.Println("Unmatched Password")
-		return errors.New("Unmatched Password\n")
+		return errors.New("Unmatched Password")
 	}
 	err := onchain.GenEthkey(walletPath, first)
 	if err != nil {

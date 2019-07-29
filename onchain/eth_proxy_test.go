@@ -14,11 +14,11 @@ const (
 )
 
 var (
-	urls           = []string{}
-	proxyAddr      = ""
-	crAddr         = ""
-	credentialPath = ""
-	passphrase     = ""
+	urls           = []string{"https://rinkeby.infura.io/v3/2a6901876ca54406960499e888e70439", "ws://34.220.59.83:8546"}
+	proxyAddr      = "0x3b8Cb935bDdFAF59EFa11aFfDfc8760387624fa2"
+	crAddr         = "0xE04B34A113BB707eCF8dc01D51f8A56213Bdcb81"
+	credentialPath = "/Users/chenhaonien/go/src/github.com/DOSNetwork/core/testAccounts/bootCredential/fundKey/"
+	passphrase     = "123"
 )
 
 func TestGetPendingNonce(t *testing.T) {
@@ -240,10 +240,10 @@ S:
 	ctx := context.Background()
 	for i := 3; i < 8; i++ {
 		if err = adaptor.SetGroupSize(ctx, uint64(i)); err != nil {
-			fmt.Println(" err ", err)
+			fmt.Println("SetGroupSize err ", err)
 		}
 		if err = adaptor.SetGroupToPick(ctx, uint64(i)); err != nil {
-			fmt.Println(" err ", err)
+			fmt.Println("SetGroupToPick err ", err)
 		}
 		time.Sleep(2 * time.Second)
 	}

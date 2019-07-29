@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"math"
 	"math/big"
 	"runtime/debug"
 	"strings"
@@ -951,14 +952,14 @@ func (e *ethAdaptor) Start() (err error) {
 	e.auth.GasLimit = uint64(6000000)
 	e.auth.Context = e.ctx
 
-	infuraClientC := DialToEth(context.Background(), e.httpUrls)
-	infuraClient := <-infuraClientC
+	//infuraClientC := DialToEth(context.Background(), e.httpUrls)
+	//infuraClient := <-infuraClientC
 	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(300*time.Second))
 	defer cancel()
 	clients := DialToEth(ctx, e.wsUrls)
-	synClients := CheckSync(ctx, infuraClient, clients)
+	//synClients := CheckSync(ctx, infuraClient, clients)
 
-	for client := range synClients {
+	for client := range clients {
 		p, er := dosproxy.NewDosproxy(common.HexToAddress(e.proxyAddr), client)
 		if er != nil {
 			fmt.Println("NewDosproxy err ", er)
@@ -1021,6 +1022,7 @@ func (e *ethAdaptor) reqLoop() {
 func (e *ethAdaptor) get(ctx context.Context, f getFunc, p interface{}) (interface{}, interface{}) {
 	var valList []chan interface{}
 	var errList []chan interface{}
+
 	for i, client := range e.clients {
 		outc, errc := f(ctx, client, e.proxies[i], p)
 		valList = append(valList, outc)
@@ -2148,13 +2150,6 @@ func (e *ethAdaptor) PendingNonce(ctx context.Context) (result uint64, err error
 							return
 						case errc <- err:
 						}
-						b, err := client.BalanceAt(ctx, e.key.Address, nil)
-						if err != nil {
-							//Post http i/o timeout
-							fmt.Println("BalanceAt err ", err)
-						} else {
-							fmt.Println("BalanceAt id ", b)
-						}
 					} else {
 						fmt.Println("PendingNonce ", val)
 						select {
@@ -2182,7 +2177,7 @@ func (e *ethAdaptor) PendingNonce(ctx context.Context) (result uint64, err error
 }
 
 // Balance returns the wei balance of the node account.
-func (e *ethAdaptor) Balance(ctx context.Context) (result *big.Float, err error) {
+func (e *ethAdaptor) Balance(ctx context.Context, id []byte) (result *big.Float, err error) {
 	f := func(ctx context.Context, client *ethclient.Client, proxy *dosproxy.DosproxySession, p interface{}) (chan interface{}, chan interface{}) {
 		outc := make(chan interface{})
 		errc := make(chan interface{})
@@ -2190,7 +2185,10 @@ func (e *ethAdaptor) Balance(ctx context.Context) (result *big.Float, err error)
 			defer close(outc)
 			defer close(errc)
 			if address, ok := p.(common.Address); ok {
-				val, err := client.BalanceAt(context.Background(), address, nil)
+				wei, err := client.BalanceAt(context.Background(), address, nil)
+				balance := new(big.Float)
+				balance.SetString(wei.String())
+				balance = balance.Quo(balance, big.NewFloat(math.Pow10(18)))
 				if err != nil {
 					select {
 					case <-ctx.Done():
@@ -2200,14 +2198,14 @@ func (e *ethAdaptor) Balance(ctx context.Context) (result *big.Float, err error)
 				}
 				select {
 				case <-ctx.Done():
-				case outc <- val:
+				case outc <- balance:
 				}
 			}
 		}()
 		return outc, errc
 	}
 
-	vr, ve := e.get(ctx, f, e.key.Address)
+	vr, ve := e.get(ctx, f, common.BytesToAddress(id))
 	if v, ok := vr.(*big.Float); ok {
 		result = v
 	}

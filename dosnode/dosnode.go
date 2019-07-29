@@ -34,16 +34,16 @@ type ctxKey string
 
 // DosNode is a strcut that represents a offchain dos client
 type DosNode struct {
-	suite         suites.Suite
-	chain         onchain.ProxyAdapter
-	dkg           dkg.PDKGInterface
-	p             p2p.P2PInterface
-	done          chan interface{}
-	cSignToPeer   chan *vss.Signature
-	cRequestDone  chan [4]*big.Int
-	eventGrouping chan interface{}
-	id            []byte
-	logger        log.Logger
+	suite        suites.Suite
+	chain        onchain.ProxyAdapter
+	dkg          dkg.PDKGInterface
+	p            p2p.P2PInterface
+	done         chan interface{}
+	reqSignc     chan request
+	cRequestDone chan [4]*big.Int
+	onchainEvent chan interface{}
+	id           []byte
+	logger       log.Logger
 	//For REST API
 	startTime         time.Time
 	state             string
@@ -126,7 +126,7 @@ func NewDosNode(key *keystore.Key) (dosNode *DosNode, err error) {
 		chain:             chainConn,
 		dkg:               p2pDkg,
 		done:              make(chan interface{}),
-		cSignToPeer:       make(chan *vss.Signature, 21),
+		reqSignc:          make(chan request, 21),
 		cRequestDone:      make(chan [4]*big.Int),
 		id:                id.Bytes(),
 		logger:            log.New("module", "dosclient"),
@@ -159,7 +159,7 @@ func (d *DosNode) handleQuery(ids [][]byte, pubPoly *share.PubPoly, sec *share.P
 	queryCtx, cancel := d.chain.GetTimeoutCtx(time.Duration(60 * 15 * time.Second))
 	defer cancel()
 	queryCtxWithValue := context.WithValue(context.WithValue(queryCtx, ctxKey("RequestID"), fmt.Sprintf("%x", requestID)), ctxKey("GroupID"), groupID)
-
+	d.logger.Event("HandleQuery", map[string]interface{}{"GroupID": groupID, "RequestID": fmt.Sprintf("%x", requestID)})
 	defer d.logger.TimeTrack(time.Now(), "TimeHandleQuery", map[string]interface{}{"GroupID": groupID, "RequestID": fmt.Sprintf("%x", requestID)})
 	defer cancel()
 	var nonce []byte
@@ -190,16 +190,15 @@ func (d *DosNode) handleQuery(ids [][]byte, pubPoly *share.PubPoly, sec *share.P
 		nHash := sha256.Sum256(bytes)
 		nonce = nHash[:]
 	}
-
+	sign := &vss.Signature{
+		Index:     pType,
+		RequestId: requestID.Bytes(),
+		Nonce:     nonce,
+	}
 	//Build a pipeline
-	var signShares []chan *vss.Signature
 	var errcList []chan error
 
-	submitterc, errc := choseSubmitter(queryCtxWithValue, d.p, lastRand, ids, len(ids), d.logger)
-	if len(submitterc) != len(ids) || len(ids) == 0 {
-		d.logger.Event("EuildPipeError2", map[string]interface{}{"GroupID": groupID, "RequestId": fmt.Sprintf("%x", requestID), "lenSubmitter": len(submitterc)})
-		return
-	}
+	submitterc, errc := choseSubmitter(queryCtxWithValue, d.p, d.chain, lastRand, ids, 2, d.logger)
 	errcList = append(errcList, errc)
 
 	var contentc chan []byte
@@ -213,21 +212,11 @@ func (d *DosNode) handleQuery(ids [][]byte, pubPoly *share.PubPoly, sec *share.P
 		errcList = append(errcList, errc)
 	}
 
-	signc, errc := genSign(queryCtxWithValue, contentc, d.cSignToPeer, sec, d.suite, d.id, groupID, requestID.Bytes(), pType, nonce, d.logger)
+	signc, errc := genSign(queryCtxWithValue, contentc, sec, d.suite, sign, d.logger)
 	errcList = append(errcList, errc)
-	signShares = append(signShares, signc)
-
-	idx := 1
-	for _, id := range ids {
-		if r := bytes.Compare(d.id, id); r != 0 {
-			signc, errc := requestSign(queryCtxWithValue, submitterc[idx], contentc, d.p, d.id, requestID.Bytes(), pType, id, nonce, d.logger)
-			signShares = append(signShares, signc)
-			errcList = append(errcList, errc)
-			idx++
-		}
-	}
-
-	recoveredSignc, errc := recoverSign(queryCtxWithValue, fanIn(queryCtxWithValue, signShares...), d.suite, pubPoly, (len(ids)/2 + 1), len(ids), d.logger)
+	signAllc := dispatchSign(queryCtxWithValue, submitterc[1], signc, d.reqSignc, d.p, requestID.Bytes(), (len(ids)/2 + 1), d.logger)
+	errcList = append(errcList, errc)
+	recoveredSignc, errc := recoverSign(queryCtxWithValue, signAllc, d.suite, pubPoly, (len(ids)/2 + 1), len(ids), d.logger)
 	errcList = append(errcList, errc)
 
 	switch pType {
@@ -312,7 +301,9 @@ func (d *DosNode) handleCR(cr *onchain.LogStartCommitReveal, randSeed *big.Int) 
 	defer cancel()
 
 	// Generate random numbers in range [0..randSeed]
-
+	if randSeed.Cmp(big.NewInt(1)) == -1 {
+		randSeed, _ = new(big.Int).SetString("21888242871839275222246405745257275088548364400416034343698204186575808495617", 10)
+	}
 	sec, err := rand.Int(rand.Reader, randSeed)
 	if err != nil {
 		d.logger.Error(err)
@@ -427,11 +418,21 @@ func (d *DosNode) handleGroupDissolve() {
 	}
 }
 
+type request struct {
+	ctx       context.Context
+	requestID string
+	threshold int
+	reply     chan *vss.Signature
+}
+
 func (d *DosNode) listen() {
 	watchdog := time.NewTicker(watchdogInterval * time.Minute)
 	defer watchdog.Stop()
+	var errc chan error
 	peerEvent, _ := d.p.SubscribeEvent(50, vss.Signature{})
-	peerSignMap := make(map[string]*vss.Signature)
+	bufSign := make(map[string][]*vss.Signature)
+	reqSign := make(map[string]request)
+
 	//	latestRandm := big.NewInt(0)
 	defer d.p.UnSubscribeEvent(vss.Signature{})
 	subescriptions := []int{onchain.SubscribeLogGrouping, onchain.SubscribeLogGroupDissolve, onchain.SubscribeLogUrl,
@@ -443,7 +444,7 @@ func (d *DosNode) listen() {
 	_ = d.chain.RegisterNewNode(context.Background())
 	fmt.Println("(d *DosNode) listen()")
 S:
-	sink, errc := d.chain.SubscribeEvent(subescriptions)
+	d.onchainEvent, errc = d.chain.SubscribeEvent(subescriptions)
 L:
 	for {
 		select {
@@ -463,8 +464,17 @@ L:
 				case 2:
 					d.handleGroupDissolve()
 				}
+				for _, req := range reqSign {
+					select {
+					case <-req.ctx.Done():
+						close(req.reply)
+						delete(bufSign, req.requestID)
+						delete(reqSign, req.requestID)
+					default:
+					}
+				}
 			}
-		case event, ok := <-sink:
+		case event, ok := <-d.onchainEvent:
 			if ok {
 				switch content := event.(type) {
 				case *onchain.LogGrouping:
@@ -553,21 +563,40 @@ L:
 			} else {
 				break L
 			}
-		case msg, ok := <-d.cSignToPeer:
+			/*
+				bufSign := make(map[string][]*vss.Signature)
+				reqSign := make(map[string]request)
+			*/
+		case req, ok := <-d.reqSignc:
 			if !ok {
 				return
 			}
-			peerSignMap[string(msg.Nonce)] = msg
+			//1)Check buf to see if it has enough signatures
+			reqSign[req.requestID] = req
+			if signs := bufSign[req.requestID]; len(signs) >= 0 {
+				for _, sign := range signs {
+					select {
+					case <-req.ctx.Done():
+					case req.reply <- sign:
+					}
+				}
+				bufSign[req.requestID] = nil
+			}
 		case msg, ok := <-peerEvent:
 			if !ok {
 				return
 			}
 			switch content := msg.Msg.Message.(type) {
 			case *vss.Signature:
-				if peerSignMap[string(content.Nonce)] != nil {
-					fmt.Println("Got Sign ", peerSignMap[string(content.Nonce)].RequestId)
+				requestID := string(content.RequestId)
+				if req := reqSign[requestID]; req.requestID == requestID {
+					select {
+					case <-req.ctx.Done():
+					case req.reply <- content:
+					}
+				} else {
+					bufSign[requestID] = append(bufSign[requestID], content)
 				}
-				d.p.Reply(msg.Sender, msg.RequestNonce, peerSignMap[string(content.Nonce)])
 			}
 		case <-d.done:
 			return

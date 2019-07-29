@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/DOSNetwork/core/log"
+	"github.com/DOSNetwork/core/onchain"
 	"github.com/DOSNetwork/core/p2p"
 	"github.com/DOSNetwork/core/share"
 	"github.com/DOSNetwork/core/share/vss/pedersen"
@@ -95,7 +96,7 @@ func fanIn(ctx context.Context, channels ...chan *vss.Signature) chan *vss.Signa
 }
 
 //choseSubmitter choses a submitter according to the last random number and check if the submitter is reachable
-func choseSubmitter(ctx context.Context, p p2p.P2PInterface, lastSysRand *big.Int, ids [][]byte, outCount int, logger log.Logger) ([]chan []byte, chan error) {
+func choseSubmitter(ctx context.Context, p p2p.P2PInterface, e onchain.ProxyAdapter, lastSysRand *big.Int, ids [][]byte, outCount int, logger log.Logger) ([]chan []byte, chan error) {
 	errc := make(chan error)
 	var outs []chan []byte
 	for i := 0; i < outCount; i++ {
@@ -110,22 +111,33 @@ func choseSubmitter(ctx context.Context, p p2p.P2PInterface, lastSysRand *big.In
 			lastRand = 0 - lastRand
 		}
 
-		submitter := -1
+		submitter := 1
 		//Check to see if submitter is reachable
 		for i := 0; i < len(ids); i++ {
 			idx := (lastRand + i) % len(ids)
-			if !bytes.Equal(p.GetID(), ids[idx]) {
-				if _, err := p.ConnectTo("", ids[idx]); err != nil {
-					continue
-				}
+			fmt.Println(idx)
+			//Check if submitter has enough money
+			balance, err := e.Balance(ctx, ids[idx])
+			if err != nil {
+				continue
 			}
-			submitter = idx
-			break
+			if balance.Cmp(big.NewFloat(0.3)) == 1 {
+				if !bytes.Equal(p.GetID(), ids[idx]) {
+					if _, err := p.ConnectTo(ctx, "", ids[idx]); err != nil {
+						select {
+						case <-ctx.Done():
+						case errc <- err:
+						}
+						continue
+					}
+				}
+				submitter = idx
+				break
+			}
 		}
-
 		if submitter == -1 {
 			select {
-			case errc <- errors.New("No reachable submitter"):
+			case errc <- errors.New("No suitable submitter"):
 			case <-ctx.Done():
 			}
 		} else {
@@ -145,145 +157,7 @@ func choseSubmitter(ctx context.Context, p p2p.P2PInterface, lastSysRand *big.In
 	return outs, errc
 }
 
-func requestSign(
-	ctx context.Context,
-	submitterc <-chan []byte,
-	contentc chan []byte,
-	p p2p.P2PInterface,
-	nodeId []byte,
-	requestId []byte,
-	trafficType uint32,
-	id []byte,
-	nonce []byte,
-	logger log.Logger) (chan *vss.Signature, chan error) {
-	out := make(chan *vss.Signature)
-	errc := make(chan error)
-	go func() {
-		defer close(out)
-		defer close(errc)
-
-		select {
-		case submitter, ok := <-submitterc:
-			if !ok {
-				return
-			}
-			if r := bytes.Compare(nodeId, submitter); r != 0 {
-				return
-			}
-			defer logger.TimeTrack(time.Now(), "RequestSign", map[string]interface{}{"GroupID": ctx.Value(ctxKey("GroupID")), "RequestID": ctx.Value(ctxKey("RequestID"))})
-			fmt.Println("requestSign nonce ", nonce)
-			sign := &vss.Signature{
-				Index:     trafficType,
-				RequestId: requestId,
-				Nonce:     nonce,
-			}
-
-			retryCount := 0
-			for retryCount < 30 {
-				if msg, err := p.Request(id, sign); err == nil {
-					switch content := msg.Msg.Message.(type) {
-					case *vss.Signature:
-						sign.Content = content.Content
-						sign.Signature = content.Signature
-						select {
-						case out <- sign:
-						case <-ctx.Done():
-						}
-						return
-					default:
-					}
-				}
-				retryCount++
-			}
-			err := errors.New("Retry limit exceeded")
-			logger.Error(err)
-			select {
-			case errc <- err:
-			case <-ctx.Done():
-			}
-			return
-		case <-ctx.Done():
-			return
-		}
-	}()
-	return out, errc
-}
-
-func genSign(
-	ctx context.Context,
-	contentc chan []byte,
-	cSignToPeer chan *vss.Signature,
-	sec *share.PriShare,
-	suite suites.Suite,
-	nodeID []byte,
-	groupID string,
-	requestId []byte,
-	index uint32,
-	nonce []byte,
-	logger log.Logger) (chan *vss.Signature, chan error) {
-	out := make(chan *vss.Signature)
-	errc := make(chan error)
-	go func() {
-		var submitter []byte
-		var content []byte
-		defer close(out)
-		defer close(errc)
-
-		select {
-		case value, ok := <-contentc:
-			if !ok {
-				return
-			}
-			defer logger.TimeTrack(time.Now(), "GenSign", map[string]interface{}{"GroupID": ctx.Value(ctxKey("GroupID")), "RequestID": ctx.Value(ctxKey("RequestID"))})
-			fmt.Println("GenSign ")
-
-			content = value
-			submitter = content[len(content)-20:]
-
-			sig, err := tbls.Sign(suite, sec, content)
-			if err != nil {
-				logger.Error(err)
-				select {
-				case errc <- err:
-				case <-ctx.Done():
-					return
-				}
-			}
-
-			sign := &vss.Signature{
-				Index:     index,
-				RequestId: requestId,
-				Nonce:     nonce,
-				Content:   content,
-				Signature: sig,
-			}
-			select {
-			case cSignToPeer <- sign:
-			case <-ctx.Done():
-			}
-			if r := bytes.Compare(nodeID, submitter); r == 0 {
-				select {
-				case out <- sign:
-				case <-ctx.Done():
-				}
-			}
-			return
-
-		case <-ctx.Done():
-			return
-		}
-	}()
-	return out, errc
-}
-
-func genUserRandom(
-	ctx context.Context,
-	submitterc chan []byte,
-	requestId []byte,
-	lastSysRand []byte,
-	userSeed []byte,
-	logger log.Logger,
-) chan []byte {
+func genUserRandom(ctx context.Context, submitterc chan []byte, requestId []byte, lastSysRand []byte, userSeed []byte, logger log.Logger) chan []byte {
 	out := make(chan []byte)
 	go func() {
 		defer close(out)
@@ -293,7 +167,8 @@ func genUserRandom(
 			if !ok {
 				return
 			}
-			defer logger.TimeTrack(time.Now(), "GenUserRandom", map[string]interface{}{"GroupID": ctx.Value(ctxKey("GroupID")), "RequestID": ctx.Value(ctxKey("RequestID"))})
+			defer logger.TimeTrack(time.Now(), "GenUserRandom",
+				map[string]interface{}{"GroupID": ctx.Value(ctxKey("GroupID")), "RequestID": ctx.Value(ctxKey("RequestID"))})
 			fmt.Println("GenUserRandom ")
 
 			// signed message: concat(requestId, lastSystemRandom, userSeed, submitter address)
@@ -313,12 +188,7 @@ func genUserRandom(
 	return out
 }
 
-func genSysRandom(
-	ctx context.Context,
-	submitterc chan []byte,
-	lastSysRand []byte,
-	logger log.Logger,
-) chan []byte {
+func genSysRandom(ctx context.Context, submitterc chan []byte, lastSysRand []byte, logger log.Logger) chan []byte {
 	out := make(chan []byte)
 	go func() {
 		defer close(out)
@@ -328,7 +198,9 @@ func genSysRandom(
 			if !ok {
 				return
 			}
-			defer logger.TimeTrack(time.Now(), "GenSysRandom", map[string]interface{}{"GroupID": ctx.Value(ctxKey("GroupID")), "RequestID": ctx.Value(ctxKey("RequestID"))})
+			defer logger.TimeTrack(time.Now(), "GenSysRandom",
+				map[string]interface{}{"GroupID": ctx.Value(ctxKey("GroupID")),
+					"RequestID": ctx.Value(ctxKey("RequestID"))})
 			fmt.Println("genSysRandom ")
 			// signed message: concat(lastSystemRandom, submitter address)
 			paddedLastSysRand := padOrTrim(lastSysRand, randNumberSize)
@@ -433,6 +305,95 @@ func genQueryResult(ctx context.Context, submitterc chan []byte, url string, pat
 	return out, errc
 }
 
+func genSign(ctx context.Context, contentc chan []byte, sec *share.PriShare, suite suites.Suite, sign *vss.Signature, logger log.Logger) (chan *vss.Signature, chan error) {
+	out := make(chan *vss.Signature)
+	errc := make(chan error)
+	go func() {
+		defer close(out)
+		defer close(errc)
+
+		select {
+		case content, ok := <-contentc:
+			if !ok {
+				return
+			}
+			defer logger.TimeTrack(time.Now(), "GenSign", map[string]interface{}{"GroupID": ctx.Value(ctxKey("GroupID")), "RequestID": ctx.Value(ctxKey("RequestID"))})
+			sign.Content = content
+			sig, err := tbls.Sign(suite, sec, content)
+			if err != nil {
+				logger.Error(err)
+				select {
+				case errc <- err:
+				case <-ctx.Done():
+				}
+				return
+			}
+			sign.Signature = sig
+			select {
+			case <-ctx.Done():
+			case out <- sign:
+			}
+			return
+		case <-ctx.Done():
+			return
+		}
+	}()
+	return out, errc
+}
+
+func dispatchSign(ctx context.Context, submitterc chan []byte, signc chan *vss.Signature, reqSignc chan request, p p2p.P2PInterface, requestID []byte, threshold int, logger log.Logger) chan *vss.Signature {
+	out := make(chan *vss.Signature)
+	go func() {
+		select {
+		case submitter, ok := <-submitterc:
+			defer logger.TimeTrack(time.Now(), "dispatchSign", map[string]interface{}{"GroupID": ctx.Value(ctxKey("GroupID")), "RequestID": ctx.Value(ctxKey("RequestID"))})
+
+			if !ok {
+				return
+			}
+			if r := bytes.Compare(p.GetID(), submitter); r != 0 {
+				logger.Event("dispatchSignToSubmitter", map[string]interface{}{"GroupID": ctx.Value(ctxKey("GroupID")), "RequestID": ctx.Value(ctxKey("RequestID"))})
+				//Send signature to submitter
+				fmt.Println("dispatchSign to ", fmt.Sprintf("%x", submitter))
+				select {
+				case <-ctx.Done():
+				case sign := <-signc:
+					logger.Event("dispatchSendToSubmitter", map[string]interface{}{"GroupID": ctx.Value(ctxKey("GroupID")), "RequestID": ctx.Value(ctxKey("RequestID"))})
+					if _, err := p.Request(ctx, submitter, sign); err != nil {
+						logger.Error(err)
+						fmt.Println("dispatchSign err ", err)
+					}
+				}
+				close(out)
+				return
+			}
+		case <-ctx.Done():
+			close(out)
+			return
+		}
+		logger.Event("dispatchSignWaitForSign", map[string]interface{}{"GroupID": ctx.Value(ctxKey("GroupID")), "RequestID": ctx.Value(ctxKey("RequestID"))})
+
+		//Bypass signature to next stage
+		select {
+		case <-ctx.Done():
+			close(out)
+		case sign := <-signc:
+			select {
+			case <-ctx.Done():
+				close(out)
+			case out <- sign:
+			}
+		}
+		//Request for peer's signature
+		req := request{ctx: ctx, requestID: string(requestID), threshold: threshold, reply: out}
+		select {
+		case <-ctx.Done():
+		case reqSignc <- req:
+		}
+	}()
+	return out
+}
+
 func recoverSign(ctx context.Context, signc chan *vss.Signature, suite suites.Suite, pubPoly *share.PubPoly, nbThreshold int, nbParticipants int, logger log.Logger) (chan *vss.Signature, chan error) {
 	out := make(chan *vss.Signature)
 	errc := make(chan error)
@@ -447,6 +408,8 @@ func recoverSign(ctx context.Context, signc chan *vss.Signature, suite suites.Su
 				if !ok {
 					return
 				}
+				logger.Event("recoverSign", map[string]interface{}{"GroupID": ctx.Value(ctxKey("GroupID")), "RequestID": ctx.Value(ctxKey("RequestID"))})
+
 				fmt.Println("recoverSign ", len(signShares))
 				if len(signShares) == 0 {
 					defer logger.TimeTrack(time.Now(), "RecoverSign", map[string]interface{}{"GroupID": ctx.Value(ctxKey("GroupID")), "RequestID": ctx.Value(ctxKey("RequestID"))})
@@ -455,24 +418,14 @@ func recoverSign(ctx context.Context, signc chan *vss.Signature, suite suites.Su
 				signShares = append(signShares, sign.Signature)
 
 				if len(signShares) >= nbThreshold {
-					sig, err := tbls.Recover(
-						suite,
-						pubPoly,
-						sign.Content,
-						signShares,
-						nbThreshold,
-						nbParticipants)
+					sig, err := tbls.Recover(suite, pubPoly, sign.Content, signShares, nbThreshold, nbParticipants)
 					if err != nil {
 						logger.Error(err)
 						errc <- err
 						continue
 					}
 
-					if err = bls.Verify(
-						suite,
-						pubPoly.Commit(),
-						sign.Content,
-						sig); err != nil {
+					if err = bls.Verify(suite, pubPoly.Commit(), sign.Content, sig); err != nil {
 						logger.Error(err)
 						errc <- err
 						continue
@@ -489,12 +442,7 @@ func recoverSign(ctx context.Context, signc chan *vss.Signature, suite suites.Su
 					queryResult := make([]byte, t)
 					copy(queryResult, sign.Content)
 					select {
-					case out <- &vss.Signature{
-						Index:     sign.Index,
-						RequestId: sign.RequestId,
-						Content:   queryResult,
-						Signature: sig,
-					}:
+					case out <- &vss.Signature{Index: sign.Index, RequestId: sign.RequestId, Content: queryResult, Signature: sig}:
 					case <-ctx.Done():
 					}
 					return

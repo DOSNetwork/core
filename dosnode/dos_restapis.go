@@ -24,6 +24,7 @@ func (d *DosNode) startRESTServer() {
 	//TODO : Remove after beta .Only used for dev test
 	mux.HandleFunc("/p2pTest", d.p2pTest)
 	mux.HandleFunc("/dkgTest", d.dkgTest)
+	mux.HandleFunc("/queryTest", d.queryTest)
 	go http.ListenAndServe(":8080", mux)
 }
 
@@ -88,7 +89,7 @@ func (d *DosNode) balance(w http.ResponseWriter, r *http.Request) {
 	html := "Balance :"
 	ctx, cancelFunc := context.WithDeadline(context.Background(), time.Now().Add(3*time.Second))
 	defer cancelFunc()
-	result, err := d.chain.Balance(ctx)
+	result, err := d.chain.Balance(ctx, d.p.GetID())
 	if err != nil {
 		html = html + result.String()
 	} else {
@@ -133,11 +134,13 @@ func (d *DosNode) p2pTest(w http.ResponseWriter, r *http.Request) {
 	members := d.p.MembersID()
 	fmt.Println("p2p test ", len(members))
 	for i := 0; i < len(members); i++ {
-		fmt.Println("p2p ConnectTo ", members[i])
-		id, err := d.p.ConnectTo("", members[i])
+		id, err := d.p.ConnectTo(context.Background(), "", members[i])
 		if err != nil {
-			fmt.Println("ConnectTo ", id, " err ", err)
+			fmt.Println("ConnectTo err", id, " err ", err)
+		} else {
+			fmt.Println(i, "p2p ConnectTo ", id)
 		}
+		d.p.DisConnectTo(id)
 	}
 }
 
@@ -186,13 +189,43 @@ func (d *DosNode) dkgTest(w http.ResponseWriter, r *http.Request) {
 			return false
 		})
 		var participants [][]byte
+
 		for i := start; i < end; i++ {
 			participants = append(participants, members[i])
 		}
 
-		d.eventGrouping <- &onchain.LogGrouping{
+		d.onchainEvent <- &onchain.LogGrouping{
 			GroupId: groupID,
 			NodeId:  participants,
 		}
+	}
+}
+func (d *DosNode) queryTest(w http.ResponseWriter, r *http.Request) {
+	groupId := big.NewInt(0)
+	lastSys := big.NewInt(0)
+	userSeed := big.NewInt(0)
+	requestId := big.NewInt(0)
+	switch r.Method {
+	case "GET":
+		for k, v := range r.URL.Query() {
+			fmt.Printf("%s: %s\n", k, v)
+			if k == "gid" {
+				i, err := strconv.Atoi(v[0])
+				if err == nil && i >= 0 {
+					groupId = groupId.SetInt64(int64(i))
+				}
+			} else if k == "rid" {
+				i, err := strconv.Atoi(v[0])
+				if err == nil && i >= 0 {
+					requestId = requestId.SetInt64(int64(i))
+				}
+			}
+		}
+	}
+	d.onchainEvent <- &onchain.LogRequestUserRandom{
+		RequestId:            requestId,
+		LastSystemRandomness: lastSys,
+		UserSeed:             userSeed,
+		DispatchedGroupId:    groupId,
 	}
 }

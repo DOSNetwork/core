@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net"
 	"reflect"
-
 	"time"
 
 	"github.com/dedis/kyber"
@@ -83,43 +82,6 @@ func (n *server) MembersIP() []net.IP {
 
 func (n *server) MembersID() [][]byte {
 	return n.members.MembersID()
-}
-
-func (n *server) ConnectToAll(ctx context.Context, groupIds [][]byte, sessionID string) (out chan bool, errc chan error) {
-	out = make(chan bool)
-	errc = make(chan error)
-	go func() {
-		defer close(out)
-		defer close(errc)
-		//defer logger.TimeTrack(time.Now(), "ConnectToAll", map[string]interface{}{"GroupID": sessionID})
-		//var wg sync.WaitGroup
-		//wg.Add(len(groupIds) - 1)
-		for i := 0; i < len(groupIds); i++ {
-			if !bytes.Equal(n.GetID(), groupIds[i]) {
-				select {
-				case <-ctx.Done():
-				default:
-					_, err := n.ConnectTo("", groupIds[i])
-					if err != nil {
-						fmt.Println("ConnectTo ", err)
-						logger.TimeTrack(time.Now(), "ConnectToAllFail", map[string]interface{}{"GroupID": sessionID, "ConnectToID": fmt.Sprintf("%x", groupIds[i])})
-						select {
-						case errc <- err:
-						case <-ctx.Done():
-						}
-						return
-					}
-					logger.TimeTrack(time.Now(), "ConnectToAllSucc", map[string]interface{}{"GroupID": sessionID, "ConnectToID": fmt.Sprintf("%x", groupIds[i])})
-				}
-			}
-		}
-		//wg.Wait()
-		select {
-		case out <- true:
-		case <-ctx.Done():
-		}
-	}()
-	return
 }
 
 func (n *server) numOfClient() (iNum, cNum int) {
@@ -248,7 +210,7 @@ func (n *server) receiveHandler() {
 }
 
 func (n *server) callHandler() {
-	n.calling = make(chan request, 21)
+	n.calling = make(chan request, 200)
 	hangup := make(chan string)
 	addrToid := make(map[string][]byte)
 	idTostatus := make(map[string][]byte)
@@ -282,12 +244,13 @@ func (n *server) callHandler() {
 									case req.reply <- client:
 									case <-req.ctx.Done():
 									}
-									close(req.reply)
-									close(req.errc)
+									//close(req.reply)
+									//close(req.errc)
 								}
 							}
 						} else {
 							go func(req request) {
+								fmt.Println("p2p retry")
 								time.Sleep(1 * time.Second)
 								select {
 								case n.calling <- req:
@@ -307,8 +270,8 @@ func (n *server) callHandler() {
 							case req.reply <- client:
 							case <-req.ctx.Done():
 							}
-							close(req.reply)
-							close(req.errc)
+							//close(req.reply)
+							//close(req.errc)
 						}
 						continue
 					}
@@ -322,18 +285,23 @@ func (n *server) callHandler() {
 
 					if req.addr == nil && req.id != nil {
 						if bytes.Equal(idTostatus[string(req.id)], []byte{'p', 'e', 'n', 'd', 'i', 'n', 'g'}) {
+							fmt.Println("p2p pending ", req.id)
 							continue
 						}
 						// Find Peer from routing map
 						if n.members != nil {
+							fmt.Println("p2p lookup ", fmt.Sprintf("%x", req.id))
+
 							req.addr = n.members.Lookup(req.id)
+							fmt.Println("p2p lookup after", fmt.Sprintf("%x", req.id), req.addr)
+
 						}
 
 						if req.addr == nil {
-							//Retry later
+							fmt.Println("Can't find addr ", fmt.Sprintf("%x", req.id))
 							go func(req request) {
 								select {
-								case n.calling <- req:
+								case req.errc <- errors.New("P2P connection failed"):
 								case <-req.ctx.Done():
 								}
 							}(req)
@@ -357,12 +325,15 @@ func (n *server) callHandler() {
 							}
 							//Retry later
 							go func(req request) {
+								fmt.Println("p2p retry case 2")
 								select {
 								case n.calling <- req:
 								case <-req.ctx.Done():
 								}
 							}(req)
 							return
+						} else {
+							fmt.Println("p2p Dial success", req.id, req.addr)
 						}
 
 						if c, err = newClient(n.suite, n.secKey, n.pubKey, n.id, conn, false); err != nil {
@@ -374,6 +345,7 @@ func (n *server) callHandler() {
 							conn.Close()
 							//Retry later
 							go func(req request) {
+								fmt.Println("p2p retry case 3")
 								select {
 								case n.calling <- req:
 								case <-req.ctx.Done():
@@ -414,8 +386,8 @@ func (n *server) callHandler() {
 							case req.reply <- c:
 							case <-req.ctx.Done():
 							}
-							close(req.reply)
-							close(req.errc)
+							//close(req.reply)
+							//close(req.errc)
 						}
 						select {
 						case n.addCallingC <- c:
@@ -443,6 +415,7 @@ func (n *server) callHandler() {
 					c.close()
 				}
 				n.callingNum = len(clients)
+				fmt.Println("p2p remove ", len(clients))
 			case _, _ = <-hangup:
 			}
 		}
@@ -471,11 +444,46 @@ func (n *server) DisConnectTo(id []byte) (err error) {
 /*
 This is a block call
 */
-func (n *server) ConnectTo(addr string, id []byte) ([]byte, error) {
+func (n *server) ConnectToAll(ctx context.Context, groupIds [][]byte, sessionID string) (out chan bool, errc chan error) {
+	out = make(chan bool)
+	errc = make(chan error)
+	go func() {
+		defer close(out)
+		defer close(errc)
+		logger.Event("ConnectToAll", map[string]interface{}{"GroupID": sessionID})
+		//var wg sync.WaitGroup
+		//wg.Add(len(groupIds) - 1)
+		for i := 0; i < len(groupIds); i++ {
+			if !bytes.Equal(n.GetID(), groupIds[i]) {
+				select {
+				case <-ctx.Done():
+				default:
+					if _, err := n.ConnectTo(ctx, "", groupIds[i]); err != nil {
+						fmt.Println("ConnectToAll ConnectTo ", err)
+						logger.TimeTrack(time.Now(), "ConnectToAllFail", map[string]interface{}{"GroupID": sessionID, "ConnectToID": fmt.Sprintf("%x", groupIds[i])})
+						select {
+						case errc <- err:
+						case <-ctx.Done():
+						}
+						return
+					} else {
+						logger.TimeTrack(time.Now(), "ConnectToAllSucc", map[string]interface{}{"GroupID": sessionID, "ConnectToID": fmt.Sprintf("%x", groupIds[i])})
+					}
+				}
+			}
+		}
+		//wg.Wait()
+		select {
+		case out <- true:
+		case <-ctx.Done():
+		}
+	}()
+	return
+}
+
+func (n *server) ConnectTo(ctx context.Context, addr string, id []byte) ([]byte, error) {
 	var err error
 	callReq := request{}
-	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
-	defer cancel()
 	callReq.ctx = ctx
 	callReq.rType = 0
 	callReq.id = id
@@ -490,7 +498,7 @@ func (n *server) ConnectTo(addr string, id []byte) ([]byte, error) {
 	case <-callReq.ctx.Done():
 		return nil, callReq.ctx.Err()
 	}
-
+	fmt.Println("p2p ConnectTo done send to calling", id)
 	select {
 	case r := <-callReq.reply:
 		client, ok := r.(*client)
@@ -507,11 +515,10 @@ func (n *server) ConnectTo(addr string, id []byte) ([]byte, error) {
 }
 
 // Request sends a proto message to the specific node
-func (n *server) Request(id []byte, m proto.Message) (msg P2PMessage, err error) {
+func (n *server) Request(ctx context.Context, id []byte, m proto.Message) (msg P2PMessage, err error) {
 	//defer logger.TimeTrack(time.Now(), "Request", nil)
 	callReq := request{}
-	callReq.ctx, callReq.cancel = context.WithTimeout(context.Background(), 120*time.Second)
-	defer callReq.cancel()
+	callReq.ctx = ctx
 	callReq.rType = 1
 	callReq.id = id
 	callReq.reply = make(chan interface{})
@@ -532,21 +539,12 @@ func (n *server) Request(id []byte, m proto.Message) (msg P2PMessage, err error)
 		if !ok {
 			err = errors.New("Reply cast error")
 		}
-		return
 	case e, ok := <-callReq.errc:
 		if ok {
 			err = e
-			return
 		}
 	case <-callReq.ctx.Done():
 		err = callReq.ctx.Err()
-		go func() {
-			select {
-			case _ = <-callReq.reply:
-			case <-time.After(5 * time.Second):
-			}
-		}()
-		return
 	}
 	return
 }

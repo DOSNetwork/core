@@ -180,7 +180,7 @@ func CheckSync(ctx context.Context, mClient *ethclient.Client, cs chan *ethclien
 			for range ticker.C {
 				highestBlk, e := mClient.BlockByNumber(ctx, nil)
 				if e != nil {
-					fmt.Println(e)
+					fmt.Println("CheckSync error ", e)
 					if e.Error() == light.ErrNoPeers.Error() {
 						continue
 					} else {
@@ -192,6 +192,7 @@ func CheckSync(ctx context.Context, mClient *ethclient.Client, cs chan *ethclien
 				if e != nil {
 					fmt.Println(e)
 					if e.Error() == light.ErrNoPeers.Error() {
+						fmt.Println("CheckSync error ", e)
 						continue
 					} else {
 						return
