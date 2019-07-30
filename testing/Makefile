@@ -7,7 +7,7 @@
 ETH_CONTRACTS := ../onchain/eth/contracts
 REMOTE_USER_CONTRACT := ../onchain/eth/contracts/examples
 USER_CONTRACTS := dosUser/contract
-BOOT_CREDENTIAL := ../testAccounts/bootCredential/fundKey
+BOOT_CREDENTIAL := ./testAccounts/bootCredential/fundKey
 AMA_CONFIGPATH := dosUser/ama.json
 DOSPROXY_GOPATH := onchain/dosproxy
 DOSPAYMENT_GOPATH := onchain/dospayment
@@ -43,15 +43,11 @@ deploy-cr:
 	abigen --abi="../$(COMMITREVEAL_GOPATH)/CommitReveal.abi" --bin="../$(COMMITREVEAL_GOPATH)/CommitReveal.bin" --pkg commitreveal --out ../$(COMMITREVEAL_GOPATH)/CommitReveal.go
 	go run contracts_deploy/deploy.go -credentialPath $(BOOT_CREDENTIAL) -contractPath $(ETH_CONTRACTS) -target deployCommitReveal
 
-setup-dos:
-	go run contracts_deploy/deploy.go -credentialPath $(BOOT_CREDENTIAL) -contractPath $(ETH_CONTRACTS) -target setUpDOSNetwork
-
 deploy-dos:
 	$(MAKE) deploy-bridge
 	$(MAKE) deploy-payment
-	$(MAKE) deploy-proxy
 	$(MAKE) deploy-cr
-	$(MAKE) setup-dos
+	$(MAKE) deploy-proxy
 
 build-client:
 ifeq ($(UNAME_S),Linux)
@@ -72,7 +68,6 @@ build-client-docker:
 dos-all:
 	$(MAKE) deploy-dos
 	$(MAKE) build-client
-	$(MAKE) build-client-docker
 
 gen-dosuser:
 	mkdir -p $(USER_CONTRACTS)

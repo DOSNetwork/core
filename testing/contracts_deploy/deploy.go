@@ -33,6 +33,7 @@ import (
 const (
 	proxyAddressType = iota
 	crAddressType
+	paymentAddressType
 )
 
 func between(value string, a string, b string) string {
@@ -82,7 +83,7 @@ func updateBridgeAddr(path string, updated string) error {
 	return nil
 }
 
-func updateBridge(client *ethclient.Client, key *keystore.Key, bridgeAddress, proxyAddress, paymentAddress, crAddress common.Address) (err error) {
+func updateBridge(client *ethclient.Client, key *keystore.Key, addrType int, bridgeAddress, addr common.Address) (err error) {
 	var auth *bind.TransactOpts
 	fmt.Println("start to update proxy address to bridge...")
 	auth = bind.NewKeyedTransactor(key.PrivateKey)
@@ -94,60 +95,46 @@ func updateBridge(client *ethclient.Client, key *keystore.Key, bridgeAddress, pr
 	}
 	var tx *types.Transaction
 
-	tx, err = bridge.SetProxyAddress(auth, proxyAddress)
-	for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
-		fmt.Println(err)
-		time.Sleep(time.Second)
-		fmt.Println("transaction retry...")
-		tx, err = bridge.SetProxyAddress(auth, proxyAddress)
+	switch addrType {
+	case proxyAddressType:
+		tx, err = bridge.SetProxyAddress(auth, addr)
+		for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
+			fmt.Println(err)
+			time.Sleep(time.Second)
+			fmt.Println("transaction retry...")
+			tx, err = bridge.SetProxyAddress(auth, addr)
+		}
+		if err == nil {
+			fmt.Println("tx sent: ", tx.Hash().Hex())
+			fmt.Println("proxy address updated in bridge")
+		}
+	case crAddressType:
+		tx, err = bridge.SetCommitRevealAddress(auth, addr)
+		for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
+			fmt.Println(err)
+			time.Sleep(time.Second)
+			fmt.Println("transaction retry...")
+			tx, err = bridge.SetCommitRevealAddress(auth, addr)
+		}
+
+		if err == nil {
+			fmt.Println("tx sent: ", tx.Hash().Hex())
+			fmt.Println("commitReveal address updated in bridge")
+		}
+	case paymentAddressType:
+		tx, err = bridge.SetPaymentAddress(auth, addr)
+		for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
+			fmt.Println(err)
+			time.Sleep(time.Second)
+			fmt.Println("transaction retry...")
+			tx, err = bridge.SetPaymentAddress(auth, addr)
+		}
+		if err == nil {
+			fmt.Println("tx sent: ", tx.Hash().Hex())
+			fmt.Println("payment address updated in bridge")
+		}
+	default:
 	}
-
-	if err != nil {
-		return
-	}
-
-	fmt.Println("tx sent: ", tx.Hash().Hex())
-	fmt.Println("proxy address updated in bridge")
-
-	err = onchain.CheckTransaction(client, tx)
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	tx, err = bridge.SetPaymentAddress(auth, paymentAddress)
-	for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
-		fmt.Println(err)
-		time.Sleep(time.Second)
-		fmt.Println("transaction retry...")
-		tx, err = bridge.SetPaymentAddress(auth, paymentAddress)
-	}
-
-	if err != nil {
-		return
-	}
-
-	fmt.Println("tx sent: ", tx.Hash().Hex())
-	fmt.Println("payment address updated in bridge")
-
-	err = onchain.CheckTransaction(client, tx)
-	if err != nil {
-		fmt.Println(err)
-	}
-
-	tx, err = bridge.SetCommitRevealAddress(auth, crAddress)
-	for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
-		fmt.Println(err)
-		time.Sleep(time.Second)
-		fmt.Println("transaction retry...")
-		tx, err = bridge.SetCommitRevealAddress(auth, crAddress)
-	}
-
-	if err != nil {
-		return
-	}
-
-	fmt.Println("tx sent: ", tx.Hash().Hex())
-	fmt.Println("commitReveal address updated in bridge")
 
 	err = onchain.CheckTransaction(client, tx)
 	if err != nil {
@@ -157,12 +144,25 @@ func updateBridge(client *ethclient.Client, key *keystore.Key, bridgeAddress, pr
 	return
 }
 
-func addProxyToCRWhiteList(client *ethclient.Client, key *keystore.Key, crAddress common.Address, proxyAddress common.Address) (err error) {
+func addProxyToCRWhiteList(client *ethclient.Client, key *keystore.Key, bridgeAddress common.Address) (err error) {
 	var auth *bind.TransactOpts
 	fmt.Println("start to update proxy address to bridge...")
 	auth = bind.NewKeyedTransactor(key.PrivateKey)
 	auth.GasLimit = uint64(6000000)
 	auth.GasPrice = big.NewInt(30000000000)
+	bridge, err := dosbridge.NewDosbridge(bridgeAddress, client)
+	if err != nil {
+		return
+	}
+	proxyAddress, err := bridge.GetProxyAddress(&bind.CallOpts{Context: context.Background()})
+	if err != nil {
+		return
+	}
+	crAddress, err := bridge.GetCommitRevealAddress(&bind.CallOpts{Context: context.Background()})
+	if err != nil {
+		return
+
+	}
 	cr, err := commitreveal.NewCommitreveal(crAddress, client)
 	if err != nil {
 		return
@@ -199,6 +199,7 @@ func deployContract(contractPath, targetTask, configPath string, config configur
 	auth.GasLimit = uint64(6000000)
 	auth.GasPrice = big.NewInt(30000000000)
 	var err error
+	bridgeAddress := common.HexToAddress(chainConfig.DOSAddressBridgeAddress)
 	if targetTask == "deployBridge" {
 		fmt.Println("Starting deploy DOSAddressBridge.sol...")
 		address, tx, _, err = dosbridge.DeployDosbridge(auth, client)
@@ -241,8 +242,8 @@ func deployContract(contractPath, targetTask, configPath string, config configur
 		if err != nil {
 			fmt.Println(err)
 		}
-		chainConfig.DOSPaymentAddress = address.Hex()
-		if err := config.UpdateConfig(chainConfig); err != nil {
+		err := updateBridge(client, key, paymentAddressType, bridgeAddress, address)
+		if err != nil {
 			log.Fatal(err)
 		}
 
@@ -262,13 +263,15 @@ func deployContract(contractPath, targetTask, configPath string, config configur
 		if err != nil {
 			fmt.Println(err)
 		}
-		chainConfig.CommitReveal = address.Hex()
-		if err := config.UpdateConfig(chainConfig); err != nil {
+		err := updateBridge(client, key, crAddressType, bridgeAddress, address)
+		if err != nil {
 			log.Fatal(err)
 		}
 
 	} else if targetTask == "deployProxy" {
 		fmt.Println("Starting deploy DOSProxy.sol...")
+		bridgeAddress := common.HexToAddress(chainConfig.DOSAddressBridgeAddress)
+
 		address, tx, _, err = dosproxy.DeployDosproxy(auth, client)
 		for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
 			fmt.Println(err)
@@ -283,28 +286,16 @@ func deployContract(contractPath, targetTask, configPath string, config configur
 		if err != nil {
 			fmt.Println(err)
 		}
-		chainConfig.DOSProxyAddress = address.Hex()
-		if err := config.UpdateConfig(chainConfig); err != nil {
-			log.Fatal(err)
-		}
 
-	} else if targetTask == "setUpDOSNetwork" {
-
-		bridgeAddress := common.HexToAddress(chainConfig.DOSAddressBridgeAddress)
-		paymentAddress := common.HexToAddress(chainConfig.DOSPaymentAddress)
-		proxyAddress := common.HexToAddress(chainConfig.DOSProxyAddress)
-		crAddress := common.HexToAddress(chainConfig.CommitReveal)
-
-		err := updateBridge(client, key, bridgeAddress, proxyAddress, paymentAddress, crAddress)
+		err := updateBridge(client, key, proxyAddressType, bridgeAddress, address)
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		err = addProxyToCRWhiteList(client, key, crAddress, proxyAddress)
+		err = addProxyToCRWhiteList(client, key, bridgeAddress)
 		if err != nil {
 			log.Fatal(err)
 		}
-
 	} else if targetTask == "deployAMA" {
 		fmt.Println("Starting deploy AskMeAnyThing.sol...")
 		amaConfig := eth.AMAConfig{}
@@ -345,7 +336,7 @@ func deployContract(contractPath, targetTask, configPath string, config configur
 }
 
 func main() {
-	credentialPathPtr := flag.String("credentialPath", "./testAccounts/bootCredential/fundKey", "credential path")
+	credentialPathPtr := flag.String("credentialPath", "./testAccounts/fundKey/fundKey", "credential path")
 	contractPathPtr := flag.String("contractPath", "./contracts", "Contract file path")
 	targetPtr := flag.String("target", "DOSProxy", "DOSProxy or AMA or SimpleDice")
 	configPathPtr := flag.String("configPath", "", "config path")
