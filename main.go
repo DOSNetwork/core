@@ -26,6 +26,13 @@ const pidFile string = "./vault/dosclient.pid"
 const logFile string = "./vault/doslog.txt"
 const dosPath string = "./vault"
 
+func init() {
+	// Check for the directory's existence and create it if it doesn't exist
+	if _, err := os.Stat(dosPath); os.IsNotExist(err) {
+		os.Mkdir(dosPath, 0744)
+	}
+}
+
 func savePID(pid int) {
 
 	file, err := os.Create(pidFile)
@@ -48,11 +55,6 @@ func savePID(pid int) {
 
 func runDos() {
 	defer os.Remove(pidFile)
-	// Check for the directory's existence and create it if it doesn't exist
-	if _, err := os.Stat(dosPath); os.IsNotExist(err) {
-		os.Mkdir(dosPath, os.ModeDir)
-	}
-
 	// check if there is an account
 	n := onchain.NumOfAccounts(dosPath)
 	if n == 0 {
@@ -171,11 +173,9 @@ func getkey() (key *keystore.Key, err error) {
 	return
 }
 func getPassword(s string) (p string) {
-	for p == "" {
-		fmt.Print(s)
-		bytePassword, _ := terminal.ReadPassword(0)
-		p = strings.TrimSpace(string(bytePassword))
-	}
+	fmt.Print(s)
+	bytePassword, _ := terminal.ReadPassword(0)
+	p = strings.TrimSpace(string(bytePassword))
 	fmt.Println("")
 	return
 }
@@ -290,6 +290,9 @@ func actionRnadom(c *cli.Context) error {
 }
 func createWallet() error {
 	first := getPassword("Generating node wallet...\nEnter passphrase (empty is not allowed): ")
+	if first == "" {
+		return errors.New("Empty string is not allowed")
+	}
 	second := getPassword("Confirm passphrase again: ")
 	if first != second {
 		fmt.Println("Unmatched Password")
