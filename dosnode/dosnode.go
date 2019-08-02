@@ -131,19 +131,6 @@ func NewDosNode(key *keystore.Key, config configuration.Config) (dosNode *DosNod
 	return dosNode, nil
 }
 
-// Start registers to onchain and listen to p2p events
-func (d *DosNode) Start() (err error) {
-	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(300*time.Second))
-	defer cancel()
-
-	d.startRESTServer()
-	d.chain.Connect(ctx)
-
-	d.state = "Working"
-
-	return
-}
-
 //End is an operation that does a graceful shutdown
 func (d *DosNode) End() {
 	close(d.done)
@@ -419,18 +406,16 @@ type request struct {
 	reply     chan *vss.Signature
 }
 
-func (d *DosNode) Listen() {
+func (d *DosNode) Start() {
+	d.state = "Working"
 	d.startRESTServer()
-
 	watchdog := time.NewTicker(watchdogInterval * time.Minute)
 	defer watchdog.Stop()
 
 	var errc chan error
-	peerEvent, _ := d.p.SubscribeEvent(50, vss.Signature{})
 	bufSign := make(map[string][]*vss.Signature)
 	reqSign := make(map[string]request)
-
-	//	latestRandm := big.NewInt(0)
+	peerEvent, _ := d.p.SubscribeEvent(50, vss.Signature{})
 	defer d.p.UnSubscribeEvent(vss.Signature{})
 	subescriptions := []int{onchain.SubscribeLogGrouping, onchain.SubscribeLogGroupDissolve, onchain.SubscribeLogUrl,
 		onchain.SubscribeLogUpdateRandom, onchain.SubscribeLogRequestUserRandom,

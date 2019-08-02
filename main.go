@@ -174,9 +174,9 @@ func actionStart(c *cli.Context) (err error) {
 		fmt.Println("NewDosNode err", err)
 		return err
 	}
+
 	savePID(os.Getpid())
 	dosclient.Start()
-	dosclient.Listen()
 	return nil
 }
 
