@@ -12,6 +12,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/DOSNetwork/core/configuration"
 	"github.com/DOSNetwork/core/dosnode"
 	"github.com/DOSNetwork/core/log"
 	"github.com/DOSNetwork/core/onchain"
@@ -23,7 +24,7 @@ import (
 // Caching running node's process id.
 const pidFile string = "./vault/dosclient.pid"
 const logFile string = "./vault/doslog.txt"
-const walletPath string = "./vault"
+const dosPath string = "./vault"
 
 func savePID(pid int) {
 
@@ -47,11 +48,16 @@ func savePID(pid int) {
 
 func runDos() {
 	defer os.Remove(pidFile)
-	// check if there is a account
-	n := onchain.NumOfAccounts(walletPath)
+	// Check for the directory's existence and create it if it doesn't exist
+	if _, err := os.Stat(dosPath); os.IsNotExist(err) {
+		os.Mkdir(dosPath, os.ModeDir)
+	}
+
+	// check if there is an account
+	n := onchain.NumOfAccounts(dosPath)
 	if n == 0 {
 		fmt.Println("Please run 'client wallet create' to create a new wallet for the node")
-		os.Exit(1)
+		return
 	}
 	// check if password is in env variable
 	password := os.Getenv("PASSPHRASE")
@@ -59,12 +65,37 @@ func runDos() {
 		fmt.Println("Please run 'client start' to start a client daemon and provide a password")
 		return
 	}
-	key, err := onchain.ReadEthKey(walletPath, password)
+	key, err := onchain.ReadEthKey(dosPath, password)
 	if err != nil {
-		fmt.Println("Error : ", err)
+		fmt.Println("ReadEthKey Error : ", err)
 		return
 	}
 	log.Init(key.Address.Bytes()[:])
+
+	//Read Configuration
+	config := configuration.Config{}
+	if err := config.LoadConfig(); err != nil {
+		fmt.Println("LoadConfig Error : ", err)
+		return
+	}
+	//Check if config has all information
+	if len(config.ChainNodePool) == 0 {
+		fmt.Println("Please provides geth ws address in config.json")
+		return
+	}
+	hasWsAddr := false
+	for _, gethAddr := range config.ChainNodePool {
+		if strings.Contains(gethAddr, "ws://") {
+			hasWsAddr = true
+			break
+		}
+
+	}
+	if !hasWsAddr {
+		fmt.Println("Please provides at least one geth ws address in config.json")
+		return
+	}
+
 	// Make arrangement to remove PID file upon receiving the SIGTERM from kill command
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, os.Interrupt, os.Kill, syscall.SIGTERM)
@@ -73,21 +104,21 @@ func runDos() {
 		defer os.Exit(0)
 		signalType := <-ch
 		signal.Stop(ch)
-		fmt.Println("Received signal type : ", signalType)
 		os.Remove(pidFile)
+		fmt.Println("Received signal type : ", signalType)
 	}()
 
 	fErr, err := os.OpenFile(logFile, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0666)
 	if err != nil {
-		fmt.Println("runDos err ", err)
+		fmt.Println("OpenLogFile err ", err)
 		return
 	}
 	syscall.Dup2(int(fErr.Fd()), 1) /* -- stdout */
 	syscall.Dup2(int(fErr.Fd()), 2) /* -- stderr */
 
-	dosclient, err := dosnode.NewDosNode(key)
+	dosclient, err := dosnode.NewDosNode(key, config)
 	if err != nil {
-		fmt.Println(" err", err)
+		fmt.Println("NewDosNode err", err)
 		return
 	}
 	dosclient.Start()
@@ -122,7 +153,7 @@ func makeRequest(f string) ([]byte, error) {
 func getkey() (key *keystore.Key, err error) {
 	//Check if there is a keystore
 	password := ""
-	key, err = onchain.ReadEthKey(walletPath, password)
+	key, err = onchain.ReadEthKey(dosPath, password)
 	if err != nil && err.Error() == "No Account" {
 		return
 	}
@@ -132,7 +163,7 @@ func getkey() (key *keystore.Key, err error) {
 		//Get password from terminal
 		password = getPassword("Enter password :")
 	}
-	key, err = onchain.ReadEthKey(walletPath, password)
+	key, err = onchain.ReadEthKey(dosPath, password)
 
 	return
 }
@@ -152,7 +183,7 @@ func actionStart(c *cli.Context) error {
 		os.Exit(1)
 	}
 	// check if there is a account
-	n := onchain.NumOfAccounts(walletPath)
+	n := onchain.NumOfAccounts(dosPath)
 	if n == 0 {
 		fmt.Println("Please run 'client wallet create' to create a new wallet for the node")
 		os.Exit(1)
@@ -263,16 +294,16 @@ func actionCreateWallet(c *cli.Context) error {
 		fmt.Println("Unmatched Password")
 		return errors.New("Unmatched Password")
 	}
-	err := onchain.GenEthkey(walletPath, first)
+	err := onchain.GenEthkey(dosPath, first)
 	if err != nil {
 		fmt.Println("GenEthkey error : ", err)
 	} else {
-		key, err := onchain.ReadEthKey(walletPath, first)
+		key, err := onchain.ReadEthKey(dosPath, first)
 		if err != nil {
 			fmt.Println("Error :", err)
 			return err
 		}
-		fmt.Println("wallet keystore file has been saved under", walletPath)
+		fmt.Println("wallet keystore file has been saved under", dosPath)
 		fmt.Println("Your node wallet address is:", fmt.Sprintf("0x%x", key.Address))
 	}
 	return nil

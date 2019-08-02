@@ -2,43 +2,34 @@ package configuration
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"os"
-	"strconv"
 	"strings"
 )
 
 const (
 	envChainType     = "CHAINTYPE"
-	envChainNode     = "CHAINNODE"
-	envRandomConnect = "RANDOMCONNECT"
 	envConfigPath    = "CONFIGPATH"
-	envNodeRole      = "NODEROLE"
 	envBootStrapIP   = "BOOTSTRAPIP"
+	envNodeIP        = "NODEIP"
 	envNodePort      = "NODEPORT"
-	envGroupSize     = "GROUPSIZE"
-	envGroupToPick   = "GROUPTOPICK"
+	envGethPool      = "GETHPOOL"
+	defaultChainType = "ETH"
+	defaultPort      = "9501"
 )
 
 // Config is the configuration for creating a DOS client instance.
 type Config struct {
-	NodeRole        string
-	BootStrapIp     []string
-	Port            string
-	ChainConfigs    map[string]map[string]ChainConfig
-	randomGroupSize int
-	queryGroupSize  int
-	credentialPath  string
-	path            string
-	currentType     string
-	currentNode     string
-}
-
-// ChainConfig is the configuration for connecting to onchan contracts.
-type ChainConfig struct {
+	ConfigPath              string
+	NodeIP                  string
+	NodePort                string
+	ChainType               string
 	DOSAddressBridgeAddress string
-	RemoteNodeAddressPool   []string
+	BootStrapIPs            []string
+	ChainNodePool           []string
 }
 
 // LoadConfig loads configuration file from path.
@@ -73,13 +64,6 @@ func LoadConfig(path string, c interface{}) (err error) {
 	return
 }
 
-// UpdateConfig saves configuration to a file.
-func UpdateConfig(path string, c interface{}) (err error) {
-	configsJson, _ := json.MarshalIndent(c, "", "    ")
-	err = ioutil.WriteFile(path, configsJson, 0644)
-	return
-}
-
 // LoadConfig loads configuration file from path.
 func (c *Config) LoadConfig() (err error) {
 	path := os.Getenv(envConfigPath)
@@ -92,8 +76,8 @@ func (c *Config) LoadConfig() (err error) {
 			path = "."
 		}
 	}
-	c.path = path + "/config.json"
-	err = LoadConfig(c.path, c)
+	c.ConfigPath = path + "/config.json"
+	err = LoadConfig(c.ConfigPath, c)
 	if err != nil {
 		fmt.Println("LoadConfig  err", err)
 		return
@@ -105,69 +89,45 @@ func (c *Config) LoadConfig() (err error) {
 }
 
 func (c *Config) overWrite() (err error) {
-	envSize := os.Getenv(envGroupSize)
-	if envSize != "" {
-		var size int
-		size, err = strconv.Atoi(envSize)
-		if err != nil {
-			return
+	ip := os.Getenv(envNodeIP)
+	if ip != "" {
+		testInput := net.ParseIP(ip)
+		if testInput.To4() == nil {
+			fmt.Printf("%v is not a valid IPv4 address\n", testInput)
+			return errors.New("not a valid IPv4 address")
+		} else {
+			c.NodeIP = ip
 		}
-		c.randomGroupSize = size
-		c.queryGroupSize = size
 	}
-
-	nodeRole := os.Getenv(envNodeRole)
-	if nodeRole != "" {
-		c.NodeRole = nodeRole
-	}
-
 	port := os.Getenv(envNodePort)
 	if port != "" {
-		//TODO:add a check
-		c.Port = port
+		c.NodePort = port
+	} else if c.NodePort == "" {
+		c.NodePort = defaultPort
 	}
 
 	chainType := os.Getenv(envChainType)
-	if chainType == "" {
-		fmt.Println("No CHAINTYPE Environment variable.")
-		chainType = "ETH"
+	if chainType != "" {
+		c.ChainType = chainType
+	} else if c.ChainType == "" {
+		c.ChainType = defaultChainType
 	}
-	c.currentType = chainType
 
-	chainNode := os.Getenv(envChainNode)
-	if chainNode == "" {
-		fmt.Println("No CHAINNODE Environment variable.")
-		chainNode = "rinkeby"
-	}
-	c.currentNode = chainNode
-	if config, loaded := c.ChainConfigs[c.currentType][c.currentNode]; loaded {
-		gethIP := os.Getenv("GETHPOOL")
-		if gethIP != "" {
-			ipPool := strings.Split(gethIP, ";")
-			for _, ip := range ipPool {
-				config.RemoteNodeAddressPool = append(config.RemoteNodeAddressPool, ip)
-			}
+	gethIP := os.Getenv(envGethPool)
+	if gethIP != "" {
+		ipPool := strings.Split(gethIP, ";")
+		for _, ip := range ipPool {
+			c.ChainNodePool = append(c.ChainNodePool, ip)
 		}
-		c.ChainConfigs[c.currentType][c.currentNode] = config
 	}
-
 	return
 }
 
-// GetCurrentType return a string to indicate the type of onchain.
-func (c *Config) GetCurrentType() string {
-	return c.currentType
-}
-
-// GetChainConfig return a ChainConfig struct that contain onchain information
-func (c *Config) GetChainConfig() (config ChainConfig) {
-	return c.ChainConfigs[c.currentType][c.currentNode]
-}
-
 // UpdateConfig saves configuration to a file.
-func (c *Config) UpdateConfig(updated ChainConfig) (err error) {
-	if _, loaded := c.ChainConfigs[c.currentType][c.currentNode]; loaded {
-		c.ChainConfigs[c.currentType][c.currentNode] = updated
+func (c *Config) UpdateConfig() (err error) {
+	if c.ConfigPath != "" {
+		configJson, _ := json.MarshalIndent(c, "", "    ")
+		err = ioutil.WriteFile(c.ConfigPath, configJson, 0644)
 	}
-	return UpdateConfig(c.path, c)
+	return
 }

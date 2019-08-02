@@ -1,21 +1,16 @@
 {
-    "NodeRole": "",
-    "BootStrapIp": [
+    "BootStrapIPs": [
         "18.236.117.126",
         "18.236.199.131",
         "18.236.80.51",
         "18.237.0.120",
         "18.237.179.193"
     ],
-    "Port": "9501",
-    "ChainConfigs": {
-        "ETH": {
-            "rinkeby": {
-                "DOSAddressBridgeAddress": "0x508D4ab5F1304d6ed0944F65f93beFb4f1e635f6",
-                "RemoteNodeAddressPool": [
-                    "https://rinkeby.infura.io/v3/2a6901876ca54406960499e888e70439"
-                ]
-            }
-        }
-    }
+	"NodeIP":"",
+    "NodePort": "9501",
+    "DOSAddressBridgeAddress": "0x508D4ab5F1304d6ed0944F65f93beFb4f1e635f6",
+	"ChainType":"ETH",
+    "ChainNodePool": [
+		""
+    ]
 }

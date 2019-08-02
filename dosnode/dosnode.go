@@ -60,22 +60,13 @@ type crDurations struct {
 }
 
 //NewDosNode creates a DosNode struct
-func NewDosNode(key *keystore.Key) (dosNode *DosNode, err error) {
+func NewDosNode(key *keystore.Key, config configuration.Config) (dosNode *DosNode, err error) {
 
-	//Read Configuration
-	config := configuration.Config{}
-	err = config.LoadConfig()
-	if err != nil {
-		return
-	}
-
-	port := config.Port
-	bootstrapIP := config.BootStrapIp
-
-	chainConfig := config.GetChainConfig()
+	port := config.NodePort
+	bootstrapIP := config.BootStrapIPs
 
 	//Set up an onchain adapter
-	chainConn, err := onchain.NewProxyAdapter(config.GetCurrentType(), key, chainConfig.DOSAddressBridgeAddress, chainConfig.RemoteNodeAddressPool)
+	chainConn, err := onchain.NewProxyAdapter(config.ChainType, key, config.DOSAddressBridgeAddress, config.ChainNodePool)
 	if err != nil {
 		if err.Error() != "No any working eth client for event tracking" {
 			fmt.Println("NewDosNode failed ", err)
