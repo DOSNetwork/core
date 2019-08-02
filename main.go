@@ -56,9 +56,12 @@ func runDos() {
 	// check if there is an account
 	n := onchain.NumOfAccounts(dosPath)
 	if n == 0 {
-		fmt.Println("Please run 'client wallet create' to create a new wallet for the node")
-		return
+		if err := createWallet(); err != nil {
+			fmt.Println("CreateWallet Error : ", err)
+			return
+		}
 	}
+
 	// check if password is in env variable
 	password := os.Getenv("PASSPHRASE")
 	if len(password) == 0 {
@@ -285,9 +288,7 @@ func actionRnadom(c *cli.Context) error {
 	}
 	return err
 }
-
-func actionCreateWallet(c *cli.Context) error {
-
+func createWallet() error {
 	first := getPassword("Generating node wallet...\nEnter passphrase (empty is not allowed): ")
 	second := getPassword("Confirm passphrase again: ")
 	if first != second {
@@ -297,6 +298,7 @@ func actionCreateWallet(c *cli.Context) error {
 	err := onchain.GenEthkey(dosPath, first)
 	if err != nil {
 		fmt.Println("GenEthkey error : ", err)
+		return err
 	} else {
 		key, err := onchain.ReadEthKey(dosPath, first)
 		if err != nil {
@@ -307,6 +309,15 @@ func actionCreateWallet(c *cli.Context) error {
 		fmt.Println("Your node wallet address is:", fmt.Sprintf("0x%x", key.Address))
 	}
 	return nil
+}
+
+func actionCreateWallet(c *cli.Context) error {
+	// check if there is an account
+	if n := onchain.NumOfAccounts(dosPath); n != 0 {
+		fmt.Println("Node already has an account")
+		return nil
+	}
+	return createWallet()
 }
 
 func actionWalletInfo(c *cli.Context) error {
