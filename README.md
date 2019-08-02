@@ -16,13 +16,13 @@
 ##### Verified and recommended installation environment
 - Ubuntu 16.04 x64 LTS or higher 
 - An IPv4 address
-- Run `$ curl ipconfig.me`
-- Or get it from cloud server providers. Most vps / cloud server 
+  - Run `$ dig +short myip.opendns.com @resolver1.opendns.com`
+  - Or get it from cloud server providers. Most vps / cloud server 
 - With below ports open:
   - **udp** port `7946`,`30303`
-  - **tcp** port `7946`,`30303`,`8545`,`8546`,`9501`
+  - **tcp** port `7946`,`9501``30303`,`8545`,`8546`
 - It's recommended to generate ssh login key pairs and setup public key authentication instead of using password login for server security and funds safety:
-- Learn [how to](https://www.digitalocean.com/community/tutorials/how-to-set-up-ssh-keys-on-ubuntu-1604) setup SSH public key authentication on Ubuntu 16.04 and disable password logins.
+  - Learn [how to](https://www.digitalocean.com/community/tutorials/how-to-set-up-ssh-keys-on-ubuntu-1604) setup SSH public key authentication on Ubuntu 16.04 and disable password logins.
 
 
 ##### Acquire testnet ether and testnet tokens
@@ -58,7 +58,12 @@
     ```sh
     $ sudo apt-get install build-essential
     ```
-    
+- Install `go-dep` if not already done
+    ```sh
+    $ cd $GOPATH
+    $ mkdir -p bin
+    $ curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
+    ```    
 - Build:
   - `$ make vendor` - to prepare dependencies for building 
   - `$ make` - to build release version client
@@ -71,9 +76,18 @@
   - `$ make gen` to generate binding files for system contracts.
   - `$ make clean` to remove built binaries or unnecessary generated files.
 
-## Building using Docker (TODO)
-
-
+## Building using Docker
+- Install `docker` if not already done
+    ```sh
+    $ sudo apt-get purge docker lxc-docker docker-engine docker.io
+    $ sudo apt-get install  curl  apt-transport-https ca-certificates software-properties-common
+    $ curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add 
+    $ sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+    $ sudo apt-get update
+    $ sudo apt-get install docker-ce
+    ```
+- Build:
+  - `$ make client-docker`
 
 ## Prepare the environment (TODO)
 - Download github repo: `$ git clone https://github.com/DOSNetwork/core.git`
