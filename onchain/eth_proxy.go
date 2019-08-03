@@ -950,12 +950,8 @@ func (e *ethAdaptor) Close() {
 }
 
 func (e *ethAdaptor) Connect(ctx context.Context) (err error) {
-	clients := DialToEth(ctx, e.wsUrls)
-	if len(clients) == 0 {
-		return errors.New("No reachable geth client")
-	}
-
 	var bridge *dosbridge.Dosbridge
+	clients := DialToEth(ctx, e.wsUrls)
 	for client := range clients {
 		var err error
 		if bridge == nil {

@@ -138,7 +138,8 @@ func actionStart(c *cli.Context) (err error) {
 	}
 	hasWsAddr := false
 	for _, gethAddr := range config.ChainNodePool {
-		if strings.Contains(gethAddr, "ws://") {
+		if strings.Contains(gethAddr, "ws://") ||
+			strings.Contains(gethAddr, "wss://") {
 			hasWsAddr = true
 			break
 		}

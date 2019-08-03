@@ -407,6 +407,7 @@ type request struct {
 }
 
 func (d *DosNode) Start() {
+	defer fmt.Println("end Start")
 	d.state = "Working"
 	d.startRESTServer()
 	watchdog := time.NewTicker(watchdogInterval * time.Minute)
@@ -427,7 +428,8 @@ S:
 	defer cancel()
 	err := d.chain.Connect(ctx)
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println("chain.Connect err ", err)
+		return
 	}
 	//TODO: Check to see if it is a valid stacking node first
 	_ = d.chain.RegisterNewNode(context.Background())
