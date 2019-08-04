@@ -5,7 +5,7 @@ startClient(){
           dosnode:latest /client wallet create
   echo -n Enter password :
   read -s password
-  docker run -it -d -p 7946:7946 -p 7947:8080 -p 9501:9501 \
+  docker run -it -d -p 7946:7946 -p 8080:8080 -p 9501:9501 \
           --mount type=bind,source=$(pwd),target=/config  \
           --mount type=bind,source=$(pwd)/vault,target=/vault  \
           -e CONFIGPATH=config -e PASSPHRASE=$password \

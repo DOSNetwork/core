@@ -51,7 +51,7 @@ func savePID(pid int) {
 
 func makeRequest(f string) ([]byte, error) {
 
-	tServer := "http://localhost:9502/" + f
+	tServer := "http://localhost:8080/" + f
 
 	req, err := http.NewRequest("GET", tServer, nil)
 	if err != nil {
