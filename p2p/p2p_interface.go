@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"os"
 	"strconv"
 
 	"github.com/DOSNetwork/core/log"
@@ -58,7 +57,7 @@ type P2PInterface interface {
 }
 
 // CreateP2PNetwork creates a P2PInterface implementation , gets a public IP and generates a secret key
-func CreateP2PNetwork(id []byte, port string, netType int) (P2PInterface, error) {
+func CreateP2PNetwork(id []byte, ip, port string, netType int) (P2PInterface, error) {
 	suite := suites.MustFind("bn256")
 	logger = log.New("module", "p2p")
 	p := &server{
@@ -74,8 +73,8 @@ func CreateP2PNetwork(id []byte, port string, netType int) (P2PInterface, error)
 	p.id = id
 
 	// If user specify a public ip from the env variable,use it as external IP.
-	if ip := net.ParseIP(os.Getenv("PUBLICIP")); ip != nil {
-		p.addr = ip
+	if addr := net.ParseIP(ip); addr != nil {
+		p.addr = addr
 	} else {
 		ip, err := getIP()
 		if err != nil {

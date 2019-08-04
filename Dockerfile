@@ -8,5 +8,3 @@ FROM scratch
 COPY --from=dosnetwork/dosenv:latest  /etc/ssl/certs/ /etc/ssl/certs/
 COPY --from=builder /go/src/github.com/DOSNetwork/core/client /
 COPY --from=builder /go/src/github.com/DOSNetwork/core/config.json /
-COPY --from=builder /go/src/github.com/DOSNetwork/core/testAccounts /testAccounts
-CMD ["/client","run"]

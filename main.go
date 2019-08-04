@@ -51,7 +51,7 @@ func savePID(pid int) {
 
 func makeRequest(f string) ([]byte, error) {
 
-	tServer := "http://localhost:8080/" + f
+	tServer := "http://localhost:9502/" + f
 
 	req, err := http.NewRequest("GET", tServer, nil)
 	if err != nil {
@@ -293,7 +293,7 @@ func createWallet() (string, error) {
 func actionCreateWallet(c *cli.Context) (err error) {
 	// check if there is an account
 	if n := onchain.NumOfAccounts(dosPath); n != 0 {
-		fmt.Println("Node already has an account")
+		fmt.Println("Found an node account")
 		return nil
 	}
 	_, err = createWallet()

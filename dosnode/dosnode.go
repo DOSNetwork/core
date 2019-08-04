@@ -62,9 +62,6 @@ type crDurations struct {
 //NewDosNode creates a DosNode struct
 func NewDosNode(key *keystore.Key, config configuration.Config) (dosNode *DosNode, err error) {
 
-	port := config.NodePort
-	bootstrapIP := config.BootStrapIPs
-
 	//Set up an onchain adapter
 	chainConn, err := onchain.NewProxyAdapter(config.ChainType, key, config.DOSAddressBridgeAddress, config.ChainNodePool)
 	if err != nil {
@@ -77,7 +74,7 @@ func NewDosNode(key *keystore.Key, config configuration.Config) (dosNode *DosNod
 	id := key.Address
 
 	//Build a p2p network
-	p, err := p2p.CreateP2PNetwork(id.Bytes(), port, p2p.GossipDiscover)
+	p, err := p2p.CreateP2PNetwork(id.Bytes(), config.NodeIP, config.NodePort, p2p.GossipDiscover)
 	if err != nil {
 		fmt.Println("CreateP2PNetwork err ", err)
 		return
@@ -90,10 +87,10 @@ func NewDosNode(key *keystore.Key, config configuration.Config) (dosNode *DosNod
 	}
 
 	//Bootstrapping p2p network
-	fmt.Println("Join :", bootstrapIP)
+	fmt.Println("Join :", config.BootStrapIPs)
 	retry, num := 0, 0
 	for {
-		num, err = p.Join(bootstrapIP)
+		num, err = p.Join(config.BootStrapIPs)
 		if err != nil || num == 0 {
 			fmt.Println("Join ", err, num)
 

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/big"
 	"net/http"
+	"os"
 	"sort"
 	"strconv"
 	"time"
@@ -25,7 +26,12 @@ func (d *DosNode) startRESTServer() {
 	mux.HandleFunc("/p2pTest", d.p2pTest)
 	mux.HandleFunc("/dkgTest", d.dkgTest)
 	mux.HandleFunc("/queryTest", d.queryTest)
-	go http.ListenAndServe(":8080", mux)
+	go func() {
+		if err := http.ListenAndServe(":8080", mux); err != nil {
+			fmt.Println("RESTServer err : ", err)
+			os.Exit(1)
+		}
+	}()
 }
 
 func (d *DosNode) status(w http.ResponseWriter, r *http.Request) {
