@@ -134,7 +134,29 @@
     ```
 
 ### Run client node using Docker (TODO)
-
+- Config following fields in [`config.json`](https://github.com/DOSNetwork/core/blob/master/config.json) file:
+  - `NodeIP`: Public ip address of the server/vps. 
+  - `ChainNodePool`: User can add more ws (web socket) of infura endpoints and more ws (web socket) of geth full nodes here.
+  - Example:
+	```
+	"NodeIP":"111.111.111.111",
+	"ChainNodePool": [
+	        "ws://<ip-to-ethereum-rinkeby-fullnode>:8546",
+                "wss://rinkeby.infura.io/ws/v3/<INFURA-PROJECT-ID>"
+        ]
+	```
+- Run client on the background (Recommended):
+    ```sh
+    $ ./vps_docker.sh start
+    ```
+- Check client status :
+    ```sh
+    $ ./vps_docker.sh status
+    ```
+- Stop client :
+    ```sh
+    $ ./vps_docker.sh stop
+    ```
 
 
 ## Status
