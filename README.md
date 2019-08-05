@@ -118,7 +118,7 @@
                 "ws://22.22.22.22:8546"
         ]
 	```
-    Assuming one has a geth full node and had an infura account
+    Assuming one has a geth full node and an infura account
 	```
 	"NodeIP":"111.111.111.111",
 	"ChainNodePool": [
