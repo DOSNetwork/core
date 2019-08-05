@@ -138,11 +138,26 @@
   - `NodeIP`: Public ip address of the server/vps. 
   - `ChainNodePool`: User can add more ws (web socket) of infura endpoints and more ws (web socket) of geth full nodes here.
   - Example:
+    Assuming one has an infura account that INFURA-PROJECT-ID is "abcdefghijk"
 	```
 	"NodeIP":"111.111.111.111",
 	"ChainNodePool": [
-	        "ws://<ip-to-ethereum-rinkeby-fullnode>:8546",
-                "wss://rinkeby.infura.io/ws/v3/<INFURA-PROJECT-ID>"
+                "wss://rinkeby.infura.io/ws/v3/abcdefghijk"
+        ]
+	```
+    Assuming one has a geth full node that ip is 22.22.22.22
+	```
+	"NodeIP":"111.111.111.111",
+	"ChainNodePool": [
+                "ws://22.22.22.22:8546"
+        ]
+	```
+    Assuming one has a geth full node and had an infura account
+	```
+	"NodeIP":"111.111.111.111",
+	"ChainNodePool": [
+                "ws://22.22.22.22:8546",
+		"wss://rinkeby.infura.io/ws/v3/abcdefghijk"
         ]
 	```
 - Run client on the background (Recommended):
@@ -156,6 +171,10 @@
 - Stop client :
     ```sh
     $ ./vps_docker.sh stop
+    ```
+- Debuging an issue :
+    ```sh
+    $ cat vault/doslog.txt
     ```
 
 
