@@ -98,42 +98,8 @@
     ```
 - Build:
   - `$ make client-docker`
-
-## Run standalone binary
-- Config following fields in [`config.json`](https://github.com/DOSNetwork/core/blob/master/config.json) file:
-  - `NodeIP`: Public ip address of the server/vps. 
-  - `ChainNodePool`: User can add more ws (web socket) of infura endpoints and more ws (web socket) of geth full nodes here.
-  - Example:
-	```
-	"NodeIP":"111.111.111.111",
-	"ChainNodePool": [
-	        "ws://<ip-to-ethereum-rinkeby-fullnode>:8546",
-                "wss://rinkeby.infura.io/ws/v3/<INFURA-PROJECT-ID>"
-        ]
-	```
-- Create an node wallet (Only for the first time):
-    ```sh
-    $ ./client wallet create
-    ```	
-- Run client :
-    ```sh
-    $ ./client start
-    ```
-- Run client on the background (Recommended):
-    ```sh
-    $ echo -n Password:;read -s password ;export PASSPHRASE=$password ;nohup ./client start &
-    ```
-- Check client status :
-	./client status
-    ```sh
-    $ ./client status
-    ```
-- Stop client :
-    ```sh
-    $ ./client stop
-    ```
-
-### Run client node using Docker (TODO)
+  
+## Configure the client
 - Config following fields in [`config.json`](https://github.com/DOSNetwork/core/blob/master/config.json) file:
   - `NodeIP`: Public ip address of the server/vps. 
   - `ChainNodePool`: User can add more ws (web socket) of infura endpoints and more ws (web socket) of geth full nodes here.
@@ -160,6 +126,34 @@
 		"wss://rinkeby.infura.io/ws/v3/abcdefghijk"
         ]
 	```
+## Run standalone binary
+- Create an node wallet (Only for the first time):
+    ```sh
+    $ ./client wallet create
+    ```	
+- Run client :
+    ```sh
+    $ ./client start
+    ```
+- Run client on the background (Recommended):
+    ```sh
+    $ echo -n Password:;read -s password ;export PASSPHRASE=$password ;nohup ./client start &
+    ```
+- Check client status :
+	./client status
+    ```sh
+    $ ./client status
+    ```
+- Stop client :
+    ```sh
+    $ ./client stop
+    ```
+- Debuging an issue :
+    ```sh
+    $ cat vault/doslog.txt
+    ```
+
+### Run client node using Docker
 - Run client on the background (Recommended):
     ```sh
     $ ./vps_docker.sh start
