@@ -313,6 +313,14 @@ func actionWalletBalance(c *cli.Context) error {
 	return err
 }
 
+func actionEnableGuardian(c *cli.Context) error {
+	_, err := makeRequest("/enableGuardian")
+	if err == nil {
+		return nil
+	}
+	return err
+}
+
 // main
 func main() {
 
@@ -341,6 +349,11 @@ func main() {
 			Name:  "guardian",
 			Usage: "Guardian functions",
 			Subcommands: []cli.Command{
+				{
+					Name:   "enable",
+					Usage:  "enable guardian ",
+					Action: actionEnableGuardian,
+				},
 				{
 					Name:   "groupFormation",
 					Usage:  "signal proxy to generate a new group",

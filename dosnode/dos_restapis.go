@@ -18,6 +18,7 @@ func (d *DosNode) startRESTServer() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", d.status)
 	mux.HandleFunc("/balance", d.balance)
+	mux.HandleFunc("/enableGuardian", d.enableGuardian)
 	mux.HandleFunc("/signalGroupFormation", d.signalGroupFormation)
 	mux.HandleFunc("/signalGroupDissolve", d.signalGroupDissolve)
 	mux.HandleFunc("/signalBootstrap", d.signalBootstrap)
@@ -102,6 +103,10 @@ func (d *DosNode) balance(w http.ResponseWriter, r *http.Request) {
 		html = html + err.Error()
 	}
 	w.Write([]byte(html))
+}
+
+func (d *DosNode) enableGuardian(w http.ResponseWriter, r *http.Request) {
+	d.isGuardian = true
 }
 
 func (d *DosNode) signalBootstrap(w http.ResponseWriter, r *http.Request) {

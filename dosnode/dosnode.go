@@ -44,6 +44,8 @@ type DosNode struct {
 	onchainEvent chan interface{}
 	id           []byte
 	logger       log.Logger
+	isGuardian   bool
+
 	//For REST API
 	startTime         time.Time
 	state             string
@@ -437,7 +439,7 @@ L:
 	for {
 		select {
 		case <-watchdog.C:
-			if isPendingNode, _ := d.chain.IsPendingNode(context.Background(), d.id); isPendingNode {
+			if d.isGuardian {
 				//Let pending node as a guardian
 				currentBlockNumber, err := d.chain.CurrentBlock(context.Background())
 				if err != nil {
