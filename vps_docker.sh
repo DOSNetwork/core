@@ -13,7 +13,7 @@ startClient(){
 }
 
 status(){
-  docker run -it dosnode:latest /client status
+  curl http://localhost:8080/
 }
 
 stop(){

@@ -8,7 +8,7 @@
     ],
     "NodeIP":"",
     "NodePort": "9501",
-    "DOSAddressBridgeAddress": "0x508D4ab5F1304d6ed0944F65f93beFb4f1e635f6",
+    "DOSAddressBridgeAddress": "0xf0CEFfc4209e38EA3Cd1926DDc2bC641cbFFd1cF",
     "ChainType":"ETH",
     "ChainNodePool": [
 		""
