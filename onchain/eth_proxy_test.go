@@ -14,10 +14,10 @@ const (
 )
 
 var (
-	urls           = []string{"https://rinkeby.infura.io/v3/2a6901876ca54406960499e888e70439", "ws://34.220.59.83:8546"}
+	urls           = []string{""}
 	bridgeAddr     = "0xf0CEFfc4209e38EA3Cd1926DDc2bC641cbFFd1cF"
-	credentialPath = "/Users/chenhaonien/go/src/github.com/DOSNetwork/core/testAccounts/bootCredential/fundKey/"
-	passphrase     = "123"
+	credentialPath = ""
+	passphrase     = ""
 )
 
 func TestGetPendingNonce(t *testing.T) {
@@ -231,7 +231,7 @@ func TestReconnect(t *testing.T) {
 		return
 	}
 S:
-	adaptor.Start()
+	adaptor.Connect(context.Background())
 	var errcList []chan error
 	sink, errc := adaptor.SubscribeEvent([]int{SubscribeDosproxyUpdateGroupToPick, SubscribeDosproxyUpdateGroupSize})
 	errcList = append(errcList, errc)
@@ -274,7 +274,7 @@ L:
 			}
 		}
 	}
-	adaptor.End()
+	adaptor.Close()
 	adaptor.UpdateWsUrls([]string{"ws://52.24.205.11:8546"})
 	goto S
 }

@@ -439,13 +439,13 @@ L:
 	for {
 		select {
 		case <-watchdog.C:
+			currentBlockNumber, err := d.chain.CurrentBlock(context.Background())
+			if err != nil {
+				d.logger.Error(err)
+				fmt.Println("Dos node CurrentBlock err ", err)
+				break L
+			}
 			if d.isGuardian {
-				//Let pending node as a guardian
-				currentBlockNumber, err := d.chain.CurrentBlock(context.Background())
-				if err != nil {
-					d.logger.Error(err)
-					return
-				}
 				switch index := currentBlockNumber % 3; index {
 				case 0:
 					d.handleRandom(currentBlockNumber)
@@ -593,17 +593,19 @@ L:
 		}
 	}
 	d.chain.Close()
-	ips := d.p.MembersIP()
-	var urls = []string{}
-	urls = append(urls, "wss://rinkeby.infura.io/ws/v3/db19cf9028054762865cb9ce883c6ab8")
-	urls = append(urls, "wss://rinkeby.infura.io/ws/v3/3a3e5d776961418e93a8b33fef2f6642")
-	for _, ip := range ips {
-		urls = append(urls, "ws://"+ip.String()+":8546")
-		if len(urls) >= 5 {
-			break
+	/*
+		ips := d.p.MembersIP()
+		var urls = []string{}
+		urls = append(urls, "wss://rinkeby.infura.io/ws/v3/db19cf9028054762865cb9ce883c6ab8")
+		urls = append(urls, "wss://rinkeby.infura.io/ws/v3/3a3e5d776961418e93a8b33fef2f6642")
+		for _, ip := range ips {
+			urls = append(urls, "ws://"+ip.String()+":8546")
+			if len(urls) >= 5 {
+				break
+			}
 		}
-	}
-	d.chain.UpdateWsUrls(urls)
+		d.chain.UpdateWsUrls(urls)
+	*/
 	goto S
 }
 

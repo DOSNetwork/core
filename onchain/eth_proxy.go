@@ -1055,6 +1055,7 @@ func (e *ethAdaptor) get(ctx context.Context, f getFunc, p interface{}) (interfa
 			}
 			fmt.Println("get err", err, " stack ", stack.Trace().TrimRuntime())
 			e.logger.Error(err.(error))
+			return nil, err
 		case <-ctx.Done():
 			return nil, errors.New("Timeout")
 		}
