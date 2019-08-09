@@ -122,15 +122,7 @@ func choseSubmitter(ctx context.Context, p p2p.P2PInterface, e onchain.ProxyAdap
 				continue
 			}
 			if balance.Cmp(big.NewFloat(0.3)) == 1 {
-				if !bytes.Equal(p.GetID(), ids[idx]) {
-					if _, err := p.ConnectTo(ctx, "", ids[idx]); err != nil {
-						select {
-						case <-ctx.Done():
-						case errc <- err:
-						}
-						continue
-					}
-				}
+				//Check to see if submitter is alive
 				submitter = idx
 				break
 			}

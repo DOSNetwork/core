@@ -42,17 +42,16 @@ type P2PInterface interface {
 	GetPort() string
 	Listen() error
 	Join(bootstrapIp []string) (num int, err error)
-	ConnectTo(ctx context.Context, ip string, id []byte) ([]byte, error)
 	DisConnectTo(id []byte) error
 	Leave()
 	Request(ctx context.Context, id []byte, m proto.Message) (msg P2PMessage, err error)
-	Reply(id []byte, nonce uint64, m proto.Message) (err error)
+	Reply(ctx context.Context, id []byte, nonce uint64, m proto.Message) (err error)
 	SubscribeEvent(chanBuffer int, messages ...interface{}) (outch chan P2PMessage, err error)
 	UnSubscribeEvent(messages ...interface{})
 	NumOfMembers() int
 	MembersID() [][]byte
 	MembersIP() []net.IP
-	ConnectToAll(ctx context.Context, groupIds [][]byte, sessionID string) (out chan bool, errc chan error)
+	//ConnectToAll(ctx context.Context, groupIds [][]byte, sessionID string) (out chan bool, errc chan error)
 	numOfClient() (int, int)
 }
 
@@ -62,7 +61,7 @@ func CreateP2PNetwork(id []byte, ip, port string, netType int) (P2PInterface, er
 	logger = log.New("module", "p2p")
 	p := &server{
 		suite:     suite,
-		messages:  make(chan P2PMessage, 100),
+		peersFeed: make(chan P2PMessage, 100),
 		subscribe: make(chan subscription),
 		unscribe:  make(chan subscription),
 		port:      port,
@@ -121,13 +120,15 @@ func CreateP2PNetwork(id []byte, ip, port string, netType int) (P2PInterface, er
 
 	switch netType {
 	case GossipDiscover:
-		network, err := discover.NewSerfNet(p.addr, p.id)
+		network, err := discover.NewSerfNet(p.addr, string(p.id), p.port)
 		if err != nil {
 			p.cancel()
 			return nil, err
 		}
 		p.members = network
 	default:
+		network, _ := discover.NewSimulator()
+		p.members = network
 	}
 	return p, nil
 }

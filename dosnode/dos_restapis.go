@@ -144,15 +144,16 @@ func (d *DosNode) signalGroupDissolve(w http.ResponseWriter, r *http.Request) {
 func (d *DosNode) p2pTest(w http.ResponseWriter, r *http.Request) {
 	members := d.p.MembersID()
 	fmt.Println("p2p test ", len(members))
-	for i := 0; i < len(members); i++ {
-		id, err := d.p.ConnectTo(context.Background(), "", members[i])
-		if err != nil {
-			fmt.Println("ConnectTo err", id, " err ", err)
-		} else {
-			fmt.Println(i, "p2p ConnectTo ", id)
-		}
-		d.p.DisConnectTo(id)
-	}
+	/*
+		for i := 0; i < len(members); i++ {
+			id, err := d.p.ConnectTo(context.Background(), "", members[i])
+			if err != nil {
+				fmt.Println("ConnectTo err", id, " err ", err)
+			} else {
+				fmt.Println(i, "p2p ConnectTo ", id)
+			}
+			d.p.DisConnectTo(id)
+		}*/
 }
 
 func (d *DosNode) dkgTest(w http.ResponseWriter, r *http.Request) {

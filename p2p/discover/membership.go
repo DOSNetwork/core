@@ -11,14 +11,14 @@ import (
 type Membership interface {
 	Join(Ip []string) (num int, err error)
 	Leave()
-	Lookup(id []byte) (addr net.IP)
+	Lookup(id []byte) (addr string)
 	NumOfPeers() int
 	MembersIP() (addr []net.IP)
 	MembersID() (list [][]byte)
 }
 
 //NewSerfNet creates a Serf implementation
-func NewSerfNet(Addr net.IP, id []byte) (Membership, error) {
+func NewSerfNet(Addr net.IP, id, port string) (Membership, error) {
 	var err error
 	serfNet := &serfNet{}
 	conf := serf.DefaultConfig()
@@ -26,7 +26,7 @@ func NewSerfNet(Addr net.IP, id []byte) (Membership, error) {
 	conf.LogOutput = ioutil.Discard
 	conf.MemberlistConfig.LogOutput = ioutil.Discard
 	conf.MemberlistConfig.AdvertiseAddr = Addr.String()
-	conf.NodeName = string(id)
+	conf.NodeName = id + port
 	serfNet.serf, err = serf.Create(conf)
 
 	return serfNet, err
@@ -55,11 +55,18 @@ func (s *serfNet) Leave() {
 }
 
 // Lookup return the IP address of the given ID
-func (s *serfNet) Lookup(id []byte) (addr net.IP) {
+func (s *serfNet) Lookup(id []byte) (addr string) {
+	if string(id) == "b" {
+		return "127.0.0.1:9502"
+	} else if string(id) == "a" {
+		return "127.0.0.1:9501"
+	}
 	members := s.serf.Members()
 	for i := 0; i < len(members); i++ {
-		if members[i].Name == string(id) {
-			return members[i].Addr
+		nodeId := members[i].Name[:42]
+		port := members[i].Name[42:]
+		if nodeId == string(id) {
+			return members[i].Addr.String() + ":" + port
 		}
 	}
 	return

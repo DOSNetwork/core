@@ -3,24 +3,25 @@ package p2p
 import (
 	"context"
 	"encoding/binary"
-	"errors"
+	"io"
 	"net"
-	"os"
-	"strconv"
-	"sync"
+	//	"strconv"
+	"fmt"
 	"time"
-
-	"github.com/DOSNetwork/core/sign/bls"
-	"github.com/DOSNetwork/core/suites"
-
-	"github.com/dedis/kyber"
-
-	"crypto/aes"
-	"crypto/cipher"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/ptypes"
 	"github.com/golang/protobuf/ptypes/any"
+	errors "golang.org/x/xerrors"
+
+	"crypto/aes"
+	"crypto/cipher"
+
+	"github.com/DOSNetwork/core/sign/bls"
+	"github.com/DOSNetwork/core/suites"
+	"github.com/DOSNetwork/core/utils"
+	"github.com/dedis/kyber"
+	"github.com/felixge/tcpkeepalive"
 )
 
 const (
@@ -29,143 +30,525 @@ const (
 	headerSize   = 4
 )
 
-type client struct {
-	conn         net.Conn
-	incomingConn bool
+var (
+	ErrNoRemoteID  = errors.New("remoteID is nil")
+	ErrMsgOverSize = errors.New("header size check failed")
+	ErrCasting     = errors.New("casting failed")
+	ErrDuplicateID = errors.New("remote ID is the same with local ID")
+)
 
-	suite        suites.Suite
-	localID      []byte
-	localSecKey  kyber.Scalar
-	localPubKey  kyber.Point
-	remoteID     []byte
-	remotePubKey kyber.Point
-	dhKey        []byte
-	dhNonce      []byte
+type signFunc func(msg []byte) (sig []byte, err error)
+type verifyFunc func(msg, sig []byte) (err error)
+
+type client struct {
+	addr     string
+	conn     net.Conn
+	inBound  bool
+	localID  []byte
+	remoteID []byte
 
 	ctx      context.Context
 	cancel   context.CancelFunc
-	sender   chan request
-	receiver chan interface{}
+	peerSend chan request
+	peerFeed chan P2PMessage
 	errc     chan error
+
+	//TODO : Move to other module
+	suite        suites.Suite
+	localSecKey  kyber.Scalar
+	localPubKey  kyber.Point
+	remotePubKey kyber.Point
+	dhKey        []byte
+	dhNonce      []byte
 }
 
-func mergeErrors(ctx context.Context, cs ...<-chan error) chan error {
-	var wg sync.WaitGroup
-	// We must ensure that the output channel has the capacity to
-	// hold as many errors
-	// as there are error channels.
-	// This will ensure that it never blocks, even
-	// if WaitForPipeline returns early.
-	out := make(chan error, len(cs))
-	// Start an output goroutine for each input channel in cs.  output
-	// copies values from c to out until c is closed, then calls
-	// wg.Done.
-	output := func(c <-chan error) {
-		for n := range c {
-			select {
-			case <-ctx.Done():
-				return
-			case out <- n:
-			}
-		}
-		wg.Done()
-	}
-	wg.Add(len(cs))
-	for _, c := range cs {
-		go output(c)
-	}
-	// Start a goroutine to close out once all the output goroutines
-	// are done.  This must start after the wg.Add call.
-	go func() {
-		wg.Wait()
-		close(out)
-	}()
-	return out
-}
+func newClient(localID []byte, conn net.Conn, peerFeed chan P2PMessage, inBound bool) (c *client) {
 
-func newClient(suite suites.Suite, secKey kyber.Scalar, localPubKey kyber.Point, localID []byte, conn net.Conn, incomingConn bool) (c *client, err error) {
+	kaConn, _ := tcpkeepalive.EnableKeepAlive(conn)
+	kaConn.SetKeepAliveIdle(1 * time.Second)
+	kaConn.SetKeepAliveCount(1)
+	kaConn.SetKeepAliveInterval(1 * time.Second)
+
 	c = &client{
-		suite:        suite,
-		localSecKey:  secKey,
-		localPubKey:  localPubKey,
-		localID:      localID,
-		conn:         conn,
-		incomingConn: incomingConn,
+		localID: localID,
+		conn:    conn,
+		inBound: inBound,
+		errc:    make(chan error),
 	}
 	c.ctx, c.cancel = context.WithCancel(context.Background())
-	c.sender = make(chan request, 21)
-	//Wait for exchanging ID complete
-	err = c.exchangeID()
-	if c.remoteID == nil {
-		err = errors.New("exchangeID failed")
-		return
-	}
-	if err != nil {
-		logger.Error(err)
-		return
-	}
+	c.peerSend = make(chan request, 21)
+	c.peerFeed = peerFeed
+	//TODO : Move to other module
+	c.suite = suites.MustFind("bn256")
+	c.localSecKey = c.suite.Scalar().Pick(c.suite.RandomStream())
+	c.localPubKey = c.suite.Point().Mul(c.localSecKey, nil)
+	return
+}
 
-	var errs []<-chan error
-	var packByte chan []byte
-	//Build a secure pipeline
-	bytes, errc := readBytes(c.ctx, conn, c.localID, c.remoteID, incomingConn)
-	errs = append(errs, errc)
-	decrypted, errc := decrypt(c.ctx, c.dhKey, c.dhNonce, bytes)
-	errs = append(errs, errc)
-	c.receiver, packByte, errc = dispatch(c.ctx, c.localID, c.remoteID, incomingConn, c.suite, c.remotePubKey, c.sender, decrypted)
-	errs = append(errs, errc)
-	encrypted, errc := encrypt(c.ctx, c.dhKey, c.dhNonce, packByte)
-	errs = append(errs, errc)
-	errc = sendBytes(c.ctx, c.conn, encrypted, c.localID, c.remoteID, incomingConn)
-	errs = append(errs, errc)
-	c.errc = mergeErrors(c.ctx, errs...)
+func (c *client) handShake(ctx context.Context) (err chan error) {
+	return utils.MergeErrors(ctx, c.sendID(ctx), c.receiveID(ctx))
+}
+
+func (c *client) receiveID(ctx context.Context) (errc chan error) {
+	errc = make(chan error)
+	go func() {
+		defer close(errc)
+
+		buffer, err := readFrom(c.conn)
+		if err != nil {
+			utils.ReportError(ctx, errc, errors.Errorf("client handShake: %w", err))
+			return
+		}
+
+		_, ptr, err := decodeBytes(buffer, nil)
+		if err != nil {
+			utils.ReportError(ctx, errc, errors.Errorf("client handShake: %w", err))
+			return
+		}
+
+		id, ok := ptr.Message.(*ID)
+		if !ok {
+			err = errors.Errorf("client handShake: %w", ErrCasting)
+			utils.ReportError(ctx, errc, errors.Errorf("client handShake: %w", err))
+			return
+		}
+		//ID should not be nil or the same with local ID
+		c.remoteID = id.GetId()
+		if string(c.remoteID) == string(c.localID) {
+			err = errors.Errorf("client handShake: remoteID %b localID %b: %w",
+				c.remoteID, c.localID, ErrDuplicateID)
+			utils.ReportError(ctx, errc, errors.Errorf("client : %w", err))
+		}
+		if c.remoteID == nil {
+			err = errors.Errorf("client handShake: %w", ErrNoRemoteID)
+		}
+
+		//TODO: Move to other module
+		pub := c.suite.G2().Point()
+		if err = pub.UnmarshalBinary(id.GetPublicKey()); err != nil {
+			utils.ReportError(ctx, errc, errors.Errorf("client handShake: %w", err))
+			return
+		}
+		c.remotePubKey = pub
+
+		var dhBytes []byte
+		dhKey := c.suite.Point().Mul(c.localSecKey, c.remotePubKey)
+		if dhBytes, err = dhKey.MarshalBinary(); err != nil {
+			utils.ReportError(ctx, errc, errors.Errorf("client handShake: %w", err))
+			return
+		}
+		c.dhKey = dhBytes[0:32]
+		c.dhNonce = dhBytes[32:44]
+
+		return
+	}()
+	return
+}
+
+func (c *client) sendID(ctx context.Context) (errc chan error) {
+	errc = make(chan error)
+	go func() {
+		defer close(errc)
+
+		var err error
+		var bytes, pubKeyBytes []byte
+		if pubKeyBytes, err = c.localPubKey.MarshalBinary(); err != nil {
+			utils.ReportError(ctx, errc, errors.Errorf("client handShake: %w", err))
+			return
+		}
+
+		pID := &ID{
+			PublicKey: pubKeyBytes,
+			Id:        c.localID,
+		}
+
+		if bytes, err = encodeProto(pID, c.localID, nil, 0, false); err != nil {
+			utils.ReportError(ctx, errc, errors.Errorf("client handShake: %w", err))
+		}
+
+		if err = writeTo(bytes, c.conn); err != nil {
+			utils.ReportError(ctx, errc, errors.Errorf("client handShake: %w", err))
+		}
+		return
+	}()
+	return
+}
+
+func (c *client) run() (err error) {
+	c.sendPipe(c.encryptPipe(c.packPipe(c.dispatch(c.decodePipe(c.decryptPipe(c.readPipe()))))))
+	for {
+		var ok bool
+		select {
+		case <-c.ctx.Done():
+			err = c.ctx.Err()
+			return
+		case err, ok = <-c.errc:
+			if ok {
+				if errors.Is(err, io.EOF) {
+					return
+				}
+				continue
+			}
+		}
+	}
 	return
 }
 
 func (c *client) close() {
-	//close(c.sender)
 	c.cancel()
 	c.conn.Close()
+	<-c.ctx.Done()
 }
 
-func (c *client) exchangeID() (err error) {
-	var wg sync.WaitGroup
-	ch := make(chan struct{})
-	wg.Add(2)
-	go c.sendID(&wg)
-	go c.receiveID(&wg)
+func (c *client) send(req request) {
 	go func() {
-		wg.Wait()
-		ch <- struct{}{}
-	}()
-	timeout := time.Duration(60) * time.Second
-	select {
-	case <-ch:
-		f := map[string]interface{}{
-			"localID":  c.localID,
-			"remoteID": c.remoteID}
-		if logger != nil {
-			logger.Event("exchangeIDSuccess", f)
+		err := req.sendReq(c.peerSend)
+		if err != nil {
+			req.replyError(errors.Errorf("client send: %w", err))
 		}
-	case <-time.After(timeout):
-		f := map[string]interface{}{
-			"localID": c.localID}
-		logger.Event("exchangeIDFail", f)
+	}()
+}
+
+func (c *client) encryptPipe(plaintext chan []byte) (out chan []byte) {
+	out = make(chan []byte)
+
+	go func() {
+		defer close(out)
+		for {
+			var result []byte
+			select {
+			case <-c.ctx.Done():
+				return
+			case text, ok := <-plaintext:
+				if !ok {
+					return
+				}
+
+				var err error
+				var block cipher.Block
+				var aesgcm cipher.AEAD
+
+				if block, err = aes.NewCipher(c.dhKey); err != nil {
+					c.reportError(errors.Errorf("client encryptPipe: %w", err))
+					continue
+				}
+
+				if aesgcm, err = cipher.NewGCM(block); err != nil {
+					c.reportError(errors.Errorf("client encryptPipe: %w", err))
+					continue
+				}
+				result = aesgcm.Seal(nil, c.dhNonce, text, nil)
+			}
+			select {
+			case <-c.ctx.Done():
+			case out <- result:
+			}
+		}
+	}()
+	return out
+}
+
+func (c *client) decryptPipe(ciphertext chan []byte) (out chan []byte) {
+	out = make(chan []byte)
+
+	go func() {
+		defer close(out)
+		for {
+			var result []byte
+			select {
+			case <-c.ctx.Done():
+				return
+			case text, ok := <-ciphertext:
+				if !ok {
+					return
+				}
+				var block cipher.Block
+				var aesgcm cipher.AEAD
+				var err error
+
+				if block, err = aes.NewCipher(c.dhKey); err != nil {
+					c.reportError(errors.Errorf("client decryptPipe: %w", err))
+					continue
+				}
+
+				if aesgcm, err = cipher.NewGCM(block); err != nil {
+					c.reportError(errors.Errorf("client decryptPipe: %w", err))
+					continue
+				}
+
+				if result, err = aesgcm.Open(nil, c.dhNonce, text, nil); err != nil {
+					c.reportError(errors.Errorf("client decryptPipe: %w", err))
+					continue
+				}
+			}
+
+			select {
+			case out <- result:
+			case <-c.ctx.Done():
+			}
+		}
+	}()
+	return out
+}
+
+func (c *client) dispatch(replyMsg, receivedMsg chan P2PMessage) (out chan request) {
+	out = make(chan request)
+	requests := make(map[uint64]*request)
+	var nonce uint64
+	go func() {
+		defer close(out)
+		for {
+			var (
+				ok  bool
+				req request
+				msg P2PMessage
+			)
+			select {
+			case <-c.ctx.Done():
+				for _, req := range requests {
+					req.cancel()
+				}
+				return
+			case req, ok = <-c.peerSend:
+				if !ok {
+					return
+				}
+				if req.rType != replyReq {
+					req.nonce = nonce
+					requests[nonce] = &req
+					nonce++
+				}
+			case msg, ok = <-replyMsg:
+				if !ok {
+					return
+				}
+				request := requests[msg.RequestNonce]
+				if request != nil {
+					delete(requests, msg.RequestNonce)
+				}
+				go request.replyResult(msg)
+				continue
+			case msg, ok = <-receivedMsg:
+				if !ok {
+					return
+				}
+				go c.reportMsg(msg)
+				continue
+			}
+			select {
+			case <-c.ctx.Done():
+				return
+			case out <- req:
+			}
+		}
+	}()
+	return
+}
+
+func (c *client) packPipe(reqC chan request) (out chan []byte) {
+	out = make(chan []byte)
+	go func() {
+		defer close(out)
+		for {
+			select {
+			case <-c.ctx.Done():
+				return
+			case req, ok := <-reqC:
+				if !ok {
+					return
+				}
+				var err error
+				var bytes []byte
+				select {
+				case <-req.ctx.Done():
+				default:
+				}
+				replyFlag := false
+				if req.rType == replyReq {
+					go req.cancel()
+					replyFlag = true
+				}
+
+				bytes, err = encodeProto(req.msg, c.localID, c.signFn, req.nonce, replyFlag)
+				if err != nil {
+					c.reportError(errors.Errorf("client packPipe: %w", err))
+				}
+
+				select {
+				case <-c.ctx.Done():
+				case out <- bytes:
+				}
+			}
+		}
+	}()
+	return
+}
+
+func (c *client) sendPipe(bytesC chan []byte) {
+	go func() {
+		for {
+			select {
+			case <-c.ctx.Done():
+				return
+			case bytes, ok := <-bytesC:
+				if !ok {
+					return
+				}
+				err := writeTo(bytes, c.conn)
+				if err != nil {
+					c.reportError(errors.Errorf("client sendPipe: %w", err))
+				}
+			}
+		}
+	}()
+	return
+}
+
+func (c *client) decodePipe(bytesC chan []byte) (replyMsg, receivedMsg chan P2PMessage) {
+	replyMsg = make(chan P2PMessage)
+	receivedMsg = make(chan P2PMessage)
+	go func() {
+		defer close(replyMsg)
+		defer close(receivedMsg)
+		for {
+			var msg P2PMessage
+			select {
+			case <-c.ctx.Done():
+				return
+			case bytes, ok := <-bytesC:
+				if !ok {
+					return
+				}
+				pa, ptr, err := decodeBytes(bytes, c.verifyFn)
+				if err != nil {
+					c.reportError(errors.Errorf("client decodePipe: %w", err))
+					continue
+				}
+				//TODO: Move to other module
+				if err := bls.Verify(c.suite, c.remotePubKey, pa.GetAnything().Value, pa.GetSignature()); err != nil {
+					c.reportError(errors.Errorf("client decodePipe: %w", err))
+					continue
+				}
+
+				msg = P2PMessage{Msg: ptr, Sender: pa.GetSender(), RequestNonce: pa.GetRequestNonce()}
+				if pa.GetReplyFlag() {
+					select {
+					case <-c.ctx.Done():
+					case replyMsg <- msg:
+					}
+				} else {
+					select {
+					case <-c.ctx.Done():
+					case receivedMsg <- msg:
+					}
+				}
+			}
+		}
+	}()
+	return
+}
+
+func (c *client) readPipe() (out chan []byte) {
+	out = make(chan []byte)
+	go func() {
+		defer close(out)
+		for {
+			select {
+			case <-c.ctx.Done():
+				return
+			default:
+				buffer, err := readFrom(c.conn)
+				if err != nil {
+					c.reportError(errors.Errorf("client readPipe: %w", err))
+					continue
+				}
+				select {
+				case <-c.ctx.Done():
+				case out <- buffer:
+				}
+			}
+		}
+	}()
+	return out
+}
+
+func encodeProto(msg proto.Message, sender []byte, signFn signFunc, nonce uint64, replyFlag bool) (bytes []byte, err error) {
+	var anything *any.Any
+	var sign []byte
+	if anything, err = ptypes.MarshalAny(msg); err != nil {
+		err = errors.Errorf(": %w", err)
+		return
+	}
+	if signFn != nil {
+		if sign, err = signFn(anything.Value); err != nil {
+			err = errors.Errorf(": %w", err)
+			return
+		}
+	}
+	p := &Package{
+		Anything:     anything,
+		Sender:       sender,
+		Signature:    sign,
+		RequestNonce: nonce,
+		ReplyFlag:    replyFlag,
+	}
+	if bytes, err = proto.Marshal(p); err != nil {
+		err = errors.Errorf(": %w", err)
 	}
 	return
 }
 
-func (c *client) receiveID(wg *sync.WaitGroup) (err error) {
-	defer wg.Done()
+func decodeBytes(bytes []byte, veifyfn verifyFunc) (pa *Package, ptr ptypes.DynamicAny, err error) {
+	pa = &Package{}
+	if err = proto.Unmarshal(bytes, pa); err != nil {
+		err = errors.Errorf(": %w", err)
+		return
+	}
+	if veifyfn != nil {
+		if err = veifyfn(pa.GetAnything().Value, pa.GetSignature()); err != nil {
+			err = errors.Errorf(": %w", err)
+			return
+		}
+	}
+	if err = ptypes.UnmarshalAny(pa.GetAnything(), &ptr); err != nil {
+		err = errors.Errorf(": %w", err)
+	}
+	return
+}
+
+func writeTo(bytes []byte, conn net.Conn) (err error) {
+	prefix := make([]byte, headerSize)
+	bytesWrite, totalBytesWrtie := 0, 0
+
+	size := len(bytes)
+	if size > msgSizeLimit {
+		err = errors.Errorf("SizeLimit %d size %d : %w",
+			msgSizeLimit, size, ErrMsgOverSize)
+		return
+	}
+	binary.BigEndian.PutUint32(prefix, uint32(size))
+	bytes = append(prefix, bytes...)
+	for totalBytesWrtie < len(bytes) && err == nil {
+		if bytesWrite, err = conn.Write(bytes[totalBytesWrtie:]); err != nil {
+			err = errors.Errorf(": %w", err)
+			return
+		}
+		totalBytesWrtie += bytesWrite
+	}
+	return
+}
+
+//read shold not be called in multiple go routine
+func readFrom(conn net.Conn) (buffer []byte, err error) {
 	// Read until all header bytes have been read.
 	header := make([]byte, headerSize)
 	// Read until all header bytes have been read.
 	bytesRead, totalBytesRead := 0, 0
+	//TestPoint
+	//conn.Close()
 	for totalBytesRead < headerSize && err == nil {
-		if bytesRead, err = c.conn.Read(header[totalBytesRead:]); err != nil {
-			if err.Error() == "EOF" {
-				c.close()
-			}
+		if bytesRead, err = conn.Read(header[totalBytesRead:]); err != nil {
+			err = errors.Errorf(": %w", err)
 			return
 		}
 		totalBytesRead += bytesRead
@@ -174,487 +557,53 @@ func (c *client) receiveID(wg *sync.WaitGroup) (err error) {
 	// Decode message size.
 	size := binary.BigEndian.Uint32(header)
 	header = nil
+	//TestPoint
+	//size = msgSizeLimit + 1
 	if size > msgSizeLimit || size <= 0 {
-		err = errors.New("p2p message size is not valid " + strconv.Itoa(int(size)))
+		err = errors.Errorf("SizeLimit %d size %d : %w", msgSizeLimit, size, ErrMsgOverSize)
 		return
 	}
-	// Read until all message bytes have been read.
-	buffer := make([]byte, size)
 
+	// Read until all message bytes have been read.
+	buffer = make([]byte, size)
 	contentBytesRead, totalContentBytesRead := 0, 0
 	for totalContentBytesRead < int(size) && err == nil {
-		if contentBytesRead, err = c.conn.Read(buffer[totalContentBytesRead:]); err != nil {
+		if contentBytesRead, err = conn.Read(buffer[totalContentBytesRead:]); err != nil {
+			err = errors.Errorf(": %w", err)
 			return
 		}
 		totalContentBytesRead += contentBytesRead
 	}
-	pa := new(Package)
-	if err = proto.Unmarshal(buffer, pa); err != nil {
-		logger.Error(err)
-		return
-	}
-	buffer = nil
-
-	var ptr ptypes.DynamicAny
-	if err = ptypes.UnmarshalAny(pa.GetAnything(), &ptr); err != nil {
-		logger.Error(err)
-		return
-	}
-	id, ok := ptr.Message.(*ID)
-	if !ok {
-		return
-	}
-
-	c.remoteID = id.GetId()
-
-	if string(c.remoteID) == string(c.localID) {
-		os.Exit(2)
-	}
-	pub := c.suite.G2().Point()
-	if err = pub.UnmarshalBinary(id.GetPublicKey()); err != nil {
-		logger.Error(err)
-		return
-	}
-	c.remotePubKey = pub
-
-	var dhBytes []byte
-	dhKey := c.suite.Point().Mul(c.localSecKey, c.remotePubKey)
-	if dhBytes, err = dhKey.MarshalBinary(); err != nil {
-		logger.Error(err)
-		return
-	}
-	c.dhKey = dhBytes[0:32]
-	c.dhNonce = dhBytes[32:44]
 	return
 }
 
-func (c *client) sendID(wg *sync.WaitGroup) (err error) {
-	defer wg.Done()
-	var anything *any.Any
-	var bytes, pubKeyBytes []byte
-	if pubKeyBytes, err = c.localPubKey.MarshalBinary(); err != nil {
-		logger.Error(err)
-		return
+func (c *client) reportError(err error) {
+	select {
+	case <-c.ctx.Done():
+	case c.errc <- err:
 	}
+}
 
-	pID := &ID{
-		PublicKey: pubKeyBytes,
-		Id:        c.localID,
+func (c *client) reportMsg(msg P2PMessage) {
+	select {
+	case <-c.ctx.Done():
+	case c.peerFeed <- msg:
 	}
+}
 
-	if anything, err = ptypes.MarshalAny(pID); err != nil {
-		logger.Error(err)
-		return
+//TODO : Move to other module
+func (c *client) signFn(msg []byte) (sig []byte, err error) {
+	if sig, err = bls.Sign(c.suite, c.localSecKey, msg); err != nil {
+		err = errors.Errorf(": %w", err)
 	}
-	pa := &Package{
-		Anything: anything,
-	}
-	if bytes, err = proto.Marshal(pa); err != nil {
-		logger.Error(err)
-		return
-	}
-	if len(bytes) > msgSizeLimit {
-		err = errors.New("p2p message size is too big " + strconv.Itoa(int(len(bytes))))
-		return
-	}
-	prefix := make([]byte, headerSize)
-	binary.BigEndian.PutUint32(prefix, uint32(len(bytes)))
-
-	bytes = append(prefix, bytes...)
-
-	bytesRead, totalBytesRead := 0, 0
-	for totalBytesRead < headerSize && err == nil {
-		if bytesRead, err = c.conn.Write(bytes); err != nil {
-			c.close()
-			return
-		}
-		totalBytesRead += bytesRead
-	}
+	fmt.Println("sign ", len(msg), len(sig))
 
 	return
 }
-
-func encrypt(ctx context.Context, dhKey, dhNonce []byte, plaintext chan []byte) (chan []byte, chan error) {
-	out := make(chan []byte)
-	errc := make(chan error)
-
-	go func() {
-		defer close(out)
-		defer close(errc)
-		for {
-			select {
-			case c, ok := <-plaintext:
-				if !ok {
-					return
-				}
-
-				var err error
-				var block cipher.Block
-				var aesgcm cipher.AEAD
-
-				if block, err = aes.NewCipher(dhKey); err != nil {
-					select {
-					case errc <- err:
-					case <-ctx.Done():
-					}
-					continue
-				}
-
-				if aesgcm, err = cipher.NewGCM(block); err != nil {
-					select {
-					case errc <- err:
-					case <-ctx.Done():
-					}
-					continue
-				}
-				c = aesgcm.Seal(nil, dhNonce, c, nil)
-
-				select {
-				case out <- c:
-				case <-ctx.Done():
-				}
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-	return out, errc
-}
-
-func decrypt(ctx context.Context, dhKey, dhNonce []byte, ciphertext chan []byte) (chan []byte, chan error) {
-	out := make(chan []byte)
-	errc := make(chan error)
-
-	go func() {
-		defer close(out)
-		defer close(errc)
-		for {
-			select {
-			case c, ok := <-ciphertext:
-				if !ok {
-					return
-				}
-
-				var block cipher.Block
-				var aesgcm cipher.AEAD
-				var err error
-
-				if block, err = aes.NewCipher(dhKey); err != nil {
-					select {
-					case errc <- err:
-					case <-ctx.Done():
-					}
-					continue
-				}
-
-				if aesgcm, err = cipher.NewGCM(block); err != nil {
-					select {
-					case errc <- err:
-					case <-ctx.Done():
-					}
-					continue
-				}
-
-				if c, err = aesgcm.Open(nil, dhNonce, c, nil); err != nil {
-					select {
-					case errc <- err:
-					case <-ctx.Done():
-					}
-					continue
-				}
-
-				select {
-				case out <- c:
-				case <-ctx.Done():
-				}
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-	return out, errc
-}
-
-func dispatch(ctx context.Context, localID, remoteID []byte, incomingConn bool, suite suites.Suite, pub kyber.Point, sendMsg chan request, receiveBytes chan []byte) (chan interface{}, chan []byte, chan error) {
-	receiver := make(chan interface{}, 21)
-	sender := make(chan []byte, 21)
-	errc := make(chan error)
-	requests := make(map[uint64]request)
-	var nonce uint64
-	go func() {
-		defer close(receiver)
-		defer close(sender)
-		defer close(errc)
-		for {
-			select {
-			case req, ok := <-sendMsg:
-				if !ok {
-					return
-				}
-
-				if !req.p.ReplyFlag {
-					if req.ctx == nil && req.reply == nil {
-						continue
-					}
-					req.p.RequestNonce = nonce
-				}
-				//Encode the package
-				var bytes []byte
-				var err error
-				if bytes, err = proto.Marshal(req.p); err != nil {
-					go func() {
-						select {
-						case req.errc <- err:
-						case <-req.ctx.Done():
-						}
-						close(req.errc)
-						if req.reply != nil {
-							close(req.reply)
-						}
-					}()
-					continue
-				}
-				if !req.p.ReplyFlag {
-					requests[nonce] = req
-					nonce++
-				}
-				select {
-				case sender <- bytes:
-					if !req.p.ReplyFlag {
-					} else {
-						//req.cancel()
-					}
-				case <-req.ctx.Done():
-					close(req.errc)
-					if req.reply != nil {
-						close(req.reply)
-					}
-				}
-			case bytes, ok := <-receiveBytes:
-				if !ok {
-					return
-				}
-
-				pa := new(Package)
-				if err := proto.Unmarshal(bytes, pa); err != nil {
-					select {
-					case errc <- err:
-					case <-ctx.Done():
-					}
-					continue
-				}
-
-				replyErrc := errc
-				replyCtx := ctx
-				replyRecivier := receiver
-				if pa.GetReplyFlag() {
-					request := requests[pa.RequestNonce]
-					if request.ctx == nil {
-
-						continue
-					}
-					delete(requests, pa.RequestNonce)
-
-					replyErrc = request.errc
-					replyCtx = request.ctx
-					replyRecivier = request.reply
-				}
-				if pub != nil {
-					if err := bls.Verify(suite, pub, pa.GetAnything().Value, pa.GetSignature()); err != nil {
-
-						select {
-						case replyErrc <- err:
-						case <-replyCtx.Done():
-						}
-						continue
-					}
-				}
-
-				var ptr ptypes.DynamicAny
-				if err := ptypes.UnmarshalAny(pa.GetAnything(), &ptr); err != nil {
-
-					select {
-					case replyErrc <- err:
-					case <-replyCtx.Done():
-					}
-					continue
-				}
-				msg := P2PMessage{Msg: ptr, Sender: pa.GetSender(), RequestNonce: pa.GetRequestNonce()}
-
-				select {
-				case replyRecivier <- msg:
-				case <-replyCtx.Done():
-				}
-
-				continue
-			case <-ctx.Done():
-				continue
-			}
-		}
-	}()
-	return receiver, sender, errc
-}
-
-func sendBytes(ctx context.Context, c net.Conn, bytesC chan []byte, localID, remoteID []byte, incomingConn bool) chan error {
-	errc := make(chan error)
-	prefix := make([]byte, headerSize)
-	go func() {
-		defer close(errc)
-		for {
-			select {
-			case bytes, ok := <-bytesC:
-				if !ok {
-					return
-				}
-
-				var err error
-				bytesWrite, totalBytesWrtie := 0, 0
-
-				size := uint32(len(bytes))
-				binary.BigEndian.PutUint32(prefix, size)
-				bytes = append(prefix, bytes...)
-				for totalBytesWrtie < len(bytes) && err == nil {
-					if bytesWrite, err = c.Write(bytes[totalBytesWrtie:]); err != nil {
-						select {
-						case errc <- err:
-						case <-ctx.Done():
-							return
-						}
-					}
-					totalBytesWrtie += bytesWrite
-				}
-			case <-ctx.Done():
-
-				return
-			}
-		}
-	}()
-	return errc
-}
-
-func readBytes(ctx context.Context, c net.Conn, localID, remoteID []byte, incomingConn bool) (chan []byte, chan error) {
-	out := make(chan []byte, 10)
-	errc := make(chan error)
-	header := make([]byte, headerSize)
-	go func() {
-		defer close(out)
-		defer close(errc)
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-				var err error
-				// Read until all header bytes have been read.
-				bytesRead, totalBytesRead := 0, 0
-				for totalBytesRead < headerSize && err == nil {
-					if bytesRead, err = c.Read(header[totalBytesRead:]); err != nil {
-						select {
-						case errc <- err:
-						case <-ctx.Done():
-						}
-						return
-					}
-					totalBytesRead += bytesRead
-				}
-
-				// Decode message size and check size to avoid OOM
-				size := binary.BigEndian.Uint32(header)
-
-				if size > msgSizeLimit {
-					err = errors.New("p2p message size is too big " + strconv.Itoa(int(size)))
-					select {
-					case errc <- err:
-					case <-ctx.Done():
-					}
-					return
-				}
-				if size == 0 {
-					return
-				}
-
-				// Read until all message bytes have been read.
-				buffer := make([]byte, size)
-				bytesRead, totalBytesRead = 0, 0
-				for totalBytesRead < int(size) && err == nil {
-					if bytesRead, err = c.Read(buffer[totalBytesRead:]); err != nil {
-						select {
-						case errc <- err:
-						case <-ctx.Done():
-						}
-						return
-					}
-					totalBytesRead += bytesRead
-				}
-				select {
-				case out <- buffer:
-				case <-ctx.Done():
-				}
-
-				buffer = nil
-
-			}
-		}
-	}()
-	return out, errc
-}
-
-func (c *client) send(req request) error {
-	if req.msg == nil {
-		//return errors.New("request msg is nil")
+func (c *client) verifyFn(msg, sig []byte) (err error) {
+	if err = bls.Verify(c.suite, c.localPubKey, msg, sig); err != nil {
+		err = errors.Errorf(": %w", err)
 	}
-	if req.ctx == nil {
-		return errors.New("request msg is nil")
-	}
-	go func(req request) {
-		var anything *any.Any
-		var err error
-		var sig []byte
-
-		if anything, err = ptypes.MarshalAny(req.msg); err != nil {
-			select {
-			case req.errc <- err:
-			case <-req.ctx.Done():
-			}
-			close(req.errc)
-			if req.reply != nil {
-				close(req.reply)
-			}
-			return
-		}
-		if sig, err = bls.Sign(c.suite, c.localSecKey, anything.Value); err != nil {
-			select {
-			case req.errc <- err:
-			case <-req.ctx.Done():
-			}
-			close(req.errc)
-			if req.reply != nil {
-				close(req.reply)
-			}
-			return
-		}
-
-		req.p = &Package{
-			Sender:    c.localID,
-			Anything:  anything,
-			Signature: sig,
-		}
-		if req.rType == 2 {
-			req.p.RequestNonce = req.nonce
-			req.p.ReplyFlag = true
-		}
-
-		select {
-		case c.sender <- req:
-		case <-req.ctx.Done():
-			err := errors.New("request Timeout")
-			logger.Error(err)
-			close(req.errc)
-			if req.reply != nil {
-				close(req.reply)
-			}
-		}
-		return
-	}(req)
-	return nil
+	fmt.Println("verify ", len(msg), len(sig), err)
+	return
 }

@@ -1,12 +1,12 @@
 package log
 
 import (
+	"fmt"
 	"os"
 	"runtime"
 	"strings"
 	"time"
 
-	"github.com/go-stack/stack"
 	"github.com/sirupsen/logrus"
 )
 
@@ -90,11 +90,13 @@ func (l *logger) Warn(msg string) {
 }
 
 func (l *logger) Error(err error) {
+	fmt.Println("===================")
+	fmt.Printf("%+v\n", err)
 	if l.entry == nil {
 		return
 	}
-	s := stack.Trace().TrimRuntime()
-	l.entry.WithFields(logrus.Fields{"Stack": s, "ErrMsg": err}).Error(err)
+	fmt.Println("===================")
+	//l.entry.Error(err)
 }
 
 func (l *logger) Fatal(err error) {

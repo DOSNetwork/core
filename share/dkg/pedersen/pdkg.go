@@ -117,13 +117,13 @@ func (d *pdkg) listen() {
 				switch content := msg.Msg.Message.(type) {
 				case *PublicKey:
 					d.logger.Event("PeerPublicKey", map[string]interface{}{"GroupID": content.SessionId})
-					d.p.Reply(msg.Sender, msg.RequestNonce, &PublicKey{})
+					d.p.Reply(context.Background(), msg.Sender, msg.RequestNonce, &PublicKey{})
 					handlePeerMsg(sessionPubKeys, sessionReqPubs, d.p, content.SessionId, content)
 				case *Deal:
-					d.p.Reply(msg.Sender, msg.RequestNonce, &Deal{})
+					d.p.Reply(context.Background(), msg.Sender, msg.RequestNonce, &Deal{})
 					handlePeerMsg(sessionDeals, sessionReqDeals, d.p, content.SessionId, content)
 				case *Responses:
-					d.p.Reply(msg.Sender, msg.RequestNonce, &Responses{})
+					d.p.Reply(context.Background(), msg.Sender, msg.RequestNonce, &Responses{})
 					resps := content.Response
 					for _, resp := range resps {
 						handlePeerMsg(sessionResps, sessionReResps, d.p, content.SessionId, resp)
@@ -160,10 +160,10 @@ func (d *pdkg) Grouping(ctx context.Context, sessionID string, groupIds [][]byte
 	}
 
 	//Check if all members are reachable
-	connc, errc := d.p.ConnectToAll(ctx, groupIds, sessionID)
-	errcList = append(errcList, errc)
+	//connc, errc := d.p.ConnectToAll(ctx, groupIds, sessionID)
+	//errcList = append(errcList, errc)
 	//exchange pub key
-	selfPubc, secrc, errc := genPub(ctx, d.logger, connc, d.suite, d.p.GetID(), groupIds, sessionID)
+	selfPubc, secrc, errc := genPub(ctx, d.logger, d.suite, d.p.GetID(), groupIds, sessionID)
 	errcList = append(errcList, errc)
 	selfPubcs := fanOut(ctx, selfPubc, 2)
 	errcList = append(errcList, sendToMembers(ctx, d.logger, selfPubcs[0], d.p, groupIds, sessionID))
@@ -191,7 +191,7 @@ func (d *pdkg) Grouping(ctx context.Context, sessionID string, groupIds [][]byte
 	return outc, errc, nil
 }
 
-func genPub(ctx context.Context, logger log.Logger, conn chan bool, suite suites.Suite, id []byte, groupIds [][]byte, sessionID string) (out chan interface{}, secrc chan kyber.Scalar, errc chan error) {
+func genPub(ctx context.Context, logger log.Logger, suite suites.Suite, id []byte, groupIds [][]byte, sessionID string) (out chan interface{}, secrc chan kyber.Scalar, errc chan error) {
 	out = make(chan interface{})
 	secrc = make(chan kyber.Scalar)
 	errc = make(chan error)
@@ -199,42 +199,34 @@ func genPub(ctx context.Context, logger log.Logger, conn chan bool, suite suites
 		//defer fmt.Println("1 ) genPub")
 		defer close(out)
 		defer close(errc)
-		select {
-		case c, ok := <-conn:
-			if ok && c == true {
-				defer logger.TimeTrack(time.Now(), "genPub", map[string]interface{}{"GroupID": sessionID})
-				//Index pub key
-				index := -1
-				for i, groupId := range groupIds {
-					if r := bytes.Compare(id, groupId); r == 0 {
-						index = i
-						break
-					}
-				}
-				if index == -1 {
-					reportErr(ctx, errc, errors.New("Can't find id in group IDs"))
-				}
-				//Generate secret and public key
-				sec := suite.Scalar().Pick(suite.RandomStream())
-				select {
-				case secrc <- sec:
-				case <-ctx.Done():
-				}
-				pub := suite.Point().Mul(sec, nil)
-				if bin, err := pub.MarshalBinary(); err != nil {
-					reportErr(ctx, errc, err)
-				} else {
-					pubkey := &PublicKey{SessionId: sessionID, Index: uint32(index), Publickey: &vss.PublicKey{Binary: bin}}
-					select {
-					case out <- pubkey:
-					case <-ctx.Done():
-					}
-					return
-				}
-			} else {
-				logger.TimeTrack(time.Now(), "genPubStop", map[string]interface{}{"GroupID": sessionID})
+
+		defer logger.TimeTrack(time.Now(), "genPub", map[string]interface{}{"GroupID": sessionID})
+		//Index pub key
+		index := -1
+		for i, groupId := range groupIds {
+			if r := bytes.Compare(id, groupId); r == 0 {
+				index = i
+				break
 			}
+		}
+		if index == -1 {
+			reportErr(ctx, errc, errors.New("Can't find id in group IDs"))
+		}
+		//Generate secret and public key
+		sec := suite.Scalar().Pick(suite.RandomStream())
+		select {
+		case secrc <- sec:
 		case <-ctx.Done():
+		}
+		pub := suite.Point().Mul(sec, nil)
+		if bin, err := pub.MarshalBinary(); err != nil {
+			reportErr(ctx, errc, err)
+		} else {
+			pubkey := &PublicKey{SessionId: sessionID, Index: uint32(index), Publickey: &vss.PublicKey{Binary: bin}}
+			select {
+			case out <- pubkey:
+			case <-ctx.Done():
+			}
 			return
 		}
 	}()
