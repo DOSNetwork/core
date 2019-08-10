@@ -174,9 +174,11 @@ func (n *server) setupConn(fd net.Conn, inOrOut bool) (c *client, err error) {
 }
 
 func (n *server) runClient(c *client, inBound bool) {
-	defer fmt.Println("Close runClient")
-	_ = c.run()
-
+	err := c.run()
+	if err != nil {
+		fmt.Println("runClient err", err)
+		logger.Error(err)
+	}
 	var delpeer chan []byte
 	if inBound {
 		delpeer = n.removeIncomingC
@@ -197,7 +199,6 @@ func (n *server) receiveHandler() {
 	clients := make(map[string]*client)
 
 	go func() {
-		defer fmt.Println("Close receiveHandler")
 		for {
 			select {
 			case <-n.ctx.Done():
@@ -213,21 +214,23 @@ func (n *server) receiveHandler() {
 				go n.runClient(c, true)
 			case id := <-n.removeIncomingC:
 				if c := clients[string(id)]; c != nil {
+					c.close()
 					delete(clients, string(id))
 				}
 				n.incomingNum = len(clients)
 				fmt.Println("remove inbound ", len(clients))
 			case req := <-n.replying:
-				fmt.Println("!!replying ", string(req.id))
 				client := clients[string(req.id)]
 				if client != nil {
 					client.send(req)
 				} else {
+					fmt.Println("Can't find client ", string(req.id))
 					err := &P2PError{
 						err: errors.New("p2p reply can't find client"),
 						t:   time.Now(),
 					}
 					logger.Error(err)
+					req.cancel()
 				}
 			}
 		}
@@ -243,7 +246,6 @@ func (n *server) callHandler() {
 	n.addCallingC = make(chan *client)
 
 	go func() {
-		defer fmt.Println("Close callHandler")
 		for {
 			select {
 			case <-n.ctx.Done():
@@ -258,7 +260,11 @@ func (n *server) callHandler() {
 				addrToid[c.conn.RemoteAddr().String()] = c.remoteID
 				fmt.Println("addCallingC ", len(clients), len(sendCache[string(c.remoteID)]))
 				for _, req := range sendCache[string(c.remoteID)] {
-					go c.send(req)
+					select {
+					case <-req.ctx.Done():
+					default:
+						go c.send(req)
+					}
 				}
 
 			case id, ok := <-n.removeCallingC:
@@ -270,15 +276,14 @@ func (n *server) callHandler() {
 					delete(addrToid, c.conn.RemoteAddr().String())
 					delete(clients, string(id))
 					c.close()
+					fmt.Println("outbound p2p remove ", len(clients))
 				}
 				n.callingNum = len(clients)
-				fmt.Println("outbound p2p remove ", len(clients))
 			case req, ok := <-n.calling:
 				if !ok {
 					return
 				}
 				var c *client
-				fmt.Println("calling ", string(req.id))
 				if c = clients[string(req.id)]; c == nil {
 					req.addr = n.members.Lookup(req.id)
 					sendCache[string(req.id)] = append(sendCache[string(req.id)], req)
@@ -315,7 +320,6 @@ func dialTo(ctx context.Context, addr string) (fd net.Conn, err error) {
 			err = ctx.Err()
 			return
 		default:
-			//if fd, err = net.DialTimeout("tcp", addr, 2*time.Second); err == nil {
 			if fd, err = net.Dial("tcp", addr); err == nil {
 				return
 			} else {
@@ -354,13 +358,11 @@ func (n *server) Request(ctx context.Context, id []byte, m proto.Message) (msg P
 		return
 	}
 	if result, err = req.waitForResult(); err != nil {
-		err = &P2PError{
-			err: errors.New("Error in waitForResult error "),
-			t:   time.Now(),
-		}
+		fmt.Println(err)
 		logger.Error(err)
 		return
 	}
+
 	if msg, ok = result.(P2PMessage); !ok {
 		err = &P2PError{
 			err: errors.New("Error in Request casting error "),
@@ -399,7 +401,6 @@ func (n *server) messageDispatch(ctx context.Context) {
 					continue
 				}
 				messagetype := reflect.TypeOf(msg.Msg.Message).String()
-				fmt.Println("peersFeed ", messagetype)
 				if len(messagetype) > 0 && messagetype[0] == '*' {
 					messagetype = messagetype[1:]
 				}

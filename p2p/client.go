@@ -21,20 +21,13 @@ import (
 	"github.com/DOSNetwork/core/suites"
 	"github.com/DOSNetwork/core/utils"
 	"github.com/dedis/kyber"
-	"github.com/felixge/tcpkeepalive"
+	///"github.com/felixge/tcpkeepalive"
 )
 
 const (
 	msgSizeLimit = 1024 * 1024
 	bufSize      = 1024
 	headerSize   = 4
-)
-
-var (
-	ErrNoRemoteID  = errors.New("remoteID is nil")
-	ErrMsgOverSize = errors.New("header size check failed")
-	ErrCasting     = errors.New("casting failed")
-	ErrDuplicateID = errors.New("remote ID is the same with local ID")
 )
 
 type signFunc func(msg []byte) (sig []byte, err error)
@@ -63,15 +56,21 @@ type client struct {
 }
 
 func newClient(localID []byte, conn net.Conn, peerFeed chan P2PMessage, inBound bool) (c *client) {
-
-	kaConn, _ := tcpkeepalive.EnableKeepAlive(conn)
-	kaConn.SetKeepAliveIdle(1 * time.Second)
-	kaConn.SetKeepAliveCount(1)
-	kaConn.SetKeepAliveInterval(1 * time.Second)
-
+	/*
+		kaConn, _ := tcpkeepalive.EnableKeepAlive(conn)
+		kaConn.SetKeepAliveIdle(10 * time.Second)
+		kaConn.SetKeepAliveCount(5)
+		kaConn.SetKeepAliveInterval(10 * time.Second)
+	*/
+	tcpConn, ok := conn.(*net.TCPConn)
+	if !ok {
+		//error handle
+	}
+	tcpConn.SetKeepAlive(true)
+	tcpConn.SetKeepAlivePeriod(time.Second * 1)
 	c = &client{
 		localID: localID,
-		conn:    conn,
+		conn:    tcpConn,
 		inBound: inBound,
 		errc:    make(chan error),
 	}
@@ -175,19 +174,20 @@ func (c *client) sendID(ctx context.Context) (errc chan error) {
 }
 
 func (c *client) run() (err error) {
+	//if c.inBound {
 	c.sendPipe(c.encryptPipe(c.packPipe(c.dispatch(c.decodePipe(c.decryptPipe(c.readPipe()))))))
+	//}
 	for {
 		var ok bool
 		select {
 		case <-c.ctx.Done():
-			err = c.ctx.Err()
 			return
 		case err, ok = <-c.errc:
 			if ok {
 				if errors.Is(err, io.EOF) {
 					return
 				}
-				continue
+				return
 			}
 		}
 	}
@@ -196,7 +196,10 @@ func (c *client) run() (err error) {
 
 func (c *client) close() {
 	c.cancel()
-	c.conn.Close()
+	err := c.conn.Close()
+	if err != nil {
+		fmt.Println("c.conn.Close err ", err)
+	}
 	<-c.ctx.Done()
 }
 
@@ -325,14 +328,19 @@ func (c *client) dispatch(replyMsg, receivedMsg chan P2PMessage) (out chan reque
 				request := requests[msg.RequestNonce]
 				if request != nil {
 					delete(requests, msg.RequestNonce)
+					select {
+					case <-request.ctx.Done():
+					default:
+						request.replyResult(msg)
+					}
 				}
-				go request.replyResult(msg)
+
 				continue
 			case msg, ok = <-receivedMsg:
 				if !ok {
 					return
 				}
-				go c.reportMsg(msg)
+				c.reportMsg(msg)
 				continue
 			}
 			select {
@@ -350,6 +358,8 @@ func (c *client) packPipe(reqC chan request) (out chan []byte) {
 	go func() {
 		defer close(out)
 		for {
+			var err error
+			var bytes []byte
 			select {
 			case <-c.ctx.Done():
 				return
@@ -357,8 +367,6 @@ func (c *client) packPipe(reqC chan request) (out chan []byte) {
 				if !ok {
 					return
 				}
-				var err error
-				var bytes []byte
 				select {
 				case <-req.ctx.Done():
 				default:
@@ -373,11 +381,11 @@ func (c *client) packPipe(reqC chan request) (out chan []byte) {
 				if err != nil {
 					c.reportError(errors.Errorf("client packPipe: %w", err))
 				}
-
-				select {
-				case <-c.ctx.Done():
-				case out <- bytes:
-				}
+			}
+			select {
+			case <-c.ctx.Done():
+				return
+			case out <- bytes:
 			}
 		}
 	}()
@@ -449,23 +457,26 @@ func (c *client) decodePipe(bytesC chan []byte) (replyMsg, receivedMsg chan P2PM
 }
 
 func (c *client) readPipe() (out chan []byte) {
-	out = make(chan []byte)
+	out = make(chan []byte, 10)
 	go func() {
 		defer close(out)
 		for {
+			var buffer []byte
+			var err error
 			select {
 			case <-c.ctx.Done():
 				return
 			default:
-				buffer, err := readFrom(c.conn)
+				buffer, err = readFrom(c.conn)
 				if err != nil {
 					c.reportError(errors.Errorf("client readPipe: %w", err))
-					continue
+					return
 				}
-				select {
-				case <-c.ctx.Done():
-				case out <- buffer:
-				}
+			}
+			select {
+			case <-c.ctx.Done():
+				return
+			case out <- buffer:
 			}
 		}
 	}()
@@ -596,14 +607,11 @@ func (c *client) signFn(msg []byte) (sig []byte, err error) {
 	if sig, err = bls.Sign(c.suite, c.localSecKey, msg); err != nil {
 		err = errors.Errorf(": %w", err)
 	}
-	fmt.Println("sign ", len(msg), len(sig))
-
 	return
 }
 func (c *client) verifyFn(msg, sig []byte) (err error) {
-	if err = bls.Verify(c.suite, c.localPubKey, msg, sig); err != nil {
+	if err = bls.Verify(c.suite, c.remotePubKey, msg, sig); err != nil {
 		err = errors.Errorf(": %w", err)
 	}
-	fmt.Println("verify ", len(msg), len(sig), err)
 	return
 }
