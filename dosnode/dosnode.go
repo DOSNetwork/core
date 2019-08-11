@@ -81,12 +81,13 @@ func NewDosNode(key *keystore.Key, config configuration.Config) (dosNode *DosNod
 		fmt.Println("CreateP2PNetwork err ", err)
 		return
 	}
-
-	err = p.Listen()
-	if err != nil {
-		fmt.Println("Listen() err ", err)
-		return
-	}
+	go func() {
+		err = p.Listen()
+		if err != nil {
+			fmt.Println("Listen() err ", err)
+			return
+		}
+	}()
 
 	//Bootstrapping p2p network
 	fmt.Println("Join :", config.BootStrapIPs)
