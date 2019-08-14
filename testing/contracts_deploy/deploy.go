@@ -192,14 +192,13 @@ func addProxyToCRWhiteList(client *ethclient.Client, key *keystore.Key, bridgeAd
 	return
 }
 
-func deployContract(contractPath, targetTask, configPath string, config configuration.Config, chainConfig configuration.ChainConfig, client *ethclient.Client, key *keystore.Key) {
+func deployContract(contractPath, targetTask, configPath string, config configuration.Config, client *ethclient.Client, key *keystore.Key) {
 	var tx *types.Transaction
 	var address common.Address
 	auth := bind.NewKeyedTransactor(key.PrivateKey)
 	auth.GasLimit = uint64(6000000)
 	auth.GasPrice = big.NewInt(30000000000)
 	var err error
-	bridgeAddress := common.HexToAddress(chainConfig.DOSAddressBridgeAddress)
 	if targetTask == "deployBridge" {
 		fmt.Println("Starting deploy DOSAddressBridge.sol...")
 		address, tx, _, err = dosbridge.DeployDosbridge(auth, client)
@@ -216,17 +215,25 @@ func deployContract(contractPath, targetTask, configPath string, config configur
 		if err != nil {
 			fmt.Println(err)
 		}
-		chainConfig.DOSAddressBridgeAddress = address.Hex()
-		if err := config.UpdateConfig(chainConfig); err != nil {
+		config.DOSAddressBridgeAddress = address.Hex()
+		if err := config.UpdateConfig(); err != nil {
 			log.Fatal(err)
 		}
-		if err := updateBridgeAddr(contractPath+"/DOSOnChainSDK.sol", chainConfig.DOSAddressBridgeAddress); err != nil {
+		if err := updateBridgeAddr(contractPath+"/DOSOnChainSDK.sol", address.Hex()); err != nil {
 			log.Fatal(err)
 		}
-		if err := updateBridgeAddr(contractPath+"/DOSProxy.sol", chainConfig.DOSAddressBridgeAddress); err != nil {
+		if err := updateBridgeAddr(contractPath+"/DOSProxy.sol", address.Hex()); err != nil {
 			log.Fatal(err)
 		}
-	} else if targetTask == "deployPayment" {
+		return
+	}
+
+	if !common.IsHexAddress(config.DOSAddressBridgeAddress) {
+		return
+	}
+	bridgeAddr := common.HexToAddress(config.DOSAddressBridgeAddress)
+
+	if targetTask == "deployPayment" {
 		fmt.Println("Starting deploy DOSPayment.sol...")
 		address, tx, _, err = dospayment.DeployDospayment(auth, client)
 		for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
@@ -242,7 +249,7 @@ func deployContract(contractPath, targetTask, configPath string, config configur
 		if err != nil {
 			fmt.Println(err)
 		}
-		err := updateBridge(client, key, paymentAddressType, bridgeAddress, address)
+		err := updateBridge(client, key, paymentAddressType, bridgeAddr, address)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -263,14 +270,13 @@ func deployContract(contractPath, targetTask, configPath string, config configur
 		if err != nil {
 			fmt.Println(err)
 		}
-		err := updateBridge(client, key, crAddressType, bridgeAddress, address)
+		err := updateBridge(client, key, crAddressType, bridgeAddr, address)
 		if err != nil {
 			log.Fatal(err)
 		}
 
 	} else if targetTask == "deployProxy" {
 		fmt.Println("Starting deploy DOSProxy.sol...")
-		bridgeAddress := common.HexToAddress(chainConfig.DOSAddressBridgeAddress)
 
 		address, tx, _, err = dosproxy.DeployDosproxy(auth, client)
 		for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
@@ -287,12 +293,12 @@ func deployContract(contractPath, targetTask, configPath string, config configur
 			fmt.Println(err)
 		}
 
-		err := updateBridge(client, key, proxyAddressType, bridgeAddress, address)
+		err := updateBridge(client, key, proxyAddressType, bridgeAddr, address)
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		err = addProxyToCRWhiteList(client, key, bridgeAddress)
+		err = addProxyToCRWhiteList(client, key, bridgeAddr)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -329,9 +335,7 @@ func deployContract(contractPath, targetTask, configPath string, config configur
 			amaAdd = append(amaAdd, address.Hex())
 		}
 		amaConfig.AskMeAnythingAddressPool = amaAdd
-		if err := configuration.UpdateConfig(configPath, amaConfig); err != nil {
-			log.Fatal(err)
-		}
+
 	}
 }
 
@@ -356,10 +360,6 @@ func main() {
 		log.Fatal(err)
 	}
 
-	chainConfig := config.GetChainConfig()
-	fmt.Println("Use : ", chainConfig)
-	fmt.Println(" address ", chainConfig.RemoteNodeAddressPool[0])
-
 	password := os.Getenv("PASSPHRASE")
 	for password == "" {
 		fmt.Print("Enter Password: ")
@@ -369,6 +369,7 @@ func main() {
 		}
 		password = strings.TrimSpace(string(bytePassword))
 	}
+
 	//Dial to blockchain
 	key, err := onchain.ReadEthKey(credentialPath, password)
 	if err != nil {
@@ -376,7 +377,7 @@ func main() {
 		return
 	}
 
-	clients := onchain.DialToEth(context.Background(), chainConfig.RemoteNodeAddressPool[:1])
+	clients := onchain.DialToEth(context.Background(), []string{"ws://51.15.0.157:8546"})
 
 	//Use first client
 	c, ok := <-clients
@@ -385,5 +386,5 @@ func main() {
 		return
 	}
 
-	deployContract(contractPath, target, configPath, config, chainConfig, c, key)
+	deployContract(contractPath, target, configPath, config, c, key)
 }
