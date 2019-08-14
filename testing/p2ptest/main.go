@@ -65,10 +65,12 @@ func main() {
 			}
 		case "s":
 			if node != nil {
+
 				for i := 0; i <= 10; i++ {
 					go func() {
+						ctx := context.Background()
 						cmd := &p2p.Ping{Count: 1}
-						reply, _ := node.Request(context.Background(), []byte(destid), proto.Message(cmd))
+						reply, _ := node.Request(ctx, []byte(destid), proto.Message(cmd))
 						pong, _ := reply.Msg.Message.(*p2p.Pong)
 						fmt.Println("pong ", pong)
 					}()
@@ -77,7 +79,6 @@ func main() {
 		case "r":
 			if node != nil {
 				for key, msg := range messages {
-					fmt.Println("reply.")
 					r, ok := msg.Msg.Message.(*p2p.Ping)
 					if !ok {
 						fmt.Println("not ok.")

@@ -298,14 +298,14 @@ func sendToMembers(ctx context.Context, logger log.Logger, msgc chan interface{}
 						if r := bytes.Compare(p.GetID(), id); r != 0 {
 							go func(i int, id []byte) {
 								defer wg.Done()
-								for {
-									//retry until success or ctx.Done
-									if _, err := p.Request(ctx, id, m); err != nil {
-										reportErr(ctx, errc, err)
-									} else {
-										return
-									}
+								//for {
+								//retry until success or ctx.Done
+								if _, err := p.Request(ctx, id, m); err != nil {
+									reportErr(ctx, errc, err)
+								} else {
+									return
 								}
+								//}
 							}(i, id)
 						}
 					}

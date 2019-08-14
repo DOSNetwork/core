@@ -35,8 +35,8 @@ type server struct {
 
 	//client lookup
 	members  discover.Membership
-	calling  chan request
-	replying chan request
+	calling  chan p2pRequest
+	replying chan p2pRequest
 
 	addIncomingC    chan *client
 	removeIncomingC chan []byte
@@ -246,11 +246,12 @@ func (n *server) runClient(c *client, inBound bool) {
 	}
 }
 
-func (n *server) handleCallReq(req request) (c *client) {
+func (n *server) handleCallReq(req p2pRequest) (c *client) {
 	var fd net.Conn
 	var err error
+
 	if fd, err = net.Dial("tcp", req.addr); err != nil {
-		req.replyError(errors.Errorf("server handleCallReq : %w", err))
+		req.replyResult(nil, errors.Errorf("server handleCallReq %s: %w", req.addr, err))
 		return
 	}
 
@@ -260,7 +261,7 @@ func (n *server) handleCallReq(req request) (c *client) {
 		err = errors.Errorf("server handleCallReq : %w", err)
 	}
 	if err != nil {
-		req.replyError(errors.Errorf("server handleCallReq : %w", err))
+		req.replyResult(nil, errors.Errorf("server handleCallReq : %w", err))
 		c.close()
 		c = nil
 	}
@@ -290,13 +291,12 @@ func (n *server) DisConnectTo(id []byte) (err error) {
 }
 
 // Request sends a proto message to the specific node
-func (n *server) Request(ctx context.Context, id []byte, m proto.Message) (msg P2PMessage, err error) {
+func (n *server) Request(ctx context.Context, id []byte, msg proto.Message) (p2pmsg P2PMessage, err error) {
 	var (
 		result interface{}
 		ok     bool
 	)
-	rctx, cancel := context.WithCancel(ctx)
-	req := request{ctx: rctx, cancel: cancel, id: id, msg: m, rType: sendReq, reply: make(chan interface{}), errc: make(chan error)}
+	req := NewP2pRequest(ctx, sendReq, id, "", msg, 0)
 	if err = req.sendReq(n.calling); err != nil {
 		err = errors.Errorf("server Request : %w", err)
 		logger.Error(err)
@@ -308,7 +308,7 @@ func (n *server) Request(ctx context.Context, id []byte, m proto.Message) (msg P
 		return
 	}
 
-	if msg, ok = result.(P2PMessage); !ok {
+	if p2pmsg, ok = result.(P2PMessage); !ok {
 		err = errors.Errorf("server Request : %w", ErrCasting)
 		logger.Error(err)
 	}
@@ -317,14 +317,13 @@ func (n *server) Request(ctx context.Context, id []byte, m proto.Message) (msg P
 
 // Reply sends a reply to the specific node
 func (n *server) Reply(ctx context.Context, id []byte, nonce uint64, msg proto.Message) (err error) {
-	rctx, cancel := context.WithCancel(ctx)
-	req := request{ctx: rctx, cancel: cancel, id: id, rType: replyReq, nonce: nonce, msg: msg, errc: make(chan error)}
+	req := NewP2pRequest(ctx, replyReq, id, "", msg, nonce)
 	if err = req.sendReq(n.replying); err != nil {
 		err = errors.Errorf("server Reply : %w", err)
 		logger.Error(err)
 		return
 	}
-	if err = req.waitForError(); err != nil {
+	if _, err = req.waitForResult(); err != nil {
 		err = errors.Errorf("server Reply : %w", err)
 		logger.Error(err)
 	}

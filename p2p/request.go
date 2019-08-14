@@ -6,7 +6,7 @@ import (
 	"github.com/golang/protobuf/proto"
 )
 
-type request struct {
+type p2pRequest struct {
 	rType  int
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -17,11 +17,19 @@ type request struct {
 	p   *Package
 	//
 	nonce uint64
-	reply chan interface{}
-	errc  chan error
+	reply chan p2pResult
+}
+type p2pResult struct {
+	res interface{}
+	err error
 }
 
-func (r *request) sendReq(ch chan request) (err error) {
+func NewP2pRequest(ctx context.Context, rType int, id []byte, addr string, msg proto.Message, nonce uint64) (req *p2pRequest) {
+	rctx, cancel := context.WithCancel(ctx)
+	req = &p2pRequest{ctx: rctx, cancel: cancel, id: id, msg: msg, rType: rType, reply: make(chan p2pResult)}
+	return
+}
+func (r *p2pRequest) sendReq(ch chan p2pRequest) (err error) {
 	select {
 	case ch <- *r:
 	case <-r.ctx.Done():
@@ -30,38 +38,22 @@ func (r *request) sendReq(ch chan request) (err error) {
 	return
 }
 
-func (r *request) waitForResult() (result interface{}, err error) {
+func (r *p2pRequest) waitForResult() (res interface{}, err error) {
 	defer close(r.reply)
-	defer close(r.errc)
+	defer r.cancel()
 	select {
-	case result = <-r.reply:
-	case err = <-r.errc:
 	case <-r.ctx.Done():
 		err = r.ctx.Err()
-	}
-	return
-}
-func (r *request) waitForError() (err error) {
-	defer close(r.errc)
-	select {
-	case err = <-r.errc:
-	case <-r.ctx.Done():
+	case result := <-r.reply:
+		res = result.res
+		err = result.err
 	}
 	return
 }
 
-func (r *request) replyResult(result interface{}) {
-	defer r.cancel()
+func (r *p2pRequest) replyResult(res interface{}, err error) {
 	select {
 	case <-r.ctx.Done():
-	case r.reply <- result:
-	}
-}
-
-func (r *request) replyError(err error) {
-	defer r.cancel()
-	select {
-	case <-r.ctx.Done():
-	case r.errc <- err:
+	case r.reply <- p2pResult{res: res, err: err}:
 	}
 }

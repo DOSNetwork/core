@@ -43,7 +43,7 @@ type client struct {
 
 	ctx      context.Context
 	cancel   context.CancelFunc
-	peerSend chan request
+	peerSend chan p2pRequest
 	peerFeed chan P2PMessage
 	errc     chan error
 
@@ -76,7 +76,7 @@ func newClient(localID []byte, conn net.Conn, peerFeed chan P2PMessage, inBound 
 		errc:    make(chan error),
 	}
 	c.ctx, c.cancel = context.WithCancel(context.Background())
-	c.peerSend = make(chan request, 21)
+	c.peerSend = make(chan p2pRequest, 21)
 	c.peerFeed = peerFeed
 	//TODO : Move to other module
 	c.suite = suites.MustFind("bn256")
@@ -202,13 +202,13 @@ func (c *client) close() {
 	<-c.ctx.Done()
 }
 
-func (c *client) send(req request) {
+func (c *client) send(req p2pRequest) {
 	go func() {
 		select {
 		case <-c.ctx.Done():
 		default:
 			if err := req.sendReq(c.peerSend); err != nil {
-				req.replyError(errors.Errorf("client send: %w", err))
+				req.replyResult(nil, errors.Errorf("client send: %w", err))
 			}
 		}
 	}()
@@ -291,9 +291,9 @@ func (c *client) decryptPipe(ciphertext chan []byte) (out chan []byte) {
 	return out
 }
 
-func (c *client) dispatch(replyMsg, receivedMsg chan P2PMessage) (out chan request) {
-	out = make(chan request)
-	requests := make(map[uint64]*request)
+func (c *client) dispatch(replyMsg, receivedMsg chan P2PMessage) (out chan p2pRequest) {
+	out = make(chan p2pRequest)
+	requests := make(map[uint64]*p2pRequest)
 	var nonce uint64
 	idleTimer := time.NewTimer(idleTimeout)
 	var readTimer bool
@@ -302,13 +302,13 @@ func (c *client) dispatch(replyMsg, receivedMsg chan P2PMessage) (out chan reque
 		for {
 			var (
 				ok  bool
-				req request
+				req p2pRequest
 				msg P2PMessage
 			)
 			select {
 			case <-c.ctx.Done():
 				for _, req := range requests {
-					req.cancel()
+					req.replyResult(nil, errors.Errorf("client dispatch: %w", c.ctx.Err()))
 				}
 				if !idleTimer.Stop() && !readTimer {
 					<-idleTimer.C
@@ -323,7 +323,6 @@ func (c *client) dispatch(replyMsg, receivedMsg chan P2PMessage) (out chan reque
 						<-idleTimer.C
 					}
 					idleTimer.Reset(idleTimeout)
-
 					if req.rType != replyReq {
 						req.nonce = nonce
 						requests[nonce] = &req
@@ -340,13 +339,13 @@ func (c *client) dispatch(replyMsg, receivedMsg chan P2PMessage) (out chan reque
 						<-idleTimer.C
 					}
 					idleTimer.Reset(idleTimeout)
-					request := requests[msg.RequestNonce]
-					if request != nil {
+					p2pRequest := requests[msg.RequestNonce]
+					if p2pRequest != nil {
 						delete(requests, msg.RequestNonce)
 						select {
-						case <-request.ctx.Done():
+						case <-p2pRequest.ctx.Done():
 						default:
-							request.replyResult(msg)
+							p2pRequest.replyResult(msg, nil)
 						}
 					}
 				}
@@ -364,7 +363,7 @@ func (c *client) dispatch(replyMsg, receivedMsg chan P2PMessage) (out chan reque
 	return
 }
 
-func (c *client) packPipe(reqC chan request) (out chan []byte) {
+func (c *client) packPipe(reqC chan p2pRequest) (out chan []byte) {
 	out = make(chan []byte)
 	go func() {
 		defer close(out)
@@ -376,16 +375,16 @@ func (c *client) packPipe(reqC chan request) (out chan []byte) {
 				return
 			case req, ok := <-reqC:
 				if ok {
+
 					select {
 					case <-req.ctx.Done():
 					default:
 					}
 					replyFlag := false
 					if req.rType == replyReq {
-						go req.cancel()
+						req.replyResult(nil, nil)
 						replyFlag = true
 					}
-
 					bytes, err = encodeProto(req.msg, c.localID, c.signFn, req.nonce, replyFlag)
 					if err != nil {
 						c.reportError(errors.Errorf("client packPipe: %w", err))
@@ -447,7 +446,6 @@ func (c *client) decodePipe(bytesC chan []byte) (replyMsg, receivedMsg chan P2PM
 						c.reportError(errors.Errorf("client decodePipe: %w", err))
 						continue
 					}
-
 					msg = P2PMessage{Msg: ptr, Sender: pa.GetSender(), RequestNonce: pa.GetRequestNonce()}
 					if pa.GetReplyFlag() {
 						select {
