@@ -8,10 +8,12 @@ import (
 )
 
 var (
-	ErrNoRemoteID  = errors.New("remoteID is nil")
-	ErrMsgOverSize = errors.New("header size check failed")
-	ErrCasting     = errors.New("casting failed")
-	ErrDuplicateID = errors.New("remote ID is the same with local ID")
+	ErrNoRemoteID       = errors.New("remoteID is nil")
+	ErrMsgOverSize      = errors.New("header size check failed")
+	ErrCasting          = errors.New("casting failed")
+	ErrDuplicateID      = errors.New("remote ID is the same with local ID")
+	ErrCanNotFindClient = errors.New("can't find client")
+	ErrIdleTimeout      = errors.New("idle timeout")
 )
 
 type P2PError struct {

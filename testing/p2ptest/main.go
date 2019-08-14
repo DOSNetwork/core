@@ -15,6 +15,7 @@ import (
 var messages map[string]p2p.P2PMessage
 
 func receiveEvent(node p2p.P2PInterface) {
+	defer fmt.Println("end receiveEvent")
 	messages = make(map[string]p2p.P2PMessage)
 	go node.Listen()
 	events, _ := node.SubscribeEvent(1, p2p.Ping{})
@@ -32,8 +33,8 @@ func main() {
 		return
 	}
 	log.Init([]byte(id))
-	node, _ := p2p.CreateP2PNetwork([]byte(id), "0.0.0.0", nodePort, p2p.NoDiscover)
-	go receiveEvent(node)
+	var node p2p.P2PInterface
+
 	//	var remoteNode []byte
 	validate := func(input string) error {
 		return nil
@@ -51,26 +52,41 @@ func main() {
 			return
 		}
 		switch result {
-		case "close":
-			node.DisConnectTo([]byte(destid))
-		case "send":
-			go func() {
-				cmd := &p2p.Ping{Count: 1}
-				reply, _ := node.Request(context.Background(), []byte(destid), proto.Message(cmd))
-				pong, _ := reply.Msg.Message.(*p2p.Pong)
-				fmt.Println("pong ", pong)
-			}()
-		case "reply":
-			for key, msg := range messages {
-				fmt.Println("reply.")
-				r, ok := msg.Msg.Message.(*p2p.Ping)
-				if !ok {
-					fmt.Println("not ok.")
-					return
+		case "p":
+			node, _ = p2p.CreateP2PNetwork([]byte(id), "0.0.0.0", nodePort, p2p.NoDiscover)
+			go receiveEvent(node)
+		case "l":
+			if node != nil {
+				node.Leave()
+			}
+		case "c":
+			if node != nil {
+				node.DisConnectTo([]byte(destid))
+			}
+		case "s":
+			if node != nil {
+				for i := 0; i <= 10; i++ {
+					go func() {
+						cmd := &p2p.Ping{Count: 1}
+						reply, _ := node.Request(context.Background(), []byte(destid), proto.Message(cmd))
+						pong, _ := reply.Msg.Message.(*p2p.Pong)
+						fmt.Println("pong ", pong)
+					}()
 				}
-				node.Reply(context.Background(), msg.Sender, msg.RequestNonce, proto.Message(&p2p.Pong{Count: r.Count + 10}))
-				delete(messages, key)
+			}
+		case "r":
+			if node != nil {
+				for key, msg := range messages {
+					fmt.Println("reply.")
+					r, ok := msg.Msg.Message.(*p2p.Ping)
+					if !ok {
+						fmt.Println("not ok.")
+						return
+					}
+					node.Reply(context.Background(), msg.Sender, msg.RequestNonce, proto.Message(&p2p.Pong{Count: r.Count + 10}))
+					delete(messages, key)
 
+				}
 			}
 		case "exit":
 			fmt.Println("exit.")

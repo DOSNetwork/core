@@ -59,12 +59,18 @@ type P2PInterface interface {
 func CreateP2PNetwork(id []byte, ip, port string, netType int) (P2PInterface, error) {
 	suite := suites.MustFind("bn256")
 	logger = log.New("module", "p2p")
+
 	p := &server{
-		suite:     suite,
-		peersFeed: make(chan P2PMessage, 100),
-		subscribe: make(chan subscription),
-		unscribe:  make(chan subscription),
-		port:      port,
+		suite:           suite,
+		addIncomingC:    make(chan *client),
+		removeIncomingC: make(chan []byte),
+		replying:        make(chan request),
+		calling:         make(chan request),
+		removeCallingC:  make(chan []byte),
+		peersFeed:       make(chan P2PMessage, 100),
+		subscribe:       make(chan subscription),
+		unscribe:        make(chan subscription),
+		port:            port,
 	}
 	p.ctx, p.cancel = context.WithCancel(context.Background())
 	p.secKey = suite.Scalar().Pick(suite.RandomStream())

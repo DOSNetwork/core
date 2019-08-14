@@ -3,7 +3,7 @@ package p2p
 import (
 	"context"
 	"encoding/binary"
-	"io"
+	//	"io"
 	"net"
 	//	"strconv"
 	"fmt"
@@ -28,6 +28,7 @@ const (
 	msgSizeLimit = 1024 * 1024
 	bufSize      = 1024
 	headerSize   = 4
+	idleTimeout  = 60 * time.Second
 )
 
 type signFunc func(msg []byte) (sig []byte, err error)
@@ -174,9 +175,7 @@ func (c *client) sendID(ctx context.Context) (errc chan error) {
 }
 
 func (c *client) run() (err error) {
-	//if c.inBound {
 	c.sendPipe(c.encryptPipe(c.packPipe(c.dispatch(c.decodePipe(c.decryptPipe(c.readPipe()))))))
-	//}
 	for {
 		var ok bool
 		select {
@@ -184,9 +183,9 @@ func (c *client) run() (err error) {
 			return
 		case err, ok = <-c.errc:
 			if ok {
-				if errors.Is(err, io.EOF) {
-					return
-				}
+				//if errors.Is(err, io.EOF) {
+				//	return
+				//}
 				return
 			}
 		}
@@ -205,9 +204,12 @@ func (c *client) close() {
 
 func (c *client) send(req request) {
 	go func() {
-		err := req.sendReq(c.peerSend)
-		if err != nil {
-			req.replyError(errors.Errorf("client send: %w", err))
+		select {
+		case <-c.ctx.Done():
+		default:
+			if err := req.sendReq(c.peerSend); err != nil {
+				req.replyError(errors.Errorf("client send: %w", err))
+			}
 		}
 	}()
 }
@@ -223,24 +225,22 @@ func (c *client) encryptPipe(plaintext chan []byte) (out chan []byte) {
 			case <-c.ctx.Done():
 				return
 			case text, ok := <-plaintext:
-				if !ok {
-					return
-				}
+				if ok {
+					var err error
+					var block cipher.Block
+					var aesgcm cipher.AEAD
 
-				var err error
-				var block cipher.Block
-				var aesgcm cipher.AEAD
+					if block, err = aes.NewCipher(c.dhKey); err != nil {
+						c.reportError(errors.Errorf("client encryptPipe: %w", err))
+						continue
+					}
 
-				if block, err = aes.NewCipher(c.dhKey); err != nil {
-					c.reportError(errors.Errorf("client encryptPipe: %w", err))
-					continue
+					if aesgcm, err = cipher.NewGCM(block); err != nil {
+						c.reportError(errors.Errorf("client encryptPipe: %w", err))
+						continue
+					}
+					result = aesgcm.Seal(nil, c.dhNonce, text, nil)
 				}
-
-				if aesgcm, err = cipher.NewGCM(block); err != nil {
-					c.reportError(errors.Errorf("client encryptPipe: %w", err))
-					continue
-				}
-				result = aesgcm.Seal(nil, c.dhNonce, text, nil)
 			}
 			select {
 			case <-c.ctx.Done():
@@ -262,32 +262,29 @@ func (c *client) decryptPipe(ciphertext chan []byte) (out chan []byte) {
 			case <-c.ctx.Done():
 				return
 			case text, ok := <-ciphertext:
-				if !ok {
-					return
-				}
-				var block cipher.Block
-				var aesgcm cipher.AEAD
-				var err error
+				if ok {
+					var block cipher.Block
+					var aesgcm cipher.AEAD
+					var err error
+					if block, err = aes.NewCipher(c.dhKey); err != nil {
+						c.reportError(errors.Errorf("client decryptPipe: %w", err))
+						continue
+					}
 
-				if block, err = aes.NewCipher(c.dhKey); err != nil {
-					c.reportError(errors.Errorf("client decryptPipe: %w", err))
-					continue
-				}
+					if aesgcm, err = cipher.NewGCM(block); err != nil {
+						c.reportError(errors.Errorf("client decryptPipe: %w", err))
+						continue
+					}
 
-				if aesgcm, err = cipher.NewGCM(block); err != nil {
-					c.reportError(errors.Errorf("client decryptPipe: %w", err))
-					continue
+					if result, err = aesgcm.Open(nil, c.dhNonce, text, nil); err != nil {
+						c.reportError(errors.Errorf("client decryptPipe: %w", err))
+						continue
+					}
+					select {
+					case out <- result:
+					case <-c.ctx.Done():
+					}
 				}
-
-				if result, err = aesgcm.Open(nil, c.dhNonce, text, nil); err != nil {
-					c.reportError(errors.Errorf("client decryptPipe: %w", err))
-					continue
-				}
-			}
-
-			select {
-			case out <- result:
-			case <-c.ctx.Done():
 			}
 		}
 	}()
@@ -298,6 +295,8 @@ func (c *client) dispatch(replyMsg, receivedMsg chan P2PMessage) (out chan reque
 	out = make(chan request)
 	requests := make(map[uint64]*request)
 	var nonce uint64
+	idleTimer := time.NewTimer(idleTimeout)
+	var readTimer bool
 	go func() {
 		defer close(out)
 		for {
@@ -311,42 +310,54 @@ func (c *client) dispatch(replyMsg, receivedMsg chan P2PMessage) (out chan reque
 				for _, req := range requests {
 					req.cancel()
 				}
+				if !idleTimer.Stop() && !readTimer {
+					<-idleTimer.C
+				}
 				return
+			case <-idleTimer.C:
+				readTimer = true
+				c.close()
 			case req, ok = <-c.peerSend:
-				if !ok {
-					return
-				}
-				if req.rType != replyReq {
-					req.nonce = nonce
-					requests[nonce] = &req
-					nonce++
-				}
-			case msg, ok = <-replyMsg:
-				if !ok {
-					return
-				}
-				request := requests[msg.RequestNonce]
-				if request != nil {
-					delete(requests, msg.RequestNonce)
+				if ok {
+					if !idleTimer.Stop() {
+						<-idleTimer.C
+					}
+					idleTimer.Reset(idleTimeout)
+
+					if req.rType != replyReq {
+						req.nonce = nonce
+						requests[nonce] = &req
+						nonce++
+					}
 					select {
-					case <-request.ctx.Done():
-					default:
-						request.replyResult(msg)
+					case <-c.ctx.Done():
+					case out <- req:
 					}
 				}
-
-				continue
-			case msg, ok = <-receivedMsg:
-				if !ok {
-					return
+			case msg, ok = <-replyMsg:
+				if ok {
+					if !idleTimer.Stop() {
+						<-idleTimer.C
+					}
+					idleTimer.Reset(idleTimeout)
+					request := requests[msg.RequestNonce]
+					if request != nil {
+						delete(requests, msg.RequestNonce)
+						select {
+						case <-request.ctx.Done():
+						default:
+							request.replyResult(msg)
+						}
+					}
 				}
-				c.reportMsg(msg)
-				continue
-			}
-			select {
-			case <-c.ctx.Done():
-				return
-			case out <- req:
+			case msg, ok = <-receivedMsg:
+				if ok {
+					if !idleTimer.Stop() {
+						<-idleTimer.C
+					}
+					idleTimer.Reset(idleTimeout)
+					c.reportMsg(msg)
+				}
 			}
 		}
 	}()
@@ -364,27 +375,25 @@ func (c *client) packPipe(reqC chan request) (out chan []byte) {
 			case <-c.ctx.Done():
 				return
 			case req, ok := <-reqC:
-				if !ok {
-					return
-				}
-				select {
-				case <-req.ctx.Done():
-				default:
-				}
-				replyFlag := false
-				if req.rType == replyReq {
-					go req.cancel()
-					replyFlag = true
-				}
+				if ok {
+					select {
+					case <-req.ctx.Done():
+					default:
+					}
+					replyFlag := false
+					if req.rType == replyReq {
+						go req.cancel()
+						replyFlag = true
+					}
 
-				bytes, err = encodeProto(req.msg, c.localID, c.signFn, req.nonce, replyFlag)
-				if err != nil {
-					c.reportError(errors.Errorf("client packPipe: %w", err))
+					bytes, err = encodeProto(req.msg, c.localID, c.signFn, req.nonce, replyFlag)
+					if err != nil {
+						c.reportError(errors.Errorf("client packPipe: %w", err))
+					}
 				}
 			}
 			select {
 			case <-c.ctx.Done():
-				return
 			case out <- bytes:
 			}
 		}
@@ -399,12 +408,11 @@ func (c *client) sendPipe(bytesC chan []byte) {
 			case <-c.ctx.Done():
 				return
 			case bytes, ok := <-bytesC:
-				if !ok {
-					return
-				}
-				err := writeTo(bytes, c.conn)
-				if err != nil {
-					c.reportError(errors.Errorf("client sendPipe: %w", err))
+				if ok {
+					err := writeTo(bytes, c.conn)
+					if err != nil {
+						c.reportError(errors.Errorf("client sendPipe: %w", err))
+					}
 				}
 			}
 		}
@@ -424,30 +432,33 @@ func (c *client) decodePipe(bytesC chan []byte) (replyMsg, receivedMsg chan P2PM
 			case <-c.ctx.Done():
 				return
 			case bytes, ok := <-bytesC:
-				if !ok {
-					return
-				}
-				pa, ptr, err := decodeBytes(bytes, c.verifyFn)
-				if err != nil {
-					c.reportError(errors.Errorf("client decodePipe: %w", err))
-					continue
-				}
-				//TODO: Move to other module
-				if err := bls.Verify(c.suite, c.remotePubKey, pa.GetAnything().Value, pa.GetSignature()); err != nil {
-					c.reportError(errors.Errorf("client decodePipe: %w", err))
-					continue
-				}
-
-				msg = P2PMessage{Msg: ptr, Sender: pa.GetSender(), RequestNonce: pa.GetRequestNonce()}
-				if pa.GetReplyFlag() {
-					select {
-					case <-c.ctx.Done():
-					case replyMsg <- msg:
+				if ok {
+					if len(bytes) == 0 {
+						fmt.Println("P2PMessage ", len(bytes))
+						continue
 					}
-				} else {
-					select {
-					case <-c.ctx.Done():
-					case receivedMsg <- msg:
+					pa, ptr, err := decodeBytes(bytes, c.verifyFn)
+					if err != nil {
+						c.reportError(errors.Errorf("client decodePipe: %w", err))
+						continue
+					}
+					//TODO: Move to other module
+					if err := bls.Verify(c.suite, c.remotePubKey, pa.GetAnything().Value, pa.GetSignature()); err != nil {
+						c.reportError(errors.Errorf("client decodePipe: %w", err))
+						continue
+					}
+
+					msg = P2PMessage{Msg: ptr, Sender: pa.GetSender(), RequestNonce: pa.GetRequestNonce()}
+					if pa.GetReplyFlag() {
+						select {
+						case <-c.ctx.Done():
+						case replyMsg <- msg:
+						}
+					} else {
+						select {
+						case <-c.ctx.Done():
+						case receivedMsg <- msg:
+						}
 					}
 				}
 			}
@@ -475,7 +486,6 @@ func (c *client) readPipe() (out chan []byte) {
 			}
 			select {
 			case <-c.ctx.Done():
-				return
 			case out <- buffer:
 			}
 		}
@@ -511,6 +521,8 @@ func encodeProto(msg proto.Message, sender []byte, signFn signFunc, nonce uint64
 
 func decodeBytes(bytes []byte, veifyfn verifyFunc) (pa *Package, ptr ptypes.DynamicAny, err error) {
 	pa = &Package{}
+	//TestPoint
+	//bytes = []byte{}
 	if err = proto.Unmarshal(bytes, pa); err != nil {
 		err = errors.Errorf(": %w", err)
 		return
@@ -532,6 +544,8 @@ func writeTo(bytes []byte, conn net.Conn) (err error) {
 	bytesWrite, totalBytesWrtie := 0, 0
 
 	size := len(bytes)
+	//TestPoint
+	//size = msgSizeLimit + 1
 	if size > msgSizeLimit {
 		err = errors.Errorf("SizeLimit %d size %d : %w",
 			msgSizeLimit, size, ErrMsgOverSize)
@@ -539,6 +553,8 @@ func writeTo(bytes []byte, conn net.Conn) (err error) {
 	}
 	binary.BigEndian.PutUint32(prefix, uint32(size))
 	bytes = append(prefix, bytes...)
+	//TestPoint
+	//conn.Close()
 	for totalBytesWrtie < len(bytes) && err == nil {
 		if bytesWrite, err = conn.Write(bytes[totalBytesWrtie:]); err != nil {
 			err = errors.Errorf(": %w", err)
@@ -578,6 +594,8 @@ func readFrom(conn net.Conn) (buffer []byte, err error) {
 	// Read until all message bytes have been read.
 	buffer = make([]byte, size)
 	contentBytesRead, totalContentBytesRead := 0, 0
+	//TestPoint
+	//conn.Close()
 	for totalContentBytesRead < int(size) && err == nil {
 		if contentBytesRead, err = conn.Read(buffer[totalContentBytesRead:]); err != nil {
 			err = errors.Errorf(": %w", err)

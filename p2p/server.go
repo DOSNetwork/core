@@ -54,131 +54,193 @@ type server struct {
 	cancel context.CancelFunc
 }
 
-type request struct {
-	rType  int
-	ctx    context.Context
-	cancel context.CancelFunc
-	addr   string
-	id     []byte
-	//client signs and packs msg into Package
-	msg proto.Message
-	p   *Package
-	//
-	nonce uint64
-	reply chan interface{}
-	errc  chan error
-}
-
-func (r *request) sendReq(ch chan request) (err error) {
-	select {
-	case ch <- *r:
-	case <-r.ctx.Done():
-		err = r.ctx.Err()
-	}
-	return
-}
-
-func (r *request) waitForResult() (result interface{}, err error) {
-	defer close(r.reply)
-	defer close(r.errc)
-	select {
-	case result = <-r.reply:
-	case err = <-r.errc:
-	case <-r.ctx.Done():
-		err = r.ctx.Err()
-	}
-	return
-}
-func (r *request) waitForError() (err error) {
-	defer close(r.errc)
-	select {
-	case err = <-r.errc:
-	case <-r.ctx.Done():
-		err = r.ctx.Err()
-	}
-	return
-}
-
-func (r *request) replyResult(result interface{}) {
-	defer r.cancel()
-	select {
-	case <-r.ctx.Done():
-	case r.reply <- result:
-	}
-}
-
-func (r *request) replyError(err error) {
-	defer r.cancel()
-	select {
-	case <-r.ctx.Done():
-	case r.errc <- err:
-	}
-}
-
 type subscription struct {
 	eventType string
 	message   chan P2PMessage
 }
 
 func (n *server) Listen() (err error) {
-	defer fmt.Println("Close Listen")
-	n.receiveHandler()
-	n.callHandler()
-	go n.messageDispatch(context.Background())
+	defer fmt.Println("end Listen")
+	go n.receiveHandler()
+	go n.callHandler()
+	go n.messageDispatch()
 
 	p := fmt.Sprintf(":%s", n.port)
 	if n.listener, err = net.Listen("tcp", p); err != nil {
-		err = &P2PError{
-			err: errors.Errorf("Error in server Listen(): %w", err),
-			t:   time.Now(),
-		}
-		logger.Error(err)
+		logger.Error(errors.Errorf("server Listen : %w", err))
 		return
 	}
 	fmt.Println("Listen to ", n.addr, " ", n.port)
 
+	errc := make(chan error)
+	defer close(errc)
 	for {
-		var fd net.Conn
-		fd, err = n.listener.Accept()
-		if err != nil {
-
+		select {
+		case <-n.ctx.Done():
+		case err = <-errc:
+			//TODO add error handling
 			return
-		}
-		go func() {
-			c, err := n.setupConn(fd, true)
+		default:
+			var fd net.Conn
+			fd, err = n.listener.Accept()
 			if err != nil {
-				logger.Error(err)
+				logger.Error(errors.Errorf("server Listen : %w", err))
 				return
 			}
-			select {
-			case n.addIncomingC <- c:
-			case <-n.ctx.Done():
-			}
-		}()
+			go func() {
+				ctx, cancel := context.WithTimeout(n.ctx, 2*time.Second)
+				defer cancel()
+				c := newClient(n.id, fd, n.peersFeed, true)
+				errc := c.handShake(ctx)
+				for err = range errc {
+					err = errors.Errorf("server Listen : %w", err)
+					logger.Error(err)
+				}
+				if err != nil {
+					select {
+					case <-n.ctx.Done():
+						return
+					case errc <- err:
+					}
+					return
+				}
+				select {
+				case <-n.ctx.Done():
+					return
+				case n.addIncomingC <- c:
+				}
+				return
+			}()
+		}
 	}
 
-	return nil
+	return
 }
 
-// SetupConn runs the handshakes and attempts to add the connection
-// as a peer. It returns when the connection has been added as a peer
-// or the handshakes have failed.
-func (n *server) setupConn(fd net.Conn, inOrOut bool) (c *client, err error) {
-	c = newClient(n.id, fd, n.peersFeed, inOrOut)
-	errc := c.handShake(context.Background())
-	for err = range errc {
-		c.close()
-		break
+func (n *server) receiveHandler() {
+	defer fmt.Println("end receiveHandler")
+	clients := make(map[string]*client)
+	for {
+		select {
+		case <-n.ctx.Done():
+			for _, client := range clients {
+				client.close()
+			}
+			return
+		case c := <-n.addIncomingC:
+			if clients[string(c.remoteID)] != nil {
+				c.close()
+				continue
+			}
+			clients[string(c.remoteID)] = c
+			n.incomingNum = len(clients)
+			go n.runClient(c, true)
+			fmt.Println("add inbound ", len(clients))
+		case id := <-n.removeIncomingC:
+			if c := clients[string(id)]; c != nil {
+				delete(clients, string(id))
+			}
+			n.incomingNum = len(clients)
+			fmt.Println("remove inbound ", len(clients))
+		case req := <-n.replying:
+			client := clients[string(req.id)]
+			if client == nil {
+				logger.Error(errors.Errorf("server reply: %w", ErrCanNotFindClient))
+				req.cancel()
+				go client.send(req)
+			}
+			go client.send(req)
+		}
+	}
+}
+
+func (n *server) callHandler() {
+	defer fmt.Println("end callHandler")
+	addrToid := make(map[string][]byte)
+	clients := make(map[string]*client)
+
+	for {
+		select {
+		case <-n.ctx.Done():
+			for _, client := range clients {
+				client.close()
+			}
+			return
+		case id, ok := <-n.removeCallingC:
+			if ok {
+				c := clients[string(id)]
+				if c != nil {
+					delete(addrToid, c.conn.RemoteAddr().String())
+					delete(clients, string(id))
+					fmt.Println("outbound p2p remove ", len(clients))
+				}
+				n.callingNum = len(clients)
+			}
+		case req, ok := <-n.calling:
+			if ok {
+				var c *client
+				if c = clients[string(req.id)]; c == nil {
+					//TODO : performance bottleneck
+					req.addr = n.members.Lookup(req.id)
+					if c = n.handleCallReq(req); c == nil {
+						continue
+					}
+					clients[string(req.id)] = c
+					go n.runClient(c, false)
+				}
+				go c.send(req)
+			}
+		}
 	}
 	return
 }
 
+func (n *server) messageDispatch() {
+	defer fmt.Println("end messageDispatch")
+	subscriptions := make(map[string]chan P2PMessage)
+	for {
+		select {
+		case msg, ok := <-n.peersFeed:
+			if ok {
+				if msg.Msg.Message == nil {
+					continue
+				}
+				messagetype := reflect.TypeOf(msg.Msg.Message).String()
+				if len(messagetype) > 0 && messagetype[0] == '*' {
+					messagetype = messagetype[1:]
+				}
+				if out := subscriptions[messagetype]; out != nil {
+					go func() {
+						select {
+						case <-n.ctx.Done():
+						case out <- msg:
+						}
+					}()
+				}
+			}
+		case sub, ok := <-n.subscribe:
+			if ok {
+				subscriptions[sub.eventType] = sub.message
+			}
+		case sub, ok := <-n.unscribe:
+			if ok {
+				delete(subscriptions, sub.eventType)
+			}
+		case <-n.ctx.Done():
+			for _, outch := range subscriptions {
+				close(outch)
+			}
+			return
+		}
+	}
+}
+
 func (n *server) runClient(c *client, inBound bool) {
-	err := c.run()
-	if err != nil {
+	if err := c.run(); err != nil {
 		fmt.Println("runClient err", err)
 		logger.Error(err)
 	}
+	c.close()
 	var delpeer chan []byte
 	if inBound {
 		delpeer = n.removeIncomingC
@@ -192,148 +254,33 @@ func (n *server) runClient(c *client, inBound bool) {
 	}
 }
 
-func (n *server) receiveHandler() {
-	n.addIncomingC = make(chan *client, 21)
-	n.removeIncomingC = make(chan []byte)
-	n.replying = make(chan request)
-	clients := make(map[string]*client)
+func (n *server) handleCallReq(req request) (c *client) {
+	var fd net.Conn
+	var err error
+	if fd, err = net.Dial("tcp", req.addr); err != nil {
+		req.replyError(errors.Errorf("server handleCallReq : %w", err))
+		return
+	}
 
-	go func() {
-		for {
-			select {
-			case <-n.ctx.Done():
-				return
-			case c := <-n.addIncomingC:
-				if clients[string(c.remoteID)] != nil {
-					c.close()
-					continue
-				}
-				clients[string(c.remoteID)] = c
-				n.incomingNum = len(clients)
-				fmt.Println("add inbound ", len(clients))
-				go n.runClient(c, true)
-			case id := <-n.removeIncomingC:
-				if c := clients[string(id)]; c != nil {
-					c.close()
-					delete(clients, string(id))
-				}
-				n.incomingNum = len(clients)
-				fmt.Println("remove inbound ", len(clients))
-			case req := <-n.replying:
-				client := clients[string(req.id)]
-				if client != nil {
-					client.send(req)
-				} else {
-					fmt.Println("Can't find client ", string(req.id))
-					err := &P2PError{
-						err: errors.New("p2p reply can't find client"),
-						t:   time.Now(),
-					}
-					logger.Error(err)
-					req.cancel()
-				}
-			}
-		}
-	}()
-}
-
-func (n *server) callHandler() {
-	n.calling = make(chan request)
-	addrToid := make(map[string][]byte)
-	clients := make(map[string]*client)
-	sendCache := make(map[string][]request)
-	n.removeCallingC = make(chan []byte)
-	n.addCallingC = make(chan *client)
-
-	go func() {
-		for {
-			select {
-			case <-n.ctx.Done():
-				return
-			case c, ok := <-n.addCallingC:
-				if !ok {
-					return
-				}
-				go n.runClient(c, false)
-				clients[string(c.remoteID)] = c
-				n.callingNum = len(clients)
-				addrToid[c.conn.RemoteAddr().String()] = c.remoteID
-				fmt.Println("addCallingC ", len(clients), len(sendCache[string(c.remoteID)]))
-				for _, req := range sendCache[string(c.remoteID)] {
-					select {
-					case <-req.ctx.Done():
-					default:
-						go c.send(req)
-					}
-				}
-
-			case id, ok := <-n.removeCallingC:
-				if !ok {
-					return
-				}
-				c := clients[string(id)]
-				if c != nil {
-					delete(addrToid, c.conn.RemoteAddr().String())
-					delete(clients, string(id))
-					c.close()
-					fmt.Println("outbound p2p remove ", len(clients))
-				}
-				n.callingNum = len(clients)
-			case req, ok := <-n.calling:
-				if !ok {
-					return
-				}
-				var c *client
-				if c = clients[string(req.id)]; c == nil {
-					req.addr = n.members.Lookup(req.id)
-					sendCache[string(req.id)] = append(sendCache[string(req.id)], req)
-					go func() {
-						fd, err := dialTo(req.ctx, req.addr)
-						if err != nil {
-							req.replyError(err)
-							return
-						}
-						if c, err = n.setupConn(fd, true); err != nil {
-							c.close()
-							req.replyError(err)
-							return
-						}
-						select {
-						case <-req.ctx.Done():
-						case n.addCallingC <- c:
-						}
-					}()
-				} else {
-					go c.send(req)
-				}
-
-			}
-		}
-	}()
+	c = newClient(n.id, fd, n.peersFeed, true)
+	errc := c.handShake(req.ctx)
+	for err = range errc {
+		err = errors.Errorf("server handleCallReq : %w", err)
+	}
+	if err != nil {
+		req.replyError(errors.Errorf("server handleCallReq : %w", err))
+		c.close()
+		c = nil
+	}
 	return
 }
 
-func dialTo(ctx context.Context, addr string) (fd net.Conn, err error) {
-	for {
-		select {
-		case <-ctx.Done():
-			err = ctx.Err()
-			return
-		default:
-			if fd, err = net.Dial("tcp", addr); err == nil {
-				return
-			} else {
-				fmt.Println("dialTo fail err", err)
-			}
-		}
-	}
-}
-
 func (n *server) Leave() {
+	n.cancel()
 	err := n.listener.Close()
 	if err != nil {
+		logger.Error(err)
 	}
-	n.cancel()
 
 	if n.members != nil {
 		n.members.Leave()
@@ -342,7 +289,11 @@ func (n *server) Leave() {
 }
 
 func (n *server) DisConnectTo(id []byte) (err error) {
-	n.removeCallingC <- id
+	select {
+	case <-n.ctx.Done():
+		return errors.Errorf("server DisConnectTo : %w", n.ctx.Err())
+	case n.removeCallingC <- id:
+	}
 	return
 }
 
@@ -355,19 +306,18 @@ func (n *server) Request(ctx context.Context, id []byte, m proto.Message) (msg P
 	rctx, cancel := context.WithCancel(ctx)
 	req := request{ctx: rctx, cancel: cancel, id: id, msg: m, rType: sendReq, reply: make(chan interface{}), errc: make(chan error)}
 	if err = req.sendReq(n.calling); err != nil {
+		err = errors.Errorf("server Request : %w", err)
+		logger.Error(err)
 		return
 	}
 	if result, err = req.waitForResult(); err != nil {
-		fmt.Println(err)
+		err = errors.Errorf("server Request : %w", err)
 		logger.Error(err)
 		return
 	}
 
 	if msg, ok = result.(P2PMessage); !ok {
-		err = &P2PError{
-			err: errors.New("Error in Request casting error "),
-			t:   time.Now(),
-		}
+		err = errors.Errorf("server Request : %w", ErrCasting)
 		logger.Error(err)
 	}
 	return
@@ -375,59 +325,18 @@ func (n *server) Request(ctx context.Context, id []byte, m proto.Message) (msg P
 
 // Reply sends a reply to the specific node
 func (n *server) Reply(ctx context.Context, id []byte, nonce uint64, msg proto.Message) (err error) {
-	fmt.Println("Server reply")
 	rctx, cancel := context.WithCancel(ctx)
 	req := request{ctx: rctx, cancel: cancel, id: id, rType: replyReq, nonce: nonce, msg: msg, errc: make(chan error)}
 	if err = req.sendReq(n.replying); err != nil {
-		fmt.Println("er ", err)
+		err = errors.Errorf("server Reply : %w", err)
+		logger.Error(err)
 		return
 	}
-
-	return req.waitForError()
-}
-
-func (n *server) messageDispatch(ctx context.Context) {
-	subscriptions := make(map[string]chan P2PMessage)
-	go func() {
-		for {
-			select {
-			case msg, ok := <-n.peersFeed:
-				if !ok {
-					return
-				}
-
-				if msg.Msg.Message == nil {
-
-					continue
-				}
-				messagetype := reflect.TypeOf(msg.Msg.Message).String()
-				if len(messagetype) > 0 && messagetype[0] == '*' {
-					messagetype = messagetype[1:]
-				}
-				out := subscriptions[messagetype]
-				if out != nil {
-					fmt.Println("peersFeed out", messagetype)
-					go func(msg P2PMessage) {
-						select {
-						case out <- msg:
-						}
-					}(msg)
-				}
-			case sub, ok := <-n.subscribe:
-				if !ok {
-					return
-				}
-				fmt.Println("subscriptions out", sub.eventType)
-				subscriptions[sub.eventType] = sub.message
-			case sub, ok := <-n.unscribe:
-				if !ok {
-					return
-				}
-				delete(subscriptions, sub.eventType)
-			case <-ctx.Done():
-			}
-		}
-	}()
+	if err = req.waitForError(); err != nil {
+		err = errors.Errorf("server Reply : %w", err)
+		logger.Error(err)
+	}
+	return
 }
 
 // SubscribeEvent is a message subscription operation binding the P2PMessage
@@ -439,8 +348,10 @@ func (n *server) SubscribeEvent(chanBuffer int, peersFeed ...interface{}) (outch
 	}
 	for _, m := range peersFeed {
 		fmt.Println("SubscribeEvent ", reflect.TypeOf(m).String())
-
-		n.subscribe <- subscription{reflect.TypeOf(m).String(), outch}
+		select {
+		case <-n.ctx.Done():
+		case n.subscribe <- subscription{reflect.TypeOf(m).String(), outch}:
+		}
 	}
 	return
 }
@@ -448,48 +359,101 @@ func (n *server) SubscribeEvent(chanBuffer int, peersFeed ...interface{}) (outch
 // UnSubscribeEvent is a un-subscription operation
 func (n *server) UnSubscribeEvent(peersFeed ...interface{}) {
 	for _, m := range peersFeed {
-		n.unscribe <- subscription{reflect.TypeOf(m).String(), nil}
-
+		select {
+		case <-n.ctx.Done():
+		case n.unscribe <- subscription{reflect.TypeOf(m).String(), nil}:
+		}
 	}
 	return
 }
 
 func (n *server) Join(bootstrapIP []string) (num int, err error) {
-	return n.members.Join(bootstrapIP)
+	select {
+	case <-n.ctx.Done():
+		err = n.ctx.Err()
+	default:
+		num, err = n.members.Join(bootstrapIP)
+	}
+	return
 }
 
-func (n *server) NumOfMembers() int {
-	return n.members.NumOfPeers()
+func (n *server) NumOfMembers() (num int) {
+	select {
+	case <-n.ctx.Done():
+	default:
+		num = n.members.NumOfPeers()
+	}
+	return
 }
 
-func (n *server) MembersIP() []net.IP {
-	return n.members.MembersIP()
+func (n *server) MembersIP() (ips []net.IP) {
+	select {
+	case <-n.ctx.Done():
+	default:
+		ips = n.members.MembersIP()
+	}
+	return
 }
 
-func (n *server) MembersID() [][]byte {
-	return n.members.MembersID()
+func (n *server) MembersID() (ids [][]byte) {
+	select {
+	case <-n.ctx.Done():
+	default:
+		ids = n.members.MembersID()
+	}
+	return
 }
 
 func (n *server) numOfClient() (iNum, cNum int) {
-	return n.incomingNum, n.callingNum
+	select {
+	case <-n.ctx.Done():
+	default:
+		iNum, cNum = n.incomingNum, n.callingNum
+	}
+	return
 }
 
 func (n *server) SetID(id []byte) {
-	n.id = id
+	select {
+	case <-n.ctx.Done():
+	default:
+		n.id = id
+	}
+	return
 }
 
 func (n *server) SetPort(port string) {
-	n.port = port
+	select {
+	case <-n.ctx.Done():
+	default:
+		n.port = port
+	}
+	return
 }
 
-func (n *server) GetPort() string {
-	return n.port
+func (n *server) GetPort() (port string) {
+	select {
+	case <-n.ctx.Done():
+	default:
+		port = n.port
+	}
+	return
 }
 
-func (n *server) GetID() []byte {
-	return n.id
+func (n *server) GetID() (id []byte) {
+	select {
+	case <-n.ctx.Done():
+	default:
+		id = n.id
+	}
+	return
 }
 
-func (n *server) GetIP() net.IP {
-	return n.addr
+func (n *server) GetIP() (ip net.IP) {
+	select {
+	case <-n.ctx.Done():
+	default:
+		ip = n.addr
+	}
+	return
 }
