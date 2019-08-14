@@ -1,6 +1,7 @@
 package discover
 
 import (
+	"fmt"
 	"io/ioutil"
 	"net"
 
@@ -56,16 +57,22 @@ func (s *serfNet) Leave() {
 
 // Lookup return the IP address of the given ID
 func (s *serfNet) Lookup(id []byte) (addr string) {
-	if string(id) == "b" {
-		return "127.0.0.1:9502"
-	} else if string(id) == "a" {
-		return "127.0.0.1:9501"
-	}
 	members := s.serf.Members()
+	var nodeId, port string
 	for i := 0; i < len(members); i++ {
-		nodeId := members[i].Name[:42]
-		port := members[i].Name[42:]
+		if len(members[i].Name) < 42 {
+			continue
+		}
+		nodeId = members[i].Name[:41]
+		if len(members[i].Name) == 42 {
+			port = "9501"
+			continue
+		} else {
+			port = members[i].Name[41:]
+		}
 		if nodeId == string(id) {
+			fmt.Println("ID ", nodeId, " ", members[i].Addr.String()+":"+port)
+
 			return members[i].Addr.String() + ":" + port
 		}
 	}
