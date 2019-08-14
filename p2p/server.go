@@ -72,12 +72,12 @@ func (n *server) Listen() (err error) {
 	}
 	fmt.Println("Listen to ", n.addr, " ", n.port)
 
-	errc := make(chan error)
-	defer close(errc)
+	listenErrc := make(chan error)
+	defer close(listenErrc)
 	for {
 		select {
 		case <-n.ctx.Done():
-		case err = <-errc:
+		case err = <-listenErrc:
 			//TODO add error handling
 			return
 		default:
@@ -100,7 +100,7 @@ func (n *server) Listen() (err error) {
 					select {
 					case <-n.ctx.Done():
 						return
-					case errc <- err:
+					case listenErrc <- err:
 					}
 					return
 				}

@@ -144,6 +144,9 @@ func (d *DosNode) signalGroupDissolve(w http.ResponseWriter, r *http.Request) {
 func (d *DosNode) p2pTest(w http.ResponseWriter, r *http.Request) {
 	members := d.p.MembersID()
 	fmt.Println("p2p test ", len(members))
+	for i := 0; i < len(members); i++ {
+		fmt.Println("p2p test ", members[i])
+	}
 	/*
 		for i := 0; i < len(members); i++ {
 			id, err := d.p.ConnectTo(context.Background(), "", members[i])

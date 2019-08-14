@@ -60,18 +60,18 @@ func (s *serfNet) Lookup(id []byte) (addr string) {
 	members := s.serf.Members()
 	var nodeId, port string
 	for i := 0; i < len(members); i++ {
-		if len(members[i].Name) < 42 {
+		if len(members[i].Name) < 20 {
 			continue
 		}
-		nodeId = members[i].Name[:41]
-		if len(members[i].Name) == 42 {
+		nodeId = members[i].Name[:20]
+		if len(members[i].Name) == 20 {
 			port = "9501"
 			continue
 		} else {
-			port = members[i].Name[41:]
+			port = members[i].Name[20:]
 		}
 		if nodeId == string(id) {
-			fmt.Println("ID ", nodeId, " ", members[i].Addr.String()+":"+port)
+			fmt.Println("ID ", []byte(nodeId), " ", members[i].Addr.String()+":"+port)
 
 			return members[i].Addr.String() + ":" + port
 		}
@@ -99,6 +99,18 @@ func (s *serfNet) MembersIP() (addr []net.IP) {
 func (s *serfNet) MembersID() (list [][]byte) {
 	members := s.serf.Members()
 	for i := 0; i < len(members); i++ {
+		var port string
+		if len(members[i].Name) < 20 {
+			continue
+		}
+		if len(members[i].Name) == 20 {
+			port = "9501"
+			continue
+		} else {
+			port = members[i].Name[20:]
+		}
+		fmt.Println(members[i].Addr.String() + ":" + port)
+		fmt.Println("len ", len(members[i].Name))
 		if members[i].Status == serf.StatusAlive {
 			list = append(list, []byte(members[i].Name))
 		}
