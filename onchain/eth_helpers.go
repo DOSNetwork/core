@@ -165,7 +165,7 @@ func DialToEth(ctx context.Context, urlPool []string) (out chan *ethclient.Clien
 }
 
 //CheckSync is a utility function to check sync state
-func CheckSync(ctx context.Context, mClient *ethclient.Client, cs chan *ethclient.Client) chan *ethclient.Client {
+func CheckSync(ctx context.Context, cs chan *ethclient.Client) chan *ethclient.Client {
 	out := make(chan *ethclient.Client)
 	var wg sync.WaitGroup
 	size := 0
@@ -173,41 +173,25 @@ func CheckSync(ctx context.Context, mClient *ethclient.Client, cs chan *ethclien
 	for client := range cs {
 		size++
 		go func(client *ethclient.Client) {
-			//defer logger.TimeTrack(time.Now(), "CheckSync", nil)
-
 			defer wg.Done()
-			ticker := time.NewTicker(time.Second * time.Duration(checkSyncInterval))
-			for range ticker.C {
-				highestBlk, e := mClient.BlockByNumber(ctx, nil)
-				if e != nil {
-					fmt.Println("CheckSync error ", e)
-					if e.Error() == light.ErrNoPeers.Error() {
-						continue
-					} else {
-						return
-					}
+			var blk *types.Block
+			var progress *ethereum.SyncProgress
+			var err error
+			if blk, err = client.BlockByNumber(ctx, nil); err != nil {
+				fmt.Println("CheckSync error ", err)
+				if err.Error() == light.ErrNoPeers.Error() {
+					fmt.Println("CheckSync error ErrNoPeers ", err)
 				}
-				highestBlkN := highestBlk.NumberU64()
-				currBlk, e := client.BlockByNumber(ctx, nil)
-				if e != nil {
-					fmt.Println(e)
-					if e.Error() == light.ErrNoPeers.Error() {
-						fmt.Println("CheckSync error ", e)
-						continue
-					} else {
-						return
-					}
-				}
-				currBlkN := currBlk.NumberU64()
-				fmt.Println("highestBlkN ", highestBlkN, "  currBlkN ", currBlkN)
-				blockDiff := math.Abs(float64(highestBlkN) - float64(currBlkN))
-				fmt.Println("block to Sync ", blockDiff)
-				if blockDiff <= syncBlockDiff {
-					ticker.Stop()
-					out <- client
-					return
-				}
+				return
 			}
+			highestBlkN := blk.NumberU64()
+
+			fmt.Println("highestBlkN ", highestBlkN)
+			if progress, err = client.SyncProgress(ctx); err != nil {
+				fmt.Println("SyncProgress err ", err)
+				return
+			}
+			fmt.Println("progress ", progress)
 		}(client)
 	}
 	wg.Add(size)

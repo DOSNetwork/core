@@ -2,6 +2,7 @@ package p2p
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/golang/protobuf/proto"
 )
@@ -26,7 +27,7 @@ type p2pResult struct {
 
 func NewP2pRequest(ctx context.Context, rType int, id []byte, addr string, msg proto.Message, nonce uint64) (req *p2pRequest) {
 	rctx, cancel := context.WithCancel(ctx)
-	req = &p2pRequest{ctx: rctx, cancel: cancel, id: id, msg: msg, rType: rType, reply: make(chan p2pResult)}
+	req = &p2pRequest{ctx: rctx, cancel: cancel, id: id, msg: msg, rType: rType, nonce: nonce, reply: make(chan p2pResult)}
 	return
 }
 func (r *p2pRequest) sendReq(ch chan p2pRequest) (err error) {
@@ -34,13 +35,13 @@ func (r *p2pRequest) sendReq(ch chan p2pRequest) (err error) {
 	case ch <- *r:
 	case <-r.ctx.Done():
 		err = r.ctx.Err()
+		fmt.Println("p2pRequest sendReq err", err)
 	}
 	return
 }
 
 func (r *p2pRequest) waitForResult() (res interface{}, err error) {
 	defer close(r.reply)
-	defer r.cancel()
 	select {
 	case <-r.ctx.Done():
 		err = r.ctx.Err()
@@ -48,6 +49,8 @@ func (r *p2pRequest) waitForResult() (res interface{}, err error) {
 		res = result.res
 		err = result.err
 	}
+	r.cancel()
+	<-r.ctx.Done()
 	return
 }
 

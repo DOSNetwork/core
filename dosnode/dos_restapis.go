@@ -3,10 +3,10 @@ package dosnode
 import (
 	"context"
 	"fmt"
+	"io"
 	"math/big"
 	"net/http"
 	"os"
-	"sort"
 	"strconv"
 	"time"
 
@@ -158,10 +158,33 @@ func (d *DosNode) p2pTest(w http.ResponseWriter, r *http.Request) {
 			d.p.DisConnectTo(id)
 		}*/
 }
+func readLines(path string) ([]string, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
 
+	var lines []string
+	buffer := make([]byte, 20)
+
+	for {
+		bytesread, err := file.Read(buffer)
+
+		if err != nil {
+			if err != io.EOF {
+				fmt.Println(err)
+			}
+
+			break
+		}
+		lines = append(lines, string(buffer[:bytesread]))
+	}
+	return lines, nil
+}
 func (d *DosNode) dkgTest(w http.ResponseWriter, r *http.Request) {
 	groupID := big.NewInt(0)
-	members := d.p.MembersID()
+	//members := d.p.MembersID()
 	start := -1
 	end := -1
 	switch r.Method {
@@ -186,28 +209,23 @@ func (d *DosNode) dkgTest(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	members, err := readLines("/vault/members.txt")
+	if err != nil {
+		fmt.Println("readLines err ", err)
+		return
+	}
+	fmt.Println("members len ", len(members))
 	if start >= 0 && end >= 0 {
 		if len(members) < (end - start) {
 			fmt.Println("members size not enough:", len(members))
 			return
 		}
-		fmt.Println("members size:", len(members))
-		sort.SliceStable(members, func(i, j int) bool {
-			a := big.NewInt(0)
-			a = a.SetBytes(members[i])
-			b := big.NewInt(0)
-			b = b.SetBytes(members[j])
-			r := a.Cmp(b)
-			if r == -1 {
-				return true
-			}
-			return false
-		})
 		var participants [][]byte
 
 		for i := start; i < end; i++ {
-			participants = append(participants, members[i])
+			participants = append(participants, []byte(members[i]))
 		}
+		fmt.Println("members participants:", participants)
 
 		d.onchainEvent <- &onchain.LogGrouping{
 			GroupId: groupID,

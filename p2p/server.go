@@ -137,9 +137,10 @@ func (n *server) receiveHandler() {
 		case req := <-n.replying:
 			client := clients[string(req.id)]
 			if client == nil {
-				logger.Error(errors.Errorf("server reply: %w", ErrCanNotFindClient))
-				req.cancel()
-				go client.send(req)
+				err := errors.Errorf("server reply: %w", ErrCanNotFindClient)
+				logger.Error(err)
+				req.replyResult(nil, err)
+				continue
 			}
 			go client.send(req)
 		}
@@ -172,6 +173,7 @@ func (n *server) callHandler() {
 			if ok {
 				var c *client
 				if c = clients[string(req.id)]; c == nil {
+					fmt.Println("New Outbound Client ", req.id)
 					//TODO : performance bottleneck
 					req.addr = n.members.Lookup(req.id)
 					if c = n.handleCallReq(req); c == nil {
@@ -180,6 +182,7 @@ func (n *server) callHandler() {
 					clients[string(req.id)] = c
 					go n.runClient(c, false)
 				}
+				fmt.Println("Found Outbound Client ", req.id)
 				go c.send(req)
 			}
 		}

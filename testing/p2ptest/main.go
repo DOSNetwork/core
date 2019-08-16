@@ -20,7 +20,7 @@ func receiveEvent(node p2p.P2PInterface) {
 	go node.Listen()
 	events, _ := node.SubscribeEvent(1, p2p.Ping{})
 	for msg := range events {
-		fmt.Println("receiveEvent")
+		fmt.Println("receiveEvent ", msg.RequestNonce)
 		messages[strconv.FormatUint(msg.RequestNonce, 10)] = msg
 	}
 }
@@ -79,6 +79,7 @@ func main() {
 		case "r":
 			if node != nil {
 				for key, msg := range messages {
+					fmt.Println("nonce ", key, " msg.RequestNonce", msg.RequestNonce)
 					r, ok := msg.Msg.Message.(*p2p.Ping)
 					if !ok {
 						fmt.Println("not ok.")
