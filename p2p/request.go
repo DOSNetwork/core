@@ -3,6 +3,7 @@ package p2p
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/golang/protobuf/proto"
 )
@@ -19,6 +20,7 @@ type p2pRequest struct {
 	//
 	nonce uint64
 	reply chan p2pResult
+	once  sync.Once
 }
 type p2pResult struct {
 	res interface{}
@@ -42,6 +44,7 @@ func (r *p2pRequest) sendReq(ch chan p2pRequest) (err error) {
 
 func (r *p2pRequest) waitForResult() (res interface{}, err error) {
 	defer close(r.reply)
+	defer r.cancel()
 	select {
 	case <-r.ctx.Done():
 		err = r.ctx.Err()
@@ -49,14 +52,15 @@ func (r *p2pRequest) waitForResult() (res interface{}, err error) {
 		res = result.res
 		err = result.err
 	}
-	r.cancel()
-	<-r.ctx.Done()
+
 	return
 }
 
 func (r *p2pRequest) replyResult(res interface{}, err error) {
-	select {
-	case <-r.ctx.Done():
-	case r.reply <- p2pResult{res: res, err: err}:
-	}
+	r.once.Do(func() {
+		select {
+		case <-r.ctx.Done():
+		case r.reply <- p2pResult{res: res, err: err}:
+		}
+	})
 }
