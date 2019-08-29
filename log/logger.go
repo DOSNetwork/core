@@ -3,11 +3,12 @@ package log
 import (
 	"fmt"
 	"os"
-	"runtime"
+	"reflect"
 	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
+	//errors "golang.org/x/xerrors"
 )
 
 /*
@@ -44,9 +45,7 @@ type Logger interface {
 	Warn(msg string)
 	Error(err error)
 	Fatal(err error)
-	Metrics(value interface{})
 	TimeTrack(time.Time, string, map[string]interface{})
-	Progress(progress string)
 	Event(e string, f map[string]interface{})
 }
 
@@ -90,13 +89,23 @@ func (l *logger) Warn(msg string) {
 }
 
 func (l *logger) Error(err error) {
-	fmt.Println("===================")
-	fmt.Printf("%+v\n", err)
 	if l.entry == nil {
 		return
 	}
-	fmt.Println("===================")
-	//l.entry.Error(err)
+	ss := strings.FieldsFunc(fmt.Sprintf("%+v", err), func(r rune) bool {
+		if r == '-' {
+			return true
+		}
+		return false
+	})
+	errCause := ""
+	if len(ss) >= 1 {
+		c := strings.Split(ss[len(ss)-1], ":")
+		errCause = c[0]
+	}
+	//
+	l.entry.WithFields(logrus.Fields{"errCause": errCause, "errDetail": fmt.Sprintf("%+v", err), "errType": reflect.TypeOf(err).String(), "Time": time.Now()}).Error()
+
 }
 
 func (l *logger) Fatal(err error) {
@@ -106,29 +115,6 @@ func (l *logger) Fatal(err error) {
 	}
 	l.entry.Fatal(err)
 	os.Exit(1)
-}
-
-func (l *logger) Metrics(value interface{}) {
-	if l.entry == nil {
-		return
-	}
-	fpcs := make([]uintptr, 1)
-	// Skip 2 levels to get the caller
-	n := runtime.Callers(2, fpcs)
-	if n == 0 {
-		l.entry.WithFields(logrus.Fields{"M_": value}).Info("")
-	} else {
-		caller := runtime.FuncForPC(fpcs[0] - 1)
-		s := strings.Split(caller.Name(), ".")
-		l.entry.WithFields(logrus.Fields{"M_" + s[len(s)-1]: value}).Debug("")
-	}
-}
-
-func (l *logger) Progress(progress string) {
-	if l.entry == nil {
-		return
-	}
-	l.entry.WithFields(logrus.Fields{"Progress": progress}).Debug("")
 }
 
 func (l *logger) Event(e string, info map[string]interface{}) {

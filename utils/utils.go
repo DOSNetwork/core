@@ -13,6 +13,14 @@ func ReportError(ctx context.Context, errc chan error, err error) {
 	return
 }
 
+func ReportResult(ctx context.Context, outc chan interface{}, result interface{}) {
+	select {
+	case <-ctx.Done():
+	case outc <- result:
+	}
+	return
+}
+
 func MergeErrors(ctx context.Context, cs ...<-chan error) chan error {
 	var wg sync.WaitGroup
 	// We must ensure that the output channel has the capacity to

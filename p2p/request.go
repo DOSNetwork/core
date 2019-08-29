@@ -43,8 +43,6 @@ func (r *p2pRequest) sendReq(ch chan p2pRequest) (err error) {
 }
 
 func (r *p2pRequest) waitForResult() (res interface{}, err error) {
-	defer close(r.reply)
-	defer r.cancel()
 	select {
 	case <-r.ctx.Done():
 		err = r.ctx.Err()
@@ -52,12 +50,13 @@ func (r *p2pRequest) waitForResult() (res interface{}, err error) {
 		res = result.res
 		err = result.err
 	}
-
+	r.cancel()
 	return
 }
 
 func (r *p2pRequest) replyResult(res interface{}, err error) {
 	r.once.Do(func() {
+		defer close(r.reply)
 		select {
 		case <-r.ctx.Done():
 		case r.reply <- p2pResult{res: res, err: err}:

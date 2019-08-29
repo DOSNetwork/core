@@ -19,6 +19,7 @@ import (
 
 // PDKGInterface is a interface for DKG
 type PDKGInterface interface {
+	Loop()
 	GetGroupPublicPoly(groupId string) *share.PubPoly
 	GetShareSecurity(groupId string) *share.PriShare
 	GetGroupIDs(groupId string) [][]byte
@@ -51,12 +52,25 @@ func NewPDKG(p p2p.P2PInterface, suite suites.Suite) PDKGInterface {
 		suite:     suite,
 		logger:    log.New("module", "dkg"),
 	}
-	d.listen()
 	return d
 }
 
 func handlePeerMsg(sessionMap map[string][]interface{}, sessionReq map[string]request, p p2p.P2PInterface, sessionID string, content interface{}) {
+	switch pubkeyFromPeer := content.(type) {
+	case *PublicKey:
+		pubkeys := sessionMap[sessionID]
+		for _, p := range pubkeys {
+			pubkey, ok := p.(*PublicKey)
+			if ok {
+				if pubkey.Index == pubkeyFromPeer.Index {
+					return
+				}
+			}
+		}
+	default:
+	}
 	sessionMap[sessionID] = append(sessionMap[sessionID], content)
+
 	//if sessionMap[sessionID] != nil {
 	fmt.Println("sessionMap len ", len(sessionMap[sessionID]))
 	if len(sessionMap[sessionID]) == sessionReq[sessionID].numOfResps {
@@ -89,59 +103,58 @@ func handleRequest(sessionMap map[string][]interface{}, sessionReq map[string]re
 		delete(sessionReq, req.sessionID)
 	}
 }
-func (d *pdkg) listen() {
+func (d *pdkg) Loop() {
+
 	peersToBuf, _ := d.p.SubscribeEvent(50, PublicKey{}, Deal{}, Responses{})
-	go func() {
-		sessionPubKeys := make(map[string][]interface{})
-		sessionDeals := make(map[string][]interface{})
-		sessionResps := make(map[string][]interface{})
-		sessionReqPubs := map[string]request{}
-		sessionReqDeals := map[string]request{}
-		sessionReResps := map[string]request{}
-		for {
-			select {
-			case msg, ok := <-peersToBuf:
-				if !ok {
-					return
+	sessionPubKeys := make(map[string][]interface{})
+	sessionDeals := make(map[string][]interface{})
+	sessionResps := make(map[string][]interface{})
+	sessionReqPubs := map[string]request{}
+	sessionReqDeals := map[string]request{}
+	sessionReResps := map[string]request{}
+	for {
+		select {
+		case msg, ok := <-peersToBuf:
+			if !ok {
+				return
+			}
+			switch content := msg.Msg.Message.(type) {
+			case *PublicKey:
+				d.p.Reply(context.Background(), msg.Sender, msg.RequestNonce, content)
+				handlePeerMsg(sessionPubKeys, sessionReqPubs, d.p, content.SessionId, content)
+				fmt.Println("pkdg :PublicKey nonce", msg.RequestNonce)
+			case *Deal:
+				d.p.Reply(context.Background(), msg.Sender, msg.RequestNonce, content)
+				handlePeerMsg(sessionDeals, sessionReqDeals, d.p, content.SessionId, content)
+				fmt.Println("pkdg :Deal nonce", msg.RequestNonce)
+			case *Responses:
+				d.p.Reply(context.Background(), msg.Sender, msg.RequestNonce, content)
+				resps := content.Response
+				for _, resp := range resps {
+					handlePeerMsg(sessionResps, sessionReResps, d.p, content.SessionId, resp)
 				}
-				switch content := msg.Msg.Message.(type) {
-				case *PublicKey:
-					d.p.Reply(context.Background(), msg.Sender, msg.RequestNonce, content)
-					handlePeerMsg(sessionPubKeys, sessionReqPubs, d.p, content.SessionId, content)
-					fmt.Println("pkdg :PublicKey nonce", msg.RequestNonce)
-				case *Deal:
-					d.p.Reply(context.Background(), msg.Sender, msg.RequestNonce, content)
-					handlePeerMsg(sessionDeals, sessionReqDeals, d.p, content.SessionId, content)
-					fmt.Println("pkdg :Deal nonce", msg.RequestNonce)
-				case *Responses:
-					d.p.Reply(context.Background(), msg.Sender, msg.RequestNonce, content)
-					resps := content.Response
-					for _, resp := range resps {
-						handlePeerMsg(sessionResps, sessionReResps, d.p, content.SessionId, resp)
-					}
-					fmt.Println("pkdg :Responses")
-				}
+				fmt.Println("pkdg :Responses")
+			}
 
-			case req, ok := <-d.bufToNode:
-				if !ok {
-					return
+		case req, ok := <-d.bufToNode:
+			if !ok {
+				return
+			}
+			if r, ok := req.(request); ok {
+				switch r.reqType {
+				case 0:
+					handleRequest(sessionPubKeys, sessionReqPubs, r)
+				case 1:
+					handleRequest(sessionDeals, sessionReqDeals, r)
+				case 2:
+					handleRequest(sessionResps, sessionReResps, r)
 				}
-				if r, ok := req.(request); ok {
-					switch r.reqType {
-					case 0:
-						handleRequest(sessionPubKeys, sessionReqPubs, r)
-					case 1:
-						handleRequest(sessionDeals, sessionReqDeals, r)
-					case 2:
-						handleRequest(sessionResps, sessionReResps, r)
-					}
-				} else {
-					fmt.Println("handleRequest cast error")
+			} else {
+				fmt.Println("handleRequest cast error")
 
-				}
 			}
 		}
-	}()
+	}
 }
 
 func (d *pdkg) Grouping(ctx context.Context, sessionID string, groupIds [][]byte) (chan [5]*big.Int, chan error, error) {

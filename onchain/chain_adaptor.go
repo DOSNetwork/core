@@ -4,11 +4,12 @@ import (
 	"context"
 	"fmt"
 	"math/big"
-	"time"
 
+	"github.com/DOSNetwork/core/log"
 	"github.com/DOSNetwork/core/share/vss/pedersen"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 	"github.com/ethereum/go-ethereum/common"
+	errors "golang.org/x/xerrors"
 )
 
 const (
@@ -19,18 +20,17 @@ const (
 //ProxyAdapter represents an unified adapter interface for different blockchain
 type ProxyAdapter interface {
 	Connect(ctx context.Context) error
+	ReqLoop() (err error)
 	Close()
 	UpdateWsUrls(urls []string)
 	SetRandomNum(ctx context.Context, signatures chan *vss.Signature) (errc chan error)
 	DataReturn(ctx context.Context, signatures chan *vss.Signature) (errc chan error)
 	RegisterGroupPubKey(ctx context.Context, IdWithPubKeys chan [5]*big.Int) (errc chan error)
 	SubscribeEvent(subscribeTypes []int) (chan interface{}, chan error)
-	GetTimeoutCtx(t time.Duration) (context.Context, context.CancelFunc)
 	SetGroupingThreshold(ctx context.Context, threshold uint64) (errc error)
 	SetGroupToPick(ctx context.Context, groupToPick uint64) (errc error)
 	SetGroupSize(ctx context.Context, size uint64) (errc error)
 	SetGroupMaturityPeriod(ctx context.Context, size uint64) (errc error)
-	AddToWhitelist(ctx context.Context, addr common.Address) (err error)
 	StartCommitReveal(ctx context.Context, startBlock int64, commitDuration int64, revealDuration int64, revealThreshold int64) (err error)
 	Commit(ctx context.Context, cid *big.Int, commitment [32]byte) (errc error)
 	Reveal(ctx context.Context, cid *big.Int, secret *big.Int) (errc error)
@@ -61,7 +61,11 @@ type ProxyAdapter interface {
 func NewProxyAdapter(ChainType string, key *keystore.Key, beidgeAddr string, urls []string) (ProxyAdapter, error) {
 	switch ChainType {
 	case ETH:
-		adaptor, err := NewEthAdaptor(key, beidgeAddr, urls)
+		l := log.New("module", "EthProxy")
+		adaptor, err := NewEthAdaptor(key, beidgeAddr, urls, l)
+		if err != nil {
+			l.Error(errors.Errorf("NewProxyAdapter : %w", err))
+		}
 		return adaptor, err
 	default:
 		err := fmt.Errorf("Chain %s not supported error\n", ChainType)

@@ -2,18 +2,166 @@ package onchain
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
+	"math/big"
+	"time"
 
 	"github.com/DOSNetwork/core/onchain/commitreveal"
 	"github.com/DOSNetwork/core/onchain/dosproxy"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/ethclient"
 )
 
-type getFunc func(ctx context.Context, client *ethclient.Client, proxy *dosproxy.DosproxySession, p interface{}) (chan interface{}, chan interface{})
-type setFunc func(ctx context.Context, proxy *dosproxy.DosproxySession, cr *commitreveal.CommitrevealSession, p []interface{}) (tx *types.Transaction, err error)
+const (
+	//SubscribeLogUpdateRandom is a log type to subscribe the event LogUpdateRandom
+	SubscribeLogUpdateRandom = iota
+	//SubscribeLogRequestUserRandom is a log type to subscribe the event LogRequestUserRandom
+	SubscribeLogRequestUserRandom
+	//SubscribeLogUrl is a log type to subscribe the event LogUrl
+	SubscribeLogUrl
+	//SubscribeLogValidationResult is a log type to subscribe the event LogValidationResult
+	SubscribeLogValidationResult
+	//SubscribeLogGrouping is a log type to subscribe the event LogGrouping
+	SubscribeLogGrouping
+	//SubscribeLogPublicKeyAccepted is a log type to subscribe the event LogPublicKeyAccepted
+	SubscribeLogPublicKeyAccepted
+	//SubscribeLogPublicKeySuggested is a log type to subscribe the event LogPublicKeySuggested
+	SubscribeLogPublicKeySuggested
+	//SubscribeLogGroupDissolve is a log type to subscribe the event LogGroupDissolve
+	SubscribeLogGroupDissolve
+	//SubscribeLogInsufficientPendingNode is a log type to subscribe the event LogInsufficientPendingNode
+	SubscribeLogInsufficientPendingNode
+	//SubscribeLogInsufficientWorkingGroup is a log type to subscribe the event LogInsufficientWorkingGroup
+	SubscribeLogInsufficientWorkingGroup
+	//SubscribeLogNoWorkingGroup is a log type to subscribe the event LogNoWorkingGroup
+	SubscribeLogNoWorkingGroup
+	//SubscribeLogGroupingInitiated is a log type to subscribe the event GroupingInitiated
+	SubscribeLogGroupingInitiated
+	//SubscribeDosproxyUpdateGroupToPick is a log type to subscribe the event UpdateGroupToPick
+	SubscribeDosproxyUpdateGroupToPick
+	//SubscribeDosproxyUpdateGroupSize is a log type to subscribe the event UpdateGroupSize
+	SubscribeDosproxyUpdateGroupSize
+	//SubscribeCommitrevealLogStartCommitreveal is a log type to subscribe the event StartCommitreveal
+	SubscribeCommitrevealLogStartCommitreveal
+	//SubscribeCommitrevealLogCommit is a log type to subscribe the event LogCommit
+	SubscribeCommitrevealLogCommit
+	//SubscribeCommitrevealLogReveal is a log type to subscribe the event LogReveal
+	SubscribeCommitrevealLogReveal
+	//SubscribeCommitrevealLogRandom is a log type to subscribe the event LogRandom
+	SubscribeCommitrevealLogRandom
+)
+
+func convertToError(ctx context.Context, i chan interface{}) (out chan error) {
+	out = make(chan error)
+	go func() {
+		defer close(out)
+		for {
+			select {
+			case e, ok := <-i:
+				if !ok {
+					return
+				}
+				if err, ok := e.(error); ok {
+					select {
+					case out <- err:
+					case <-ctx.Done():
+					}
+				}
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	return out
+}
+
+func firstEvent(ctx context.Context, source chan interface{}) (out chan interface{}) {
+	out = make(chan interface{})
+
+	go func() {
+		defer close(out)
+		visited := make(map[string]uint64)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case event, ok := <-source:
+				if !ok {
+					return
+				}
+				if content, ok := event.(*LogCommon); ok {
+					if content.Removed {
+						continue
+					}
+					var bytes []byte
+					bytes = append(bytes, content.Raw.Data...)
+					bytes = append(bytes, new(big.Int).SetUint64(content.BlockN).Bytes()...)
+					nHash := sha256.Sum256(bytes)
+
+					identity := string(nHash[:])
+					if visited[identity] == 0 {
+						visited[identity] = content.BlockN
+						select {
+						case out <- content.log:
+						case <-ctx.Done():
+						}
+						go func(identity string) {
+							select {
+							case <-ctx.Done():
+							case <-time.After(100 * 15 * time.Second):
+								delete(visited, identity)
+							}
+						}(identity)
+					}
+				}
+			}
+		}
+	}()
+
+	return
+}
+
+// SubscribeEvent is a log subscription operation
+func (e *ethAdaptor) SubscribeEvent(subscribeTypes []int) (chan interface{}, chan error) {
+	var eventList []chan interface{}
+	var errcs []chan interface{}
+	fmt.Println("Subscribe proxies ", len(e.proxies), " crs ", len(e.crs))
+	for _, subscribeType := range subscribeTypes {
+		if subscribeType >= SubscribeCommitrevealLogStartCommitreveal {
+			for i := 0; i < len(e.crs); i++ {
+				fmt.Println("Subscribe CR Event ", i)
+				cr := e.crs[i]
+				if cr == nil {
+					continue
+				}
+				ctx := e.ctx
+				if ctx == nil {
+					continue
+				}
+				out, errc := crTable[subscribeType](ctx, cr)
+				eventList = append(eventList, out)
+				errcs = append(errcs, errc)
+			}
+		} else {
+			for i := 0; i < len(e.proxies); i++ {
+				fmt.Println("SubscribeEvent ", i, subscribeType)
+				proxy := e.proxies[i]
+				if proxy == nil {
+					continue
+				}
+				ctx := e.ctx
+				if ctx == nil {
+					continue
+				}
+				out, errc := proxyTable[subscribeType](ctx, proxy)
+				eventList = append(eventList, out)
+				errcs = append(errcs, errc)
+			}
+		}
+	}
+	return firstEvent(e.ctx, merge(e.ctx, eventList...)), convertToError(e.ctx, merge(e.ctx, errcs...))
+}
 
 var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (chan interface{}, chan interface{}){
 	SubscribeLogUpdateRandom: func(ctx context.Context, proxy *dosproxy.DosproxySession) (chan interface{}, chan interface{}) {
@@ -413,9 +561,11 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 					sub.Unsubscribe()
 					return
 				case err := <-sub.Err():
+					fmt.Println("WatchUpdateGroupToPick sub err ", err)
 					errc <- err
 					return
 				case i := <-transitChan:
+					fmt.Println("SubscribeDosproxyUpdateGroupToPick")
 					l := &LogUpdateGroupToPick{
 						OldNum: i.OldNum,
 						NewNum: i.NewNum,

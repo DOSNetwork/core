@@ -4,6 +4,7 @@ import (
 	//	"bytes"
 	"context"
 	"fmt"
+	"math/rand"
 	"net"
 	"reflect"
 	"time"
@@ -23,7 +24,14 @@ const (
 	replyReq
 )
 
+type logger interface {
+	Error(err error)
+	TimeTrack(start time.Time, e string, info map[string]interface{})
+	Event(e string, info map[string]interface{})
+}
+
 type server struct {
+	logger
 	id     []byte
 	suite  suites.Suite
 	secKey kyber.Scalar
@@ -67,7 +75,8 @@ func (n *server) Listen() (err error) {
 
 	p := fmt.Sprintf(":%s", n.port)
 	if n.listener, err = net.Listen("tcp", p); err != nil {
-		logger.Error(errors.Errorf("server Listen : %w", err))
+		err = &P2PError{err: errors.Errorf("server Listen failed: %w", err), t: time.Now()}
+		n.logger.Error(err)
 		return
 	}
 	fmt.Println("Listen to ", n.addr, " ", n.port)
@@ -80,7 +89,8 @@ func (n *server) Listen() (err error) {
 			var fd net.Conn
 			fd, err = n.listener.Accept()
 			if err != nil {
-				logger.Error(errors.Errorf("server Listen : %w", err))
+				err = &P2PError{err: errors.Errorf("listener accept failed: %w", err), t: time.Now()}
+				n.logger.Error(err)
 				return
 			}
 			go func() {
@@ -89,11 +99,14 @@ func (n *server) Listen() (err error) {
 				c := newClient(n.id, fd, n.peersFeed, true)
 				errc := c.handShake(ctx)
 				for err = range errc {
-					err = errors.Errorf("server Listen : %w", err)
-					logger.Error(err)
+					err = &P2PError{err: errors.Errorf("handShake failed: %w", err), t: time.Now()}
+					n.logger.Error(err)
 				}
 				if err != nil {
-					c.close()
+					if err = c.close(); err != nil {
+						err = &P2PError{err: errors.Errorf("conn closed failed: %w", err), t: time.Now()}
+						n.logger.Error(err)
+					}
 					return
 				}
 				select {
@@ -116,12 +129,18 @@ func (n *server) receiveHandler() {
 		select {
 		case <-n.ctx.Done():
 			for _, client := range clients {
-				client.close()
+				if err := client.close(); err != nil {
+					err = &P2PError{err: errors.Errorf("conn close failed: %w", err), t: time.Now()}
+					n.logger.Error(err)
+				}
 			}
 			return
 		case c := <-n.addIncomingC:
 			if clients[string(c.remoteID)] != nil {
-				c.close()
+				if err := c.close(); err != nil {
+					err = &P2PError{err: errors.Errorf("conn close failed: %w", err), t: time.Now()}
+					n.logger.Error(err)
+				}
 				continue
 			}
 			clients[string(c.remoteID)] = c
@@ -137,8 +156,8 @@ func (n *server) receiveHandler() {
 		case req := <-n.replying:
 			client := clients[string(req.id)]
 			if client == nil {
-				err := errors.Errorf("server reply: %w", ErrCanNotFindClient)
-				logger.Error(err)
+				err := &P2PError{err: errors.Errorf("reply failed: %w", ErrCanNotFindClient), t: time.Now()}
+				n.logger.Error(err)
 				req.replyResult(nil, err)
 				continue
 			}
@@ -156,7 +175,10 @@ func (n *server) callHandler() {
 		select {
 		case <-n.ctx.Done():
 			for _, client := range clients {
-				client.close()
+				if err := client.close(); err != nil {
+					err = &P2PError{err: errors.Errorf("conn close failed: %w", err), t: time.Now()}
+					n.logger.Error(err)
+				}
 			}
 			return
 		case id, ok := <-n.removeCallingC:
@@ -232,10 +254,10 @@ func (n *server) messageDispatch() {
 
 func (n *server) runClient(c *client, inBound bool) {
 	if err := c.run(); err != nil {
-		fmt.Println("runClient err", err)
-		logger.Error(err)
+		err = &P2PError{err: errors.Errorf("runClient failed: %w", err), t: time.Now()}
+		n.logger.Error(err)
 	}
-	c.close()
+
 	var delpeer chan []byte
 	if inBound {
 		delpeer = n.removeIncomingC
@@ -254,18 +276,25 @@ func (n *server) handleCallReq(req p2pRequest) (c *client) {
 	var err error
 
 	if fd, err = net.Dial("tcp", req.addr); err != nil {
-		req.replyResult(nil, errors.Errorf("server handleCallReq %s: %w", req.addr, err))
+		err = &P2PError{err: errors.Errorf("dial %s failed: %w", req.addr, err), t: time.Now()}
+		req.replyResult(nil, err)
+		n.logger.Error(err)
 		return
 	}
 
 	c = newClient(n.id, fd, n.peersFeed, true)
 	errc := c.handShake(req.ctx)
 	for err = range errc {
-		err = errors.Errorf("server handleCallReq : %w", err)
+		err = &P2PError{err: errors.Errorf("server handleCallReq: %w", err), t: time.Now()}
+		n.logger.Error(err)
 	}
 	if err != nil {
-		req.replyResult(nil, errors.Errorf("server handleCallReq : %w", err))
-		c.close()
+		req.replyResult(nil, err)
+		err = c.close()
+		if err != nil {
+			err = &P2PError{err: errors.Errorf("close failed in handleCallReq: %w", err), t: time.Now()}
+			n.logger.Error(err)
+		}
 		c = nil
 	}
 	return
@@ -275,7 +304,8 @@ func (n *server) Leave() {
 	n.cancel()
 	err := n.listener.Close()
 	if err != nil {
-		logger.Error(err)
+		err = &P2PError{err: errors.Errorf("listener.Close failed: %w", err), t: time.Now()}
+		n.logger.Error(err)
 	}
 
 	if n.members != nil {
@@ -301,19 +331,19 @@ func (n *server) Request(ctx context.Context, id []byte, msg proto.Message) (p2p
 	)
 	req := NewP2pRequest(ctx, sendReq, id, "", msg, 0)
 	if err = req.sendReq(n.calling); err != nil {
-		err = errors.Errorf("server Request : %w", err)
-		logger.Error(err)
+		err = &P2PError{err: errors.Errorf("sendReq failed: %w", err), t: time.Now()}
+		n.logger.Error(err)
 		return
 	}
 	if result, err = req.waitForResult(); err != nil {
-		err = errors.Errorf("server Request : %w", err)
-		logger.Error(err)
+		err = &P2PError{err: errors.Errorf("req.waitForResult: %w", err), t: time.Now()}
+		n.logger.Error(err)
 		return
 	}
 
 	if p2pmsg, ok = result.(P2PMessage); !ok {
-		err = errors.Errorf("server Request : %w", ErrCasting)
-		logger.Error(err)
+		err = &P2PError{err: errors.Errorf("P2PMessage casting failed: %w", err), t: time.Now()}
+		n.logger.Error(err)
 	}
 	return
 }
@@ -322,13 +352,13 @@ func (n *server) Request(ctx context.Context, id []byte, msg proto.Message) (p2p
 func (n *server) Reply(ctx context.Context, id []byte, nonce uint64, msg proto.Message) (err error) {
 	req := NewP2pRequest(ctx, replyReq, id, "", msg, nonce)
 	if err = req.sendReq(n.replying); err != nil {
-		err = errors.Errorf("server Reply : %w", err)
-		logger.Error(err)
+		err = &P2PError{err: errors.Errorf("sendReq failed: %w", err), t: time.Now()}
+		n.logger.Error(err)
 		return
 	}
 	if _, err = req.waitForResult(); err != nil {
-		err = errors.Errorf("server Reply : %w", err)
-		logger.Error(err)
+		err = &P2PError{err: errors.Errorf("waitForResult failed: %w", err), t: time.Now()}
+		n.logger.Error(err)
 	}
 	return
 }
@@ -380,11 +410,16 @@ func (n *server) NumOfMembers() (num int) {
 	return
 }
 
-func (n *server) MembersIP() (ips []net.IP) {
+func (n *server) RandomPeerIP() (ips []string) {
 	select {
 	case <-n.ctx.Done():
 	default:
-		ips = n.members.MembersIP()
+		slice := n.members.MembersIP()
+		rand.Seed(time.Now().UnixNano())
+		rand.Shuffle(len(slice), func(i, j int) { slice[i], slice[j] = slice[j], slice[i] })
+		for _, ip := range slice {
+			ips = append(ips, ip.String())
+		}
 	}
 	return
 }

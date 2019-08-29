@@ -17,8 +17,6 @@ import (
 	"github.com/golang/protobuf/ptypes"
 )
 
-var logger log.Logger
-
 const (
 	//NoDiscover means that p2p don't use any discover protocol
 	NoDiscover = iota // 0
@@ -50,7 +48,7 @@ type P2PInterface interface {
 	UnSubscribeEvent(messages ...interface{})
 	NumOfMembers() int
 	MembersID() [][]byte
-	MembersIP() []net.IP
+	RandomPeerIP() []string
 	//ConnectToAll(ctx context.Context, groupIds [][]byte, sessionID string) (out chan bool, errc chan error)
 	numOfClient() (int, int)
 }
@@ -58,7 +56,6 @@ type P2PInterface interface {
 // CreateP2PNetwork creates a P2PInterface implementation , gets a public IP and generates a secret key
 func CreateP2PNetwork(id []byte, ip, port string, netType int) (P2PInterface, error) {
 	suite := suites.MustFind("bn256")
-	logger = log.New("module", "p2p")
 
 	p := &server{
 		suite:           suite,
@@ -71,6 +68,7 @@ func CreateP2PNetwork(id []byte, ip, port string, netType int) (P2PInterface, er
 		subscribe:       make(chan subscription),
 		unscribe:        make(chan subscription),
 		port:            port,
+		logger:          log.New("module", "p2p"),
 	}
 	p.ctx, p.cancel = context.WithCancel(context.Background())
 	p.secKey = suite.Scalar().Pick(suite.RandomStream())

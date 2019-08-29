@@ -2,13 +2,14 @@ package onchain
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"math"
 	"math/big"
 	"sync"
 	"time"
+
+	errors "golang.org/x/xerrors"
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/keystore"
@@ -21,6 +22,12 @@ const (
 	checkSyncInterval = 15
 	syncBlockDiff     = 3
 )
+
+type DialResult struct {
+	c   *ethclient.Client
+	url string
+	err error
+}
 
 func first(ctx context.Context, source <-chan interface{}) <-chan interface{} {
 	out := make(chan interface{})
@@ -112,38 +119,44 @@ func ReadEthKey(credentialPath, passphrase string) (key *keystore.Key, err error
 	return
 
 }
+func reporeResult(ctx context.Context, out chan DialResult, result DialResult) {
+	select {
+	case <-ctx.Done():
+	case out <- result:
+	}
+}
 
 //DialToEth is a utility function to dial to Ethereum
-func DialToEth(ctx context.Context, urlPool []string) (out chan *ethclient.Client) {
-	out = make(chan *ethclient.Client)
+func DialToEth(ctx context.Context, urlPool []string) (out chan DialResult) {
+	out = make(chan DialResult)
 	var wg sync.WaitGroup
 
 	multiplex := func(url string) {
-		var e error
-		var client *ethclient.Client
+		r := DialResult{}
+		var err error
 		defer wg.Done()
 
-		client, e = ethclient.Dial(url)
-		if e != nil {
+		client, err := ethclient.Dial(url)
+		if err != nil {
 			//ws connect: connection timed out
-			fmt.Println(url, ":DialToEth err ", e)
+			fmt.Println(url, ":DialToEth err ", err)
+			r.err = errors.Errorf("DialToEth: %w", err)
+			reporeResult(ctx, out, r)
 			return
 		}
 
-		_, err := client.NetworkID(ctx)
+		id, err := client.NetworkID(ctx)
 		if err != nil {
 			//Post http i/o timeout
-			fmt.Println(url, "NetworkID err ", err)
+			r.err = errors.Errorf("DialToEth: %w", err)
+			reporeResult(ctx, out, r)
 			client.Close()
 			return
 		}
-		fmt.Println(url, "DialToEthr got a client")
-		select {
-		case <-ctx.Done():
-			client.Close()
-			return
-		case out <- client:
-		}
+		fmt.Println(url, "DialToEthr got a client ", id)
+		r.c = client
+		r.url = url
+		reporeResult(ctx, out, r)
 	}
 
 	// Select from all the channels

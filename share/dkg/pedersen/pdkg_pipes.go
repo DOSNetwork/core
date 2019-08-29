@@ -194,6 +194,7 @@ func genDistKeyGenerator(ctx context.Context, logger log.Logger, secrc chan kybe
 						for _, pubkey := range pubs {
 							if pubPoints[pubkey.Index] != nil {
 								fmt.Println("!!!Duplicate Index", pubkey.Index)
+								return
 							}
 							fmt.Println(pubkey.Index)
 							pubPoints[pubkey.Index] = suite.Point()

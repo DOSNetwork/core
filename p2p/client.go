@@ -3,7 +3,7 @@ package p2p
 import (
 	"context"
 	"encoding/binary"
-	//	"io"
+	"io"
 	"net"
 	//	"strconv"
 	"fmt"
@@ -96,37 +96,37 @@ func (c *client) receiveID(ctx context.Context) (errc chan error) {
 
 		buffer, err := readFrom(c.conn)
 		if err != nil {
-			utils.ReportError(ctx, errc, errors.Errorf("client handShake: %w", err))
+			utils.ReportError(ctx, errc, errors.Errorf("readFrom: %w", err))
 			return
 		}
 
 		_, ptr, err := decodeBytes(buffer, nil)
 		if err != nil {
-			utils.ReportError(ctx, errc, errors.Errorf("client handShake: %w", err))
+			utils.ReportError(ctx, errc, errors.Errorf("decodeBytes: %w", err))
 			return
 		}
 
 		id, ok := ptr.Message.(*ID)
 		if !ok {
-			err = errors.Errorf("client handShake: %w", ErrCasting)
-			utils.ReportError(ctx, errc, errors.Errorf("client handShake: %w", err))
+			err = errors.Errorf("ID casting: %w", ErrCasting)
+			utils.ReportError(ctx, errc, err)
 			return
 		}
 		//ID should not be nil or the same with local ID
 		c.remoteID = id.GetId()
 		if string(c.remoteID) == string(c.localID) {
-			err = errors.Errorf("client handShake: remoteID %b localID %b: %w",
+			err = errors.Errorf("remoteID %b != localID %b: %w",
 				c.remoteID, c.localID, ErrDuplicateID)
 			utils.ReportError(ctx, errc, errors.Errorf("client : %w", err))
 		}
 		if c.remoteID == nil {
-			err = errors.Errorf("client handShake: %w", ErrNoRemoteID)
+			err = errors.Errorf("remoteID is nil: %w", ErrNoRemoteID)
 		}
 
 		//TODO: Move to other module
 		pub := c.suite.G2().Point()
 		if err = pub.UnmarshalBinary(id.GetPublicKey()); err != nil {
-			utils.ReportError(ctx, errc, errors.Errorf("client handShake: %w", err))
+			utils.ReportError(ctx, errc, errors.Errorf("UnmarshalBinary: %w", err))
 			return
 		}
 		c.remotePubKey = pub
@@ -134,7 +134,7 @@ func (c *client) receiveID(ctx context.Context) (errc chan error) {
 		var dhBytes []byte
 		dhKey := c.suite.Point().Mul(c.localSecKey, c.remotePubKey)
 		if dhBytes, err = dhKey.MarshalBinary(); err != nil {
-			utils.ReportError(ctx, errc, errors.Errorf("client handShake: %w", err))
+			utils.ReportError(ctx, errc, errors.Errorf("MarshalBinary: %w", err))
 			return
 		}
 		c.dhKey = dhBytes[0:32]
@@ -153,7 +153,7 @@ func (c *client) sendID(ctx context.Context) (errc chan error) {
 		var err error
 		var bytes, pubKeyBytes []byte
 		if pubKeyBytes, err = c.localPubKey.MarshalBinary(); err != nil {
-			utils.ReportError(ctx, errc, errors.Errorf("client handShake: %w", err))
+			utils.ReportError(ctx, errc, errors.Errorf("MarshalBinary: %w", err))
 			return
 		}
 
@@ -163,11 +163,11 @@ func (c *client) sendID(ctx context.Context) (errc chan error) {
 		}
 
 		if bytes, err = encodeProto(pID, c.localID, nil, 0, false); err != nil {
-			utils.ReportError(ctx, errc, errors.Errorf("client handShake: %w", err))
+			utils.ReportError(ctx, errc, errors.Errorf("encodeProto: %w", err))
 		}
 
 		if err = writeTo(bytes, c.conn); err != nil {
-			utils.ReportError(ctx, errc, errors.Errorf("client handShake: %w", err))
+			utils.ReportError(ctx, errc, errors.Errorf("writeTo: %w", err))
 		}
 		return
 	}()
@@ -183,9 +183,10 @@ func (c *client) run() (err error) {
 			return
 		case err, ok = <-c.errc:
 			if ok {
-				//if errors.Is(err, io.EOF) {
-				//	return
-				//}
+				if errors.Is(err, io.EOF) {
+					err = nil
+					return
+				}
 				return
 			}
 		}
@@ -193,13 +194,14 @@ func (c *client) run() (err error) {
 	return
 }
 
-func (c *client) close() {
+func (c *client) close() (err error) {
 	c.cancel()
-	err := c.conn.Close()
+	err = c.conn.Close()
 	if err != nil {
-		fmt.Println("c.conn.Close err ", err)
+		err = errors.Errorf("client close: %w", err)
 	}
 	<-c.ctx.Done()
+	return
 }
 
 func (c *client) send(req p2pRequest) {
@@ -316,7 +318,10 @@ func (c *client) dispatch(replyMsg, receivedMsg chan P2PMessage) (out chan p2pRe
 				return
 			case <-idleTimer.C:
 				readTimer = true
-				c.close()
+				err := c.close()
+				if err != nil {
+					errors.Errorf("client close: %w", err)
+				}
 			case req, ok = <-c.peerSend:
 				if ok {
 					if !idleTimer.Stop() {
@@ -478,7 +483,7 @@ func (c *client) readPipe() (out chan []byte) {
 			default:
 				buffer, err = readFrom(c.conn)
 				if err != nil {
-					c.reportError(errors.Errorf("client readPipe: %w", err))
+					c.reportError(errors.Errorf("readPipe: %w", err))
 					return
 				}
 			}
@@ -495,12 +500,12 @@ func encodeProto(msg proto.Message, sender []byte, signFn signFunc, nonce uint64
 	var anything *any.Any
 	var sign []byte
 	if anything, err = ptypes.MarshalAny(msg); err != nil {
-		err = errors.Errorf(": %w", err)
+		err = errors.Errorf("MarshalAny: %w", err)
 		return
 	}
 	if signFn != nil {
 		if sign, err = signFn(anything.Value); err != nil {
-			err = errors.Errorf(": %w", err)
+			err = errors.Errorf("signFn: %w", err)
 			return
 		}
 	}
@@ -512,7 +517,7 @@ func encodeProto(msg proto.Message, sender []byte, signFn signFunc, nonce uint64
 		ReplyFlag:    replyFlag,
 	}
 	if bytes, err = proto.Marshal(p); err != nil {
-		err = errors.Errorf(": %w", err)
+		err = errors.Errorf("Marshal: %w", err)
 	}
 	return
 }
@@ -522,17 +527,17 @@ func decodeBytes(bytes []byte, veifyfn verifyFunc) (pa *Package, ptr ptypes.Dyna
 	//TestPoint
 	//bytes = []byte{}
 	if err = proto.Unmarshal(bytes, pa); err != nil {
-		err = errors.Errorf(": %w", err)
+		err = errors.Errorf("Unmarshal: %w", err)
 		return
 	}
 	if veifyfn != nil {
 		if err = veifyfn(pa.GetAnything().Value, pa.GetSignature()); err != nil {
-			err = errors.Errorf(": %w", err)
+			err = errors.Errorf("veifyfn: %w", err)
 			return
 		}
 	}
 	if err = ptypes.UnmarshalAny(pa.GetAnything(), &ptr); err != nil {
-		err = errors.Errorf(": %w", err)
+		err = errors.Errorf("UnmarshalAny: %w", err)
 	}
 	return
 }
@@ -545,7 +550,7 @@ func writeTo(bytes []byte, conn net.Conn) (err error) {
 	//TestPoint
 	//size = msgSizeLimit + 1
 	if size > msgSizeLimit {
-		err = errors.Errorf("SizeLimit %d size %d : %w",
+		err = errors.Errorf("SizeLimit %d size %d: %w",
 			msgSizeLimit, size, ErrMsgOverSize)
 		return
 	}
@@ -555,7 +560,7 @@ func writeTo(bytes []byte, conn net.Conn) (err error) {
 	//conn.Close()
 	for totalBytesWrtie < len(bytes) && err == nil {
 		if bytesWrite, err = conn.Write(bytes[totalBytesWrtie:]); err != nil {
-			err = errors.Errorf(": %w", err)
+			err = errors.Errorf("conn write: %w", err)
 			return
 		}
 		totalBytesWrtie += bytesWrite
@@ -573,7 +578,7 @@ func readFrom(conn net.Conn) (buffer []byte, err error) {
 	//conn.Close()
 	for totalBytesRead < headerSize && err == nil {
 		if bytesRead, err = conn.Read(header[totalBytesRead:]); err != nil {
-			err = errors.Errorf(": %w", err)
+			err = errors.Errorf("conn read header: %w", err)
 			return
 		}
 		totalBytesRead += bytesRead
@@ -585,7 +590,7 @@ func readFrom(conn net.Conn) (buffer []byte, err error) {
 	//TestPoint
 	//size = msgSizeLimit + 1
 	if size > msgSizeLimit || size <= 0 {
-		err = errors.Errorf("SizeLimit %d size %d : %w", msgSizeLimit, size, ErrMsgOverSize)
+		err = errors.Errorf("SizeLimit %d size %d: %w", msgSizeLimit, size, ErrMsgOverSize)
 		return
 	}
 
@@ -596,7 +601,7 @@ func readFrom(conn net.Conn) (buffer []byte, err error) {
 	//conn.Close()
 	for totalContentBytesRead < int(size) && err == nil {
 		if contentBytesRead, err = conn.Read(buffer[totalContentBytesRead:]); err != nil {
-			err = errors.Errorf(": %w", err)
+			err = errors.Errorf("conn read content: %w", err)
 			return
 		}
 		totalContentBytesRead += contentBytesRead
@@ -621,13 +626,13 @@ func (c *client) reportMsg(msg P2PMessage) {
 //TODO : Move to other module
 func (c *client) signFn(msg []byte) (sig []byte, err error) {
 	if sig, err = bls.Sign(c.suite, c.localSecKey, msg); err != nil {
-		err = errors.Errorf(": %w", err)
+		err = errors.Errorf("Sign: %w", err)
 	}
 	return
 }
 func (c *client) verifyFn(msg, sig []byte) (err error) {
 	if err = bls.Verify(c.suite, c.remotePubKey, msg, sig); err != nil {
-		err = errors.Errorf(": %w", err)
+		err = errors.Errorf("Verify: %w", err)
 	}
 	return
 }
