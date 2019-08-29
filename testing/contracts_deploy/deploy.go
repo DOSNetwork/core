@@ -376,12 +376,16 @@ func main() {
 		fmt.Println("NewETHProxySession ", err)
 		return
 	}
-
-	clients := onchain.DialToEth(context.Background(), []string{"ws://51.15.0.157:8546"})
-
-	//Use first client
-	c, ok := <-clients
-	if !ok {
+	var c *ethclient.Client
+	results := onchain.DialToEth(context.Background(), []string{"ws://51.15.0.157:8546"})
+	for result := range results {
+		if result.Err != nil {
+			continue
+		}
+		c = result.Client
+		break
+	}
+	if c == nil {
 		fmt.Println("NewETHProxySession ", err)
 		return
 	}

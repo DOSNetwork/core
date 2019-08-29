@@ -146,13 +146,11 @@ func (n *server) receiveHandler() {
 			clients[string(c.remoteID)] = c
 			n.incomingNum = len(clients)
 			go n.runClient(c, true)
-			fmt.Println("add inbound ", len(clients))
 		case id := <-n.removeIncomingC:
 			if c := clients[string(id)]; c != nil {
 				delete(clients, string(id))
 			}
 			n.incomingNum = len(clients)
-			fmt.Println("remove inbound ", len(clients))
 		case req := <-n.replying:
 			client := clients[string(req.id)]
 			if client == nil {
@@ -167,7 +165,6 @@ func (n *server) receiveHandler() {
 }
 
 func (n *server) callHandler() {
-	defer fmt.Println("end callHandler")
 	addrToid := make(map[string][]byte)
 	clients := make(map[string]*client)
 
@@ -187,7 +184,6 @@ func (n *server) callHandler() {
 				if c != nil {
 					delete(addrToid, c.conn.RemoteAddr().String())
 					delete(clients, string(id))
-					fmt.Println("outbound p2p remove ", len(clients))
 				}
 				n.callingNum = len(clients)
 			}
@@ -195,7 +191,6 @@ func (n *server) callHandler() {
 			if ok {
 				var c *client
 				if c = clients[string(req.id)]; c == nil {
-					fmt.Println("New Outbound Client ", req.id)
 					//TODO : performance bottleneck
 					req.addr = n.members.Lookup(req.id)
 					if c = n.handleCallReq(req); c == nil {
@@ -204,7 +199,6 @@ func (n *server) callHandler() {
 					clients[string(req.id)] = c
 					go n.runClient(c, false)
 				}
-				fmt.Println("Found Outbound Client ", req.id)
 				go c.send(req)
 			}
 		}
@@ -213,7 +207,6 @@ func (n *server) callHandler() {
 }
 
 func (n *server) messageDispatch() {
-	defer fmt.Println("end messageDispatch")
 	subscriptions := make(map[string]chan P2PMessage)
 	for {
 		select {
@@ -254,7 +247,7 @@ func (n *server) messageDispatch() {
 
 func (n *server) runClient(c *client, inBound bool) {
 	if err := c.run(); err != nil {
-		err = &P2PError{err: errors.Errorf("runClient failed: %w", err), t: time.Now()}
+		err = &P2PError{err: errors.Errorf("runClient (%t) err: %w", inBound, err), t: time.Now()}
 		n.logger.Error(err)
 	}
 
@@ -428,6 +421,7 @@ func (n *server) MembersID() (ids [][]byte) {
 	select {
 	case <-n.ctx.Done():
 	default:
+		n.members.MembersIP()
 		ids = n.members.MembersID()
 	}
 	return

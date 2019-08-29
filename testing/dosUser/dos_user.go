@@ -99,8 +99,8 @@ func main() {
 		log.Fatal(err)
 	}
 
-	onChainConfig := configuration.Config{}
-	if err = onChainConfig.LoadConfig(); err != nil {
+	config := configuration.Config{}
+	if err = config.LoadConfig(); err != nil {
 		log.Fatal(err)
 	}
 	credentialPath := ""
@@ -115,9 +115,8 @@ func main() {
 	if credentialPath == "" {
 		credentialPath = workingDir + "/credential"
 	}
-	chainConfig := onChainConfig.GetChainConfig()
 
-	passphrase := os.Getenv(configuration.ENVPASSPHRASE)
+	passphrase := os.Getenv("PASSPHRASE")
 
 	envSize := os.Getenv("AMA")
 	index, err := strconv.Atoi(envSize)
@@ -125,7 +124,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	userTestAdaptor, err := eth.NewAMAUserSession(credentialPath, passphrase, c.AskMeAnythingAddressPool[index], chainConfig.RemoteNodeAddressPool)
+	userTestAdaptor, err := eth.NewAMAUserSession(credentialPath, passphrase, c.AskMeAnythingAddressPool[index], config.ChainNodePool)
 	if err != nil {
 		log.Fatal(err)
 		fmt.Println("NewAMAUserSession err ", err)

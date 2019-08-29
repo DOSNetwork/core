@@ -7,13 +7,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/go-stack/stack"
-
 	"github.com/DOSNetwork/core/log"
 	"github.com/DOSNetwork/core/p2p"
 	"github.com/DOSNetwork/core/share"
 	"github.com/DOSNetwork/core/suites"
 	"github.com/dedis/kyber"
+	"github.com/go-stack/stack"
 	errors "golang.org/x/xerrors"
 )
 
@@ -197,8 +196,6 @@ func (d *pdkg) Grouping(ctx context.Context, sessionID string, groupIds [][]byte
 }
 
 func (d *pdkg) GetGroupPublicPoly(groupId string) (pubPoly *share.PubPoly) {
-	d.logger.Event("GetGroupPublicPoly", map[string]interface{}{"GroupID": groupId, "GroupNumber": d.GetGroupNumber()})
-
 	if g, loaded := d.groups.Load(groupId); loaded {
 		pubPoly = g.(*group).pubPoly
 	}
@@ -206,17 +203,17 @@ func (d *pdkg) GetGroupPublicPoly(groupId string) (pubPoly *share.PubPoly) {
 }
 
 func (d *pdkg) GetShareSecurity(groupId string) (secShare *share.PriShare) {
-	d.logger.Event("GetShareSecurity", map[string]interface{}{"GroupID": groupId, "GroupNumber": d.GetGroupNumber()})
 	if g, loaded := d.groups.Load(groupId); loaded {
 		if g != nil {
 			if dks := g.(*group).secShare; dks != nil {
 				secShare = dks.Share
 			} else {
-				d.logger.Error(errors.New("can't load sec "))
+				err := &DKGError{err: errors.Errorf("GetShareSecurity from %s failed : %w", groupId, ErrCanNotLoadSec)}
+				d.logger.Error(err)
 			}
 		} else {
-			d.logger.Error(errors.New("can't load sec "))
-
+			err := &DKGError{err: errors.Errorf("GetShareSecurity from %s failed : %w", groupId, ErrCanNotLoadGroup)}
+			d.logger.Error(err)
 		}
 	}
 	return
@@ -225,10 +222,6 @@ func (d *pdkg) GetShareSecurity(groupId string) (secShare *share.PriShare) {
 func (d *pdkg) GetGroupIDs(groupId string) (participants [][]byte) {
 	if g, loaded := d.groups.Load(groupId); loaded {
 		participants = g.(*group).participants
-		d.logger.Event("GetGroupIDsSucc", map[string]interface{}{"GroupID": groupId, "GroupNumber": d.GetGroupNumber()})
-	} else {
-		d.logger.Event("GetGroupIDsFail", map[string]interface{}{"GroupID": groupId, "GroupNumber": d.GetGroupNumber()})
-
 	}
 
 	return

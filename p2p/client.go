@@ -6,7 +6,6 @@ import (
 	"io"
 	"net"
 	//	"strconv"
-	"fmt"
 	"time"
 
 	"github.com/golang/protobuf/proto"
@@ -96,7 +95,7 @@ func (c *client) receiveID(ctx context.Context) (errc chan error) {
 
 		buffer, err := readFrom(c.conn)
 		if err != nil {
-			utils.ReportError(ctx, errc, errors.Errorf("readFrom: %w", err))
+			utils.ReportError(ctx, errc, errors.Errorf("readFrom %s : %w", c.conn.RemoteAddr().String(), err))
 			return
 		}
 
@@ -438,7 +437,6 @@ func (c *client) decodePipe(bytesC chan []byte) (replyMsg, receivedMsg chan P2PM
 			case bytes, ok := <-bytesC:
 				if ok {
 					if len(bytes) == 0 {
-						fmt.Println("P2PMessage ", len(bytes))
 						continue
 					}
 					pa, ptr, err := decodeBytes(bytes, c.verifyFn)

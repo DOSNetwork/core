@@ -40,25 +40,30 @@ func genPub(ctx context.Context, logger log.Logger, suite suites.Suite, id []byt
 			}
 		}
 		if index == -1 {
-			reportErr(ctx, errc, errors.New("Can't find id in group IDs"))
+			err := &DKGError{err: errors.Errorf("index id failed for GID %s : %w", sessionID, ErrCanNotFindID)}
+			reportErr(ctx, errc, err)
+			return
 		}
 		//Generate secret and public key
 		sec := suite.Scalar().Pick(suite.RandomStream())
 		select {
 		case secrc <- sec:
 		case <-ctx.Done():
-		}
-		pub := suite.Point().Mul(sec, nil)
-		if bin, err := pub.MarshalBinary(); err != nil {
-			reportErr(ctx, errc, err)
-		} else {
-			pubkey := &PublicKey{SessionId: sessionID, Index: uint32(index), Publickey: &vss.PublicKey{Binary: bin}}
-			select {
-			case out <- pubkey:
-			case <-ctx.Done():
-			}
 			return
 		}
+		pub := suite.Point().Mul(sec, nil)
+		bin, err := pub.MarshalBinary()
+		if err != nil {
+			err := &DKGError{err: errors.Errorf("MarshalBinary failed for GID %s : %w", sessionID, err)}
+			reportErr(ctx, errc, err)
+			return
+		}
+		pubkey := &PublicKey{SessionId: sessionID, Index: uint32(index), Publickey: &vss.PublicKey{Binary: bin}}
+		select {
+		case out <- pubkey:
+		case <-ctx.Done():
+		}
+		return
 	}()
 	return
 }
@@ -75,14 +80,21 @@ func exchangePub(ctx context.Context, logger log.Logger, selfPubc chan interface
 		fmt.Println("2)Start exchangePub")
 		select {
 		case <-ctx.Done():
+			return
 		case resp, ok := <-selfPubc:
-			if ok {
-				fmt.Println("exchangePub selfPubc")
-				logger.TimeTrack(time.Now(), "exchangePubselfPubc", map[string]interface{}{"GroupID": sessionID})
-				if pubkey, ok := resp.(*PublicKey); ok {
-					partPubs = append(partPubs, pubkey)
-				}
+			if !ok {
+				return
 			}
+			fmt.Println("exchangePub selfPubc")
+			logger.TimeTrack(time.Now(), "exchangePubselfPubc", map[string]interface{}{"GroupID": sessionID})
+			pubkey, ok := resp.(*PublicKey)
+			if !ok {
+				err := &DKGError{err: errors.Errorf("casting PublicKey failed for GID %s : %w", sessionID, ErrCasting)}
+				reportErr(ctx, errc, err)
+				return
+			}
+			partPubs = append(partPubs, pubkey)
+
 		}
 		for {
 			select {
@@ -92,12 +104,15 @@ func exchangePub(ctx context.Context, logger log.Logger, selfPubc chan interface
 				if !ok {
 					return
 				}
-				fmt.Println("3)exchangePub peerPubc ", len(resps))
 				logger.TimeTrack(time.Now(), "exchangePubpeerPubc", map[string]interface{}{"GroupID": sessionID})
 				for _, resp := range resps {
-					if pubkey, ok := resp.(*PublicKey); ok {
-						partPubs = append(partPubs, pubkey)
+					pubkey, ok := resp.(*PublicKey)
+					if !ok {
+						err := &DKGError{err: errors.Errorf("casting PublicKey failed for GID %s : %w", sessionID, ErrCasting)}
+						reportErr(ctx, errc, err)
+						return
 					}
+					partPubs = append(partPubs, pubkey)
 				}
 			}
 			if len(partPubs) == len(groupIds) {
@@ -128,21 +143,21 @@ func sendToMembers(ctx context.Context, logger log.Logger, msgc chan interface{}
 					wg.Add(len(groupIds) - 1)
 					for i, id := range groupIds {
 						if r := bytes.Compare(p.GetID(), id); r != 0 {
-							fmt.Println("sendToMembers ", id)
 							go func(i int, id []byte) {
 								defer wg.Done()
 								defer fmt.Println("sendToMembers ", id, " ", i, " done ")
 								for {
 									select {
 									case <-ctx.Done():
+										return
 									default:
 										if _, err := p.Request(ctx, id, m); err != nil {
-											fmt.Println("sendToMembers ", id, " err ", err)
+											err := &DKGError{err: errors.Errorf("sendToMembers failed for GID %s : %w", sessionID, err)}
 											reportErr(ctx, errc, err)
-										} else {
-
-											return
+											time.Sleep(100 * time.Millisecond)
+											continue
 										}
+										return
 									}
 								}
 							}(i, id)
@@ -188,33 +203,33 @@ func genDistKeyGenerator(ctx context.Context, logger log.Logger, secrc chan kybe
 				case pubs, ok := <-partPubs:
 					if ok {
 						fmt.Println("5) Start genDistKeyGenerator")
-
 						defer logger.TimeTrack(time.Now(), "genDistKeyGenerator", map[string]interface{}{"GroupID": sessionID})
 						pubPoints := make([]kyber.Point, numOfPubkeys)
 						for _, pubkey := range pubs {
 							if pubPoints[pubkey.Index] != nil {
-								fmt.Println("!!!Duplicate Index", pubkey.Index)
+								err := &DKGError{err: errors.Errorf("genDistKeyGenerator failed for GID %s : %w", sessionID, ErrDupPubKeyIndex)}
+								reportErr(ctx, errc, err)
 								return
 							}
-							fmt.Println(pubkey.Index)
 							pubPoints[pubkey.Index] = suite.Point()
 							if err := pubPoints[pubkey.Index].UnmarshalBinary(pubkey.Publickey.Binary); err != nil {
+								err := &DKGError{err: errors.Errorf("UnmarshalBinary failed for GID %s : %w", sessionID, err)}
 								reportErr(ctx, errc, err)
 								return
 							}
 						}
-						fmt.Println("!!!!! pubPoints", len(pubPoints))
 
 						dkg, err := NewDistKeyGenerator(suite, sec, pubPoints, numOfPubkeys/2+1)
 						if err != nil {
+							err := &DKGError{err: errors.Errorf("NewDistKeyGenerator failed for GID %s : %w", sessionID, err)}
 							reportErr(ctx, errc, err)
-						} else {
-							select {
-							case <-ctx.Done():
-							case out <- dkg:
-							}
 							return
 						}
+						select {
+						case <-ctx.Done():
+						case out <- dkg:
+						}
+						return
 					}
 				}
 			}
@@ -224,6 +239,8 @@ func genDistKeyGenerator(ctx context.Context, logger log.Logger, secrc chan kybe
 	return
 }
 
+//err = &P2PError{err: errors.Errorf("runClient (%t) err: %w", inBound, err), t: time.Now()}
+//n.logger.Error(err)
 func genDealsAndSend(ctx context.Context, logger log.Logger, dkgc chan *DistKeyGenerator, p p2p.P2PInterface, groupIds [][]byte, sessionID string) (out chan *DistKeyGenerator, errc chan error) {
 	out = make(chan *DistKeyGenerator)
 	errc = make(chan error)
@@ -238,48 +255,43 @@ func genDealsAndSend(ctx context.Context, logger log.Logger, dkgc chan *DistKeyG
 			if ok {
 				fmt.Println("6) Start genDealsAndSend")
 				defer logger.TimeTrack(time.Now(), "genDealsAndSend", map[string]interface{}{"GroupID": sessionID})
-				if deals, err := dkg.Deals(); err == nil {
-					var wg sync.WaitGroup
-					wg.Add(len(deals))
-					fmt.Println("6) Start genDealsAndSend add wg ", len(groupIds)-1, " deals ", len(deals))
-
-					for i, d := range deals {
-						d.SessionId = sessionID
-						go func(id []byte, d *Deal) {
-							defer wg.Done()
-							defer fmt.Println("6) Start genDealsAndSend wg.Done()")
-
-							for {
-								select {
-								case <-ctx.Done():
-								default:
-									fmt.Println("genDealsAndSend Request")
-
-									if _, err := p.Request(ctx, id, d); err != nil {
-										fmt.Println("genDealsAndSend Request err", err)
-										reportErr(ctx, errc, err)
-									} else {
-										fmt.Println("genDealsAndSend Request done")
-										return
-									}
-								}
-							}
-						}(groupIds[i], d)
-					}
-					wg.Wait()
-					fmt.Println("6) Start genDealsAndSend done waiting")
-
-					select {
-					case <-ctx.Done():
-					case out <- dkg:
-					}
-					fmt.Println("6) Start genDealsAndSend end")
-
-				} else {
+				deals, err := dkg.Deals()
+				if err != nil {
+					err := &DKGError{err: errors.Errorf("genDealsAndSend failed for GID %s : %w", sessionID, err)}
 					reportErr(ctx, errc, err)
+					return
 				}
-			} else {
-				fmt.Println("genDealsAndSend dkgc end")
+				var wg sync.WaitGroup
+				wg.Add(len(deals))
+				fmt.Println("6) Start genDealsAndSend add wg ", len(groupIds)-1, " deals ", len(deals))
+
+				for i, d := range deals {
+					d.SessionId = sessionID
+					go func(id []byte, d *Deal) {
+						defer wg.Done()
+						for {
+							select {
+							case <-ctx.Done():
+								return
+							default:
+								fmt.Println("genDealsAndSend Request")
+								if _, err := p.Request(ctx, id, d); err != nil {
+									err := &DKGError{err: errors.Errorf("genDealsAndSend failed for GID %s : %w", sessionID, err)}
+									reportErr(ctx, errc, err)
+									time.Sleep(100 * time.Millisecond)
+									continue
+								}
+								return
+							}
+						}
+					}(groupIds[i], d)
+				}
+				wg.Wait()
+
+				select {
+				case <-ctx.Done():
+				case out <- dkg:
+				}
 			}
 		}
 	}()
@@ -305,7 +317,6 @@ func getAndProcessDeals(ctx context.Context, logger log.Logger, dkgc chan *DistK
 				return
 			}
 		}
-		fmt.Println("7) getAndProcessDeals got dkg")
 		defer logger.TimeTrack(time.Now(), "getAndProcessDeals", map[string]interface{}{"GroupID": sessionID})
 		select {
 		case <-ctx.Done():
@@ -314,18 +325,25 @@ func getAndProcessDeals(ctx context.Context, logger log.Logger, dkgc chan *DistK
 				fmt.Println("Start getAndProcessDeals")
 				var resps []*Response
 				for _, d := range deals {
-					if deal, ok := d.(*Deal); ok {
-						if resp, err := dkg.ProcessDeal(deal); err == nil {
-							resp.SessionId = sessionID
-							if vss.StatusApproval == resp.Response.Status {
-								resps = append(resps, resp)
-							} else {
-								reportErr(ctx, errc, errors.New("resp StatusNotApproval"))
-							}
-						} else {
-							reportErr(ctx, errc, err)
-						}
+					deal, ok := d.(*Deal)
+					if !ok {
+						err := &DKGError{err: errors.Errorf("Casting Deal failed for GID %s : %w", sessionID, ErrCasting)}
+						reportErr(ctx, errc, err)
+						return
 					}
+					resp, err := dkg.ProcessDeal(deal)
+					if err != nil {
+						err = &DKGError{err: errors.Errorf("ProcessDeal failed for GID %s : %w", sessionID, err)}
+						reportErr(ctx, errc, err)
+						return
+					}
+					resp.SessionId = sessionID
+					if vss.StatusApproval != resp.Response.Status {
+						err = &DKGError{err: errors.Errorf("ProcessDeal failed for GID %s : %w", sessionID, ErrResponseNoApproval)}
+						reportErr(ctx, errc, err)
+						return
+					}
+					resps = append(resps, resp)
 				}
 
 				select {
@@ -336,11 +354,8 @@ func getAndProcessDeals(ctx context.Context, logger log.Logger, dkgc chan *DistK
 
 				select {
 				case <-ctx.Done():
-					return
 				case dkgOut <- dkg:
 				}
-			} else {
-				fmt.Println("getAndProcessDeals dealsc end")
 			}
 		}
 	}()
@@ -351,12 +366,10 @@ func getAndProcessResponses(ctx context.Context, logger log.Logger, dkgc chan *D
 	out = make(chan *DistKeyGenerator)
 	errc = make(chan error)
 	go func() {
-		var dkg *DistKeyGenerator
-		var ok bool
-		defer fmt.Println("8) Close getAndProcessResponses Pipe ")
-
 		defer close(out)
 		defer close(errc)
+		var dkg *DistKeyGenerator
+		var ok bool
 		select {
 		case <-ctx.Done():
 		case dkg, ok = <-dkgc:
@@ -364,21 +377,22 @@ func getAndProcessResponses(ctx context.Context, logger log.Logger, dkgc chan *D
 				return
 			}
 		}
-		fmt.Println("8) Start getAndProcessResponses")
 		defer logger.TimeTrack(time.Now(), "getAndProcessResponses", map[string]interface{}{"GroupID": sessionID})
 		select {
 		case <-ctx.Done():
 		case resps, ok := <-respsc:
 			if ok {
-				fmt.Println("getAndProcessResponses got resps")
-
 				for _, r := range resps {
-					if resp, ok := r.(*Response); ok {
-						if _, err := dkg.ProcessResponse(resp); err != nil {
-							reportErr(ctx, errc, err)
-						}
-					} else {
-						reportErr(ctx, errc, errors.New("Response cast error"))
+					resp, ok := r.(*Response)
+					if !ok {
+						err := &DKGError{err: errors.Errorf("getAndProcessResponses failed for GID %s : %w", sessionID, ErrCasting)}
+						reportErr(ctx, errc, err)
+						return
+					}
+					if _, err := dkg.ProcessResponse(resp); err != nil {
+						err := &DKGError{err: errors.Errorf("ProcessResponse failed for GID %s : %w", sessionID, err)}
+						reportErr(ctx, errc, err)
+						return
 					}
 				}
 
@@ -386,8 +400,6 @@ func getAndProcessResponses(ctx context.Context, logger log.Logger, dkgc chan *D
 				case <-ctx.Done():
 				case out <- dkg:
 				}
-			} else {
-				fmt.Println("getAndProcessResponses respsc end")
 			}
 		}
 	}()
@@ -408,32 +420,37 @@ func genGroup(ctx context.Context, logger log.Logger, group *group, suite suites
 			if ok {
 				defer logger.TimeTrack(time.Now(), "genGroup", map[string]interface{}{"GroupID": sessionID})
 				if !dkg.Certified() {
-					reportErr(ctx, errc, errors.New("dkg is not certified"))
-				}
-				if secShare, err := dkg.DistKeyShare(); err == nil {
-					group.secShare = secShare
-					group.pubPoly = share.NewPubPoly(suite, suite.Point().Base(), group.secShare.Commitments())
-					pubKey := group.pubPoly.Commit()
-					if pubKeyCoor, err := decodePubKey(pubKey); err == nil {
-						if groupId, ok := new(big.Int).SetString(sessionID, 16); ok {
-							dataReturn := [5]*big.Int{groupId}
-							copy(dataReturn[1:], pubKeyCoor[:])
-							select {
-							case <-ctx.Done():
-							case out <- dataReturn:
-							}
-						} else {
-							reportErr(ctx, errc, errors.New("sessionID cast error "))
-						}
-					} else {
-						reportErr(ctx, errc, err)
-					}
-				} else {
+					err := &DKGError{err: errors.Errorf("ProcessResponse failed for GID %s : %w", sessionID, ErrDKGNotCertified)}
 					reportErr(ctx, errc, err)
+					return
 				}
-			} else {
-				fmt.Println("genGroup dkgc end")
-
+				secShare, err := dkg.DistKeyShare()
+				if err != nil {
+					err := &DKGError{err: errors.Errorf("DistKeyShare failed for GID %s : %w", sessionID, err)}
+					reportErr(ctx, errc, err)
+					return
+				}
+				group.secShare = secShare
+				group.pubPoly = share.NewPubPoly(suite, suite.Point().Base(), group.secShare.Commitments())
+				pubKey := group.pubPoly.Commit()
+				pubKeyCoor, err := decodePubKey(pubKey)
+				if err != nil {
+					err := &DKGError{err: errors.Errorf("decodePubKey failed for GID %s : %w", sessionID, err)}
+					reportErr(ctx, errc, err)
+					return
+				}
+				groupId, ok := new(big.Int).SetString(sessionID, 16)
+				if !ok {
+					err := &DKGError{err: errors.Errorf("genGroup failed for GID %s : %w", sessionID, ErrCasting)}
+					reportErr(ctx, errc, err)
+					return
+				}
+				dataReturn := [5]*big.Int{groupId}
+				copy(dataReturn[1:], pubKeyCoor[:])
+				select {
+				case <-ctx.Done():
+				case out <- dataReturn:
+				}
 			}
 		}
 	}()

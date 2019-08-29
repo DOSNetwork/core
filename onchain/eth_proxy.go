@@ -120,11 +120,11 @@ func (e *ethAdaptor) Connect(ctx context.Context) (err error) {
 	results := DialToEth(ctx, e.wsUrls)
 
 	for result := range results {
-		if result.err != nil {
-			e.logger.Error(&OnchainError{err: result.err, t: time.Now()})
+		if result.Err != nil {
+			e.logger.Error(&OnchainError{err: result.Err, t: time.Now()})
 			continue
 		}
-		client := result.c
+		client := result.Client
 
 		bridge, err := dosbridge.NewDosbridge(e.bridgeAddr, client)
 		if err != nil {
@@ -163,7 +163,7 @@ func (e *ethAdaptor) Connect(ctx context.Context) (err error) {
 			client.Close()
 			continue
 		}
-		e.logger.Event("ConnToOnchain", map[string]interface{}{"OnchainURL": result.url})
+		e.logger.Event("ConnToOnchain", map[string]interface{}{"OnchainURL": result.Url})
 
 		e.clients = append(e.clients, client)
 		e.proxies = append(e.proxies, &dosproxy.DosproxySession{Contract: p, CallOpts: bind.CallOpts{Context: e.ctx}, TransactOpts: *e.auth})

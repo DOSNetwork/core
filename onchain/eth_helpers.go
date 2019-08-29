@@ -24,9 +24,9 @@ const (
 )
 
 type DialResult struct {
-	c   *ethclient.Client
-	url string
-	err error
+	Client *ethclient.Client
+	Url    string
+	Err    error
 }
 
 func first(ctx context.Context, source <-chan interface{}) <-chan interface{} {
@@ -140,7 +140,7 @@ func DialToEth(ctx context.Context, urlPool []string) (out chan DialResult) {
 		if err != nil {
 			//ws connect: connection timed out
 			fmt.Println(url, ":DialToEth err ", err)
-			r.err = errors.Errorf("DialToEth: %w", err)
+			r.Err = errors.Errorf("DialToEth: %w", err)
 			reporeResult(ctx, out, r)
 			return
 		}
@@ -148,14 +148,14 @@ func DialToEth(ctx context.Context, urlPool []string) (out chan DialResult) {
 		id, err := client.NetworkID(ctx)
 		if err != nil {
 			//Post http i/o timeout
-			r.err = errors.Errorf("DialToEth: %w", err)
+			r.Err = errors.Errorf("DialToEth: %w", err)
 			reporeResult(ctx, out, r)
 			client.Close()
 			return
 		}
 		fmt.Println(url, "DialToEthr got a client ", id)
-		r.c = client
-		r.url = url
+		r.Client = client
+		r.Url = url
 		reporeResult(ctx, out, r)
 	}
 

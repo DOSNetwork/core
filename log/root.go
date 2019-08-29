@@ -31,6 +31,7 @@ func Init(id []byte) {
 	appName := os.Getenv("APPNAME")
 	nodId := byteTohex(id)
 	logIp := os.Getenv("LOGIP")
+	clientIP := os.Getenv("NODEIP")
 	logrus.SetLevel(logrus.DebugLevel)
 	logrus.SetOutput(ioutil.Discard)
 	//IP,Subject and appName should read from environment variables
@@ -46,6 +47,7 @@ func Init(id []byte) {
 	root.entry = logrus.WithFields(logrus.Fields{
 		"appSession": appSession,
 		"appName":    appName,
+		"clientip":   clientIP,
 		"nodeID":     nodId,
 	})
 }

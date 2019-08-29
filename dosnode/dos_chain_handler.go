@@ -201,27 +201,28 @@ func (d *DosNode) handleGrouping(participants [][]byte, groupID string) {
 	var errcList []chan error
 	outFromDkg, errc, err := d.dkg.Grouping(ctx, groupID, participants)
 	if err != nil {
-		fmt.Println("!!!!!!!!!!!!Grouping dkg.Grouping err ", err)
 		d.logger.Error(err)
 		return
 	}
 	errcList = append(errcList, errc)
 	errcList = append(errcList, d.chain.RegisterGroupPubKey(ctx, outFromDkg))
 	allErrc := mergeErrors(ctx, errcList...)
+	var err error
+	var ok bool
 	for {
 		select {
-		case err, ok := <-allErrc:
+		case err, ok = <-allErrc:
 			if !ok {
 				return
 			}
-			fmt.Println("!!!!!!!!!!!!Grouping allErrc err ", err)
-			d.logger.Event("waitForGroupingError", map[string]interface{}{"Error": err.Error(), "GroupID": groupID})
+			d.logger.Error(err)
+			//d.logger.Event("waitForGroupingError", map[string]interface{}{"Error": err.Error(), "GroupID": groupID})
 		case <-ctx.Done():
-			fmt.Println("!!!!!!!!!!!!Grouping ctx.Done err ", err)
-
-			d.logger.Event("waitForGroupingError", map[string]interface{}{"Error": ctx.Err(), "GroupID": groupID})
 			return
 		}
+	}
+	if err == nil {
+		d.logger.Event("GroupingSucc", map[string]interface{}{"GroupID": groupID})
 	}
 }
 

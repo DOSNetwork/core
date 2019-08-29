@@ -74,10 +74,15 @@ func NewAMAUserSession(credentialPath, passphrase, addr string, gethUrls []strin
 
 	ctx, cancelFunc := context.WithCancel(context.Background())
 	defer cancelFunc()
-	clients := onchain.DialToEth(ctx, httpUrls)
-	//Use first client
-	c, ok := <-clients
-	if !ok {
+	var c *ethclient.Client
+	results := onchain.DialToEth(ctx, httpUrls)
+	for result := range results {
+		if result.Err == nil {
+			c = result.Client
+			break
+		}
+	}
+	if c == nil {
 		err = errors.New("No any working eth client")
 		return
 	}
@@ -107,15 +112,18 @@ func NewAMAUserSession(credentialPath, passphrase, addr string, gethUrls []strin
 	adaptor.cancel = cancelSession
 	adaptor.reqQueue = make(chan interface{})
 
-	clients = onchain.DialToEth(ctx, wsUrls)
-	for client := range clients {
-		p, err := dosUser.NewAskMeAnything(common.HexToAddress(addr), client)
+	results = onchain.DialToEth(ctx, wsUrls)
+	for result := range results {
+		if result.Err != nil {
+			continue
+		}
+		p, err := dosUser.NewAskMeAnything(common.HexToAddress(addr), result.Client)
 		if err != nil {
 			logger.Error(err)
 			continue
 		}
 		ctx, cancelFunc := context.WithCancel(context.Background())
-		adaptor.rClients = append(adaptor.rClients, client)
+		adaptor.rClients = append(adaptor.rClients, result.Client)
 		adaptor.rProxies = append(adaptor.rProxies, p)
 		adaptor.rCtxs = append(adaptor.rCtxs, ctx)
 		adaptor.rCancelFuncs = append(adaptor.rCancelFuncs, cancelFunc)
