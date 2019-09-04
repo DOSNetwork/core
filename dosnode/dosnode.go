@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	watchdogInterval = 10 //In minutes
+	watchdogInterval = 30 //In minutes
 	envPassPhrase    = "PASSPHRASE"
 )
 
@@ -114,6 +114,7 @@ func NewDosNode(key *keystore.Key, config configuration.Config) (dosNode *DosNod
 
 //End is an operation that does a graceful shutdown
 func (d *DosNode) End() {
+	d.chain.UnRegisterNode(context.Background())
 	d.cancel()
 	<-d.ctx.Done()
 	fmt.Println("End")

@@ -44,8 +44,10 @@ type P2PInterface interface {
 	Leave()
 	Request(ctx context.Context, id []byte, m proto.Message) (msg P2PMessage, err error)
 	Reply(ctx context.Context, id []byte, nonce uint64, m proto.Message) (err error)
-	SubscribeEvent(chanBuffer int, messages ...interface{}) (outch chan P2PMessage, err error)
-	UnSubscribeEvent(messages ...interface{})
+	SubscribeEvent() (subID int, outch chan discover.P2PEvent, err error)
+	UnSubscribeEvent(int)
+	SubscribeMsg(chanBuffer int, messages ...interface{}) (outch chan P2PMessage, err error)
+	UnSubscribeMsg(messages ...interface{})
 	NumOfMembers() int
 	MembersID() [][]byte
 	RandomPeerIP() []string
@@ -64,9 +66,12 @@ func CreateP2PNetwork(id []byte, ip, port string, netType int) (P2PInterface, er
 		replying:        make(chan p2pRequest),
 		calling:         make(chan p2pRequest),
 		removeCallingC:  make(chan []byte),
-		peersFeed:       make(chan P2PMessage, 100),
-		subscribe:       make(chan subscription),
-		unscribe:        make(chan subscription),
+		peersFeed:       make(chan P2PMessage, 5),
+		peersEvent:      make(chan discover.P2PEvent, 5),
+		subscribeMsg:    make(chan *subscription),
+		unscribeMsg:     make(chan string),
+		subscribeEvent:  make(chan *subscription),
+		unscribeEvent:   make(chan int),
 		port:            port,
 		logger:          log.New("module", "p2p"),
 	}

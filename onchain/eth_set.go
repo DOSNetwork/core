@@ -10,7 +10,9 @@ import (
 	"github.com/DOSNetwork/core/onchain/commitreveal"
 	"github.com/DOSNetwork/core/onchain/dosproxy"
 	"github.com/DOSNetwork/core/share/vss/pedersen"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
+
 	errors "golang.org/x/xerrors"
 )
 
@@ -193,6 +195,30 @@ func (e *ethAdaptor) RegisterNewNode(ctx context.Context) (err error) {
 	return
 }
 
+// UnRegisterNode is a wrap function that build a pipeline to call RegisterNewNode
+func (e *ethAdaptor) UnRegisterNode(ctx context.Context) (err error) {
+	f := func(ctx context.Context, proxy *dosproxy.DosproxySession, cr *commitreveal.CommitrevealSession, p []interface{}) (tx *types.Transaction, err error) {
+		tx, err = proxy.UnregisterNode()
+		fmt.Println("RegisterNewNode", tx, err)
+		return
+	}
+	defer e.logger.TimeTrack(time.Now(), "UnregisterNode", nil)
+	reply := e.set(ctx, nil, f)
+	select {
+	case r, ok := <-reply:
+		if ok {
+			err = r.err
+			if r.err == nil {
+				fmt.Println("UnregisterNode response ", fmt.Sprintf("%x", r.tx.Hash()))
+			} else {
+				fmt.Println("UnregisterNode error ", r.err)
+			}
+		}
+	case <-ctx.Done():
+	}
+	return
+}
+
 // SignalRandom is a wrap function that build a pipeline to call SignalRandom
 func (e *ethAdaptor) SignalRandom(ctx context.Context) (err error) {
 	f := func(ctx context.Context, proxy *dosproxy.DosproxySession, cr *commitreveal.CommitrevealSession, p []interface{}) (tx *types.Transaction, err error) {
@@ -256,6 +282,40 @@ func (e *ethAdaptor) SignalGroupDissolve(ctx context.Context) (err error) {
 				fmt.Println("SignalGroupDissolve response ", fmt.Sprintf("%x", r.tx.Hash()))
 			} else {
 				fmt.Println("SignalGroupDissolve error ", r.err)
+			}
+		}
+	case <-ctx.Done():
+	}
+	return
+
+}
+
+// SignalBootstrap is a wrap function that build a pipeline to call SignalBootstrap
+func (e *ethAdaptor) SignalUnregister(ctx context.Context, addr common.Address) (err error) {
+	// define how to parse parameters and execute proxy function
+	f := func(ctx context.Context, proxy *dosproxy.DosproxySession, cr *commitreveal.CommitrevealSession, p []interface{}) (tx *types.Transaction, err error) {
+		if len(p) != 1 {
+			err = errors.New("Invalid parameter")
+			return
+		}
+		if addr, ok := p[0].(common.Address); ok {
+			tx, err = proxy.SignalUnregister(addr)
+		}
+		return
+	}
+	// define parameters
+	var params []interface{}
+	params = append(params, addr)
+
+	reply := e.set(ctx, params, f)
+	select {
+	case r, ok := <-reply:
+		if ok {
+			err = r.err
+			if r.err == nil {
+				fmt.Println("signalUnregister response ", fmt.Sprintf("%x", r.tx.Hash()))
+			} else {
+				fmt.Println("signalUnregister error ", r.err)
 			}
 		}
 	case <-ctx.Done():

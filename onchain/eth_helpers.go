@@ -147,6 +147,7 @@ func DialToEth(ctx context.Context, urlPool []string) (out chan DialResult) {
 
 		id, err := client.NetworkID(ctx)
 		if err != nil {
+			fmt.Println("NetworkID err ", err)
 			//Post http i/o timeout
 			r.Err = errors.Errorf("DialToEth: %w", err)
 			reporeResult(ctx, out, r)

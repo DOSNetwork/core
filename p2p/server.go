@@ -53,18 +53,27 @@ type server struct {
 	incomingNum     int
 	callingNum      int
 
+	//Msg
+	peersFeed    chan P2PMessage
+	subscribeMsg chan *subscription
+	unscribeMsg  chan string
+
 	//Event
-	peersFeed chan P2PMessage
-	subscribe chan subscription
-	unscribe  chan subscription
+	peersEvent     chan discover.P2PEvent
+	subscribeEvent chan *subscription
+	unscribeEvent  chan int
 
 	ctx    context.Context
 	cancel context.CancelFunc
 }
 
 type subscription struct {
-	eventType string
-	message   chan P2PMessage
+	subID   int
+	msgType string
+	msgCh   chan P2PMessage
+	eventCh chan discover.P2PEvent
+	replyCh chan *subscription
+	err     error
 }
 
 func (n *server) Listen() (err error) {
@@ -72,7 +81,7 @@ func (n *server) Listen() (err error) {
 	go n.receiveHandler()
 	go n.callHandler()
 	go n.messageDispatch()
-
+	go n.eventDispatch()
 	p := fmt.Sprintf(":%s", n.port)
 	if n.listener, err = net.Listen("tcp", p); err != nil {
 		err = &P2PError{err: errors.Errorf("server Listen failed: %w", err), t: time.Now()}
@@ -206,45 +215,6 @@ func (n *server) callHandler() {
 	return
 }
 
-func (n *server) messageDispatch() {
-	subscriptions := make(map[string]chan P2PMessage)
-	for {
-		select {
-		case msg, ok := <-n.peersFeed:
-			if ok {
-				if msg.Msg.Message == nil {
-					continue
-				}
-				messagetype := reflect.TypeOf(msg.Msg.Message).String()
-				if len(messagetype) > 0 && messagetype[0] == '*' {
-					messagetype = messagetype[1:]
-				}
-				if out := subscriptions[messagetype]; out != nil {
-					go func() {
-						select {
-						case <-n.ctx.Done():
-						case out <- msg:
-						}
-					}()
-				}
-			}
-		case sub, ok := <-n.subscribe:
-			if ok {
-				subscriptions[sub.eventType] = sub.message
-			}
-		case sub, ok := <-n.unscribe:
-			if ok {
-				delete(subscriptions, sub.eventType)
-			}
-		case <-n.ctx.Done():
-			for _, outch := range subscriptions {
-				close(outch)
-			}
-			return
-		}
-	}
-}
-
 func (n *server) runClient(c *client, inBound bool) {
 	if err := c.run(); err != nil {
 		err = &P2PError{err: errors.Errorf("runClient (%t) err: %w", inBound, err), t: time.Now()}
@@ -356,8 +326,119 @@ func (n *server) Reply(ctx context.Context, id []byte, nonce uint64, msg proto.M
 	return
 }
 
+func (n *server) eventDispatch() {
+	go n.members.Listen(n.ctx, n.peersEvent)
+	subscriptions := make(map[int]chan discover.P2PEvent)
+	subID := 1
+	for {
+		select {
+		case e, ok := <-n.peersEvent:
+			if ok {
+				for _, eventCh := range subscriptions {
+					go func() {
+						select {
+						case <-n.ctx.Done():
+						case eventCh <- e:
+						}
+					}()
+				}
+			}
+		case sub, ok := <-n.subscribeEvent:
+			if ok {
+				sub.eventCh = make(chan discover.P2PEvent)
+				sub.subID = subID
+				subID++
+				subscriptions[sub.subID] = sub.eventCh
+				go func() {
+					select {
+					case <-n.ctx.Done():
+					case sub.replyCh <- sub:
+					}
+				}()
+			}
+		case subID, ok := <-n.unscribeEvent:
+			if ok {
+				delete(subscriptions, subID)
+			}
+		case <-n.ctx.Done():
+			for _, outch := range subscriptions {
+				close(outch)
+			}
+			return
+		}
+	}
+}
+
+func (n *server) messageDispatch() {
+	subscriptions := make(map[string]chan P2PMessage)
+	for {
+		select {
+		case msg, ok := <-n.peersFeed:
+			if ok {
+				if msg.Msg.Message == nil {
+					continue
+				}
+				messagetype := reflect.TypeOf(msg.Msg.Message).String()
+				if len(messagetype) > 0 && messagetype[0] == '*' {
+					messagetype = messagetype[1:]
+				}
+				if out := subscriptions[messagetype]; out != nil {
+					go func() {
+						select {
+						case <-n.ctx.Done():
+						case out <- msg:
+						}
+					}()
+				}
+			}
+		case sub, ok := <-n.subscribeMsg:
+			if ok {
+				subscriptions[sub.msgType] = sub.msgCh
+			}
+		case msgType, ok := <-n.unscribeMsg:
+			if ok {
+				delete(subscriptions, msgType)
+			}
+		case <-n.ctx.Done():
+			for _, outch := range subscriptions {
+				close(outch)
+			}
+			return
+		}
+	}
+}
+
 // SubscribeEvent is a message subscription operation binding the P2PMessage
-func (n *server) SubscribeEvent(chanBuffer int, peersFeed ...interface{}) (outch chan P2PMessage, err error) {
+func (n *server) SubscribeEvent() (subID int, outch chan discover.P2PEvent, err error) {
+
+	reply := make(chan *subscription)
+	defer close(reply)
+	select {
+	case <-n.ctx.Done():
+	case n.subscribeEvent <- &subscription{replyCh: reply}:
+	}
+	select {
+	case <-n.ctx.Done():
+		err = n.ctx.Err()
+	case r := <-reply:
+		subID = r.subID
+		outch = r.eventCh
+		err = r.err
+	}
+	return
+}
+
+// UnSubscribeEvent is a un-subscription operation
+func (n *server) UnSubscribeEvent(subID int) {
+	select {
+	case <-n.ctx.Done():
+	case n.unscribeEvent <- subID:
+	}
+	return
+}
+
+// SubscribeMsg is a message subscription operation binding the P2PMessage
+func (n *server) SubscribeMsg(chanBuffer int, peersFeed ...interface{}) (outch chan P2PMessage, err error) {
 	if chanBuffer > 0 {
 		outch = make(chan P2PMessage, chanBuffer)
 	} else {
@@ -367,18 +448,18 @@ func (n *server) SubscribeEvent(chanBuffer int, peersFeed ...interface{}) (outch
 		fmt.Println("SubscribeEvent ", reflect.TypeOf(m).String())
 		select {
 		case <-n.ctx.Done():
-		case n.subscribe <- subscription{reflect.TypeOf(m).String(), outch}:
+		case n.subscribeMsg <- &subscription{msgType: reflect.TypeOf(m).String(), msgCh: outch}:
 		}
 	}
 	return
 }
 
 // UnSubscribeEvent is a un-subscription operation
-func (n *server) UnSubscribeEvent(peersFeed ...interface{}) {
+func (n *server) UnSubscribeMsg(peersFeed ...interface{}) {
 	for _, m := range peersFeed {
 		select {
 		case <-n.ctx.Done():
-		case n.unscribe <- subscription{reflect.TypeOf(m).String(), nil}:
+		case n.unscribeMsg <- reflect.TypeOf(m).String():
 		}
 	}
 	return

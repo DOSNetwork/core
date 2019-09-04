@@ -104,7 +104,7 @@ func handleRequest(sessionMap map[string][]interface{}, sessionReq map[string]re
 }
 func (d *pdkg) Loop() {
 
-	peersToBuf, _ := d.p.SubscribeEvent(50, PublicKey{}, Deal{}, Responses{})
+	peersToBuf, _ := d.p.SubscribeMsg(50, PublicKey{}, Deal{}, Responses{})
 	sessionPubKeys := make(map[string][]interface{})
 	sessionDeals := make(map[string][]interface{})
 	sessionResps := make(map[string][]interface{})

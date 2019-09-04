@@ -1,6 +1,7 @@
 package discover
 
 import (
+	"context"
 	"net"
 )
 
@@ -26,6 +27,8 @@ func (s *simulator) Join(bootstrapIp []string) (num int, err error) {
 // Join leaves an Serf cluster.
 func (s *simulator) Leave() {
 	return
+}
+func (s *simulator) Listen(ctx context.Context, outch chan P2PEvent) {
 }
 
 // Lookup return the IP address of the given ID

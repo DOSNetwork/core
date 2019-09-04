@@ -36,10 +36,12 @@ type ProxyAdapter interface {
 	Reveal(ctx context.Context, cid *big.Int, secret *big.Int) (errc error)
 	//Guardian node functions
 	RegisterNewNode(ctx context.Context) (err error)
+	UnRegisterNode(ctx context.Context) (err error)
 	SignalRandom(ctx context.Context) (errc error)
 	SignalGroupFormation(ctx context.Context) (errc error)
 	SignalGroupDissolve(ctx context.Context) (errc error)
 	SignalBootstrap(ctx context.Context, cid *big.Int) (errc error)
+	SignalUnregister(ctx context.Context, addr common.Address) (errc error)
 
 	GetExpiredWorkingGroupSize(ctx context.Context) (r uint64, err error)
 	GroupSize(ctx context.Context) (r uint64, err error)

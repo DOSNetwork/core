@@ -1,9 +1,11 @@
 package discover
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"net"
+	"time"
 
 	"github.com/hashicorp/serf/serf"
 )
@@ -12,10 +14,17 @@ import (
 type Membership interface {
 	Join(Ip []string) (num int, err error)
 	Leave()
+	Listen(ctx context.Context, outch chan P2PEvent)
 	Lookup(id []byte) (addr string)
 	NumOfPeers() int
 	MembersIP() (addr []net.IP)
 	MembersID() (list [][]byte)
+}
+
+type P2PEvent struct {
+	EventType string
+	NodeID    string
+	Addr      net.IP
 }
 
 //NewSerfNet creates a Serf implementation
@@ -28,13 +37,32 @@ func NewSerfNet(Addr net.IP, id, port string) (Membership, error) {
 	conf.MemberlistConfig.LogOutput = ioutil.Discard
 	conf.MemberlistConfig.AdvertiseAddr = Addr.String()
 	conf.NodeName = id + port
+	eventCh := make(chan serf.Event, 4)
+	conf.EventCh = eventCh
+	serfNet.eventch = eventCh
 	serfNet.serf, err = serf.Create(conf)
-
 	return serfNet, err
 }
 
 type serfNet struct {
-	serf *serf.Serf
+	serf    *serf.Serf
+	eventch chan serf.Event
+}
+
+//NumOfPeers return the length of members
+func (s *serfNet) Listen(ctx context.Context, outch chan P2PEvent) {
+	for event := range s.eventch {
+		if e, ok := event.(serf.MemberEvent); ok {
+			for _, member := range e.Members {
+				nodeId := member.Name[:20]
+				fmt.Println("Memberlist : ", time.Now(), event, len(e.Members), fmt.Sprintf("%x", nodeId), " ADDR", member.Addr)
+				select {
+				case <-ctx.Done():
+				case outch <- P2PEvent{EventType: event.String(), NodeID: nodeId, Addr: member.Addr}:
+				}
+			}
+		}
+	}
 }
 
 //NumOfPeers return the length of members

@@ -16,8 +16,8 @@ func (d *DosNode) queryLoop() {
 	defer fmt.Println("End queryLoop")
 	bufSign := make(map[string][]*vss.Signature)
 	reqSign := make(map[string]request)
-	peerEvent, _ := d.p.SubscribeEvent(50, vss.Signature{})
-	defer d.p.UnSubscribeEvent(vss.Signature{})
+	peerMsg, _ := d.p.SubscribeMsg(50, vss.Signature{})
+	defer d.p.UnSubscribeMsg(vss.Signature{})
 	watchdog := time.NewTicker(watchdogInterval * time.Minute)
 	defer watchdog.Stop()
 	for {
@@ -34,7 +34,7 @@ func (d *DosNode) queryLoop() {
 				default:
 				}
 			}
-		case msg, ok := <-peerEvent:
+		case msg, ok := <-peerMsg:
 			if ok {
 				if content, ok := msg.Msg.Message.(*vss.Signature); ok {
 					requestID := string(content.RequestId)

@@ -150,18 +150,6 @@ func actionStart(c *cli.Context) (err error) {
 		return nil
 	}
 
-	// Make arrangement to remove PID file upon receiving the SIGTERM from kill command
-	ch := make(chan os.Signal, 1)
-	signal.Notify(ch, os.Interrupt, os.Kill, syscall.SIGTERM)
-	go func() {
-		//defer profile.Start().Stop()
-		defer os.Exit(0)
-		signalType := <-ch
-		signal.Stop(ch)
-		os.Remove(pidFile)
-		fmt.Println("Received signal type : ", signalType)
-	}()
-
 	fErr, err := os.OpenFile(logFile, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0666)
 	if err != nil {
 		fmt.Println("OpenLogFile err ", err)
@@ -175,9 +163,21 @@ func actionStart(c *cli.Context) (err error) {
 		fmt.Println("NewDosNode err", err)
 		return err
 	}
-
+	// Make arrangement to remove PID file upon receiving the SIGTERM from kill command
+	ch := make(chan os.Signal, 1)
+	signal.Notify(ch, os.Interrupt, os.Kill, syscall.SIGTERM)
+	go func() {
+		//defer profile.Start().Stop()
+		defer os.Exit(0)
+		signalType := <-ch
+		dosclient.End()
+		signal.Stop(ch)
+		os.Remove(pidFile)
+		fmt.Println("Received signal type : ", signalType)
+	}()
 	savePID(os.Getpid())
 	dosclient.Start()
+
 	return nil
 }
 

@@ -11,6 +11,7 @@ import (
 	"unsafe"
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto/sha3"
 
 	"github.com/DOSNetwork/core/onchain"
@@ -19,10 +20,10 @@ import (
 
 func (d *DosNode) onchainLoop() {
 	defer fmt.Println("End onchainLoop")
-	watchdog := time.NewTicker(watchdogInterval * time.Minute)
+	watchdog := time.NewTicker(watchdogInterval * time.Second)
 	defer watchdog.Stop()
 	randSeed, _ := new(big.Int).SetString("21888242871839275222246405745257275088548364400416034343698204186575808495617", 10)
-
+	inactiveNodes := make(map[string]time.Time)
 	for {
 		//Connect to geth
 		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(300*time.Second))
@@ -57,6 +58,11 @@ func (d *DosNode) onchainLoop() {
 			onchain.SubscribeLogUpdateRandom, onchain.SubscribeLogRequestUserRandom,
 			onchain.SubscribeLogPublicKeyAccepted, onchain.SubscribeCommitrevealLogStartCommitreveal}
 		d.onchainEvent, errc = d.chain.SubscribeEvent(subescriptions)
+		_, membersEvent, err := d.p.SubscribeEvent()
+		if err != nil {
+			fmt.Println("SubscribeEvent err ", err)
+			return
+		}
 	L:
 		for {
 			select {
@@ -68,6 +74,20 @@ func (d *DosNode) onchainLoop() {
 				}
 
 				return
+			case event := <-membersEvent:
+				if d.isGuardian {
+					//fmt.Println("", event.EventType, fmt.Sprintf("%x", event.NodeID), event.Addr)
+					switch event.EventType {
+					case "member-join":
+						if !inactiveNodes[event.NodeID].IsZero() {
+							fmt.Println(inactiveNodes[event.NodeID], event.EventType, fmt.Sprintf("%x", event.NodeID), event.Addr)
+							inactiveNodes[event.NodeID] = time.Time{}
+						}
+					case "member-failed":
+						fmt.Println(time.Now(), event.EventType, fmt.Sprintf("%x", event.NodeID), event.Addr)
+						inactiveNodes[event.NodeID] = time.Now()
+					}
+				}
 			case <-watchdog.C:
 				currentBlockNumber, err := d.chain.CurrentBlock(context.Background())
 				if err != nil {
@@ -76,6 +96,21 @@ func (d *DosNode) onchainLoop() {
 					break L
 				}
 				if d.isGuardian {
+					now := time.Now()
+					for nodeID, inactiveTime := range inactiveNodes {
+						if !inactiveTime.IsZero() {
+							diff := now.Sub(inactiveTime)
+							mins := int(diff.Minutes())
+							if mins >= 5 {
+								fmt.Printf("Diffrence in Minutes over 5: %d Minutes %s\n", mins, fmt.Sprintf("%x", nodeID))
+								inactiveNodes[nodeID] = time.Time{}
+								addr := common.Address{}
+								b := []byte(nodeID)
+								addr.SetBytes(b)
+								d.chain.SignalUnregister(context.Background(), addr)
+							}
+						}
+					}
 					switch index := currentBlockNumber % 3; index {
 					case 0:
 						d.handleRandom(currentBlockNumber)
@@ -207,7 +242,6 @@ func (d *DosNode) handleGrouping(participants [][]byte, groupID string) {
 	errcList = append(errcList, errc)
 	errcList = append(errcList, d.chain.RegisterGroupPubKey(ctx, outFromDkg))
 	allErrc := mergeErrors(ctx, errcList...)
-	var err error
 	var ok bool
 	for {
 		select {
@@ -309,20 +343,8 @@ func byte32(s []byte) (a *[32]byte) {
 
 func (d *DosNode) handleGroupFormation(currentBlockNumber uint64) {
 
-	groupSize, err := d.chain.GroupSize(context.Background())
-	if err != nil {
-		d.logger.Error(err)
-		return
-	}
-	pendingNodeSize, err := d.chain.NumPendingNodes(context.Background())
-	if err != nil {
-		d.logger.Error(err)
-		return
-	}
+	d.chain.SignalGroupFormation(context.Background())
 
-	if pendingNodeSize >= groupSize+(groupSize/2) {
-		d.chain.SignalGroupFormation(context.Background())
-	}
 }
 
 func (d *DosNode) handleRandom(currentBlockNumber uint64) {
@@ -360,12 +382,8 @@ func (d *DosNode) handleGroupDissolve() {
 		d.logger.Error(err)
 		return
 	}
-	expiredWGSize, err := d.chain.GetExpiredWorkingGroupSize(context.Background())
-	if err != nil {
-		d.logger.Error(err)
-		return
-	}
-	if expiredWGSize > 0 || pendingGrouSize > 0 {
+
+	if pendingGrouSize > 0 {
 		d.chain.SignalGroupDissolve(context.Background())
 	}
 }

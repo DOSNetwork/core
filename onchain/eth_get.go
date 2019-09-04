@@ -314,8 +314,8 @@ func (e *ethAdaptor) IsPendingNode(ctx context.Context, id []byte) (result bool,
 		return outc, errc
 	}
 	addr := common.Address{}
-
-	addr.SetBytes(id)
+	b := []byte(id)
+	addr.SetBytes(b)
 	vr, ve := e.get(ctx, f, addr)
 	if v, ok := vr.(common.Address); ok {
 		if v.Big().Cmp(big.NewInt(0)) == 0 {
