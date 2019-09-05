@@ -18,8 +18,7 @@ import (
 )
 
 const (
-	watchdogInterval = 30 //In minutes
-	envPassPhrase    = "PASSPHRASE"
+	envPassPhrase = "PASSPHRASE"
 )
 
 type ctxKey string

@@ -18,9 +18,13 @@ import (
 	"github.com/DOSNetwork/core/share"
 )
 
+const (
+	watchdogInterval = 10 //In Minute
+)
+
 func (d *DosNode) onchainLoop() {
 	defer fmt.Println("End onchainLoop")
-	watchdog := time.NewTicker(watchdogInterval * time.Second)
+	watchdog := time.NewTicker(watchdogInterval * time.Minute)
 	defer watchdog.Stop()
 	randSeed, _ := new(big.Int).SetString("21888242871839275222246405745257275088548364400416034343698204186575808495617", 10)
 	inactiveNodes := make(map[string]time.Time)
@@ -80,11 +84,9 @@ func (d *DosNode) onchainLoop() {
 					switch event.EventType {
 					case "member-join":
 						if !inactiveNodes[event.NodeID].IsZero() {
-							fmt.Println(inactiveNodes[event.NodeID], event.EventType, fmt.Sprintf("%x", event.NodeID), event.Addr)
 							inactiveNodes[event.NodeID] = time.Time{}
 						}
 					case "member-failed":
-						fmt.Println(time.Now(), event.EventType, fmt.Sprintf("%x", event.NodeID), event.Addr)
 						inactiveNodes[event.NodeID] = time.Now()
 					}
 				}
@@ -342,9 +344,45 @@ func byte32(s []byte) (a *[32]byte) {
 }
 
 func (d *DosNode) handleGroupFormation(currentBlockNumber uint64) {
+	groupToPick, err := d.chain.GroupToPick(context.Background())
+	if err != nil {
+		return
+	}
+	groupSize, err := d.chain.GroupSize(context.Background())
+	if err != nil {
+		d.logger.Error(err)
+		return
+	}
+	pendingNodeSize, err := d.chain.NumPendingNodes(context.Background())
+	if err != nil {
+		d.logger.Error(err)
+		return
+	}
+	workingGroup, err := d.chain.GetWorkingGroupSize(context.Background())
+	if err != nil {
+		d.logger.Error(err)
+		return
+	}
+	expiredGroupSize, err := d.chain.GetExpiredWorkingGroupSize(context.Background())
+	if err != nil {
+		d.logger.Error(err)
+		return
+	}
+	if pendingNodeSize < groupSize+(groupSize/2) {
+		if expiredGroupSize != 0 {
+			d.chain.SignalGroupFormation(context.Background())
+		}
+		return
+	}
 
-	d.chain.SignalGroupFormation(context.Background())
-
+	if expiredGroupSize >= groupToPick {
+		d.chain.SignalGroupFormation(context.Background())
+		return
+	}
+	if workingGroup == 0 {
+		d.chain.SignalGroupFormation(context.Background())
+		return
+	}
 }
 
 func (d *DosNode) handleRandom(currentBlockNumber uint64) {

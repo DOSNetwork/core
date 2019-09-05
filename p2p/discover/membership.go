@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
-	"time"
 
 	"github.com/hashicorp/serf/serf"
 )
@@ -55,7 +54,6 @@ func (s *serfNet) Listen(ctx context.Context, outch chan P2PEvent) {
 		if e, ok := event.(serf.MemberEvent); ok {
 			for _, member := range e.Members {
 				nodeId := member.Name[:20]
-				fmt.Println("Memberlist : ", time.Now(), event, len(e.Members), fmt.Sprintf("%x", nodeId), " ADDR", member.Addr)
 				select {
 				case <-ctx.Done():
 				case outch <- P2PEvent{EventType: event.String(), NodeID: nodeId, Addr: member.Addr}:
