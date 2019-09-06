@@ -30,7 +30,7 @@ func (d *DosNode) onchainLoop() {
 	inactiveNodes := make(map[string]time.Time)
 	for {
 		//Connect to geth
-		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(300*time.Second))
+		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(60*time.Second))
 		for {
 			if err := d.chain.Connect(ctx); err == nil {
 				break
@@ -218,7 +218,7 @@ func (d *DosNode) onchainLoop() {
 func (d *DosNode) handleGrouping(participants [][]byte, groupID string) {
 	isMember := false
 	for _, id := range participants {
-		fmt.Println("Compare ", d.id, id)
+		//fmt.Println("Compare ", d.id, id)
 		if r := bytes.Compare(d.id, id); r == 0 {
 			isMember = true
 			break
