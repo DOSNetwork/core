@@ -154,6 +154,18 @@ func DialToEth(ctx context.Context, urlPool []string) (out chan DialResult) {
 			client.Close()
 			return
 		}
+		blk, err := client.BlockByNumber(ctx, nil)
+		if err != nil {
+			fmt.Println("BlockByNumber error ", err, url)
+			return
+		}
+		fmt.Println("highestBlkN ", blk.NumberU64())
+		progress, err := client.SyncProgress(ctx)
+		if err != nil {
+			fmt.Println("SyncProgress err ", err, url)
+			return
+		}
+		fmt.Println("progress ", progress)
 		fmt.Println(url, "DialToEthr got a client ", id)
 		r.Client = client
 		r.Url = url
