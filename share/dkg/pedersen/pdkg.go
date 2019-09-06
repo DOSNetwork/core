@@ -12,7 +12,6 @@ import (
 	"github.com/DOSNetwork/core/share"
 	"github.com/DOSNetwork/core/suites"
 	"github.com/dedis/kyber"
-	"github.com/go-stack/stack"
 	errors "golang.org/x/xerrors"
 )
 
@@ -255,9 +254,9 @@ func decodePubKey(pubKey kyber.Point) (pubKeyCoor [4]*big.Int, err error) {
 }
 
 func reportErr(ctx context.Context, errc chan error, err error) {
-	s := stack.Trace().TrimRuntime()
+	//s := stack.Trace().TrimRuntime()
 	//d.logger.Error(err)
-	fmt.Println("reportErr err ", err, s)
+	//fmt.Println("reportErr err ", err, s)
 	select {
 	case errc <- err:
 	case <-ctx.Done():
