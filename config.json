@@ -1,4 +1,8 @@
 {
+    "NodeIP": "",
+    "NodePort": "9501",
+    "ChainType": "ETH",
+    "DOSAddressBridgeAddress": "0x0654F7eA1Fe38C0EBa25Ff9008FC5bdbb60C29ff",
     "BootStrapIPs": [
         "18.236.117.126",
         "18.236.199.131",
@@ -6,11 +10,6 @@
         "18.237.0.120",
         "18.237.179.193"
     ],
-    "NodeIP":"",
-    "NodePort": "9501",
-    "DOSAddressBridgeAddress": "0xf0CEFfc4209e38EA3Cd1926DDc2bC641cbFFd1cF",
-    "ChainType":"ETH",
     "ChainNodePool": [
-		""
     ]
 }
