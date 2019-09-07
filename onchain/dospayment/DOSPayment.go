@@ -15,6 +15,18 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 )
 
+// Reference imports to suppress errors if they are not otherwise used.
+var (
+	_ = big.NewInt
+	_ = strings.NewReader
+	_ = ethereum.NotFound
+	_ = abi.U256
+	_ = bind.Bind
+	_ = common.Big1
+	_ = types.BloomLookup
+	_ = event.NewSubscription
+)
+
 // DospaymentABI is the input ABI used to generate the binding from.
 const DospaymentABI = "[{\"constant\":false,\"inputs\":[{\"name\":\"addr\",\"type\":\"address\"}],\"name\":\"setNetworkToken\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"minStake\",\"outputs\":[{\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"quo\",\"type\":\"uint256\"}],\"name\":\"setDropBurnMaxQuota\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"networkToken\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[],\"name\":\"renounceOwnership\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"isOwner\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"dropburnToken\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"node\",\"type\":\"address\"}],\"name\":\"fromValidStakingNode\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"dropburnMaxQuota\",\"outputs\":[{\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"addr\",\"type\":\"address\"}],\"name\":\"setDropBurnToken\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"oldAddress\",\"type\":\"address\"},{\"indexed\":false,\"name\":\"newAddress\",\"type\":\"address\"}],\"name\":\"UpdateNetworkTokenAddress\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"oldAddress\",\"type\":\"address\"},{\"indexed\":false,\"name\":\"newAddress\",\"type\":\"address\"}],\"name\":\"UpdateDropBurnTokenAddress\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"oldQuota\",\"type\":\"uint256\"},{\"indexed\":false,\"name\":\"newQuota\",\"type\":\"uint256\"}],\"name\":\"UpdateDropBurnMaxQuota\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"previousOwner\",\"type\":\"address\"}],\"name\":\"OwnershipRenounced\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"previousOwner\",\"type\":\"address\"},{\"indexed\":true,\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"}]"
 
@@ -230,7 +242,7 @@ func (_Dospayment *DospaymentCallerSession) DropburnToken() (common.Address, err
 
 // FromValidStakingNode is a free data retrieval call binding the contract method 0xc7e6a9bc.
 //
-// Solidity: function fromValidStakingNode(node address) constant returns(bool)
+// Solidity: function fromValidStakingNode(address node) constant returns(bool)
 func (_Dospayment *DospaymentCaller) FromValidStakingNode(opts *bind.CallOpts, node common.Address) (bool, error) {
 	var (
 		ret0 = new(bool)
@@ -242,14 +254,14 @@ func (_Dospayment *DospaymentCaller) FromValidStakingNode(opts *bind.CallOpts, n
 
 // FromValidStakingNode is a free data retrieval call binding the contract method 0xc7e6a9bc.
 //
-// Solidity: function fromValidStakingNode(node address) constant returns(bool)
+// Solidity: function fromValidStakingNode(address node) constant returns(bool)
 func (_Dospayment *DospaymentSession) FromValidStakingNode(node common.Address) (bool, error) {
 	return _Dospayment.Contract.FromValidStakingNode(&_Dospayment.CallOpts, node)
 }
 
 // FromValidStakingNode is a free data retrieval call binding the contract method 0xc7e6a9bc.
 //
-// Solidity: function fromValidStakingNode(node address) constant returns(bool)
+// Solidity: function fromValidStakingNode(address node) constant returns(bool)
 func (_Dospayment *DospaymentCallerSession) FromValidStakingNode(node common.Address) (bool, error) {
 	return _Dospayment.Contract.FromValidStakingNode(&_Dospayment.CallOpts, node)
 }
@@ -381,84 +393,84 @@ func (_Dospayment *DospaymentTransactorSession) RenounceOwnership() (*types.Tran
 
 // SetDropBurnMaxQuota is a paid mutator transaction binding the contract method 0x3f3381e1.
 //
-// Solidity: function setDropBurnMaxQuota(quo uint256) returns()
+// Solidity: function setDropBurnMaxQuota(uint256 quo) returns()
 func (_Dospayment *DospaymentTransactor) SetDropBurnMaxQuota(opts *bind.TransactOpts, quo *big.Int) (*types.Transaction, error) {
 	return _Dospayment.contract.Transact(opts, "setDropBurnMaxQuota", quo)
 }
 
 // SetDropBurnMaxQuota is a paid mutator transaction binding the contract method 0x3f3381e1.
 //
-// Solidity: function setDropBurnMaxQuota(quo uint256) returns()
+// Solidity: function setDropBurnMaxQuota(uint256 quo) returns()
 func (_Dospayment *DospaymentSession) SetDropBurnMaxQuota(quo *big.Int) (*types.Transaction, error) {
 	return _Dospayment.Contract.SetDropBurnMaxQuota(&_Dospayment.TransactOpts, quo)
 }
 
 // SetDropBurnMaxQuota is a paid mutator transaction binding the contract method 0x3f3381e1.
 //
-// Solidity: function setDropBurnMaxQuota(quo uint256) returns()
+// Solidity: function setDropBurnMaxQuota(uint256 quo) returns()
 func (_Dospayment *DospaymentTransactorSession) SetDropBurnMaxQuota(quo *big.Int) (*types.Transaction, error) {
 	return _Dospayment.Contract.SetDropBurnMaxQuota(&_Dospayment.TransactOpts, quo)
 }
 
 // SetDropBurnToken is a paid mutator transaction binding the contract method 0xeac051f9.
 //
-// Solidity: function setDropBurnToken(addr address) returns()
+// Solidity: function setDropBurnToken(address addr) returns()
 func (_Dospayment *DospaymentTransactor) SetDropBurnToken(opts *bind.TransactOpts, addr common.Address) (*types.Transaction, error) {
 	return _Dospayment.contract.Transact(opts, "setDropBurnToken", addr)
 }
 
 // SetDropBurnToken is a paid mutator transaction binding the contract method 0xeac051f9.
 //
-// Solidity: function setDropBurnToken(addr address) returns()
+// Solidity: function setDropBurnToken(address addr) returns()
 func (_Dospayment *DospaymentSession) SetDropBurnToken(addr common.Address) (*types.Transaction, error) {
 	return _Dospayment.Contract.SetDropBurnToken(&_Dospayment.TransactOpts, addr)
 }
 
 // SetDropBurnToken is a paid mutator transaction binding the contract method 0xeac051f9.
 //
-// Solidity: function setDropBurnToken(addr address) returns()
+// Solidity: function setDropBurnToken(address addr) returns()
 func (_Dospayment *DospaymentTransactorSession) SetDropBurnToken(addr common.Address) (*types.Transaction, error) {
 	return _Dospayment.Contract.SetDropBurnToken(&_Dospayment.TransactOpts, addr)
 }
 
 // SetNetworkToken is a paid mutator transaction binding the contract method 0x17107c49.
 //
-// Solidity: function setNetworkToken(addr address) returns()
+// Solidity: function setNetworkToken(address addr) returns()
 func (_Dospayment *DospaymentTransactor) SetNetworkToken(opts *bind.TransactOpts, addr common.Address) (*types.Transaction, error) {
 	return _Dospayment.contract.Transact(opts, "setNetworkToken", addr)
 }
 
 // SetNetworkToken is a paid mutator transaction binding the contract method 0x17107c49.
 //
-// Solidity: function setNetworkToken(addr address) returns()
+// Solidity: function setNetworkToken(address addr) returns()
 func (_Dospayment *DospaymentSession) SetNetworkToken(addr common.Address) (*types.Transaction, error) {
 	return _Dospayment.Contract.SetNetworkToken(&_Dospayment.TransactOpts, addr)
 }
 
 // SetNetworkToken is a paid mutator transaction binding the contract method 0x17107c49.
 //
-// Solidity: function setNetworkToken(addr address) returns()
+// Solidity: function setNetworkToken(address addr) returns()
 func (_Dospayment *DospaymentTransactorSession) SetNetworkToken(addr common.Address) (*types.Transaction, error) {
 	return _Dospayment.Contract.SetNetworkToken(&_Dospayment.TransactOpts, addr)
 }
 
 // TransferOwnership is a paid mutator transaction binding the contract method 0xf2fde38b.
 //
-// Solidity: function transferOwnership(newOwner address) returns()
+// Solidity: function transferOwnership(address newOwner) returns()
 func (_Dospayment *DospaymentTransactor) TransferOwnership(opts *bind.TransactOpts, newOwner common.Address) (*types.Transaction, error) {
 	return _Dospayment.contract.Transact(opts, "transferOwnership", newOwner)
 }
 
 // TransferOwnership is a paid mutator transaction binding the contract method 0xf2fde38b.
 //
-// Solidity: function transferOwnership(newOwner address) returns()
+// Solidity: function transferOwnership(address newOwner) returns()
 func (_Dospayment *DospaymentSession) TransferOwnership(newOwner common.Address) (*types.Transaction, error) {
 	return _Dospayment.Contract.TransferOwnership(&_Dospayment.TransactOpts, newOwner)
 }
 
 // TransferOwnership is a paid mutator transaction binding the contract method 0xf2fde38b.
 //
-// Solidity: function transferOwnership(newOwner address) returns()
+// Solidity: function transferOwnership(address newOwner) returns()
 func (_Dospayment *DospaymentTransactorSession) TransferOwnership(newOwner common.Address) (*types.Transaction, error) {
 	return _Dospayment.Contract.TransferOwnership(&_Dospayment.TransactOpts, newOwner)
 }
@@ -538,7 +550,7 @@ type DospaymentOwnershipRenounced struct {
 
 // FilterOwnershipRenounced is a free log retrieval operation binding the contract event 0xf8df31144d9c2f0f6b59d69b8b98abd5459d07f2742c4df920b25aae33c64820.
 //
-// Solidity: e OwnershipRenounced(previousOwner indexed address)
+// Solidity: event OwnershipRenounced(address indexed previousOwner)
 func (_Dospayment *DospaymentFilterer) FilterOwnershipRenounced(opts *bind.FilterOpts, previousOwner []common.Address) (*DospaymentOwnershipRenouncedIterator, error) {
 
 	var previousOwnerRule []interface{}
@@ -555,7 +567,7 @@ func (_Dospayment *DospaymentFilterer) FilterOwnershipRenounced(opts *bind.Filte
 
 // WatchOwnershipRenounced is a free log subscription operation binding the contract event 0xf8df31144d9c2f0f6b59d69b8b98abd5459d07f2742c4df920b25aae33c64820.
 //
-// Solidity: e OwnershipRenounced(previousOwner indexed address)
+// Solidity: event OwnershipRenounced(address indexed previousOwner)
 func (_Dospayment *DospaymentFilterer) WatchOwnershipRenounced(opts *bind.WatchOpts, sink chan<- *DospaymentOwnershipRenounced, previousOwner []common.Address) (event.Subscription, error) {
 
 	var previousOwnerRule []interface{}
@@ -671,7 +683,7 @@ type DospaymentOwnershipTransferred struct {
 
 // FilterOwnershipTransferred is a free log retrieval operation binding the contract event 0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0.
 //
-// Solidity: e OwnershipTransferred(previousOwner indexed address, newOwner indexed address)
+// Solidity: event OwnershipTransferred(address indexed previousOwner, address indexed newOwner)
 func (_Dospayment *DospaymentFilterer) FilterOwnershipTransferred(opts *bind.FilterOpts, previousOwner []common.Address, newOwner []common.Address) (*DospaymentOwnershipTransferredIterator, error) {
 
 	var previousOwnerRule []interface{}
@@ -692,7 +704,7 @@ func (_Dospayment *DospaymentFilterer) FilterOwnershipTransferred(opts *bind.Fil
 
 // WatchOwnershipTransferred is a free log subscription operation binding the contract event 0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0.
 //
-// Solidity: e OwnershipTransferred(previousOwner indexed address, newOwner indexed address)
+// Solidity: event OwnershipTransferred(address indexed previousOwner, address indexed newOwner)
 func (_Dospayment *DospaymentFilterer) WatchOwnershipTransferred(opts *bind.WatchOpts, sink chan<- *DospaymentOwnershipTransferred, previousOwner []common.Address, newOwner []common.Address) (event.Subscription, error) {
 
 	var previousOwnerRule []interface{}
@@ -812,7 +824,7 @@ type DospaymentUpdateDropBurnMaxQuota struct {
 
 // FilterUpdateDropBurnMaxQuota is a free log retrieval operation binding the contract event 0x0aee95cca46da64ee373e28dee5994361b4002c54035d92932c9825b76382e99.
 //
-// Solidity: e UpdateDropBurnMaxQuota(oldQuota uint256, newQuota uint256)
+// Solidity: event UpdateDropBurnMaxQuota(uint256 oldQuota, uint256 newQuota)
 func (_Dospayment *DospaymentFilterer) FilterUpdateDropBurnMaxQuota(opts *bind.FilterOpts) (*DospaymentUpdateDropBurnMaxQuotaIterator, error) {
 
 	logs, sub, err := _Dospayment.contract.FilterLogs(opts, "UpdateDropBurnMaxQuota")
@@ -824,7 +836,7 @@ func (_Dospayment *DospaymentFilterer) FilterUpdateDropBurnMaxQuota(opts *bind.F
 
 // WatchUpdateDropBurnMaxQuota is a free log subscription operation binding the contract event 0x0aee95cca46da64ee373e28dee5994361b4002c54035d92932c9825b76382e99.
 //
-// Solidity: e UpdateDropBurnMaxQuota(oldQuota uint256, newQuota uint256)
+// Solidity: event UpdateDropBurnMaxQuota(uint256 oldQuota, uint256 newQuota)
 func (_Dospayment *DospaymentFilterer) WatchUpdateDropBurnMaxQuota(opts *bind.WatchOpts, sink chan<- *DospaymentUpdateDropBurnMaxQuota) (event.Subscription, error) {
 
 	logs, sub, err := _Dospayment.contract.WatchLogs(opts, "UpdateDropBurnMaxQuota")
@@ -935,7 +947,7 @@ type DospaymentUpdateDropBurnTokenAddress struct {
 
 // FilterUpdateDropBurnTokenAddress is a free log retrieval operation binding the contract event 0xfc8013dfb0c8d38f3bcab9239bd5712457c48919b272cdb109488549199a0173.
 //
-// Solidity: e UpdateDropBurnTokenAddress(oldAddress address, newAddress address)
+// Solidity: event UpdateDropBurnTokenAddress(address oldAddress, address newAddress)
 func (_Dospayment *DospaymentFilterer) FilterUpdateDropBurnTokenAddress(opts *bind.FilterOpts) (*DospaymentUpdateDropBurnTokenAddressIterator, error) {
 
 	logs, sub, err := _Dospayment.contract.FilterLogs(opts, "UpdateDropBurnTokenAddress")
@@ -947,7 +959,7 @@ func (_Dospayment *DospaymentFilterer) FilterUpdateDropBurnTokenAddress(opts *bi
 
 // WatchUpdateDropBurnTokenAddress is a free log subscription operation binding the contract event 0xfc8013dfb0c8d38f3bcab9239bd5712457c48919b272cdb109488549199a0173.
 //
-// Solidity: e UpdateDropBurnTokenAddress(oldAddress address, newAddress address)
+// Solidity: event UpdateDropBurnTokenAddress(address oldAddress, address newAddress)
 func (_Dospayment *DospaymentFilterer) WatchUpdateDropBurnTokenAddress(opts *bind.WatchOpts, sink chan<- *DospaymentUpdateDropBurnTokenAddress) (event.Subscription, error) {
 
 	logs, sub, err := _Dospayment.contract.WatchLogs(opts, "UpdateDropBurnTokenAddress")
@@ -1058,7 +1070,7 @@ type DospaymentUpdateNetworkTokenAddress struct {
 
 // FilterUpdateNetworkTokenAddress is a free log retrieval operation binding the contract event 0x4d27a2adceae86b92fb74fb7e8f96dc902d917e243fbff389b5a793c9040dafe.
 //
-// Solidity: e UpdateNetworkTokenAddress(oldAddress address, newAddress address)
+// Solidity: event UpdateNetworkTokenAddress(address oldAddress, address newAddress)
 func (_Dospayment *DospaymentFilterer) FilterUpdateNetworkTokenAddress(opts *bind.FilterOpts) (*DospaymentUpdateNetworkTokenAddressIterator, error) {
 
 	logs, sub, err := _Dospayment.contract.FilterLogs(opts, "UpdateNetworkTokenAddress")
@@ -1070,7 +1082,7 @@ func (_Dospayment *DospaymentFilterer) FilterUpdateNetworkTokenAddress(opts *bin
 
 // WatchUpdateNetworkTokenAddress is a free log subscription operation binding the contract event 0x4d27a2adceae86b92fb74fb7e8f96dc902d917e243fbff389b5a793c9040dafe.
 //
-// Solidity: e UpdateNetworkTokenAddress(oldAddress address, newAddress address)
+// Solidity: event UpdateNetworkTokenAddress(address oldAddress, address newAddress)
 func (_Dospayment *DospaymentFilterer) WatchUpdateNetworkTokenAddress(opts *bind.WatchOpts, sink chan<- *DospaymentUpdateNetworkTokenAddress) (event.Subscription, error) {
 
 	logs, sub, err := _Dospayment.contract.WatchLogs(opts, "UpdateNetworkTokenAddress")

@@ -15,6 +15,18 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 )
 
+// Reference imports to suppress errors if they are not otherwise used.
+var (
+	_ = big.NewInt
+	_ = strings.NewReader
+	_ = ethereum.NotFound
+	_ = abi.U256
+	_ = bind.Bind
+	_ = common.Big1
+	_ = types.BloomLookup
+	_ = event.NewSubscription
+)
+
 // CommitrevealABI is the input ABI used to generate the binding from.
 const CommitrevealABI = "[{\"constant\":true,\"inputs\":[{\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"campaigns\",\"outputs\":[{\"name\":\"startBlock\",\"type\":\"uint256\"},{\"name\":\"commitDuration\",\"type\":\"uint256\"},{\"name\":\"revealDuration\",\"type\":\"uint256\"},{\"name\":\"revealThreshold\",\"type\":\"uint256\"},{\"name\":\"commitNum\",\"type\":\"uint256\"},{\"name\":\"revealNum\",\"type\":\"uint256\"},{\"name\":\"generatedRandom\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[],\"name\":\"renounceOwnership\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"_addr\",\"type\":\"address\"}],\"name\":\"removeFromWhitelist\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"isOwner\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"_cid\",\"type\":\"uint256\"},{\"name\":\"_secret\",\"type\":\"uint256\"}],\"name\":\"reveal\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"_startBlock\",\"type\":\"uint256\"},{\"name\":\"_commitDuration\",\"type\":\"uint256\"},{\"name\":\"_revealDuration\",\"type\":\"uint256\"},{\"name\":\"_revealThreshold\",\"type\":\"uint256\"}],\"name\":\"startCommitReveal\",\"outputs\":[{\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"_cid\",\"type\":\"uint256\"}],\"name\":\"getRandom\",\"outputs\":[{\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"\",\"type\":\"address\"}],\"name\":\"whitelisted\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"_addr\",\"type\":\"address\"}],\"name\":\"addToWhitelist\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"_cid\",\"type\":\"uint256\"},{\"name\":\"_secretHash\",\"type\":\"bytes32\"}],\"name\":\"commit\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"cid\",\"type\":\"uint256\"},{\"indexed\":false,\"name\":\"startBlock\",\"type\":\"uint256\"},{\"indexed\":false,\"name\":\"commitDuration\",\"type\":\"uint256\"},{\"indexed\":false,\"name\":\"revealDuration\",\"type\":\"uint256\"},{\"indexed\":false,\"name\":\"revealThreshold\",\"type\":\"uint256\"}],\"name\":\"LogStartCommitReveal\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"cid\",\"type\":\"uint256\"},{\"indexed\":false,\"name\":\"from\",\"type\":\"address\"},{\"indexed\":false,\"name\":\"commitment\",\"type\":\"bytes32\"}],\"name\":\"LogCommit\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"cid\",\"type\":\"uint256\"},{\"indexed\":false,\"name\":\"from\",\"type\":\"address\"},{\"indexed\":false,\"name\":\"secret\",\"type\":\"uint256\"}],\"name\":\"LogReveal\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"cid\",\"type\":\"uint256\"},{\"indexed\":false,\"name\":\"random\",\"type\":\"uint256\"}],\"name\":\"LogRandom\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"cid\",\"type\":\"uint256\"},{\"indexed\":false,\"name\":\"commitNum\",\"type\":\"uint256\"},{\"indexed\":false,\"name\":\"revealNum\",\"type\":\"uint256\"},{\"indexed\":false,\"name\":\"revealThreshold\",\"type\":\"uint256\"}],\"name\":\"LogRandomFailure\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"previousOwner\",\"type\":\"address\"}],\"name\":\"OwnershipRenounced\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"previousOwner\",\"type\":\"address\"},{\"indexed\":true,\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"}]"
 
@@ -178,7 +190,7 @@ func (_Commitreveal *CommitrevealTransactorRaw) Transact(opts *bind.TransactOpts
 
 // Campaigns is a free data retrieval call binding the contract method 0x141961bc.
 //
-// Solidity: function campaigns( uint256) constant returns(startBlock uint256, commitDuration uint256, revealDuration uint256, revealThreshold uint256, commitNum uint256, revealNum uint256, generatedRandom uint256)
+// Solidity: function campaigns(uint256 ) constant returns(uint256 startBlock, uint256 commitDuration, uint256 revealDuration, uint256 revealThreshold, uint256 commitNum, uint256 revealNum, uint256 generatedRandom)
 func (_Commitreveal *CommitrevealCaller) Campaigns(opts *bind.CallOpts, arg0 *big.Int) (struct {
 	StartBlock      *big.Int
 	CommitDuration  *big.Int
@@ -204,7 +216,7 @@ func (_Commitreveal *CommitrevealCaller) Campaigns(opts *bind.CallOpts, arg0 *bi
 
 // Campaigns is a free data retrieval call binding the contract method 0x141961bc.
 //
-// Solidity: function campaigns( uint256) constant returns(startBlock uint256, commitDuration uint256, revealDuration uint256, revealThreshold uint256, commitNum uint256, revealNum uint256, generatedRandom uint256)
+// Solidity: function campaigns(uint256 ) constant returns(uint256 startBlock, uint256 commitDuration, uint256 revealDuration, uint256 revealThreshold, uint256 commitNum, uint256 revealNum, uint256 generatedRandom)
 func (_Commitreveal *CommitrevealSession) Campaigns(arg0 *big.Int) (struct {
 	StartBlock      *big.Int
 	CommitDuration  *big.Int
@@ -219,7 +231,7 @@ func (_Commitreveal *CommitrevealSession) Campaigns(arg0 *big.Int) (struct {
 
 // Campaigns is a free data retrieval call binding the contract method 0x141961bc.
 //
-// Solidity: function campaigns( uint256) constant returns(startBlock uint256, commitDuration uint256, revealDuration uint256, revealThreshold uint256, commitNum uint256, revealNum uint256, generatedRandom uint256)
+// Solidity: function campaigns(uint256 ) constant returns(uint256 startBlock, uint256 commitDuration, uint256 revealDuration, uint256 revealThreshold, uint256 commitNum, uint256 revealNum, uint256 generatedRandom)
 func (_Commitreveal *CommitrevealCallerSession) Campaigns(arg0 *big.Int) (struct {
 	StartBlock      *big.Int
 	CommitDuration  *big.Int
@@ -286,7 +298,7 @@ func (_Commitreveal *CommitrevealCallerSession) Owner() (common.Address, error) 
 
 // Whitelisted is a free data retrieval call binding the contract method 0xd936547e.
 //
-// Solidity: function whitelisted( address) constant returns(bool)
+// Solidity: function whitelisted(address ) constant returns(bool)
 func (_Commitreveal *CommitrevealCaller) Whitelisted(opts *bind.CallOpts, arg0 common.Address) (bool, error) {
 	var (
 		ret0 = new(bool)
@@ -298,98 +310,98 @@ func (_Commitreveal *CommitrevealCaller) Whitelisted(opts *bind.CallOpts, arg0 c
 
 // Whitelisted is a free data retrieval call binding the contract method 0xd936547e.
 //
-// Solidity: function whitelisted( address) constant returns(bool)
+// Solidity: function whitelisted(address ) constant returns(bool)
 func (_Commitreveal *CommitrevealSession) Whitelisted(arg0 common.Address) (bool, error) {
 	return _Commitreveal.Contract.Whitelisted(&_Commitreveal.CallOpts, arg0)
 }
 
 // Whitelisted is a free data retrieval call binding the contract method 0xd936547e.
 //
-// Solidity: function whitelisted( address) constant returns(bool)
+// Solidity: function whitelisted(address ) constant returns(bool)
 func (_Commitreveal *CommitrevealCallerSession) Whitelisted(arg0 common.Address) (bool, error) {
 	return _Commitreveal.Contract.Whitelisted(&_Commitreveal.CallOpts, arg0)
 }
 
 // AddToWhitelist is a paid mutator transaction binding the contract method 0xe43252d7.
 //
-// Solidity: function addToWhitelist(_addr address) returns()
+// Solidity: function addToWhitelist(address _addr) returns()
 func (_Commitreveal *CommitrevealTransactor) AddToWhitelist(opts *bind.TransactOpts, _addr common.Address) (*types.Transaction, error) {
 	return _Commitreveal.contract.Transact(opts, "addToWhitelist", _addr)
 }
 
 // AddToWhitelist is a paid mutator transaction binding the contract method 0xe43252d7.
 //
-// Solidity: function addToWhitelist(_addr address) returns()
+// Solidity: function addToWhitelist(address _addr) returns()
 func (_Commitreveal *CommitrevealSession) AddToWhitelist(_addr common.Address) (*types.Transaction, error) {
 	return _Commitreveal.Contract.AddToWhitelist(&_Commitreveal.TransactOpts, _addr)
 }
 
 // AddToWhitelist is a paid mutator transaction binding the contract method 0xe43252d7.
 //
-// Solidity: function addToWhitelist(_addr address) returns()
+// Solidity: function addToWhitelist(address _addr) returns()
 func (_Commitreveal *CommitrevealTransactorSession) AddToWhitelist(_addr common.Address) (*types.Transaction, error) {
 	return _Commitreveal.Contract.AddToWhitelist(&_Commitreveal.TransactOpts, _addr)
 }
 
 // Commit is a paid mutator transaction binding the contract method 0xf2f03877.
 //
-// Solidity: function commit(_cid uint256, _secretHash bytes32) returns()
+// Solidity: function commit(uint256 _cid, bytes32 _secretHash) returns()
 func (_Commitreveal *CommitrevealTransactor) Commit(opts *bind.TransactOpts, _cid *big.Int, _secretHash [32]byte) (*types.Transaction, error) {
 	return _Commitreveal.contract.Transact(opts, "commit", _cid, _secretHash)
 }
 
 // Commit is a paid mutator transaction binding the contract method 0xf2f03877.
 //
-// Solidity: function commit(_cid uint256, _secretHash bytes32) returns()
+// Solidity: function commit(uint256 _cid, bytes32 _secretHash) returns()
 func (_Commitreveal *CommitrevealSession) Commit(_cid *big.Int, _secretHash [32]byte) (*types.Transaction, error) {
 	return _Commitreveal.Contract.Commit(&_Commitreveal.TransactOpts, _cid, _secretHash)
 }
 
 // Commit is a paid mutator transaction binding the contract method 0xf2f03877.
 //
-// Solidity: function commit(_cid uint256, _secretHash bytes32) returns()
+// Solidity: function commit(uint256 _cid, bytes32 _secretHash) returns()
 func (_Commitreveal *CommitrevealTransactorSession) Commit(_cid *big.Int, _secretHash [32]byte) (*types.Transaction, error) {
 	return _Commitreveal.Contract.Commit(&_Commitreveal.TransactOpts, _cid, _secretHash)
 }
 
 // GetRandom is a paid mutator transaction binding the contract method 0xcd4b6914.
 //
-// Solidity: function getRandom(_cid uint256) returns(uint256)
+// Solidity: function getRandom(uint256 _cid) returns(uint256)
 func (_Commitreveal *CommitrevealTransactor) GetRandom(opts *bind.TransactOpts, _cid *big.Int) (*types.Transaction, error) {
 	return _Commitreveal.contract.Transact(opts, "getRandom", _cid)
 }
 
 // GetRandom is a paid mutator transaction binding the contract method 0xcd4b6914.
 //
-// Solidity: function getRandom(_cid uint256) returns(uint256)
+// Solidity: function getRandom(uint256 _cid) returns(uint256)
 func (_Commitreveal *CommitrevealSession) GetRandom(_cid *big.Int) (*types.Transaction, error) {
 	return _Commitreveal.Contract.GetRandom(&_Commitreveal.TransactOpts, _cid)
 }
 
 // GetRandom is a paid mutator transaction binding the contract method 0xcd4b6914.
 //
-// Solidity: function getRandom(_cid uint256) returns(uint256)
+// Solidity: function getRandom(uint256 _cid) returns(uint256)
 func (_Commitreveal *CommitrevealTransactorSession) GetRandom(_cid *big.Int) (*types.Transaction, error) {
 	return _Commitreveal.Contract.GetRandom(&_Commitreveal.TransactOpts, _cid)
 }
 
 // RemoveFromWhitelist is a paid mutator transaction binding the contract method 0x8ab1d681.
 //
-// Solidity: function removeFromWhitelist(_addr address) returns()
+// Solidity: function removeFromWhitelist(address _addr) returns()
 func (_Commitreveal *CommitrevealTransactor) RemoveFromWhitelist(opts *bind.TransactOpts, _addr common.Address) (*types.Transaction, error) {
 	return _Commitreveal.contract.Transact(opts, "removeFromWhitelist", _addr)
 }
 
 // RemoveFromWhitelist is a paid mutator transaction binding the contract method 0x8ab1d681.
 //
-// Solidity: function removeFromWhitelist(_addr address) returns()
+// Solidity: function removeFromWhitelist(address _addr) returns()
 func (_Commitreveal *CommitrevealSession) RemoveFromWhitelist(_addr common.Address) (*types.Transaction, error) {
 	return _Commitreveal.Contract.RemoveFromWhitelist(&_Commitreveal.TransactOpts, _addr)
 }
 
 // RemoveFromWhitelist is a paid mutator transaction binding the contract method 0x8ab1d681.
 //
-// Solidity: function removeFromWhitelist(_addr address) returns()
+// Solidity: function removeFromWhitelist(address _addr) returns()
 func (_Commitreveal *CommitrevealTransactorSession) RemoveFromWhitelist(_addr common.Address) (*types.Transaction, error) {
 	return _Commitreveal.Contract.RemoveFromWhitelist(&_Commitreveal.TransactOpts, _addr)
 }
@@ -417,63 +429,63 @@ func (_Commitreveal *CommitrevealTransactorSession) RenounceOwnership() (*types.
 
 // Reveal is a paid mutator transaction binding the contract method 0x9348cef7.
 //
-// Solidity: function reveal(_cid uint256, _secret uint256) returns()
+// Solidity: function reveal(uint256 _cid, uint256 _secret) returns()
 func (_Commitreveal *CommitrevealTransactor) Reveal(opts *bind.TransactOpts, _cid *big.Int, _secret *big.Int) (*types.Transaction, error) {
 	return _Commitreveal.contract.Transact(opts, "reveal", _cid, _secret)
 }
 
 // Reveal is a paid mutator transaction binding the contract method 0x9348cef7.
 //
-// Solidity: function reveal(_cid uint256, _secret uint256) returns()
+// Solidity: function reveal(uint256 _cid, uint256 _secret) returns()
 func (_Commitreveal *CommitrevealSession) Reveal(_cid *big.Int, _secret *big.Int) (*types.Transaction, error) {
 	return _Commitreveal.Contract.Reveal(&_Commitreveal.TransactOpts, _cid, _secret)
 }
 
 // Reveal is a paid mutator transaction binding the contract method 0x9348cef7.
 //
-// Solidity: function reveal(_cid uint256, _secret uint256) returns()
+// Solidity: function reveal(uint256 _cid, uint256 _secret) returns()
 func (_Commitreveal *CommitrevealTransactorSession) Reveal(_cid *big.Int, _secret *big.Int) (*types.Transaction, error) {
 	return _Commitreveal.Contract.Reveal(&_Commitreveal.TransactOpts, _cid, _secret)
 }
 
 // StartCommitReveal is a paid mutator transaction binding the contract method 0xb917b5a5.
 //
-// Solidity: function startCommitReveal(_startBlock uint256, _commitDuration uint256, _revealDuration uint256, _revealThreshold uint256) returns(uint256)
+// Solidity: function startCommitReveal(uint256 _startBlock, uint256 _commitDuration, uint256 _revealDuration, uint256 _revealThreshold) returns(uint256)
 func (_Commitreveal *CommitrevealTransactor) StartCommitReveal(opts *bind.TransactOpts, _startBlock *big.Int, _commitDuration *big.Int, _revealDuration *big.Int, _revealThreshold *big.Int) (*types.Transaction, error) {
 	return _Commitreveal.contract.Transact(opts, "startCommitReveal", _startBlock, _commitDuration, _revealDuration, _revealThreshold)
 }
 
 // StartCommitReveal is a paid mutator transaction binding the contract method 0xb917b5a5.
 //
-// Solidity: function startCommitReveal(_startBlock uint256, _commitDuration uint256, _revealDuration uint256, _revealThreshold uint256) returns(uint256)
+// Solidity: function startCommitReveal(uint256 _startBlock, uint256 _commitDuration, uint256 _revealDuration, uint256 _revealThreshold) returns(uint256)
 func (_Commitreveal *CommitrevealSession) StartCommitReveal(_startBlock *big.Int, _commitDuration *big.Int, _revealDuration *big.Int, _revealThreshold *big.Int) (*types.Transaction, error) {
 	return _Commitreveal.Contract.StartCommitReveal(&_Commitreveal.TransactOpts, _startBlock, _commitDuration, _revealDuration, _revealThreshold)
 }
 
 // StartCommitReveal is a paid mutator transaction binding the contract method 0xb917b5a5.
 //
-// Solidity: function startCommitReveal(_startBlock uint256, _commitDuration uint256, _revealDuration uint256, _revealThreshold uint256) returns(uint256)
+// Solidity: function startCommitReveal(uint256 _startBlock, uint256 _commitDuration, uint256 _revealDuration, uint256 _revealThreshold) returns(uint256)
 func (_Commitreveal *CommitrevealTransactorSession) StartCommitReveal(_startBlock *big.Int, _commitDuration *big.Int, _revealDuration *big.Int, _revealThreshold *big.Int) (*types.Transaction, error) {
 	return _Commitreveal.Contract.StartCommitReveal(&_Commitreveal.TransactOpts, _startBlock, _commitDuration, _revealDuration, _revealThreshold)
 }
 
 // TransferOwnership is a paid mutator transaction binding the contract method 0xf2fde38b.
 //
-// Solidity: function transferOwnership(newOwner address) returns()
+// Solidity: function transferOwnership(address newOwner) returns()
 func (_Commitreveal *CommitrevealTransactor) TransferOwnership(opts *bind.TransactOpts, newOwner common.Address) (*types.Transaction, error) {
 	return _Commitreveal.contract.Transact(opts, "transferOwnership", newOwner)
 }
 
 // TransferOwnership is a paid mutator transaction binding the contract method 0xf2fde38b.
 //
-// Solidity: function transferOwnership(newOwner address) returns()
+// Solidity: function transferOwnership(address newOwner) returns()
 func (_Commitreveal *CommitrevealSession) TransferOwnership(newOwner common.Address) (*types.Transaction, error) {
 	return _Commitreveal.Contract.TransferOwnership(&_Commitreveal.TransactOpts, newOwner)
 }
 
 // TransferOwnership is a paid mutator transaction binding the contract method 0xf2fde38b.
 //
-// Solidity: function transferOwnership(newOwner address) returns()
+// Solidity: function transferOwnership(address newOwner) returns()
 func (_Commitreveal *CommitrevealTransactorSession) TransferOwnership(newOwner common.Address) (*types.Transaction, error) {
 	return _Commitreveal.Contract.TransferOwnership(&_Commitreveal.TransactOpts, newOwner)
 }
@@ -555,7 +567,7 @@ type CommitrevealLogCommit struct {
 
 // FilterLogCommit is a free log retrieval operation binding the contract event 0x918c00c65dd2a8dee4c6985d1d67f04aa8cd2c93e8d427d398a90444c7f7c75e.
 //
-// Solidity: e LogCommit(cid uint256, from address, commitment bytes32)
+// Solidity: event LogCommit(uint256 cid, address from, bytes32 commitment)
 func (_Commitreveal *CommitrevealFilterer) FilterLogCommit(opts *bind.FilterOpts) (*CommitrevealLogCommitIterator, error) {
 
 	logs, sub, err := _Commitreveal.contract.FilterLogs(opts, "LogCommit")
@@ -567,7 +579,7 @@ func (_Commitreveal *CommitrevealFilterer) FilterLogCommit(opts *bind.FilterOpts
 
 // WatchLogCommit is a free log subscription operation binding the contract event 0x918c00c65dd2a8dee4c6985d1d67f04aa8cd2c93e8d427d398a90444c7f7c75e.
 //
-// Solidity: e LogCommit(cid uint256, from address, commitment bytes32)
+// Solidity: event LogCommit(uint256 cid, address from, bytes32 commitment)
 func (_Commitreveal *CommitrevealFilterer) WatchLogCommit(opts *bind.WatchOpts, sink chan<- *CommitrevealLogCommit) (event.Subscription, error) {
 
 	logs, sub, err := _Commitreveal.contract.WatchLogs(opts, "LogCommit")
@@ -678,7 +690,7 @@ type CommitrevealLogRandom struct {
 
 // FilterLogRandom is a free log retrieval operation binding the contract event 0xa34f42a90fadfe357ee14419d618438a057569fbb63bab0c5fbcca0fc2b11e8d.
 //
-// Solidity: e LogRandom(cid uint256, random uint256)
+// Solidity: event LogRandom(uint256 cid, uint256 random)
 func (_Commitreveal *CommitrevealFilterer) FilterLogRandom(opts *bind.FilterOpts) (*CommitrevealLogRandomIterator, error) {
 
 	logs, sub, err := _Commitreveal.contract.FilterLogs(opts, "LogRandom")
@@ -690,7 +702,7 @@ func (_Commitreveal *CommitrevealFilterer) FilterLogRandom(opts *bind.FilterOpts
 
 // WatchLogRandom is a free log subscription operation binding the contract event 0xa34f42a90fadfe357ee14419d618438a057569fbb63bab0c5fbcca0fc2b11e8d.
 //
-// Solidity: e LogRandom(cid uint256, random uint256)
+// Solidity: event LogRandom(uint256 cid, uint256 random)
 func (_Commitreveal *CommitrevealFilterer) WatchLogRandom(opts *bind.WatchOpts, sink chan<- *CommitrevealLogRandom) (event.Subscription, error) {
 
 	logs, sub, err := _Commitreveal.contract.WatchLogs(opts, "LogRandom")
@@ -803,7 +815,7 @@ type CommitrevealLogRandomFailure struct {
 
 // FilterLogRandomFailure is a free log retrieval operation binding the contract event 0xe888e7582d0505bce81eef694dfa216179eaaa3c1bd96b7894de8b4370d8543e.
 //
-// Solidity: e LogRandomFailure(cid uint256, commitNum uint256, revealNum uint256, revealThreshold uint256)
+// Solidity: event LogRandomFailure(uint256 cid, uint256 commitNum, uint256 revealNum, uint256 revealThreshold)
 func (_Commitreveal *CommitrevealFilterer) FilterLogRandomFailure(opts *bind.FilterOpts) (*CommitrevealLogRandomFailureIterator, error) {
 
 	logs, sub, err := _Commitreveal.contract.FilterLogs(opts, "LogRandomFailure")
@@ -815,7 +827,7 @@ func (_Commitreveal *CommitrevealFilterer) FilterLogRandomFailure(opts *bind.Fil
 
 // WatchLogRandomFailure is a free log subscription operation binding the contract event 0xe888e7582d0505bce81eef694dfa216179eaaa3c1bd96b7894de8b4370d8543e.
 //
-// Solidity: e LogRandomFailure(cid uint256, commitNum uint256, revealNum uint256, revealThreshold uint256)
+// Solidity: event LogRandomFailure(uint256 cid, uint256 commitNum, uint256 revealNum, uint256 revealThreshold)
 func (_Commitreveal *CommitrevealFilterer) WatchLogRandomFailure(opts *bind.WatchOpts, sink chan<- *CommitrevealLogRandomFailure) (event.Subscription, error) {
 
 	logs, sub, err := _Commitreveal.contract.WatchLogs(opts, "LogRandomFailure")
@@ -927,7 +939,7 @@ type CommitrevealLogReveal struct {
 
 // FilterLogReveal is a free log retrieval operation binding the contract event 0x9141bfaedbc77aa7b8d9c989cd81909d95bb1677e556e34cfd45e50e0bea2967.
 //
-// Solidity: e LogReveal(cid uint256, from address, secret uint256)
+// Solidity: event LogReveal(uint256 cid, address from, uint256 secret)
 func (_Commitreveal *CommitrevealFilterer) FilterLogReveal(opts *bind.FilterOpts) (*CommitrevealLogRevealIterator, error) {
 
 	logs, sub, err := _Commitreveal.contract.FilterLogs(opts, "LogReveal")
@@ -939,7 +951,7 @@ func (_Commitreveal *CommitrevealFilterer) FilterLogReveal(opts *bind.FilterOpts
 
 // WatchLogReveal is a free log subscription operation binding the contract event 0x9141bfaedbc77aa7b8d9c989cd81909d95bb1677e556e34cfd45e50e0bea2967.
 //
-// Solidity: e LogReveal(cid uint256, from address, secret uint256)
+// Solidity: event LogReveal(uint256 cid, address from, uint256 secret)
 func (_Commitreveal *CommitrevealFilterer) WatchLogReveal(opts *bind.WatchOpts, sink chan<- *CommitrevealLogReveal) (event.Subscription, error) {
 
 	logs, sub, err := _Commitreveal.contract.WatchLogs(opts, "LogReveal")
@@ -1053,7 +1065,7 @@ type CommitrevealLogStartCommitReveal struct {
 
 // FilterLogStartCommitReveal is a free log retrieval operation binding the contract event 0xbbfccb30e8cf1b5d88802741ceb4d63cf854fa8931eeeaec6b700f31f429dc09.
 //
-// Solidity: e LogStartCommitReveal(cid uint256, startBlock uint256, commitDuration uint256, revealDuration uint256, revealThreshold uint256)
+// Solidity: event LogStartCommitReveal(uint256 cid, uint256 startBlock, uint256 commitDuration, uint256 revealDuration, uint256 revealThreshold)
 func (_Commitreveal *CommitrevealFilterer) FilterLogStartCommitReveal(opts *bind.FilterOpts) (*CommitrevealLogStartCommitRevealIterator, error) {
 
 	logs, sub, err := _Commitreveal.contract.FilterLogs(opts, "LogStartCommitReveal")
@@ -1065,7 +1077,7 @@ func (_Commitreveal *CommitrevealFilterer) FilterLogStartCommitReveal(opts *bind
 
 // WatchLogStartCommitReveal is a free log subscription operation binding the contract event 0xbbfccb30e8cf1b5d88802741ceb4d63cf854fa8931eeeaec6b700f31f429dc09.
 //
-// Solidity: e LogStartCommitReveal(cid uint256, startBlock uint256, commitDuration uint256, revealDuration uint256, revealThreshold uint256)
+// Solidity: event LogStartCommitReveal(uint256 cid, uint256 startBlock, uint256 commitDuration, uint256 revealDuration, uint256 revealThreshold)
 func (_Commitreveal *CommitrevealFilterer) WatchLogStartCommitReveal(opts *bind.WatchOpts, sink chan<- *CommitrevealLogStartCommitReveal) (event.Subscription, error) {
 
 	logs, sub, err := _Commitreveal.contract.WatchLogs(opts, "LogStartCommitReveal")
@@ -1175,7 +1187,7 @@ type CommitrevealOwnershipRenounced struct {
 
 // FilterOwnershipRenounced is a free log retrieval operation binding the contract event 0xf8df31144d9c2f0f6b59d69b8b98abd5459d07f2742c4df920b25aae33c64820.
 //
-// Solidity: e OwnershipRenounced(previousOwner indexed address)
+// Solidity: event OwnershipRenounced(address indexed previousOwner)
 func (_Commitreveal *CommitrevealFilterer) FilterOwnershipRenounced(opts *bind.FilterOpts, previousOwner []common.Address) (*CommitrevealOwnershipRenouncedIterator, error) {
 
 	var previousOwnerRule []interface{}
@@ -1192,7 +1204,7 @@ func (_Commitreveal *CommitrevealFilterer) FilterOwnershipRenounced(opts *bind.F
 
 // WatchOwnershipRenounced is a free log subscription operation binding the contract event 0xf8df31144d9c2f0f6b59d69b8b98abd5459d07f2742c4df920b25aae33c64820.
 //
-// Solidity: e OwnershipRenounced(previousOwner indexed address)
+// Solidity: event OwnershipRenounced(address indexed previousOwner)
 func (_Commitreveal *CommitrevealFilterer) WatchOwnershipRenounced(opts *bind.WatchOpts, sink chan<- *CommitrevealOwnershipRenounced, previousOwner []common.Address) (event.Subscription, error) {
 
 	var previousOwnerRule []interface{}
@@ -1308,7 +1320,7 @@ type CommitrevealOwnershipTransferred struct {
 
 // FilterOwnershipTransferred is a free log retrieval operation binding the contract event 0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0.
 //
-// Solidity: e OwnershipTransferred(previousOwner indexed address, newOwner indexed address)
+// Solidity: event OwnershipTransferred(address indexed previousOwner, address indexed newOwner)
 func (_Commitreveal *CommitrevealFilterer) FilterOwnershipTransferred(opts *bind.FilterOpts, previousOwner []common.Address, newOwner []common.Address) (*CommitrevealOwnershipTransferredIterator, error) {
 
 	var previousOwnerRule []interface{}
@@ -1329,7 +1341,7 @@ func (_Commitreveal *CommitrevealFilterer) FilterOwnershipTransferred(opts *bind
 
 // WatchOwnershipTransferred is a free log subscription operation binding the contract event 0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0.
 //
-// Solidity: e OwnershipTransferred(previousOwner indexed address, newOwner indexed address)
+// Solidity: event OwnershipTransferred(address indexed previousOwner, address indexed newOwner)
 func (_Commitreveal *CommitrevealFilterer) WatchOwnershipTransferred(opts *bind.WatchOpts, sink chan<- *CommitrevealOwnershipTransferred, previousOwner []common.Address, newOwner []common.Address) (event.Subscription, error) {
 
 	var previousOwnerRule []interface{}
