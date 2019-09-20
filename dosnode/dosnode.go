@@ -39,7 +39,7 @@ type DosNode struct {
 	id           []byte
 	logger       log.Logger
 	isGuardian   bool
-
+	config       configuration.Config
 	//For REST API
 	startTime         time.Time
 	state             string
@@ -106,6 +106,7 @@ func NewDosNode(key *keystore.Key, config configuration.Config) (dosNode *DosNod
 		totalQuery:        0,
 		fulfilledQuery:    0,
 		numOfworkingGroup: 0,
+		config:            config,
 	}
 
 	return dosNode, nil

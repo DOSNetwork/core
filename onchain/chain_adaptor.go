@@ -50,7 +50,7 @@ type ProxyAdapter interface {
 	LastUpdatedBlock(ctx context.Context) (r uint64, err error)
 	NumPendingGroups(ctx context.Context) (r uint64, err error)
 	NumPendingNodes(ctx context.Context) (r uint64, err error)
-	Balance(ctx context.Context, id []byte) (balance *big.Float, err error)
+	Balance(ctx context.Context) (balance *big.Float, err error)
 	Address() (addr common.Address)
 	CurrentBlock(ctx context.Context) (r uint64, err error)
 	PendingNonce(ctx context.Context) (r uint64, err error)

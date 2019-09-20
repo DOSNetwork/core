@@ -2,7 +2,6 @@ package onchain
 
 import (
 	"context"
-	"math"
 	"math/big"
 
 	"github.com/DOSNetwork/core/onchain/dosproxy"
@@ -395,28 +394,23 @@ func (e *ethAdaptor) PendingNonce(ctx context.Context) (result uint64, err error
 }
 
 // Balance returns the wei balance of the node account.
-func (e *ethAdaptor) Balance(ctx context.Context, id []byte) (result *big.Float, err error) {
+func (e *ethAdaptor) Balance(ctx context.Context) (result *big.Float, err error) {
 	f := func(ctx context.Context, client *ethclient.Client, proxy *dosproxy.DosproxySession, p interface{}) (chan interface{}, chan interface{}) {
 		outc := make(chan interface{})
 		errc := make(chan interface{})
 		go func() {
 			defer close(outc)
 			defer close(errc)
-			if address, ok := p.(common.Address); ok {
-				if wei, err := client.BalanceAt(context.Background(), address, nil); err != nil {
-					utils.ReportResult(ctx, errc, errors.Errorf("PendingNonce failed : %w", err))
-				} else {
-					balance := new(big.Float)
-					balance.SetString(wei.String())
-					balance = balance.Quo(balance, big.NewFloat(math.Pow10(18)))
-					utils.ReportResult(ctx, outc, balance)
-				}
+			if balance, err := GetBalance(client, e.key); err != nil {
+				utils.ReportResult(ctx, errc, errors.Errorf("GetBalance failed : %w", err))
+			} else {
+				utils.ReportResult(ctx, outc, balance)
 			}
 		}()
 		return outc, errc
 	}
 
-	vr, ve := e.get(ctx, f, common.BytesToAddress(id))
+	vr, ve := e.get(ctx, f, nil)
 	if v, ok := vr.(*big.Float); ok {
 		result = v
 	}

@@ -111,7 +111,7 @@ func (s *serfNet) MembersIP() (addr []net.IP) {
 
 	members := s.serf.Members()
 	for i := 0; i < len(members); i++ {
-		fmt.Println("localMember ", []byte(s.serf.LocalMember().Name), "members[i].Name ", []byte(members[i].Name), " status ", members[i].Status, " addr ", members[i].Addr)
+		//fmt.Println("localMember ", []byte(s.serf.LocalMember().Name), "members[i].Name ", []byte(members[i].Name), " status ", members[i].Status, " addr ", members[i].Addr)
 		if members[i].Name != s.serf.LocalMember().Name {
 			addr = append(addr, members[i].Addr)
 		}

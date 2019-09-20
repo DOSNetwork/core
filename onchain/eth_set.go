@@ -51,18 +51,21 @@ func (e *ethAdaptor) set(ctx context.Context, params []interface{}, setF setFunc
 				select {
 				case <-ctx.Done():
 					return
-				case resp := <-pre:
-					//Request has been fulfulled by previous sendRequest or
-					//transaction failed so delete the whole requestSend chain
-					if resp.err == nil ||
-						strings.Contains(resp.err.Error(), "transaction failed") {
-						select {
-						case out <- resp:
-						case <-ctx.Done():
+				case resp, ok := <-pre:
+					if ok {
+						//Request has been fulfulled by previous sendRequest or
+						//transaction failed so delete the whole requestSend chain
+						if resp.err == nil ||
+							strings.Contains(resp.err.Error(), "transaction failed") ||
+							strings.Contains(resp.err.Error(), "insufficient funds for gas * price + value") {
+							select {
+							case out <- resp:
+							case <-ctx.Done():
+							}
+							return
 						}
-						return
+						fmt.Println("Switch to ", idx, " Client to handle request because of e ,", resp.err)
 					}
-					fmt.Println("Switch to ", idx, " Client to handle request because of e ,", resp.err)
 				}
 			}
 			r.reply = make(chan *response)
@@ -564,6 +567,10 @@ func (e *ethAdaptor) RegisterGroupPubKey(ctx context.Context, IdWithPubKeys chan
 					select {
 					default:
 						tx, err = proxy.RegisterGroupPubKey(groupId, pubKey)
+						if err != nil {
+							fmt.Println("RegisterGroupPubKey err ", err)
+						}
+						fmt.Println("RegisterGroupPubKey tx ", tx.Hash().Hex())
 					case <-ctx.Done():
 						err = ctx.Err()
 					}

@@ -271,7 +271,7 @@ func CheckTransaction(client *ethclient.Client, tx *types.Transaction) (err erro
 }
 
 // GetBalance returns the wei balance of the given account.
-func GetBalance(client *ethclient.Client, key *keystore.Key) (balance *big.Float) {
+func GetBalance(client *ethclient.Client, key *keystore.Key) (balance *big.Float, err error) {
 	wei, err := client.BalanceAt(context.Background(), key.Address, nil)
 	if err != nil {
 		return
@@ -281,5 +281,5 @@ func GetBalance(client *ethclient.Client, key *keystore.Key) (balance *big.Float
 	balance.SetString(wei.String())
 	balance = balance.Quo(balance, big.NewFloat(math.Pow10(18)))
 
-	return balance
+	return
 }

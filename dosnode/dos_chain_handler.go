@@ -30,27 +30,31 @@ func (d *DosNode) onchainLoop() {
 	inactiveNodes := make(map[string]time.Time)
 	for {
 		//Connect to geth
-		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(60*time.Second))
 		for {
-			if err := d.chain.Connect(ctx); err == nil {
-				break
-			} else {
-				fmt.Println("Connect err  ", err)
-			}
-			//TODO: Search for other geth client
 			ips := d.p.RandomPeerIP()
 			var urls = []string{}
 			urls = append(urls, "ws://"+d.p.GetIP().String()+":8546")
 			for _, ip := range ips {
 				urls = append(urls, "ws://"+ip+":8546")
-				if len(urls) >= 6 {
+				if len(urls) >= 5 {
 					break
 				}
 			}
-			fmt.Println("UpdateWsUrls ", urls)
-			d.chain.UpdateWsUrls(urls)
+			for _, url := range d.config.ChainNodePool {
+				urls = append(urls, url)
+			}
+			if len(urls) >= 5 {
+				d.chain.UpdateWsUrls(urls)
+				fmt.Println("UpdateWsUrls ", urls)
+				ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(60*time.Second))
+				if err := d.chain.Connect(ctx); err == nil {
+					break
+				} else {
+					fmt.Println("Connect err  ", err)
+				}
+				cancel()
+			}
 		}
-		cancel()
 		fmt.Println("Done connect ")
 
 		//TODO: Check to see if it is a valid stacking node first
@@ -96,6 +100,14 @@ func (d *DosNode) onchainLoop() {
 					d.logger.Error(err)
 					fmt.Println("Dos node CurrentBlock err ", err)
 					break L
+				}
+				if balance, err := d.chain.Balance(context.Background()); err != nil {
+					fmt.Println("Dos node CurrentBlock err ", err)
+				} else {
+					if balance.Cmp(big.NewFloat(0.5)) == -1 {
+						fmt.Println("Dos node no enough balance ", balance)
+						go d.End()
+					}
 				}
 				if d.isGuardian {
 					now := time.Now()

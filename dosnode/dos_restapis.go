@@ -96,11 +96,11 @@ func (d *DosNode) balance(w http.ResponseWriter, r *http.Request) {
 	html := "Balance :"
 	ctx, cancelFunc := context.WithDeadline(context.Background(), time.Now().Add(3*time.Second))
 	defer cancelFunc()
-	result, err := d.chain.Balance(ctx, d.p.GetID())
+	result, err := d.chain.Balance(ctx)
 	if err != nil {
-		html = html + result.String()
-	} else {
 		html = html + err.Error()
+	} else {
+		html = html + result.String()
 	}
 	w.Write([]byte(html))
 }

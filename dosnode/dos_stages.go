@@ -106,38 +106,12 @@ func choseSubmitter(ctx context.Context, p p2p.P2PInterface, e onchain.ProxyAdap
 	go func() {
 		defer close(errc)
 		start := time.Now()
-		lastRand := int(lastSysRand.Uint64())
-		if lastRand < 0 {
-			lastRand = 0 - lastRand
-		}
+		submitter := lastSysRand.Uint64() % uint64(len(ids))
 
-		submitter := 1
-		//Check to see if submitter is reachable
-		for i := 0; i < len(ids); i++ {
-			idx := (lastRand + i) % len(ids)
-			fmt.Println(idx)
-			//Check if submitter has enough money
-			balance, err := e.Balance(ctx, ids[idx])
-			if err != nil {
-				continue
-			}
-			if balance.Cmp(big.NewFloat(0.3)) == 1 {
-				//Check to see if submitter is alive
-				submitter = idx
-				break
-			}
-		}
-		if submitter == -1 {
+		for _, out := range outs {
 			select {
-			case errc <- errors.New("No suitable submitter"):
+			case out <- ids[submitter]:
 			case <-ctx.Done():
-			}
-		} else {
-			for _, out := range outs {
-				select {
-				case out <- ids[submitter]:
-				case <-ctx.Done():
-				}
 			}
 		}
 		for _, out := range outs {
