@@ -15,22 +15,12 @@
 
 ##### Verified and recommended installation environment
 - Ubuntu 16.04 x64 LTS or higher 
-- WebSocket of Geth endpoints (at least one)
-  - sign up with Infura
-    - Visit the following URL: https://infura.io/register
-    - Submit registration form by filling in the relevant details
-    - Confirm the email receipt
-  - creating a new project
-    - Create your project by providing the project name 
-    - Go to VIEW PROJECT
-    - Chose ENDPOINT as RINKEBY
-    - Copy PROJECT ID to config.json
 - An IPv4 address
   - Run `$ dig +short myip.opendns.com @resolver1.opendns.com`
   - Or get it from cloud server providers. Most vps / cloud server 
 - With below ports open:
-  - **udp** port `7946`
-  - **tcp** port `7946`,`9501`
+  - **udp** port `7946`,`30303`
+  - **tcp** port `7946`,`9501`,`8545`,`8546`,`30303`
 - It's recommended to generate ssh login key pairs and setup public key authentication instead of using password login for server security and funds safety:
   - Learn [how to](https://www.digitalocean.com/community/tutorials/how-to-set-up-ssh-keys-on-ubuntu-1604) setup SSH public key authentication on Ubuntu 16.04 and disable password logins.
 
@@ -39,6 +29,58 @@
 - Acquire testnet ether from rinkeby [faucet](https://faucet.rinkeby.io/).
 - Acquire 50,000 [testnet DOS token](https://rinkeby.etherscan.io/address/0x214e79c85744cd2ebbc64ddc0047131496871bee), (and optional - acquire several [testnet DropBurn token](https://rinkeby.etherscan.io/address/0x9bfe8f5749d90eb4049ad94cc4de9b6c4c31f822)).
 - Please fill in [this](https://docs.google.com/forms/d/e/1FAIpQLSdiWuVdyxpVozEC0uWZIj9HCBX9COBYFj8Dxp2C2qX4Qv5U9g/viewform) form to request testnet tokens.
+
+### Run client node using Docker
+- Install:
+    ```sh
+    $ ./dos_docker.sh install
+    ```
+- Use existing node address:(optional)
+    ```sh
+    $ cp keystore ./vault/
+    ```
+- Start:
+    ```sh
+    $ ./dos_docker.sh start
+    ```
+- Check client status :
+    ```sh
+    $ ./vps_docker.sh status
+    ```
+- Stop client :
+    ```sh
+    $ ./vps_docker.sh stop
+    ```
+- Debuging an issue :
+    ```sh
+    $ ./dos_docker.sh log
+    ```
+
+## Run standalone binary
+- Install:
+    ```sh
+    $ ./dos.sh install
+    ```
+- Use existing node address:(optional)
+    ```sh
+    $ cp keystore ./vault/
+    ```
+- Start:
+    ```sh
+    $ ./dos.sh start
+    ```
+- Check client status :
+    ```sh
+    $ ./dos.sh status
+    ```
+- Stop client :
+    ```sh
+    $ ./dos.sh stop
+    ```
+- Debuging an issue :
+    ```sh
+    $ ./dos.sh log
+    ```
 
 ## Building from source
 - [Install](https://golang.org/doc/install) Go and setup golang workingspace like below:
@@ -85,92 +127,6 @@
   - `$ make updateSubmodule` to fetch latest system contracts from [repo](https://github.com/DOSNetwork/eth-contracts), instead of making contract modifications locally.
   - `$ make gen` to generate binding files for system contracts.
   - `$ make clean` to remove built binaries or unnecessary generated files.
-
-## Building using Docker
-- Install `docker` if not already done
-    ```sh
-    $ sudo apt-get purge docker lxc-docker docker-engine docker.io
-    $ sudo apt-get install  curl  apt-transport-https ca-certificates software-properties-common
-    $ curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add 
-    $ sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
-    $ sudo apt-get update
-    $ sudo apt-get install docker-ce
-    ```
-- Build:
-  - `$ make client-docker`
-  
-## Configure the client
-- Config following fields in [`config.json`](https://github.com/DOSNetwork/core/blob/master/config.json) file:
-  - `NodeIP`: Public ip address of the server/vps. 
-  - `ChainNodePool`: User can add more ws (web socket) of infura endpoints and more ws (web socket) of geth full nodes here.
-  - Example:
-    Assuming one has an infura account that INFURA-PROJECT-ID is "abcdefghijk"
-	```
-	"NodeIP":"111.111.111.111",
-	"ChainNodePool": [
-                "wss://rinkeby.infura.io/ws/v3/abcdefghijk"
-        ]
-	```
-    Assuming one has a geth full node that ip is 22.22.22.22
-	```
-	"NodeIP":"111.111.111.111",
-	"ChainNodePool": [
-                "ws://22.22.22.22:8546"
-        ]
-	```
-    Assuming one has a geth full node and an infura account
-	```
-	"NodeIP":"111.111.111.111",
-	"ChainNodePool": [
-                "ws://22.22.22.22:8546",
-		"wss://rinkeby.infura.io/ws/v3/abcdefghijk"
-        ]
-	```
-## Run standalone binary
-- Create an node wallet (Only for the first time):
-    ```sh
-    $ ./client wallet create
-    ```	
-- Run client :
-    ```sh
-    $ ./client start
-    ```
-- Run client on the background (Recommended):
-    ```sh
-    $ echo -n Password:;read -s password ;export PASSPHRASE=$password ;nohup ./client start &
-    ```
-- Check client status :
-	./client status
-    ```sh
-    $ ./client status
-    ```
-- Stop client :
-    ```sh
-    $ ./client stop
-    ```
-- Debuging an issue :
-    ```sh
-    $ cat vault/doslog.txt
-    ```
-
-### Run client node using Docker
-- Run client on the background (Recommended):
-    ```sh
-    $ ./vps_docker.sh start
-    ```
-- Check client status :
-    ```sh
-    $ ./vps_docker.sh status
-    ```
-- Stop client :
-    ```sh
-    $ ./vps_docker.sh stop
-    ```
-- Debuging an issue :
-    ```sh
-    $ cat vault/doslog.txt
-    ```
-
 
 ## Status
 - [x] Verifiable Secret Sharing
