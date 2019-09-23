@@ -59,9 +59,9 @@ func (d *DosNode) status(w http.ResponseWriter, r *http.Request) {
 	//	result := d.dkg.GetGroupNumber()
 	balance, err := d.chain.Balance(ctx)
 	if err != nil {
-		html = html + "Balance  : " + err.Error()
+		html = html + "Balance  : " + err.Error() + "\n|"
 	} else {
-		html = html + "Balance  : " + balance.String()
+		html = html + "Balance  : " + balance.String() + "\n|"
 	}
 	workingGroupNum, err := d.chain.GetWorkingGroupSize(ctx)
 	if err != nil {
