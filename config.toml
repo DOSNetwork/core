@@ -1,0 +1,91 @@
+# Note: this config doesn't contain the genesis block.
+
+[Eth]
+NetworkId = 4
+SyncMode = "light"
+NoPruning = false
+NoPrefetch = false
+LightPeers = 100
+UltraLightFraction = 75
+DatabaseCache = 64
+DatabaseFreezer = ""
+TrieCleanCache = 32
+TrieDirtyCache = 32
+TrieTimeout = 3600000000000
+EnablePreimageRecording = false
+EWASMInterpreter = ""
+EVMInterpreter = ""
+
+[Eth.Miner]
+GasFloor = 8000000
+GasCeil = 8000000
+GasPrice = 1000000000
+Recommit = 3000000000
+Noverify = false
+
+[Eth.Ethash]
+CacheDir = "ethash"
+CachesInMem = 2
+CachesOnDisk = 3
+DatasetDir = "/home/ubuntu/.ethash"
+DatasetsInMem = 1
+DatasetsOnDisk = 2
+PowMode = 0
+
+[Eth.TxPool]
+Locals = []
+NoLocals = false
+Journal = "transactions.rlp"
+Rejournal = 3600000000000
+PriceLimit = 1
+PriceBump = 10
+AccountSlots = 16
+GlobalSlots = 4096
+AccountQueue = 64
+GlobalQueue = 1024
+Lifetime = 10800000000000
+
+[Eth.GPO]
+Blocks = 20
+Percentile = 60
+
+[Shh]
+MaxMessageSize = 1048576
+MinimumAcceptedPOW = 2e-01
+RestrictConnectionBetweenLightClients = true
+
+[Node]
+DataDir = "/home/ubuntu/.rinkeby"
+omitempty = ""
+SmartCardDaemonPath = "/run/pcscd/pcscd.comm"
+IPCPath = "geth.ipc"
+HTTPPort = 8545
+HTTPVirtualHosts = ["localhost"]
+HTTPModules = ["net", "web3", "eth", "shh"]
+WSHost = "0.0.0.0"
+WSPort = 8546
+WSOrigins = ["*"]
+WSModules = ["net", "web3", "eth", "shh"]
+GraphQLPort = 8547
+GraphQLVirtualHosts = ["localhost"]
+
+[Node.P2P]
+MaxPeers = 50
+NoDiscovery = false
+DiscoveryV5 = true
+BootstrapNodes = ["enode://3256fba9dc73794bda7bf4703bbe69b3c53f885f360da2314510eb6bcdae10c4eff76e94e53c7a998b39ed2b2858ad4f805b81f8370fdabbf964aedfc7b562cd@195.154.119.64:30303","enode://63fe36708e5869eebd7588295e78f6c4c8872bc080272e31b5af5021f8d9ff93bc13086857de3e8bbe0ed5689c959b38afa8e6166b48c57cb17ccb024968ef73@195.154.119.67:30303","enode://bb76bbb8f1f4915f87ad6cdbf44b7b8fab967600fee455e88940ec8883f1c6f4a5c964d750ea18fda700c61969ecfc21184a7d29f0099473a7c4066d453113f4@51.15.0.157:30303","enode://3a9cd3dfb3300e8a399decd7d82dcb9cab83f14b5159a69e3d97145b888375fac675ecb35a4a791b8e3f1c29951c2917bfc6460ee23283d405aed55b7c9dbd73@51.159.4.51:30303","enode://63fe36708e5869eebd7588295e78f6c4c8872bc080272e31b5af5021f8d9ff93bc13086857de3e8bbe0ed5689c959b38afa8e6166b48c57cb17ccb024968ef73@195.154.119.67:30303","enode://f9fb29751be4147dedd264be066ac4a276e4da17da333c988d195e7e7cfac33e706af94a47609f2461254822903216b295b61be774892a2aa05da603eda22b6e@195.154.119.64:30303","enode://a24ac7c5484ef4ed0c5eb2d36620ba4e4aa13b8c84684e1b4aab0cebea2ae45cb4d375b77eab56516d34bfbd3c1a833fc51296ff084b770b94fb9028c4d25ccf@52.169.42.101:30303", "enode://343149e4feefa15d882d9fe4ac7d88f885bd05ebb735e547f12e12080a9fa07c8014ca6fd7f373123488102fe5e34111f8509cf0b7de3f5b44339c9f25e87cb8@52.3.158.184:30303", "enode://b6b28890b006743680c52e64e0d16db57f28124885595fa03a562be1d2bf0f3a1da297d56b13da25fb992888fd556d4c1a27b1f39d531bde7de1921c90061cc6@159.89.28.211:30303"]
+BootstrapNodesV5 = ["enode://3256fba9dc73794bda7bf4703bbe69b3c53f885f360da2314510eb6bcdae10c4eff76e94e53c7a998b39ed2b2858ad4f805b81f8370fdabbf964aedfc7b562cd@195.154.119.64:30303","enode://63fe36708e5869eebd7588295e78f6c4c8872bc080272e31b5af5021f8d9ff93bc13086857de3e8bbe0ed5689c959b38afa8e6166b48c57cb17ccb024968ef73@195.154.119.67:30303","enode://bb76bbb8f1f4915f87ad6cdbf44b7b8fab967600fee455e88940ec8883f1c6f4a5c964d750ea18fda700c61969ecfc21184a7d29f0099473a7c4066d453113f4@51.15.0.157:30303","enode://3a9cd3dfb3300e8a399decd7d82dcb9cab83f14b5159a69e3d97145b888375fac675ecb35a4a791b8e3f1c29951c2917bfc6460ee23283d405aed55b7c9dbd73@51.159.4.51:30303","enode://a24ac7c5484ef4ed0c5eb2d36620ba4e4aa13b8c84684e1b4aab0cebea2ae45cb4d375b77eab56516d34bfbd3c1a833fc51296ff084b770b94fb9028c4d25ccf@52.169.42.101:30303", "enode://343149e4feefa15d882d9fe4ac7d88f885bd05ebb735e547f12e12080a9fa07c8014ca6fd7f373123488102fe5e34111f8509cf0b7de3f5b44339c9f25e87cb8@52.3.158.184:30303", "enode://b6b28890b006743680c52e64e0d16db57f28124885595fa03a562be1d2bf0f3a1da297d56b13da25fb992888fd556d4c1a27b1f39d531bde7de1921c90061cc6@159.89.28.211:30303"]
+StaticNodes = ["enode://3256fba9dc73794bda7bf4703bbe69b3c53f885f360da2314510eb6bcdae10c4eff76e94e53c7a998b39ed2b2858ad4f805b81f8370fdabbf964aedfc7b562cd@195.154.119.64:30303","enode://63fe36708e5869eebd7588295e78f6c4c8872bc080272e31b5af5021f8d9ff93bc13086857de3e8bbe0ed5689c959b38afa8e6166b48c57cb17ccb024968ef73@195.154.119.67:30303","enode://bb76bbb8f1f4915f87ad6cdbf44b7b8fab967600fee455e88940ec8883f1c6f4a5c964d750ea18fda700c61969ecfc21184a7d29f0099473a7c4066d453113f4@51.15.0.157:30303","enode://3a9cd3dfb3300e8a399decd7d82dcb9cab83f14b5159a69e3d97145b888375fac675ecb35a4a791b8e3f1c29951c2917bfc6460ee23283d405aed55b7c9dbd73@51.159.4.51:30303"]
+TrustedNodes = ["enode://3256fba9dc73794bda7bf4703bbe69b3c53f885f360da2314510eb6bcdae10c4eff76e94e53c7a998b39ed2b2858ad4f805b81f8370fdabbf964aedfc7b562cd@195.154.119.64:30303","enode://63fe36708e5869eebd7588295e78f6c4c8872bc080272e31b5af5021f8d9ff93bc13086857de3e8bbe0ed5689c959b38afa8e6166b48c57cb17ccb024968ef73@195.154.119.67:30303","enode://bb76bbb8f1f4915f87ad6cdbf44b7b8fab967600fee455e88940ec8883f1c6f4a5c964d750ea18fda700c61969ecfc21184a7d29f0099473a7c4066d453113f4@51.15.0.157:30303","enode://3a9cd3dfb3300e8a399decd7d82dcb9cab83f14b5159a69e3d97145b888375fac675ecb35a4a791b8e3f1c29951c2917bfc6460ee23283d405aed55b7c9dbd73@51.159.4.51:30303"]
+ListenAddr = ":30303"
+EnableMsgEvents = false
+
+[Node.HTTPTimeouts]
+ReadTimeout = 30000000000
+WriteTimeout = 30000000000
+IdleTimeout = 120000000000
+
+[Dashboard]
+Host = "localhost"
+Port = 8080
+Refresh = 5000000000
