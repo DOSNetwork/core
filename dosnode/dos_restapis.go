@@ -57,6 +57,12 @@ func (d *DosNode) status(w http.ResponseWriter, r *http.Request) {
 	html = html + "Group Number      : " + strconv.Itoa(d.numOfworkingGroup) + "\n"
 	html = html + "=================================================" + "\n|"
 	//	result := d.dkg.GetGroupNumber()
+	balance, err := d.chain.Balance(ctx)
+	if err != nil {
+		html = html + "Balance  : " + err.Error()
+	} else {
+		html = html + "Balance  : " + balance.String()
+	}
 	workingGroupNum, err := d.chain.GetWorkingGroupSize(ctx)
 	if err != nil {
 		html = html + "WorkingGroupSize  : " + err.Error() + "\n|"
