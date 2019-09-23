@@ -1,4 +1,4 @@
-nstall_docker() {
+install_docker() {
   if [ ! -x "$(command -v docker)" ]; then
     echo "Install docker"
     sudo dpkg --configure -a
@@ -149,4 +149,3 @@ case "$1" in
   echo "  log           Show client log"                                                                                                                              
   ;;                                                                                                                                                                  
 esac
-
