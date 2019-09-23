@@ -1,3 +1,4 @@
+#!/bin/bash
 install_docker() {
   if [ ! -x "$(command -v docker)" ]; then
     echo "Install docker"
