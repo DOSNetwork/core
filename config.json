@@ -11,5 +11,6 @@
         "18.237.179.193"
     ],
     "ChainNodePool": [
+        "ws://#REPLACE-WITH-IP:8546"
     ]
 }
