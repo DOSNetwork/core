@@ -93,7 +93,7 @@ status() {
 }
 
 stop() {
-    ./client status
+    ./client stop
 }
 
 log() {
