@@ -1,5 +1,5 @@
 {
-    "NodeIP": "",
+    "NodeIP": "#REPLACE-WITH-IP",
     "NodePort": "9501",
     "ChainType": "ETH",
     "DOSAddressBridgeAddress": "0x0654F7eA1Fe38C0EBa25Ff9008FC5bdbb60C29ff",

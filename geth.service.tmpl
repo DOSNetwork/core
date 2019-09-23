@@ -1,0 +1,12 @@
+[Unit]
+Description=Geth Node
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/bin/geth --rinkeby --config #REPLACE-WITH-PATH/config.toml --datadir #REPLACE-WITH-PATH/.rinkeby --nat=extip:#REPLACE-WITH-IP --cache 256 --verbosity 4
+Restart=always
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target
