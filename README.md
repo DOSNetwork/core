@@ -36,9 +36,7 @@
     $ ./dos_docker.sh install
     ```
 - Use existing node address:(optional)
-    ```sh
-    $ cp keystore ./vault/
-    ```
+    Copy existing keystore to ./vault/
 - Start:
     ```sh
     $ ./dos_docker.sh start
@@ -62,9 +60,7 @@
     $ ./dos.sh install
     ```
 - Use existing node address:(optional)
-    ```sh
-    $ cp keystore ./vault/
-    ```
+    Copy existing keystore to ./vault/
 - Start:
     ```sh
     $ ./dos.sh start
