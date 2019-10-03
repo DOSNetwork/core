@@ -71,6 +71,8 @@ dos-all:
 
 gen-dosuser:
 	mkdir -p $(USER_CONTRACTS)
+	cp $(ETH_CONTRACTS)/examples/AskMeAnything.sol $(USER_CONTRACTS)/
+	sed -i -e 's?"../?"./?g' dosUser/contract/AskMeAnything.sol
 	cp $(ETH_CONTRACTS)/DOSOnChainSDK.sol $(USER_CONTRACTS)/
 	cp $(ETH_CONTRACTS)/Ownable.sol $(USER_CONTRACTS)/
 	mkdir -p $(USER_CONTRACTS)/lib/

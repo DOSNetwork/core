@@ -70,7 +70,7 @@ func handlePeerMsg(sessionMap map[string][]interface{}, sessionReq map[string]re
 	sessionMap[sessionID] = append(sessionMap[sessionID], content)
 
 	//if sessionMap[sessionID] != nil {
-	fmt.Println("sessionMap len ", len(sessionMap[sessionID]))
+	//fmt.Println("sessionMap len ", len(sessionMap[sessionID]))
 	if len(sessionMap[sessionID]) == sessionReq[sessionID].numOfResps {
 		//go func(req request, m []interface{}) {
 		select {
@@ -120,11 +120,11 @@ func (d *pdkg) Loop() {
 			case *PublicKey:
 				d.p.Reply(context.Background(), msg.Sender, msg.RequestNonce, content)
 				handlePeerMsg(sessionPubKeys, sessionReqPubs, d.p, content.SessionId, content)
-				fmt.Println("pkdg :PublicKey nonce", msg.RequestNonce)
+				//fmt.Println("pkdg :PublicKey nonce", msg.RequestNonce)
 			case *Deal:
 				d.p.Reply(context.Background(), msg.Sender, msg.RequestNonce, content)
 				handlePeerMsg(sessionDeals, sessionReqDeals, d.p, content.SessionId, content)
-				fmt.Println("pkdg :Deal nonce", msg.RequestNonce)
+				//fmt.Println("pkdg :Deal nonce", msg.RequestNonce)
 			case *Responses:
 				d.p.Reply(context.Background(), msg.Sender, msg.RequestNonce, content)
 				resps := content.Response

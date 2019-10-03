@@ -239,7 +239,7 @@ var proxyTable = []func(ctx context.Context, proxy *dosUser.AskMeAnything) (<-ch
 			defer close(transitChan)
 			defer close(errc)
 			defer close(out)
-			sub, err := proxy.AskMeAnythingFilterer.WatchRequestSent(opt, transitChan)
+			sub, err := proxy.AskMeAnythingFilterer.WatchRequestSent(opt, transitChan,nil)
 			if err != nil {
 				fmt.Println("SubscribeAskMeAnythingRequestSent err ", err)
 				return

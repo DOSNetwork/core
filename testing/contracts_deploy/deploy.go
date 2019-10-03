@@ -87,7 +87,7 @@ func updateBridge(client *ethclient.Client, key *keystore.Key, addrType int, bri
 	var auth *bind.TransactOpts
 	fmt.Println("start to update proxy address to bridge...")
 	auth = bind.NewKeyedTransactor(key.PrivateKey)
-	auth.GasLimit = uint64(6000000)
+	auth.GasLimit = uint64(7000000)
 	auth.GasPrice = big.NewInt(30000000000)
 	bridge, err := dosbridge.NewDosbridge(bridgeAddress, client)
 	if err != nil {
@@ -148,7 +148,7 @@ func addProxyToCRWhiteList(client *ethclient.Client, key *keystore.Key, bridgeAd
 	var auth *bind.TransactOpts
 	fmt.Println("start to update proxy address to bridge...")
 	auth = bind.NewKeyedTransactor(key.PrivateKey)
-	auth.GasLimit = uint64(6000000)
+	auth.GasLimit = uint64(7000000)
 	auth.GasPrice = big.NewInt(30000000000)
 	bridge, err := dosbridge.NewDosbridge(bridgeAddress, client)
 	if err != nil {
@@ -196,7 +196,7 @@ func deployContract(contractPath, targetTask, configPath string, config configur
 	var tx *types.Transaction
 	var address common.Address
 	auth := bind.NewKeyedTransactor(key.PrivateKey)
-	auth.GasLimit = uint64(6000000)
+	auth.GasLimit = uint64(7000000)
 	auth.GasPrice = big.NewInt(30000000000)
 	var err error
 	if targetTask == "deployBridge" {
@@ -208,8 +208,12 @@ func deployContract(contractPath, targetTask, configPath string, config configur
 			fmt.Println("transaction retry...")
 			address, tx, _, err = dosbridge.DeployDosbridge(auth, client)
 		}
+		if err != nil {
+			fmt.Println("contract err: ", err)
+			return
+		}
 		fmt.Println("contract Address: ", address.Hex())
-		fmt.Println("tx sent: ", tx.Hash().Hex())
+		//fmt.Println("tx sent: ", tx.Hash().Hex())
 		fmt.Println("contract deployed, waiting for confirmation...")
 		err = onchain.CheckTransaction(client, tx)
 		if err != nil {
@@ -220,6 +224,9 @@ func deployContract(contractPath, targetTask, configPath string, config configur
 			log.Fatal(err)
 		}
 		if err := updateBridgeAddr(contractPath+"/DOSOnChainSDK.sol", address.Hex()); err != nil {
+			log.Fatal(err)
+		}
+		if err := updateBridgeAddr(contractPath+"/DOSPayment.sol", address.Hex()); err != nil {
 			log.Fatal(err)
 		}
 		if err := updateBridgeAddr(contractPath+"/DOSProxy.sol", address.Hex()); err != nil {
@@ -241,6 +248,10 @@ func deployContract(contractPath, targetTask, configPath string, config configur
 			time.Sleep(time.Second)
 			fmt.Println("transaction retry...")
 			address, tx, _, err = dospayment.DeployDospayment(auth, client)
+		}
+		if err != nil {
+			fmt.Println(err)
+			log.Fatal(err)
 		}
 		fmt.Println("contract Address: ", address.Hex())
 		fmt.Println("tx sent: ", tx.Hash().Hex())
@@ -277,13 +288,17 @@ func deployContract(contractPath, targetTask, configPath string, config configur
 
 	} else if targetTask == "deployProxy" {
 		fmt.Println("Starting deploy DOSProxy.sol...")
-
+		//tokenAddr:=common.HexToAddress("0xe90EF85fff4f38e742769Ad45DB7eCd3FC935973")
 		address, tx, _, err = dosproxy.DeployDosproxy(auth, client)
 		for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
 			fmt.Println(err)
 			time.Sleep(time.Second)
 			fmt.Println("transaction retry...")
 			address, tx, _, err = dosproxy.DeployDosproxy(auth, client)
+		}
+		if err != nil {
+			fmt.Println(err)
+			log.Fatal(err)
 		}
 		fmt.Println("contract Address: ", address.Hex())
 		fmt.Println("tx sent: ", tx.Hash().Hex())
@@ -377,7 +392,7 @@ func main() {
 		return
 	}
 	var c *ethclient.Client
-	results := onchain.DialToEth(context.Background(), []string{"ws://51.15.0.157:8546"})
+	results := onchain.DialToEth(context.Background(), []string{"ws://:8546"})
 	for result := range results {
 		if result.Err != nil {
 			continue

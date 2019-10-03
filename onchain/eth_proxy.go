@@ -84,7 +84,8 @@ func NewEthAdaptor(key *keystore.Key, bridgeAddr string, urls []string, l logger
 	//
 	adaptor.ctx, adaptor.cancelFunc = context.WithCancel(context.Background())
 	adaptor.auth = bind.NewKeyedTransactor(adaptor.key.PrivateKey)
-	adaptor.auth.GasPrice = big.NewInt(20000000000) //1 Gwei
+	//adaptor.auth.GasPrice = big.NewInt(20000000000) //1 Gwei
+	adaptor.auth.GasPrice = big.NewInt(10000000000) //1 Gwei
 	adaptor.auth.GasLimit = uint64(6000000)
 	adaptor.auth.Context = adaptor.ctx
 	return

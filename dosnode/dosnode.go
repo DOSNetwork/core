@@ -39,6 +39,7 @@ type DosNode struct {
 	id           []byte
 	logger       log.Logger
 	isGuardian   bool
+	isAdmin   	 bool
 	config       configuration.Config
 	//For REST API
 	startTime         time.Time
@@ -159,6 +160,7 @@ func (d *DosNode) Start() {
 	for {
 		select {
 		case <-d.ctx.Done():
+			return
 		case <-peerChecker.C:
 			if num != d.p.NumOfMembers() {
 				num = d.p.NumOfMembers()

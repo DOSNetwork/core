@@ -18,7 +18,7 @@ func (d *DosNode) queryLoop() {
 	reqSign := make(map[string]request)
 	peerMsg, _ := d.p.SubscribeMsg(50, vss.Signature{})
 	defer d.p.UnSubscribeMsg(vss.Signature{})
-	watchdog := time.NewTicker(watchdogInterval * time.Minute)
+	watchdog := time.NewTicker(30 * time.Minute)
 	defer watchdog.Stop()
 	for {
 		select {

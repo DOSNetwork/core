@@ -343,7 +343,6 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 						Signature:   i.Signature,
 						PubKey:      i.PubKey,
 						Pass:        i.Pass,
-						Version:     i.Version,
 					}
 					log = &LogCommon{
 						Tx:      i.Raw.TxHash.Hex(),

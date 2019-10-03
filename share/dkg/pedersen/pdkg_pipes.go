@@ -28,7 +28,7 @@ func genPub(ctx context.Context, logger log.Logger, suite suites.Suite, id []byt
 		defer close(out)
 		defer close(errc)
 
-		defer logger.TimeTrack(time.Now(), "genPub", map[string]interface{}{"GroupID": sessionID})
+		defer logger.TimeTrack(time.Now(), "genPub", map[string]interface{}{"GroupID": sessionID,"Topic": "Grouping"})
 		//Index pub key
 		defer fmt.Println("1) Start genPub Pipe ")
 
@@ -72,7 +72,7 @@ func exchangePub(ctx context.Context, logger log.Logger, selfPubc chan interface
 	out = make(chan []*PublicKey)
 	errc = make(chan error)
 	go func() {
-		defer logger.TimeTrack(time.Now(), "exchangePub", map[string]interface{}{"GroupID": sessionID})
+		defer logger.TimeTrack(time.Now(), "exchangePub", map[string]interface{}{"GroupID": sessionID,"Topic": "Grouping"})
 		defer fmt.Println("2) Close exchangePub Pipe ")
 		defer close(out)
 		defer close(errc)
@@ -86,7 +86,7 @@ func exchangePub(ctx context.Context, logger log.Logger, selfPubc chan interface
 				return
 			}
 			fmt.Println("exchangePub selfPubc")
-			logger.TimeTrack(time.Now(), "exchangePubselfPubc", map[string]interface{}{"GroupID": sessionID})
+			logger.TimeTrack(time.Now(), "exchangePubselfPubc", map[string]interface{}{"GroupID": sessionID,"Topic": "Grouping"})
 			pubkey, ok := resp.(*PublicKey)
 			if !ok {
 				err := &DKGError{err: errors.Errorf("casting PublicKey failed for GID %s : %w", sessionID, ErrCasting)}
@@ -104,7 +104,7 @@ func exchangePub(ctx context.Context, logger log.Logger, selfPubc chan interface
 				if !ok {
 					return
 				}
-				logger.TimeTrack(time.Now(), "exchangePubpeerPubc", map[string]interface{}{"GroupID": sessionID})
+				logger.TimeTrack(time.Now(), "exchangePubpeerPubc", map[string]interface{}{"GroupID": sessionID,"Topic": "Grouping"})
 				for _, resp := range resps {
 					pubkey, ok := resp.(*PublicKey)
 					if !ok {
@@ -136,7 +136,7 @@ func sendToMembers(ctx context.Context, logger log.Logger, msgc chan interface{}
 		case <-ctx.Done():
 		case msg, ok := <-msgc:
 			if ok {
-				defer logger.TimeTrack(time.Now(), "sendToMembers", map[string]interface{}{"GroupID": sessionID})
+				defer logger.TimeTrack(time.Now(), "sendToMembers", map[string]interface{}{"GroupID": sessionID,"Topic": "Grouping"})
 				fmt.Println("3) Start sendToMembers ")
 				if m, ok := msg.(proto.Message); ok {
 					var wg sync.WaitGroup
@@ -145,7 +145,6 @@ func sendToMembers(ctx context.Context, logger log.Logger, msgc chan interface{}
 						if r := bytes.Compare(p.GetID(), id); r != 0 {
 							go func(i int, id []byte) {
 								defer wg.Done()
-								defer fmt.Println("sendToMembers ", id, " ", i, " done ")
 								for {
 									select {
 									case <-ctx.Done():
@@ -175,7 +174,7 @@ func askMembers(ctx context.Context, logger log.Logger, bufToNode chan interface
 	out = make(chan []interface{})
 	go func() {
 		defer fmt.Println("4) Close askMembers Pipe ")
-		defer logger.TimeTrack(time.Now(), "askMembers", map[string]interface{}{"GroupID": sessionID})
+		defer logger.TimeTrack(time.Now(), "askMembers", map[string]interface{}{"GroupID": sessionID,"Topic": "Grouping"})
 
 		req := request{ctx: ctx, reqType: reqTpe, sessionID: sessionID, numOfResps: numOfResp, reply: out}
 		select {
@@ -203,7 +202,7 @@ func genDistKeyGenerator(ctx context.Context, logger log.Logger, secrc chan kybe
 				case pubs, ok := <-partPubs:
 					if ok {
 						fmt.Println("5) Start genDistKeyGenerator")
-						defer logger.TimeTrack(time.Now(), "genDistKeyGenerator", map[string]interface{}{"GroupID": sessionID})
+						defer logger.TimeTrack(time.Now(), "genDistKeyGenerator", map[string]interface{}{"GroupID": sessionID,"Topic": "Grouping"})
 						pubPoints := make([]kyber.Point, numOfPubkeys)
 						for _, pubkey := range pubs {
 							if pubPoints[pubkey.Index] != nil {
@@ -254,7 +253,7 @@ func genDealsAndSend(ctx context.Context, logger log.Logger, dkgc chan *DistKeyG
 		case dkg, ok := <-dkgc:
 			if ok {
 				fmt.Println("6) Start genDealsAndSend")
-				defer logger.TimeTrack(time.Now(), "genDealsAndSend", map[string]interface{}{"GroupID": sessionID})
+				defer logger.TimeTrack(time.Now(), "genDealsAndSend", map[string]interface{}{"GroupID": sessionID,"Topic": "Grouping"})
 				deals, err := dkg.Deals()
 				if err != nil {
 					err := &DKGError{err: errors.Errorf("genDealsAndSend failed for GID %s : %w", sessionID, err)}
@@ -317,7 +316,7 @@ func getAndProcessDeals(ctx context.Context, logger log.Logger, dkgc chan *DistK
 				return
 			}
 		}
-		defer logger.TimeTrack(time.Now(), "getAndProcessDeals", map[string]interface{}{"GroupID": sessionID})
+		defer logger.TimeTrack(time.Now(), "getAndProcessDeals", map[string]interface{}{"GroupID": sessionID,"Topic": "Grouping"})
 		select {
 		case <-ctx.Done():
 		case deals, ok := <-dealsc:
@@ -377,7 +376,7 @@ func getAndProcessResponses(ctx context.Context, logger log.Logger, dkgc chan *D
 				return
 			}
 		}
-		defer logger.TimeTrack(time.Now(), "getAndProcessResponses", map[string]interface{}{"GroupID": sessionID})
+		defer logger.TimeTrack(time.Now(), "getAndProcessResponses", map[string]interface{}{"GroupID": sessionID,"Topic": "Grouping"})
 		select {
 		case <-ctx.Done():
 		case resps, ok := <-respsc:
@@ -418,7 +417,7 @@ func genGroup(ctx context.Context, logger log.Logger, group *group, suite suites
 		case dkg, ok := <-dkgc:
 			fmt.Println("9) Start genGroup Pipe ")
 			if ok {
-				defer logger.TimeTrack(time.Now(), "genGroup", map[string]interface{}{"GroupID": sessionID})
+				defer logger.TimeTrack(time.Now(), "genGroup", map[string]interface{}{"GroupID": sessionID,"Topic": "Grouping"})
 				if !dkg.Certified() {
 					err := &DKGError{err: errors.Errorf("ProcessResponse failed for GID %s : %w", sessionID, ErrDKGNotCertified)}
 					reportErr(ctx, errc, err)

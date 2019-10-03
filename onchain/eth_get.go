@@ -265,6 +265,85 @@ func (e *ethAdaptor) GroupToPick(ctx context.Context) (result uint64, err error)
 	return
 }
 
+// GroupingThreshold returns the groupingThreshold value
+func (e *ethAdaptor) GroupingThreshold(ctx context.Context) (result uint64, err error) {
+	f := func(ctx context.Context, client *ethclient.Client, proxy *dosproxy.DosproxySession, p interface{}) (chan interface{}, chan interface{}) {
+		outc := make(chan interface{})
+		errc := make(chan interface{})
+		go func() {
+			defer close(outc)
+			defer close(errc)
+			if val, err := proxy.GroupingThreshold(); err != nil {
+				utils.ReportResult(ctx, errc, errors.Errorf("GroupingThreshold failed : %w", err))
+			} else {
+				utils.ReportResult(ctx, outc, val)
+			}
+		}()
+		return outc, errc
+	}
+
+	vr, ve := e.get(ctx, f, nil)
+	if v, ok := vr.(*big.Int); ok {
+		result = v.Uint64()
+	}
+	if v, ok := ve.(error); ok {
+		err = v
+	}
+	return
+}
+
+func (e *ethAdaptor) BootstrapRound(ctx context.Context) (result uint64, err error) {
+	f := func(ctx context.Context, client *ethclient.Client, proxy *dosproxy.DosproxySession, p interface{}) (chan interface{}, chan interface{}) {
+		outc := make(chan interface{})
+		errc := make(chan interface{})
+		go func() {
+			defer close(outc)
+			defer close(errc)
+			if val, err := proxy.BootstrapRound(); err != nil {
+				utils.ReportResult(ctx, errc, errors.Errorf("BootstrapRound failed : %w", err))
+			} else {
+				utils.ReportResult(ctx, outc, val)
+			}
+		}()
+		return outc, errc
+	}
+
+	vr, ve := e.get(ctx, f, nil)
+	if v, ok := vr.(*big.Int); ok {
+		result = v.Uint64()
+	}
+	if v, ok := ve.(error); ok {
+		err = v
+	}
+	return
+}
+
+func (e *ethAdaptor) BootstrapEndBlk(ctx context.Context) (result uint64, err error) {
+	f := func(ctx context.Context, client *ethclient.Client, proxy *dosproxy.DosproxySession, p interface{}) (chan interface{}, chan interface{}) {
+		outc := make(chan interface{})
+		errc := make(chan interface{})
+		go func() {
+			defer close(outc)
+			defer close(errc)
+			if val, err := proxy.BootstrapEndBlk(); err != nil {
+				utils.ReportResult(ctx, errc, errors.Errorf("BootstrapEndBlk failed : %w", err))
+			} else {
+				utils.ReportResult(ctx, outc, val)
+			}
+		}()
+		return outc, errc
+	}
+
+	vr, ve := e.get(ctx, f, nil)
+	if v, ok := vr.(*big.Int); ok {
+		result = v.Uint64()
+	}
+	if v, ok := ve.(error); ok {
+		err = v
+	}
+	return
+}
+
 // LastUpdatedBlock returns the block number of the last updated system random number
 func (e *ethAdaptor) LastUpdatedBlock(ctx context.Context) (result uint64, err error) {
 	f := func(ctx context.Context, client *ethclient.Client, proxy *dosproxy.DosproxySession, p interface{}) (chan interface{}, chan interface{}) {
