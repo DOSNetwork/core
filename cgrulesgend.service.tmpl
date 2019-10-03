@@ -1,0 +1,14 @@
+[Unit]
+Description=cgroup rules generator
+After=cgconfigparser.service
+
+[Service]
+User=root
+Group=root
+Type=forking
+EnvironmentFile=-/etc/cgred.conf
+ExecStart=/usr/sbin/cgrulesengd
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

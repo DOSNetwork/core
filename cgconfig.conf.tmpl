@@ -1,0 +1,18 @@
+group dos/geth {
+  cpu {
+    cpu.shares = 400;
+  }
+  memory {
+    memory.limit_in_bytes = 400000000;
+  }
+}
+
+group dos/client {
+  cpu {
+    cpu.shares = 600;
+  }
+  memory {
+    memory.limit_in_bytes = 600000000;
+  }
+}
+

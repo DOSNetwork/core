@@ -7,6 +7,31 @@ uninstall_LightClient() {
     fi
 }
 
+install_cgroup() {
+    if [ ! -x "$(command -v cgconfigparser)" ]; then
+        echo "Install cgroup tool"
+        sudo dpkg --configure -a
+        yes | sudo apt-get update
+        yes | sudo apt install cgroup-tools
+    fi
+    if [ ! -f /etc/cgconfig.conf]; then
+        sudo cp cgconfig.conf.tmpl /etc/cgconfig.conf
+    fi
+    if [ ! -f /etc/cgrules.conf]; then
+        sudo cp cgrules.conf.tmpl /etc/cgrules.conf
+    fi
+    if [ ! -f /lib/systemd/system/cgconfigparser.service ]; then
+        sudo cp cgconfigparser.service.tmpl /lib/systemd/system/cgconfigparser.service
+    fi
+    if [ ! -f /lib/systemd/system/cgrulesgend.service.service ]; then
+        sudo cp cgrulesgend.service.tmpl /lib/systemd/system/cgrulesgend.service
+    fi
+    sudo systemctl enable cgconfigparser
+    sudo systemctl enable cgrulesgend
+    sudo systemctl start cgconfigparser
+    sudo systemctl start cgrulesgend
+}
+
 install_LightClient() {
     if [ ! -f $(pwd)/geth-linux-amd64-1.9.2-e76047e9/geth ]; then
         wget https://gethstore.blob.core.windows.net/builds/geth-linux-amd64-1.9.2-e76047e9.tar.gz
@@ -67,6 +92,7 @@ installAll() {
     uninstall_LightClient
     checkConfigs
     findNodeIP
+    install_cgroup
     install_LightClient
 }
 
@@ -86,6 +112,8 @@ startClient() {
     read -s password
     export PASSPHRASE=$password
     nohup ./client start &
+    sudo /usr/sbin/cgconfigparser -l /etc/cgconfig.conf
+    sudo //usr/sbin/cgrulesengd -vvv
 }
 
 status() {

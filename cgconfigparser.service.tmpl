@@ -1,0 +1,11 @@
+[Unit]
+Description=cgroup config parser
+
+[Service]
+User=root
+Group=root
+ExecStart=/usr/sbin/cgconfigparser -l /etc/cgconfig.conf
+Type=oneshot
+
+[Install]
+WantedBy=multi-user.target

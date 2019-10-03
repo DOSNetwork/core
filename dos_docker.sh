@@ -20,6 +20,31 @@ uninstall_docker() {
   fi
 }
 
+install_cgroup() {
+  if [ ! -x "$(command -v cgconfigparser)" ]; then
+    echo "Install cgroup tool"
+    sudo dpkg --configure -a
+    yes | sudo apt-get update
+    yes | sudo apt install cgroup-tools
+  fi
+  if [ ! -f /etc/cgconfig.conf]; then
+    sudo cp cgconfig.conf.tmpl /etc/cgconfig.conf
+  fi
+  if [ ! -f /etc/cgrules.conf]; then
+    sudo cp cgrules.conf.tmpl /etc/cgrules.conf
+  fi
+  if [ ! -f /lib/systemd/system/cgconfigparser.service ]; then
+    sudo cp cgconfigparser.service.tmpl /lib/systemd/system/cgconfigparser.service
+  fi
+  if [ ! -f /lib/systemd/system/cgrulesgend.service.service ]; then
+    sudo cp cgrulesgend.service.tmpl /lib/systemd/system/cgrulesgend.service
+  fi
+  sudo systemctl enable cgconfigparser
+  sudo systemctl enable cgrulesgend
+  sudo systemctl start cgconfigparser
+  sudo systemctl start cgrulesgend
+}
+
 uninstall_LightClient() {
   if [ -f /lib/systemd/system/geth.service ]; then
     yes | sudo systemctl stop geth
@@ -84,6 +109,7 @@ installAll() {
   checkConfigs
   findNodeIP
   install_docker
+  install_cgroup
   install_LightClient
 }
 
@@ -108,6 +134,8 @@ startClient() {
     --mount type=bind,source=$(pwd)/vault,target=/vault \
     -e CONFIGPATH=config -e PASSPHRASE=$password \
     dosnetwork/dosnode:beta /client start
+  sudo /usr/sbin/cgconfigparser -l /etc/cgconfig.conf
+  sudo //usr/sbin/cgrulesengd -vvv
 }
 
 status() {
