@@ -25,24 +25,24 @@ install_cgroup() {
     echo "Install cgroup tool"
     sudo dpkg --configure -a
     yes | sudo apt-get update
-    yes | sudo apt install cgroup-tools
+    yes | sudo apt install cgroup-tools
   fi
-  if [ ! -f /etc/cgconfig.conf]; then
-    sudo cp cgconfig.conf.tmpl /etc/cgconfig.conf
+  if [ ! -f /etc/cgconfig.conf ]; then
+    yes | sudo cp cgconfig.conf.tmpl /etc/cgconfig.conf
   fi
-  if [ ! -f /etc/cgrules.conf]; then
-    sudo cp cgrules.conf.tmpl /etc/cgrules.conf
+  if [ ! -f /etc/cgrules.conf ]; then
+    yes | sudo cp cgrules.conf.tmpl /etc/cgrules.conf
   fi
-  if [ ! -f /lib/systemd/system/cgconfigparser.service ]; then
-    sudo cp cgconfigparser.service.tmpl /lib/systemd/system/cgconfigparser.service
+  if [ ! -f "/lib/systemd/system/cgconfigparser.service" ]; then
+    yes | sudo cp cgconfigparser.service.tmpl /lib/systemd/system/cgconfigparser.service
   fi
-  if [ ! -f /lib/systemd/system/cgrulesgend.service.service ]; then
-    sudo cp cgrulesgend.service.tmpl /lib/systemd/system/cgrulesgend.service
+  if [ ! -f "/lib/systemd/system/cgrulesgend.service" ]; then
+    yes | sudo cp cgrulesgend.service.tmpl /lib/systemd/system/cgrulesgend.service
   fi
-  sudo systemctl enable cgconfigparser
-  sudo systemctl enable cgrulesgend
-  sudo systemctl start cgconfigparser
-  sudo systemctl start cgrulesgend
+  yes | sudo systemctl enable cgconfigparser
+  yes | sudo systemctl enable cgrulesgend
+  yes | sudo systemctl start cgconfigparser
+  yes | sudo systemctl start cgrulesgend
 }
 
 uninstall_LightClient() {
@@ -111,6 +111,7 @@ installAll() {
   install_docker
   install_cgroup
   install_LightClient
+  echo "Rebooting!!!"
 }
 
 startClient() {
@@ -134,8 +135,8 @@ startClient() {
     --mount type=bind,source=$(pwd)/vault,target=/vault \
     -e CONFIGPATH=config -e PASSPHRASE=$password \
     dosnetwork/dosnode:beta /client start
-  sudo /usr/sbin/cgconfigparser -l /etc/cgconfig.conf
-  sudo //usr/sbin/cgrulesengd -vvv
+  sudo /usr/sbin/cgconfigparser -l /etc/cgconfig.conf
+  sudo /usr/sbin/cgrulesengd -vvv
 }
 
 status() {
