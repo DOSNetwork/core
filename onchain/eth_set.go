@@ -140,7 +140,7 @@ func (e *ethAdaptor) StartCommitReveal(ctx context.Context, startBlock int64, co
 	params = append(params, big.NewInt(revealThreshold))
 	return waitForReply(ctx,"StartCommitReveal",e.set(ctx, params, f))
 }
-
+/*
 // SetGroupToPick is a wrap function that build a pipeline to set groupToPick
 func (e *ethAdaptor) SetGroupToPick(ctx context.Context, groupToPick uint64) (err error) {
 	// define how to parse parameters and execute proxy function
@@ -160,7 +160,7 @@ func (e *ethAdaptor) SetGroupToPick(ctx context.Context, groupToPick uint64) (er
 
 	return waitForReply(ctx,"SetGroupToPick",e.set(ctx, params, f))
 }
-
+*/
 // RegisterNewNode is a wrap function that build a pipeline to call RegisterNewNode
 func (e *ethAdaptor) RegisterNewNode(ctx context.Context) (err error) {
 	f := func(ctx context.Context, proxy *dosproxy.DosproxySession, cr *commitreveal.CommitrevealSession, p []interface{}) (tx *types.Transaction, err error) {
@@ -243,7 +243,7 @@ func (e *ethAdaptor) SignalBootstrap(ctx context.Context, cid *big.Int) (err err
 	params = append(params, cid)
 	return waitForReply(ctx,"SignalGroupFormation",e.set(ctx, params, f))
 }
-
+/*
 // SetGroupSize is a wrap function that build a pipeline to call SetGroupSize
 func (e *ethAdaptor) SetGroupSize(ctx context.Context, size uint64) (err error) {
 	// define how to parse parameters and execute proxy function
@@ -262,7 +262,7 @@ func (e *ethAdaptor) SetGroupSize(ctx context.Context, size uint64) (err error) 
 	params = append(params, big.NewInt(int64(size)))
 	return waitForReply(ctx,"SetGroupSize",e.set(ctx, params, f))
 }
-
+*/
 // SetGroupMaturityPeriod is a wrap function that build a pipeline to call SetGroupMaturityPeriod
 func (e *ethAdaptor) SetGroupMaturityPeriod(ctx context.Context, period uint64) (err error) {
 	// define how to parse parameters and execute proxy function
@@ -281,7 +281,7 @@ func (e *ethAdaptor) SetGroupMaturityPeriod(ctx context.Context, period uint64) 
 	params = append(params, big.NewInt(int64(period)))
 	return waitForReply(ctx,"SetGroupMaturityPeriod",e.set(ctx, params, f))
 }
-
+/*
 // SetGroupingThreshold is a wrap function that build a pipeline to call SetGroupingThreshold
 func (e *ethAdaptor) SetGroupingThreshold(ctx context.Context, threshold uint64) (err error) {
 	// define how to parse parameters and execute proxy function
@@ -300,7 +300,7 @@ func (e *ethAdaptor) SetGroupingThreshold(ctx context.Context, threshold uint64)
 	params = append(params, big.NewInt(int64(threshold)))
 	return waitForReply(ctx,"SetGroupingThreshold",e.set(ctx, params, f))
 }
-
+*/
 // Commit is a wrap function that build a pipeline to call Commit
 func (e *ethAdaptor) Commit(ctx context.Context, cid *big.Int, commitment [32]byte) (err error) {
 	// define how to parse parameters and execute proxy function

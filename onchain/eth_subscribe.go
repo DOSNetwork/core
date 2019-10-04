@@ -538,55 +538,6 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 		}()
 		return out, errc
 	},
-	SubscribeDosproxyUpdateGroupToPick: func(ctx context.Context, proxy *dosproxy.DosproxySession) (chan interface{}, chan interface{}) {
-		out := make(chan interface{})
-		errc := make(chan interface{})
-		opt := &bind.WatchOpts{}
-		go func() {
-			transitChan := make(chan *dosproxy.DosproxyUpdateGroupToPick)
-			defer close(transitChan)
-			defer close(errc)
-			defer close(out)
-			sub, err := proxy.Contract.WatchUpdateGroupToPick(opt, transitChan)
-			if err != nil {
-				fmt.Println("WatchUpdateGroupToPick err ", err)
-
-				return
-			}
-			for {
-				var log *LogCommon
-				select {
-				case <-ctx.Done():
-					sub.Unsubscribe()
-					return
-				case err := <-sub.Err():
-					fmt.Println("WatchUpdateGroupToPick sub err ", err)
-					errc <- err
-					return
-				case i := <-transitChan:
-					fmt.Println("SubscribeDosproxyUpdateGroupToPick")
-					l := &LogUpdateGroupToPick{
-						OldNum: i.OldNum,
-						NewNum: i.NewNum,
-					}
-					log = &LogCommon{
-						Tx:      i.Raw.TxHash.Hex(),
-						BlockN:  i.Raw.BlockNumber,
-						Removed: i.Raw.Removed,
-						Raw:     i.Raw,
-						log:     l,
-					}
-				}
-				select {
-				case <-ctx.Done():
-					sub.Unsubscribe()
-					return
-				case out <- log:
-				}
-			}
-		}()
-		return out, errc
-	},
 	SubscribeLogGrouping: func(ctx context.Context, proxy *dosproxy.DosproxySession) (chan interface{}, chan interface{}) {
 		out := make(chan interface{})
 		errc := make(chan interface{})

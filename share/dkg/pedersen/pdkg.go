@@ -131,7 +131,6 @@ func (d *pdkg) Loop() {
 				for _, resp := range resps {
 					handlePeerMsg(sessionResps, sessionReResps, d.p, content.SessionId, resp)
 				}
-				fmt.Println("pkdg :Responses")
 			}
 
 		case req, ok := <-d.bufToNode:

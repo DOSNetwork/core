@@ -99,7 +99,7 @@ func (d *DosNode) onchainLoop() {
 					fmt.Println("Dos node CurrentBlock err ", err)
 					break L
 				}
-				fmt.Println("currentBlockNumber ",currentBlockNumber, " time ",time.Now())
+				//fmt.Println("currentBlockNumber ",currentBlockNumber, " time ",time.Now())
 				if balance, err := d.chain.Balance(context.Background()); err != nil {
 					fmt.Println("Dos node CurrentBlock err ", err)
 				} else {

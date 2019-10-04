@@ -273,7 +273,6 @@ func genDealsAndSend(ctx context.Context, logger log.Logger, dkgc chan *DistKeyG
 							case <-ctx.Done():
 								return
 							default:
-								fmt.Println("genDealsAndSend Request")
 								if _, err := p.Request(ctx, id, d); err != nil {
 									err := &DKGError{err: errors.Errorf("genDealsAndSend failed for GID %s : %w", sessionID, err)}
 									reportErr(ctx, errc, err)
