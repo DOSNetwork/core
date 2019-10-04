@@ -443,23 +443,3 @@ func (e *EthUserAdaptor) GetSafeRandom(internalSerial uint8) (err error) {
 	fmt.Println("RequestSafeRandom ", " waiting for confirmation...")
 	return
 }
-
-//GetFastRandom requests for a random number that is updated periodically on dos proxy
-func (e *EthUserAdaptor) GetFastRandom() (err error) {
-	tx, err := e.s.RequestFastRandom()
-	for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
-		fmt.Println(err)
-		time.Sleep(time.Second)
-		fmt.Println("transaction retry...")
-		tx, err = e.s.RequestFastRandom()
-	}
-	if err != nil {
-		return
-	}
-
-	fmt.Println("tx sent: ", tx.Hash().Hex())
-	fmt.Println("RequestSafeRandom ", " waiting for confirmation...")
-
-	//err = e.CheckTransaction(tx)
-	return
-}
