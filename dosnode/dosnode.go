@@ -39,7 +39,7 @@ type DosNode struct {
 	id           []byte
 	logger       log.Logger
 	isGuardian   bool
-	isAdmin   	 bool
+	isAdmin      bool
 	config       configuration.Config
 	//For REST API
 	startTime         time.Time
@@ -70,7 +70,7 @@ func NewDosNode(key *keystore.Key, config configuration.Config) (dosNode *DosNod
 	l := log.New("module", "dosclient")
 
 	//Set up an onchain adapter
-	chainConn, err := onchain.NewProxyAdapter(config.ChainType, key, config.DOSAddressBridgeAddress, config.ChainNodePool)
+	chainConn, err := onchain.NewProxyAdapter(config.ChainType, key, config.DOSAddressBridgeAddress)
 	if err != nil {
 		if err.Error() != "No any working eth client for event tracking" {
 			fmt.Println("NewDosNode failed ", err)
@@ -115,7 +115,7 @@ func NewDosNode(key *keystore.Key, config configuration.Config) (dosNode *DosNod
 
 //End is an operation that does a graceful shutdown
 func (d *DosNode) End() {
-	d.chain.UnRegisterNode(context.Background())
+	d.chain.UnRegisterNode()
 	d.cancel()
 	<-d.ctx.Done()
 	fmt.Println("End")
@@ -125,7 +125,7 @@ func (d *DosNode) Start() {
 	defer fmt.Println("End Start")
 	d.state = "Working"
 	d.startRESTServer()
-	go d.chain.ReqLoop()
+	//	go d.chain.ReqLoop()
 	go d.onchainLoop()
 
 	go func() {

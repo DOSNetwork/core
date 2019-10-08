@@ -39,15 +39,12 @@ func (d *DosNode) onchainLoop() {
 				urls = append(urls, url)
 			}
 			if len(urls) >= 5 {
-				d.chain.UpdateWsUrls(urls)
-				fmt.Println("UpdateWsUrls ", urls)
-				ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(60*time.Second))
-				if err := d.chain.Connect(ctx); err == nil {
-					break
-				} else {
-					fmt.Println("Connect err  ", err)
+				t := time.Now().Add(60 * time.Second)
+				if err := d.chain.Connect(urls, t); err != nil {
+					fmt.Print(fmt.Errorf("onchainLoop err :%+v", err))
+					return
 				}
-				cancel()
+				break
 			}
 		}
 		fmt.Println("Done connect ")
@@ -56,7 +53,7 @@ func (d *DosNode) onchainLoop() {
 		watchdog := time.NewTicker(time.Duration(watchdogInterval) * time.Second)
 
 		//TODO: Check to see if it is a valid stacking node first
-		_ = d.chain.RegisterNewNode(context.Background())
+		_ = d.chain.RegisterNewNode()
 
 		//var onchainEvent chan interface{}
 		var errc chan error
@@ -93,14 +90,14 @@ func (d *DosNode) onchainLoop() {
 					}
 				}
 			case <-watchdog.C:
-				currentBlockNumber, err := d.chain.CurrentBlock(context.Background())
+				currentBlockNumber, err := d.chain.CurrentBlock()
 				if err != nil {
 					d.logger.Error(err)
 					fmt.Println("Dos node CurrentBlock err ", err)
 					break L
 				}
 				//fmt.Println("currentBlockNumber ",currentBlockNumber, " time ",time.Now())
-				if balance, err := d.chain.Balance(context.Background()); err != nil {
+				if balance, err := d.chain.Balance(); err != nil {
 					fmt.Println("Dos node CurrentBlock err ", err)
 				} else {
 					if balance.Cmp(big.NewFloat(0.5)) == -1 {
@@ -120,7 +117,7 @@ func (d *DosNode) onchainLoop() {
 								addr := common.Address{}
 								b := []byte(nodeID)
 								addr.SetBytes(b)
-								d.chain.SignalUnregister(context.Background(), addr)
+								d.chain.SignalUnregister(addr)
 							}
 						}
 					}
@@ -217,8 +214,8 @@ func (d *DosNode) onchainLoop() {
 					}
 				case *onchain.LogStartCommitReveal:
 					f := map[string]interface{}{
-						"Cid":content.Cid,
-						"StartBlock":  content.StartBlock.String(),
+						"Cid":        content.Cid,
+						"StartBlock": content.StartBlock.String(),
 					}
 					d.logger.Event("StartCR", f)
 					fmt.Println("startBlock ", content.StartBlock.String(), " commitDur ", content.CommitDuration.String(), "revealDur", content.RevealDuration.String())
@@ -227,6 +224,7 @@ func (d *DosNode) onchainLoop() {
 			}
 		}
 		watchdog.Stop()
+		d.chain.DisconnectAll()
 	}
 }
 
@@ -242,8 +240,8 @@ func (d *DosNode) handleGrouping(participants [][]byte, groupID string) {
 		return
 	}
 	fmt.Println("Grouping start")
-	d.logger.Event("GroupingStart", map[string]interface{}{"GroupID": groupID,"Topic": "Grouping"})
-	defer d.logger.TimeTrack(time.Now(), "GroupingDone", map[string]interface{}{"GroupID": groupID,"Topic": "Grouping"})
+	d.logger.Event("GroupingStart", map[string]interface{}{"GroupID": groupID, "Topic": "Grouping"})
+	defer d.logger.TimeTrack(time.Now(), "GroupingDone", map[string]interface{}{"GroupID": groupID, "Topic": "Grouping"})
 	defer fmt.Println("!!!!!!!!Grouping Done ", groupID)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(60*60*time.Second))
@@ -256,7 +254,7 @@ func (d *DosNode) handleGrouping(participants [][]byte, groupID string) {
 		return
 	}
 	errcList = append(errcList, errc)
-	errcList = append(errcList, d.chain.RegisterGroupPubKey(ctx, outFromDkg))
+	errcList = append(errcList, registerGroup(ctx, d.chain, outFromDkg))
 	allErrc := mergeErrors(ctx, errcList...)
 	var ok bool
 	for {
@@ -266,13 +264,12 @@ func (d *DosNode) handleGrouping(participants [][]byte, groupID string) {
 				return
 			}
 			d.logger.Error(err)
-			//d.logger.Event("waitForGroupingError", map[string]interface{}{"Error": err.Error(), "GroupID": groupID})
 		case <-ctx.Done():
 			return
 		}
 	}
 	if err == nil {
-		d.logger.Event("GroupingSucc", map[string]interface{}{"GroupID": groupID,"Topic": "Grouping"})
+		d.logger.Event("GroupingSucc", map[string]interface{}{"GroupID": groupID, "Topic": "Grouping"})
 	}
 }
 
@@ -291,10 +288,6 @@ func (d *DosNode) groupInfo(groupID string) (ids [][]byte, pubPoly *share.PubPol
 
 func (d *DosNode) handleCR(cr *onchain.LogStartCommitReveal, randSeed *big.Int) {
 
-	ctx, cancel := context.WithTimeout(
-		context.Background(), time.Duration(160*15*time.Second))
-	defer cancel()
-
 	// Generate random numbers in range [0..randSeed]
 	if randSeed.Cmp(big.NewInt(1)) == -1 {
 		randSeed, _ = new(big.Int).SetString("21888242871839275222246405745257275088548364400416034343698204186575808495617", 10)
@@ -308,7 +301,7 @@ func (d *DosNode) handleCR(cr *onchain.LogStartCommitReveal, randSeed *big.Int) 
 	h.Write(abi.U256(sec))
 	b := h.Sum(nil)
 	hash := byte32(b)
-	currentBlockNumber, err := d.chain.CurrentBlock(ctx)
+	currentBlockNumber, err := d.chain.CurrentBlock()
 	if err != nil {
 		d.logger.Error(err)
 		return
@@ -327,7 +320,7 @@ func (d *DosNode) handleCR(cr *onchain.LogStartCommitReveal, randSeed *big.Int) 
 	time.Sleep(time.Duration(waitCommit*15) * time.Second)
 	fmt.Println("Commit", *hash)
 	d.logger.Event("Commit", map[string]interface{}{"CID": fmt.Sprintf("%x", cid)})
-	if err := d.chain.Commit(ctx, cid, *hash); err != nil {
+	if err := d.chain.Commit(cid, *hash); err != nil {
 		fmt.Println("Commit err ", err)
 		d.logger.Error(err)
 	}
@@ -335,11 +328,10 @@ func (d *DosNode) handleCR(cr *onchain.LogStartCommitReveal, randSeed *big.Int) 
 
 	fmt.Println("Reveal", fmt.Sprintf("%x", sec))
 	d.logger.Event("Reveal", map[string]interface{}{"CID": fmt.Sprintf("%x", cid)})
-	if err := d.chain.Reveal(ctx, cid, sec); err != nil {
+	if err := d.chain.Reveal(cid, sec); err != nil {
 		fmt.Println("Reveal err ", err)
 		d.logger.Error(err)
 	}
-	//<-time.After(time.Duration(waitRandom*15) * time.Second)
 }
 
 func byte32(s []byte) (a *[32]byte) {
@@ -350,86 +342,85 @@ func byte32(s []byte) (a *[32]byte) {
 }
 
 func (d *DosNode) handleGroupFormation(currentBlockNumber uint64) {
-	groupToPick, err := d.chain.GroupToPick(context.Background())
+	groupToPick, err := d.chain.GroupToPick()
 	if err != nil {
 		return
 	}
-	groupSize, err := d.chain.GroupSize(context.Background())
+	groupSize, err := d.chain.GroupSize()
 	if err != nil {
 		d.logger.Error(err)
 		return
 	}
-	pendingNodeSize, err := d.chain.NumPendingNodes(context.Background())
+	pendingNodeSize, err := d.chain.NumPendingNodes()
 	if err != nil {
 		d.logger.Error(err)
 		return
 	}
-	workingGroup, err := d.chain.GetWorkingGroupSize(context.Background())
+	workingGroup, err := d.chain.GetWorkingGroupSize()
 	if err != nil {
 		d.logger.Error(err)
 		return
 	}
-	expiredGroupSize, err := d.chain.GetExpiredWorkingGroupSize(context.Background())
+	expiredGroupSize, err := d.chain.GetExpiredWorkingGroupSize()
 	if err != nil {
 		d.logger.Error(err)
 		return
 	}
-	groupingThreshold, err := d.chain.GroupingThreshold(context.Background())
+	groupingThreshold, err := d.chain.GroupingThreshold()
 	if err != nil {
 		d.logger.Error(err)
 		return
-	}	
-	if pendingNodeSize < (groupSize * groupingThreshold  / 100) {
+	}
+	if pendingNodeSize < (groupSize * groupingThreshold / 100) {
 		if expiredGroupSize != 0 {
-			d.chain.SignalGroupFormation(context.Background())
+			d.chain.SignalGroupFormation()
 		}
 		return
 	}
 
 	if expiredGroupSize >= groupToPick {
-		d.chain.SignalGroupFormation(context.Background())
+		d.chain.SignalGroupFormation()
 		return
 	}
 	if workingGroup == 0 {
-		d.chain.SignalGroupFormation(context.Background())
+		d.chain.SignalGroupFormation()
 		return
 	}
 }
 
 func (d *DosNode) handleRandom(currentBlockNumber uint64) {
-	
-	lastUpdatedBlock, err := d.chain.LastUpdatedBlock(context.Background())
+
+	lastUpdatedBlock, err := d.chain.LastUpdatedBlock()
 	if err != nil {
 		d.logger.Error(err)
 		return
 	}
-	sysrandInterval, err := d.chain.RefreshSystemRandomHardLimit(context.Background())
+	sysrandInterval, err := d.chain.RefreshSystemRandomHardLimit()
 	if err != nil {
 		d.logger.Error(err)
 		return
 	}
 	diff := currentBlockNumber - lastUpdatedBlock
 	if diff > sysrandInterval {
-		d.chain.SignalRandom(context.Background())
+		d.chain.SignalRandom()
 	}
 }
 func (d *DosNode) handleBootStrap(currentBlockNumber uint64) {
-	ctx:=context.Background()
-	cid, err := d.chain.BootstrapRound(ctx)
+	cid, err := d.chain.BootstrapRound()
 	if err != nil {
 		d.logger.Error(err)
 		return
 	}
-	if cid == 0{
+	if cid == 0 {
 		return
 	}
-	endBlk, err := d.chain.BootstrapEndBlk(ctx)
+	endBlk, err := d.chain.BootstrapEndBlk()
 	if err != nil {
 		d.logger.Error(err)
 		return
 	}
-	if currentBlockNumber >endBlk {
-		if err := d.chain.SignalBootstrap(ctx, big.NewInt(int64(cid))); err != nil {
+	if currentBlockNumber > endBlk {
+		if err := d.chain.SignalBootstrap(big.NewInt(int64(cid))); err != nil {
 			fmt.Println("SignalBootstrap err ", err)
 			d.logger.Error(err)
 		}
@@ -437,14 +428,14 @@ func (d *DosNode) handleBootStrap(currentBlockNumber uint64) {
 }
 
 func (d *DosNode) handleGroupDissolve() {
-	pendingGrouSize, err := d.chain.NumPendingGroups(context.Background())
+	pendingGrouSize, err := d.chain.NumPendingGroups()
 	if err != nil {
 		d.logger.Error(err)
 		return
 	}
 
 	if pendingGrouSize > 0 {
-		d.chain.SignalGroupDissolve(context.Background())
+		d.chain.SignalGroupDissolve()
 	}
 }
 

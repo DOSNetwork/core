@@ -81,6 +81,36 @@ func merge(ctx context.Context, cs ...chan interface{}) chan interface{} {
 	return out
 }
 
+func mergeError(ctx context.Context, cs ...chan error) chan error {
+	var wg sync.WaitGroup
+	out := make(chan error)
+
+	// Start an output goroutine for each input channel in cs.  output
+	// copies values from c to out until c is closed, then calls wg.Done.
+	output := func(c <-chan error) {
+		for n := range c {
+			select {
+			case <-ctx.Done():
+				return
+			case out <- n:
+			}
+		}
+		wg.Done()
+	}
+	wg.Add(len(cs))
+	for _, c := range cs {
+		go output(c)
+	}
+
+	// Start a goroutine to close out once all the output goroutines are
+	// done.  This must start after the wg.Add call.
+	go func() {
+		wg.Wait()
+		close(out)
+	}()
+	return out
+}
+
 func GenEthkey(credentialPath, passPhrase string) (err error) {
 	newKeyStore := keystore.NewKeyStore(credentialPath, keystore.StandardScryptN, keystore.StandardScryptP)
 	if len(newKeyStore.Accounts()) >= 1 {
@@ -139,34 +169,29 @@ func DialToEth(ctx context.Context, urlPool []string) (out chan DialResult) {
 		client, err := ethclient.Dial(url)
 		if err != nil {
 			//ws connect: connection timed out
-			fmt.Println(url, ":DialToEth err ", err)
-			r.Err = errors.Errorf("DialToEth: %w", err)
+			r.Err = errors.Errorf(": %w", err)
 			reporeResult(ctx, out, r)
 			return
 		}
 
-		id, err := client.NetworkID(ctx)
-		if err != nil {
+		if _, err := client.NetworkID(ctx); err != nil {
 			fmt.Println("NetworkID err ", err)
 			//Post http i/o timeout
-			r.Err = errors.Errorf("DialToEth: %w", err)
+			r.Err = errors.Errorf(": %w", err)
 			reporeResult(ctx, out, r)
 			client.Close()
 			return
 		}
-		blk, err := client.BlockByNumber(ctx, nil)
-		if err != nil {
-			fmt.Println("BlockByNumber error ", err, url)
-			return
-		}
-		fmt.Println("highestBlkN ", blk.NumberU64())
+
 		progress, err := client.SyncProgress(ctx)
 		if err != nil {
 			fmt.Println("SyncProgress err ", err, url)
 			return
 		}
-		fmt.Println("progress ", progress)
-		fmt.Println(url, "DialToEthr got a client ", id)
+		if progress != nil {
+			fmt.Println("progress ", progress)
+		}
+		fmt.Println(url, "DialToEthr got a client ")
 		r.Client = client
 		r.Url = url
 		reporeResult(ctx, out, r)

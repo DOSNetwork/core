@@ -2,526 +2,635 @@ package onchain
 
 import (
 	"context"
+	"fmt"
 	"math/big"
-
-	"github.com/DOSNetwork/core/onchain/dosproxy"
+	//	"reflect"
+	"strings"
+	//	"github.com/DOSNetwork/core/onchain/dosproxy"
 	"github.com/DOSNetwork/core/utils"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	"github.com/ethereum/go-ethereum/ethclient"
+	//"github.com/ethereum/go-ethereum/ethclient"
 	errors "golang.org/x/xerrors"
 )
 
-type getFunc func(ctx context.Context, client *ethclient.Client, proxy *dosproxy.DosproxySession, p interface{}) (chan interface{}, chan interface{})
+type getFunc func(ctx context.Context) (chan interface{}, chan error)
 
-func (e *ethAdaptor) get(ctx context.Context, f getFunc, p interface{}) (interface{}, interface{}) {
-	var valList []chan interface{}
-	var errList []chan interface{}
-	for i, client := range e.clients {
-		outc, errc := f(ctx, client, e.proxies[i], p)
-		valList = append(valList, outc)
-		errList = append(errList, errc)
+func (e *ethAdaptor) get(f getFunc) (result interface{}, err error) {
+	if !e.isConnecting() {
+		err = errors.New("not connecting to geth")
+		return
 	}
-	outc := first(ctx, merge(ctx, valList...))
-	errc := merge(ctx, errList...)
-	var (
-		err    interface{}
-		result interface{}
-		ok     bool
-	)
+	var valList []chan interface{}
+	var errList []chan error
+	for _, ctx := range e.ctxes {
+		select {
+		case <-ctx.Done():
+		default:
+			opCtx, opCancel := context.WithTimeout(ctx, e.getTimeout)
+			defer opCancel()
+			outc, errc := f(opCtx)
+			valList = append(valList, outc)
+			errList = append(errList, errc)
+		}
+	}
+	outc := first(e.ctx, merge(e.ctx, valList...))
+	errc := mergeError(e.ctx, errList...)
+	var ok bool
+	select {
+	case result = <-outc:
+	case <-e.ctx.Done():
+		return nil, errors.Errorf(" : %w", e.ctx.Err())
+	}
 	for {
 		select {
-		case result, ok = <-outc:
-			if !ok {
-				return nil, err
-			}
-			return result, nil
 		case err, ok = <-errc:
-			if ok {
-				e.logger.Error(err.(error))
+			if !ok {
+				return
+			}
+			if strings.Contains(err.Error(), "use of closed network connection") {
+				fmt.Print(fmt.Errorf("%+v", err))
+				var oError *OnchainError
+				if errors.As(err, &oError) {
+					e.cancels[oError.Idx]()
+				}
 			}
 			continue
-		case <-ctx.Done():
-			return nil, errors.Errorf(" : %w", ctx.Err())
+		case <-e.ctx.Done():
+			return nil, errors.Errorf(" : %w", e.ctx.Err())
 		}
 	}
 }
 
-// LastRandomness return the last system random number
-func (e *ethAdaptor) LastRandomness(ctx context.Context) (result *big.Int, err error) {
-	f := func(ctx context.Context, client *ethclient.Client, proxy *dosproxy.DosproxySession, p interface{}) (chan interface{}, chan interface{}) {
-		outc := make(chan interface{})
-		errc := make(chan interface{})
-		go func() {
-			defer close(outc)
-			defer close(errc)
-			if val, err := proxy.LastRandomness(); err != nil {
-				utils.ReportResult(ctx, errc, errors.Errorf("LastRandomness failed : %w", err))
-			} else {
-				utils.ReportResult(ctx, outc, val)
-			}
-		}()
-		return outc, errc
-	}
-	vr, ve := e.get(ctx, f, nil)
-	if v, ok := vr.(*big.Int); ok {
-		result = v
-	}
-	if v, ok := ve.(error); ok {
-		err = v
-	}
-
-	return
-}
-
-// GroupSize returns the GroupSize value
-func (e *ethAdaptor) GroupSize(ctx context.Context) (result uint64, err error) {
-	f := func(ctx context.Context, client *ethclient.Client, proxy *dosproxy.DosproxySession, p interface{}) (chan interface{}, chan interface{}) {
-		outc := make(chan interface{})
-		errc := make(chan interface{})
-		go func() {
-			defer close(outc)
-			defer close(errc)
-			if val, err := proxy.GroupSize(); err != nil {
-				utils.ReportResult(ctx, errc, errors.Errorf("GroupSize failed : %w", err))
-			} else {
-				utils.ReportResult(ctx, outc, val)
-			}
-		}()
-		return outc, errc
-	}
-
-	vr, ve := e.get(ctx, f, nil)
-	if v, ok := vr.(*big.Int); ok {
-		result = v.Uint64()
-	}
-	if v, ok := ve.(error); ok {
-		err = v
-	}
-
-	return
-}
-
-// GetWorkingGroupSize returns the number of working groups
-func (e *ethAdaptor) GetWorkingGroupSize(ctx context.Context) (result uint64, err error) {
-	f := func(ctx context.Context, client *ethclient.Client, proxy *dosproxy.DosproxySession, p interface{}) (chan interface{}, chan interface{}) {
-		outc := make(chan interface{})
-		errc := make(chan interface{})
-		go func() {
-			defer close(outc)
-			defer close(errc)
-			if val, err := proxy.GetWorkingGroupSize(); err != nil {
-				utils.ReportResult(ctx, errc, errors.Errorf("GetWorkingGroupSize failed : %w", err))
-			} else {
-				utils.ReportResult(ctx, outc, val)
-			}
-		}()
-		return outc, errc
-	}
-
-	vr, ve := e.get(ctx, f, nil)
-	if v, ok := vr.(*big.Int); ok {
-		result = v.Uint64()
-	}
-	if v, ok := ve.(error); ok {
-		err = v
-	}
-	return
-}
-
-// NumPendingGroups returns the number of pending groups
-func (e *ethAdaptor) NumPendingGroups(ctx context.Context) (result uint64, err error) {
-	f := func(ctx context.Context, client *ethclient.Client, proxy *dosproxy.DosproxySession, p interface{}) (chan interface{}, chan interface{}) {
-		outc := make(chan interface{})
-		errc := make(chan interface{})
-		go func() {
-			defer close(outc)
-			defer close(errc)
-			if val, err := proxy.NumPendingGroups(); err != nil {
-				utils.ReportResult(ctx, errc, errors.Errorf("NumPendingGroups failed : %w", err))
-			} else {
-				utils.ReportResult(ctx, outc, val)
-			}
-		}()
-		return outc, errc
-	}
-
-	vr, ve := e.get(ctx, f, nil)
-	if v, ok := vr.(*big.Int); ok {
-		result = v.Uint64()
-	}
-	if v, ok := ve.(error); ok {
-		err = v
-	}
-	return
-}
-
-// RefreshSystemRandomHardLimit returns the RefreshSystemRandomHardLimit value
-func (e *ethAdaptor) RefreshSystemRandomHardLimit(ctx context.Context) (result uint64, err error) {
-	f := func(ctx context.Context, client *ethclient.Client, proxy *dosproxy.DosproxySession, p interface{}) (chan interface{}, chan interface{}) {
-		outc := make(chan interface{})
-		errc := make(chan interface{})
-		go func() {
-			defer close(outc)
-			defer close(errc)
-			if val, err := proxy.RefreshSystemRandomHardLimit(); err != nil {
-				utils.ReportResult(ctx, errc, errors.Errorf("RefreshSystemRandomHardLimit failed : %w", err))
-			} else {
-				utils.ReportResult(ctx, outc, val)
-			}
-		}()
-		return outc, errc
-	}
-
-	vr, ve := e.get(ctx, f, nil)
-	if v, ok := vr.(*big.Int); ok {
-		result = v.Uint64()
-	}
-	if v, ok := ve.(error); ok {
-		err = v
-	}
-	return
-}
-
-// NumPendingNodes returns the number of pending nodes
-func (e *ethAdaptor) NumPendingNodes(ctx context.Context) (result uint64, err error) {
-	f := func(ctx context.Context, client *ethclient.Client, proxy *dosproxy.DosproxySession, p interface{}) (chan interface{}, chan interface{}) {
-		outc := make(chan interface{})
-		errc := make(chan interface{})
-		go func() {
-			defer close(outc)
-			defer close(errc)
-			if val, err := proxy.NumPendingNodes(); err != nil {
-				utils.ReportResult(ctx, errc, errors.Errorf("RefreshSystemRandomHardLimit failed : %w", err))
-			} else {
-				utils.ReportResult(ctx, outc, val)
-			}
-		}()
-		return outc, errc
-	}
-
-	vr, ve := e.get(ctx, f, nil)
-	if v, ok := vr.(*big.Int); ok {
-		result = v.Uint64()
-	}
-	if v, ok := ve.(error); ok {
-		err = v
-	}
-	return
-}
-
-// GetExpiredWorkingGroupSize returns the expired working group size
-func (e *ethAdaptor) GetExpiredWorkingGroupSize(ctx context.Context) (result uint64, err error) {
-	f := func(ctx context.Context, client *ethclient.Client, proxy *dosproxy.DosproxySession, p interface{}) (chan interface{}, chan interface{}) {
-		outc := make(chan interface{})
-		errc := make(chan interface{})
-		go func() {
-			defer close(outc)
-			defer close(errc)
-			if val, err := proxy.GetExpiredWorkingGroupSize(); err != nil {
-				utils.ReportResult(ctx, errc, errors.Errorf("RefreshSystemRandomHardLimit failed : %w", err))
-			} else {
-				utils.ReportResult(ctx, outc, val)
-			}
-		}()
-		return outc, errc
-	}
-
-	vr, ve := e.get(ctx, f, nil)
-	if v, ok := vr.(*big.Int); ok {
-		result = v.Uint64()
-	}
-	if v, ok := ve.(error); ok {
-		err = v
-	}
-	return
-}
-
 // GroupToPick returns the groupToPick value
-func (e *ethAdaptor) GroupToPick(ctx context.Context) (result uint64, err error) {
-	f := func(ctx context.Context, client *ethclient.Client, proxy *dosproxy.DosproxySession, p interface{}) (chan interface{}, chan interface{}) {
+func (e *ethAdaptor) GroupToPick() (result uint64, err error) {
+	if !e.isConnecting() {
+		err = errors.New("not connecting to geth")
+	}
+	proxies := e.proxies
+	f := func(ctx context.Context) (chan interface{}, chan error) {
 		outc := make(chan interface{})
-		errc := make(chan interface{})
+		errc := make(chan error)
 		go func() {
 			defer close(outc)
 			defer close(errc)
-			if val, err := proxy.GroupToPick(); err != nil {
-				utils.ReportResult(ctx, errc, errors.Errorf("GroupToPick failed : %w", err))
+			idx := getIndex(ctx)
+			if idx == -1 {
+				err = errors.New("no client index in context")
 			} else {
-				utils.ReportResult(ctx, outc, val)
-			}
-		}()
-		return outc, errc
-	}
-
-	vr, ve := e.get(ctx, f, nil)
-	if v, ok := vr.(*big.Int); ok {
-		result = v.Uint64()
-	}
-	if v, ok := ve.(error); ok {
-		err = v
-	}
-	return
-}
-
-// GroupingThreshold returns the groupingThreshold value
-func (e *ethAdaptor) GroupingThreshold(ctx context.Context) (result uint64, err error) {
-	f := func(ctx context.Context, client *ethclient.Client, proxy *dosproxy.DosproxySession, p interface{}) (chan interface{}, chan interface{}) {
-		outc := make(chan interface{})
-		errc := make(chan interface{})
-		go func() {
-			defer close(outc)
-			defer close(errc)
-			if val, err := proxy.GroupingThreshold(); err != nil {
-				utils.ReportResult(ctx, errc, errors.Errorf("GroupingThreshold failed : %w", err))
-			} else {
-				utils.ReportResult(ctx, outc, val)
-			}
-		}()
-		return outc, errc
-	}
-
-	vr, ve := e.get(ctx, f, nil)
-	if v, ok := vr.(*big.Int); ok {
-		result = v.Uint64()
-	}
-	if v, ok := ve.(error); ok {
-		err = v
-	}
-	return
-}
-
-func (e *ethAdaptor) BootstrapRound(ctx context.Context) (result uint64, err error) {
-	f := func(ctx context.Context, client *ethclient.Client, proxy *dosproxy.DosproxySession, p interface{}) (chan interface{}, chan interface{}) {
-		outc := make(chan interface{})
-		errc := make(chan interface{})
-		go func() {
-			defer close(outc)
-			defer close(errc)
-			if val, err := proxy.BootstrapRound(); err != nil {
-				utils.ReportResult(ctx, errc, errors.Errorf("BootstrapRound failed : %w", err))
-			} else {
-				utils.ReportResult(ctx, outc, val)
-			}
-		}()
-		return outc, errc
-	}
-
-	vr, ve := e.get(ctx, f, nil)
-	if v, ok := vr.(*big.Int); ok {
-		result = v.Uint64()
-	}
-	if v, ok := ve.(error); ok {
-		err = v
-	}
-	return
-}
-
-func (e *ethAdaptor) BootstrapEndBlk(ctx context.Context) (result uint64, err error) {
-	f := func(ctx context.Context, client *ethclient.Client, proxy *dosproxy.DosproxySession, p interface{}) (chan interface{}, chan interface{}) {
-		outc := make(chan interface{})
-		errc := make(chan interface{})
-		go func() {
-			defer close(outc)
-			defer close(errc)
-			if val, err := proxy.BootstrapEndBlk(); err != nil {
-				utils.ReportResult(ctx, errc, errors.Errorf("BootstrapEndBlk failed : %w", err))
-			} else {
-				utils.ReportResult(ctx, outc, val)
-			}
-		}()
-		return outc, errc
-	}
-
-	vr, ve := e.get(ctx, f, nil)
-	if v, ok := vr.(*big.Int); ok {
-		result = v.Uint64()
-	}
-	if v, ok := ve.(error); ok {
-		err = v
-	}
-	return
-}
-
-// LastUpdatedBlock returns the block number of the last updated system random number
-func (e *ethAdaptor) LastUpdatedBlock(ctx context.Context) (result uint64, err error) {
-	f := func(ctx context.Context, client *ethclient.Client, proxy *dosproxy.DosproxySession, p interface{}) (chan interface{}, chan interface{}) {
-		outc := make(chan interface{})
-		errc := make(chan interface{})
-		go func() {
-			defer close(outc)
-			defer close(errc)
-			if val, err := proxy.LastUpdatedBlock(); err != nil {
-				utils.ReportResult(ctx, errc, errors.Errorf("GroupToPick failed : %w", err))
-			} else {
-				utils.ReportResult(ctx, outc, val)
-			}
-		}()
-		return outc, errc
-	}
-
-	vr, ve := e.get(ctx, f, nil)
-	if v, ok := vr.(*big.Int); ok {
-		result = v.Uint64()
-	}
-	if v, ok := ve.(error); ok {
-		err = v
-	}
-	return
-}
-
-// IsPendingNode checks to see if the node account is a pending node
-func (e *ethAdaptor) IsPendingNode(ctx context.Context, id []byte) (result bool, err error) {
-	f := func(ctx context.Context, client *ethclient.Client, proxy *dosproxy.DosproxySession, p interface{}) (chan interface{}, chan interface{}) {
-		outc := make(chan interface{})
-		errc := make(chan interface{})
-		go func() {
-			defer close(outc)
-			defer close(errc)
-			if id, ok := p.(common.Address); ok {
-				if val, err := proxy.PendingNodeList(id); err != nil {
-					utils.ReportResult(ctx, errc, errors.Errorf("GroupToPick failed : %w", err))
+				if val, err := proxies[idx].GroupToPick(); err != nil {
+					replyError(ctx, errc, &OnchainError{err: errors.Errorf("get err : %w", err), Idx: idx})
 				} else {
 					utils.ReportResult(ctx, outc, val)
 				}
-			} else {
-				utils.ReportResult(ctx, errc, errors.Errorf("PendingNodeList failed Type %T : %w", p, ErrCast))
 			}
 		}()
 		return outc, errc
 	}
+	var r interface{}
+	if r, err = e.get(f); err != nil {
+		return
+	}
+	if v, ok := r.(*big.Int); ok {
+		result = v.Uint64()
+	} else {
+		err = errors.New("casting error")
+	}
+	return
+}
+
+// GetExpiredWorkingGroupSize returns the GetExpiredWorkingGroupSize value
+func (e *ethAdaptor) GetExpiredWorkingGroupSize() (result uint64, err error) {
+	if !e.isConnecting() {
+		err = errors.New("not connecting to geth")
+	}
+	proxies := e.proxies
+	f := func(ctx context.Context) (chan interface{}, chan error) {
+		outc := make(chan interface{})
+		errc := make(chan error)
+		go func() {
+			defer close(outc)
+			defer close(errc)
+			idx := getIndex(ctx)
+			if idx == -1 {
+				err = errors.New("no client index in context")
+			} else {
+				if val, err := proxies[idx].GetExpiredWorkingGroupSize(); err != nil {
+					replyError(ctx, errc, &OnchainError{err: errors.Errorf("get err : %w", err), Idx: idx})
+				} else {
+					utils.ReportResult(ctx, outc, val)
+				}
+			}
+		}()
+		return outc, errc
+	}
+	var r interface{}
+	if r, err = e.get(f); err != nil {
+		return
+	}
+	if v, ok := r.(*big.Int); ok {
+		result = v.Uint64()
+	} else {
+		err = errors.New("casting error")
+	}
+	return
+}
+
+func (e *ethAdaptor) GroupSize() (result uint64, err error) {
+	if !e.isConnecting() {
+		err = errors.New("not connecting to geth")
+	}
+	proxies := e.proxies
+	f := func(ctx context.Context) (chan interface{}, chan error) {
+		outc := make(chan interface{})
+		errc := make(chan error)
+		go func() {
+			defer close(outc)
+			defer close(errc)
+			idx := getIndex(ctx)
+			if idx == -1 {
+				err = errors.New("no client index in context")
+			} else {
+				if val, err := proxies[idx].GroupSize(); err != nil {
+					replyError(ctx, errc, &OnchainError{err: errors.Errorf("get err : %w", err), Idx: idx})
+				} else {
+					utils.ReportResult(ctx, outc, val)
+				}
+			}
+		}()
+		return outc, errc
+	}
+	var r interface{}
+	if r, err = e.get(f); err != nil {
+		return
+	}
+	if v, ok := r.(*big.Int); ok {
+		result = v.Uint64()
+	} else {
+		err = errors.New("casting error")
+	}
+	return
+}
+func (e *ethAdaptor) GetWorkingGroupSize() (result uint64, err error) {
+	if !e.isConnecting() {
+		err = errors.New("not connecting to geth")
+	}
+	proxies := e.proxies
+	f := func(ctx context.Context) (chan interface{}, chan error) {
+		outc := make(chan interface{})
+		errc := make(chan error)
+		go func() {
+			defer close(outc)
+			defer close(errc)
+			idx := getIndex(ctx)
+			if idx == -1 {
+				err = errors.New("no client index in context")
+			} else {
+				if val, err := proxies[idx].GetWorkingGroupSize(); err != nil {
+					replyError(ctx, errc, &OnchainError{err: errors.Errorf("get err : %w", err), Idx: idx})
+				} else {
+					utils.ReportResult(ctx, outc, val)
+				}
+			}
+		}()
+		return outc, errc
+	}
+	var r interface{}
+	if r, err = e.get(f); err != nil {
+		return
+	}
+	if v, ok := r.(*big.Int); ok {
+		result = v.Uint64()
+	} else {
+		err = errors.New("casting error")
+	}
+	return
+}
+func (e *ethAdaptor) GroupingThreshold() (result uint64, err error) {
+	if !e.isConnecting() {
+		err = errors.New("not connecting to geth")
+	}
+	proxies := e.proxies
+	f := func(ctx context.Context) (chan interface{}, chan error) {
+		outc := make(chan interface{})
+		errc := make(chan error)
+		go func() {
+			defer close(outc)
+			defer close(errc)
+			idx := getIndex(ctx)
+			if idx == -1 {
+				err = errors.New("no client index in context")
+			} else {
+				if val, err := proxies[idx].GroupingThreshold(); err != nil {
+					replyError(ctx, errc, &OnchainError{err: errors.Errorf("get err : %w", err), Idx: idx})
+				} else {
+					utils.ReportResult(ctx, outc, val)
+				}
+			}
+		}()
+		return outc, errc
+	}
+	var r interface{}
+	if r, err = e.get(f); err != nil {
+		return
+	}
+	if v, ok := r.(*big.Int); ok {
+		result = v.Uint64()
+	} else {
+		err = errors.New("casting error")
+	}
+	return
+}
+func (e *ethAdaptor) LastUpdatedBlock() (result uint64, err error) {
+	if !e.isConnecting() {
+		err = errors.New("not connecting to geth")
+	}
+	proxies := e.proxies
+	f := func(ctx context.Context) (chan interface{}, chan error) {
+		outc := make(chan interface{})
+		errc := make(chan error)
+		go func() {
+			defer close(outc)
+			defer close(errc)
+			idx := getIndex(ctx)
+			if idx == -1 {
+				err = errors.New("no client index in context")
+			} else {
+				if val, err := proxies[idx].LastUpdatedBlock(); err != nil {
+					replyError(ctx, errc, &OnchainError{err: errors.Errorf("get err : %w", err), Idx: idx})
+				} else {
+					utils.ReportResult(ctx, outc, val)
+				}
+			}
+		}()
+		return outc, errc
+	}
+	var r interface{}
+	if r, err = e.get(f); err != nil {
+		return
+	}
+	if v, ok := r.(*big.Int); ok {
+		result = v.Uint64()
+	} else {
+		err = errors.New("casting error")
+	}
+	return
+}
+func (e *ethAdaptor) NumPendingGroups() (result uint64, err error) {
+	if !e.isConnecting() {
+		err = errors.New("not connecting to geth")
+	}
+	proxies := e.proxies
+	f := func(ctx context.Context) (chan interface{}, chan error) {
+		outc := make(chan interface{})
+		errc := make(chan error)
+		go func() {
+			defer close(outc)
+			defer close(errc)
+			idx := getIndex(ctx)
+			if idx == -1 {
+				err = errors.New("no client index in context")
+			} else {
+				if val, err := proxies[idx].NumPendingGroups(); err != nil {
+					replyError(ctx, errc, &OnchainError{err: errors.Errorf("get err : %w", err), Idx: idx})
+				} else {
+					utils.ReportResult(ctx, outc, val)
+				}
+			}
+		}()
+		return outc, errc
+	}
+	var r interface{}
+	if r, err = e.get(f); err != nil {
+		return
+	}
+	if v, ok := r.(*big.Int); ok {
+		result = v.Uint64()
+	} else {
+		err = errors.New("casting error")
+	}
+	return
+}
+func (e *ethAdaptor) NumPendingNodes() (result uint64, err error) {
+	if !e.isConnecting() {
+		err = errors.New("not connecting to geth")
+	}
+	proxies := e.proxies
+	f := func(ctx context.Context) (chan interface{}, chan error) {
+		outc := make(chan interface{})
+		errc := make(chan error)
+		go func() {
+			defer close(outc)
+			defer close(errc)
+			idx := getIndex(ctx)
+			if idx == -1 {
+				err = errors.New("no client index in context")
+			} else {
+				if val, err := proxies[idx].NumPendingNodes(); err != nil {
+					replyError(ctx, errc, &OnchainError{err: errors.Errorf("get err : %w", err), Idx: idx})
+				} else {
+					utils.ReportResult(ctx, outc, val)
+				}
+			}
+		}()
+		return outc, errc
+	}
+	var r interface{}
+	if r, err = e.get(f); err != nil {
+		return
+	}
+	if v, ok := r.(*big.Int); ok {
+		result = v.Uint64()
+	} else {
+		err = errors.New("casting error")
+	}
+	return
+}
+func (e *ethAdaptor) BootstrapEndBlk() (result uint64, err error) {
+	if !e.isConnecting() {
+		err = errors.New("not connecting to geth")
+	}
+	proxies := e.proxies
+	f := func(ctx context.Context) (chan interface{}, chan error) {
+		outc := make(chan interface{})
+		errc := make(chan error)
+		go func() {
+			defer close(outc)
+			defer close(errc)
+			idx := getIndex(ctx)
+			if idx == -1 {
+				err = errors.New("no client index in context")
+			} else {
+				if val, err := proxies[idx].BootstrapEndBlk(); err != nil {
+					replyError(ctx, errc, &OnchainError{err: errors.Errorf("get err : %w", err), Idx: idx})
+				} else {
+					utils.ReportResult(ctx, outc, val)
+				}
+			}
+		}()
+		return outc, errc
+	}
+	var r interface{}
+	if r, err = e.get(f); err != nil {
+		return
+	}
+	if v, ok := r.(*big.Int); ok {
+		result = v.Uint64()
+	} else {
+		err = errors.New("casting error")
+	}
+	return
+}
+func (e *ethAdaptor) RefreshSystemRandomHardLimit() (result uint64, err error) {
+	if !e.isConnecting() {
+		err = errors.New("not connecting to geth")
+	}
+	proxies := e.proxies
+	f := func(ctx context.Context) (chan interface{}, chan error) {
+		outc := make(chan interface{})
+		errc := make(chan error)
+		go func() {
+			defer close(outc)
+			defer close(errc)
+			idx := getIndex(ctx)
+			if idx == -1 {
+				err = errors.New("no client index in context")
+			} else {
+				if val, err := proxies[idx].RefreshSystemRandomHardLimit(); err != nil {
+					replyError(ctx, errc, &OnchainError{err: errors.Errorf("get err : %w", err), Idx: idx})
+				} else {
+					utils.ReportResult(ctx, outc, val)
+				}
+			}
+		}()
+		return outc, errc
+	}
+	var r interface{}
+	if r, err = e.get(f); err != nil {
+		return
+	}
+	if v, ok := r.(*big.Int); ok {
+		result = v.Uint64()
+	} else {
+		err = errors.New("casting error")
+	}
+	return
+}
+func (e *ethAdaptor) GroupPubKey(gIdx int) (result [4]*big.Int, err error) {
+	if !e.isConnecting() {
+		err = errors.New("not connecting to geth")
+	}
+	proxies := e.proxies
+	f := func(ctx context.Context) (chan interface{}, chan error) {
+		outc := make(chan interface{})
+		errc := make(chan error)
+		go func() {
+			defer close(outc)
+			defer close(errc)
+			idx := getIndex(ctx)
+			if idx == -1 {
+				err = errors.New("no client index in context")
+			} else {
+				if val, err := proxies[idx].GetGroupPubKey(big.NewInt(int64(gIdx))); err != nil {
+					replyError(ctx, errc, &OnchainError{err: errors.Errorf("get err : %w", err), Idx: idx})
+				} else {
+					utils.ReportResult(ctx, outc, val)
+				}
+			}
+		}()
+		return outc, errc
+	}
+	var r interface{}
+	if r, err = e.get(f); err != nil {
+		return
+	}
+	if v, ok := r.([4]*big.Int); ok {
+		result = v
+	} else {
+		err = errors.New("casting error")
+	}
+	return
+}
+func (e *ethAdaptor) IsPendingNode(id []byte) (result bool, err error) {
+	if !e.isConnecting() {
+		err = errors.New("not connecting to geth")
+	}
+	proxies := e.proxies
 	addr := common.Address{}
-	b := []byte(id)
-	addr.SetBytes(b)
-	vr, ve := e.get(ctx, f, addr)
-	if v, ok := vr.(common.Address); ok {
+	addr.SetBytes(id)
+	f := func(ctx context.Context) (chan interface{}, chan error) {
+		outc := make(chan interface{})
+		errc := make(chan error)
+		go func() {
+			defer close(outc)
+			defer close(errc)
+			idx := getIndex(ctx)
+			if idx == -1 {
+				err = errors.New("no client index in context")
+			} else {
+				if val, err := proxies[idx].PendingNodeList(addr); err != nil {
+					replyError(ctx, errc, &OnchainError{err: errors.Errorf("get err : %w", err), Idx: idx})
+				} else {
+					utils.ReportResult(ctx, outc, val)
+				}
+			}
+		}()
+		return outc, errc
+	}
+	var r interface{}
+	if r, err = e.get(f); err != nil {
+		return
+	}
+	if v, ok := r.(common.Address); ok {
 		if v.Big().Cmp(big.NewInt(0)) == 0 {
 			result = false
 		} else {
 			result = true
 		}
-	}
-	if v, ok := ve.(error); ok {
-		err = v
+	} else {
+		err = errors.New("casting error")
 	}
 	return
 }
-
-// GroupPubKey returns the group public key of the given index
-func (e *ethAdaptor) GroupPubKey(ctx context.Context, idx int) (result [4]*big.Int, err error) {
-	f := func(ctx context.Context, client *ethclient.Client, proxy *dosproxy.DosproxySession, p interface{}) (chan interface{}, chan interface{}) {
+func (e *ethAdaptor) BootstrapRound() (result uint64, err error) {
+	if !e.isConnecting() {
+		err = errors.New("not connecting to geth")
+	}
+	proxies := e.proxies
+	f := func(ctx context.Context) (chan interface{}, chan error) {
 		outc := make(chan interface{})
-		errc := make(chan interface{})
+		errc := make(chan error)
 		go func() {
 			defer close(outc)
 			defer close(errc)
-			if idx, ok := p.(*big.Int); ok {
-				if val, err := proxy.GetGroupPubKey(idx); err != nil {
-					utils.ReportResult(ctx, errc, errors.Errorf("GetGroupPubKey failed : %w", err))
+			idx := getIndex(ctx)
+			if idx == -1 {
+				err = errors.New("no client index in context")
+			} else {
+				if val, err := proxies[idx].BootstrapRound(); err != nil {
+					replyError(ctx, errc, &OnchainError{err: errors.Errorf("get err : %w", err), Idx: idx})
 				} else {
 					utils.ReportResult(ctx, outc, val)
 				}
-			} else {
-				utils.ReportResult(ctx, errc, errors.Errorf("GetGroupPubKey failed Type %T : %w", p, ErrCast))
 			}
 		}()
 		return outc, errc
 	}
-
-	vr, ve := e.get(ctx, f, big.NewInt(int64(idx)))
-	if v, ok := vr.([4]*big.Int); ok {
-		result = v
+	var r interface{}
+	if r, err = e.get(f); err != nil {
+		return
 	}
-	if v, ok := ve.(error); ok {
-		err = v
-	}
-	return
-}
-
-// PendingNonce returns the account nonce of the node account in the pending state.
-// This is the nonce that should be used for the next transaction.
-func (e *ethAdaptor) PendingNonce(ctx context.Context) (result uint64, err error) {
-	f := func(ctx context.Context, client *ethclient.Client, proxy *dosproxy.DosproxySession, p interface{}) (chan interface{}, chan interface{}) {
-		outc := make(chan interface{})
-		errc := make(chan interface{})
-		go func() {
-			defer close(outc)
-			defer close(errc)
-			if address, ok := p.(common.Address); ok {
-				if val, err := client.PendingNonceAt(ctx, address); err != nil {
-					utils.ReportResult(ctx, errc, errors.Errorf("PendingNonce failed : %w", err))
-				} else {
-					utils.ReportResult(ctx, outc, val)
-				}
-			} else {
-				utils.ReportResult(ctx, errc, errors.Errorf("PendingNonce failed Type %T : %w", p, ErrCast))
-			}
-		}()
-		return outc, errc
-	}
-
-	vr, ve := e.get(ctx, f, e.key.Address)
-	if v, ok := vr.(*big.Int); ok {
+	if v, ok := r.(*big.Int); ok {
 		result = v.Uint64()
-	}
-	if v, ok := ve.(error); ok {
-		err = v
+	} else {
+		err = errors.New("casting error")
 	}
 	return
-
 }
-
-// Balance returns the wei balance of the node account.
-func (e *ethAdaptor) Balance(ctx context.Context) (result *big.Float, err error) {
-	f := func(ctx context.Context, client *ethclient.Client, proxy *dosproxy.DosproxySession, p interface{}) (chan interface{}, chan interface{}) {
+func (e *ethAdaptor) Balance() (result *big.Float, err error) {
+	if !e.isConnecting() {
+		err = errors.New("not connecting to geth")
+	}
+	clients := e.clients
+	f := func(ctx context.Context) (chan interface{}, chan error) {
 		outc := make(chan interface{})
-		errc := make(chan interface{})
+		errc := make(chan error)
 		go func() {
 			defer close(outc)
 			defer close(errc)
-			if balance, err := GetBalance(client, e.key); err != nil {
-				utils.ReportResult(ctx, errc, errors.Errorf("GetBalance failed : %w", err))
+			idx := getIndex(ctx)
+			if idx == -1 {
+				err = errors.New("no client index in context")
 			} else {
-				utils.ReportResult(ctx, outc, balance)
+				if val, err := GetBalance(clients[idx], e.key); err != nil {
+					replyError(ctx, errc, &OnchainError{err: errors.Errorf("get err : %w", err), Idx: idx})
+				} else {
+					utils.ReportResult(ctx, outc, val)
+				}
 			}
 		}()
 		return outc, errc
 	}
-
-	vr, ve := e.get(ctx, f, nil)
-	if v, ok := vr.(*big.Float); ok {
-		result = v
+	var r interface{}
+	if r, err = e.get(f); err != nil {
+		return
 	}
-	if v, ok := ve.(error); ok {
-		err = v
+	if v, ok := r.(*big.Float); ok {
+		result = v
+	} else {
+		err = errors.New("casting error")
 	}
 	return
 }
-
-// CurrentBlock return the block number of the latest known header
-func (e *ethAdaptor) CurrentBlock(ctx context.Context) (result uint64, err error) {
-	f := func(ctx context.Context, client *ethclient.Client, proxy *dosproxy.DosproxySession, p interface{}) (chan interface{}, chan interface{}) {
+func (e *ethAdaptor) CurrentBlock() (result uint64, err error) {
+	if !e.isConnecting() {
+		err = errors.New("not connecting to geth")
+	}
+	clients := e.clients
+	f := func(ctx context.Context) (chan interface{}, chan error) {
 		outc := make(chan interface{})
-		errc := make(chan interface{})
+		errc := make(chan error)
 		go func() {
 			defer close(outc)
 			defer close(errc)
-			if val, err := client.HeaderByNumber(ctx, nil); err != nil {
-				utils.ReportResult(ctx, errc, errors.Errorf("PendingNonce failed : %w", err))
+			idx := getIndex(ctx)
+			if idx == -1 {
+				err = errors.New("no client index in context")
+			} else {
+				if val, err := clients[idx].HeaderByNumber(ctx, nil); err != nil {
+					replyError(ctx, errc, &OnchainError{err: errors.Errorf("get err : %w", err), Idx: idx})
+				} else {
+					utils.ReportResult(ctx, outc, val)
+				}
+			}
+		}()
+		return outc, errc
+	}
+	var r interface{}
+	if r, err = e.get(f); err != nil {
+		return
+	}
+	if v, ok := r.(*types.Header); ok {
+		result = v.Number.Uint64()
+	} else {
+		err = errors.New("casting error")
+	}
+	return
+}
+func (e *ethAdaptor) PendingNonce() (result uint64, err error) {
+	if !e.isConnecting() {
+		err = errors.New("not connecting to geth")
+	}
+	clients := e.clients
+	f := func(ctx context.Context) (chan interface{}, chan error) {
+		outc := make(chan interface{})
+		errc := make(chan error)
+		go func() {
+			defer close(outc)
+			defer close(errc)
+			idx := getIndex(ctx)
+			if idx == -1 {
+				err = errors.New("no client index in context")
+				return
+			}
+			if val, err := clients[idx].PendingNonceAt(ctx, e.key.Address); err != nil {
+				replyError(ctx, errc, &OnchainError{err: errors.Errorf("get err : %w", err), Idx: idx})
 			} else {
 				utils.ReportResult(ctx, outc, val)
 			}
 		}()
 		return outc, errc
 	}
-
-	vr, ve := e.get(ctx, f, nil)
-	if v, ok := vr.(*types.Header); ok {
-		result = v.Number.Uint64()
+	var r interface{}
+	if r, err = e.get(f); err != nil {
+		return
 	}
-	if v, ok := ve.(error); ok {
-		err = v
+	if v, ok := r.(uint64); ok {
+		result = v
+	} else {
+		err = errors.New("casting error")
 	}
 	return
+
 }

@@ -129,15 +129,8 @@ func (d *DosNode) handleQuery(ids [][]byte, pubPoly *share.PubPoly, sec *share.P
 	errcList = append(errcList, errc)
 	recoveredSignc, errc := recoverSign(queryCtxWithValue, signAllc, d.suite, pubPoly, (len(ids)/2 + 1), len(ids), d.logger)
 	errcList = append(errcList, errc)
+	errcList = append(errcList, reportQueryResult(queryCtxWithValue, d.chain, pType, recoveredSignc))
 
-	switch pType {
-	case onchain.TrafficSystemRandom:
-		errc := d.chain.SetRandomNum(queryCtxWithValue, recoveredSignc)
-		errcList = append(errcList, errc)
-	default:
-		errc := d.chain.DataReturn(queryCtxWithValue, recoveredSignc)
-		errcList = append(errcList, errc)
-	}
 	allErrc := mergeErrors(queryCtxWithValue, errcList...)
 	for {
 		select {

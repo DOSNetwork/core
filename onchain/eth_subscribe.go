@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
+	"io"
 	"math/big"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/DOSNetwork/core/onchain/dosproxy"
 
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
+	errors "golang.org/x/xerrors"
 )
 
 const (
@@ -38,8 +40,8 @@ const (
 	SubscribeLogNoWorkingGroup
 	//SubscribeLogGroupingInitiated is a log type to subscribe the event GroupingInitiated
 	SubscribeLogGroupingInitiated
-	//SubscribeDosproxyUpdateGroupToPick is a log type to subscribe the event UpdateGroupToPick
-	SubscribeDosproxyUpdateGroupToPick
+	//SubscribeDosproxyUpdateBootstrapGroups is a log type to subscribe the event UpdateGroupToPick
+	SubscribeDosproxyUpdateBootstrapGroups
 	//SubscribeDosproxyUpdateGroupSize is a log type to subscribe the event UpdateGroupSize
 	SubscribeDosproxyUpdateGroupSize
 	//SubscribeCommitrevealLogStartCommitreveal is a log type to subscribe the event StartCommitreveal
@@ -51,30 +53,6 @@ const (
 	//SubscribeCommitrevealLogRandom is a log type to subscribe the event LogRandom
 	SubscribeCommitrevealLogRandom
 )
-
-func convertToError(ctx context.Context, i chan interface{}) (out chan error) {
-	out = make(chan error)
-	go func() {
-		defer close(out)
-		for {
-			select {
-			case e, ok := <-i:
-				if !ok {
-					return
-				}
-				if err, ok := e.(error); ok {
-					select {
-					case out <- err:
-					case <-ctx.Done():
-					}
-				}
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
-	return out
-}
 
 func firstEvent(ctx context.Context, source chan interface{}) (out chan interface{}) {
 	out = make(chan interface{})
@@ -125,48 +103,67 @@ func firstEvent(ctx context.Context, source chan interface{}) (out chan interfac
 // SubscribeEvent is a log subscription operation
 func (e *ethAdaptor) SubscribeEvent(subscribeTypes []int) (chan interface{}, chan error) {
 	var eventList []chan interface{}
-	var errcs []chan interface{}
+	var errcs []chan error
 	fmt.Println("Subscribe proxies ", len(e.proxies), " crs ", len(e.crs))
 	for _, subscribeType := range subscribeTypes {
 		if subscribeType >= SubscribeCommitrevealLogStartCommitreveal {
 			for i := 0; i < len(e.crs); i++ {
 				fmt.Println("Subscribe CR Event ", i)
-				cr := e.crs[i]
-				if cr == nil {
+				if e.crs[i] == nil ||
+					e.ctxes[i] == nil {
 					continue
 				}
-				ctx := e.ctx
-				if ctx == nil {
+				select {
+				case <-e.ctxes[i].Done():
 					continue
+				default:
 				}
-				out, errc := crTable[subscribeType](ctx, cr)
+				out, errc := crTable[subscribeType](e.ctxes[i], e.crs[i])
 				eventList = append(eventList, out)
 				errcs = append(errcs, errc)
 			}
 		} else {
 			for i := 0; i < len(e.proxies); i++ {
 				fmt.Println("SubscribeEvent ", i, subscribeType)
-				proxy := e.proxies[i]
-				if proxy == nil {
+				if e.proxies[i] == nil ||
+					e.ctxes[i] == nil {
 					continue
 				}
-				ctx := e.ctx
-				if ctx == nil {
+				select {
+				case <-e.ctxes[i].Done():
 					continue
+				default:
 				}
-				out, errc := proxyTable[subscribeType](ctx, proxy)
+				out, errc := proxyTable[subscribeType](e.ctxes[i], e.proxies[i])
 				eventList = append(eventList, out)
 				errcs = append(errcs, errc)
 			}
 		}
 	}
-	return firstEvent(e.ctx, merge(e.ctx, eventList...)), convertToError(e.ctx, merge(e.ctx, errcs...))
+	return firstEvent(e.ctx, merge(e.ctx, eventList...)), mergeError(e.ctx, errcs...)
 }
 
-var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (chan interface{}, chan interface{}){
-	SubscribeLogUpdateRandom: func(ctx context.Context, proxy *dosproxy.DosproxySession) (chan interface{}, chan interface{}) {
+func getIndex(ctx context.Context) (idx int) {
+	if v := ctx.Value(contextKey); v != nil {
+		if i, ok := v.(int); ok {
+			idx = i
+		} else {
+			idx = -1
+		}
+	}
+	return
+}
+func replyError(ctx context.Context, errc chan error, err error) {
+	select {
+	case <-ctx.Done():
+	case errc <- err:
+	}
+}
+
+var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (chan interface{}, chan error){
+	SubscribeLogUpdateRandom: func(ctx context.Context, proxy *dosproxy.DosproxySession) (chan interface{}, chan error) {
 		out := make(chan interface{})
-		errc := make(chan interface{})
+		errc := make(chan error)
 		opt := &bind.WatchOpts{}
 		go func() {
 			transitChan := make(chan *dosproxy.DosproxyLogUpdateRandom)
@@ -175,6 +172,7 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 			defer close(out)
 			sub, err := proxy.Contract.WatchLogUpdateRandom(opt, transitChan)
 			if err != nil {
+				replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err : %w", err), Idx: getIndex(ctx)})
 				return
 			}
 			for {
@@ -184,8 +182,11 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 					sub.Unsubscribe()
 					return
 				case err := <-sub.Err():
-					errc <- err
-					return
+					replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err : %w", err), Idx: getIndex(ctx)})
+					if err == io.EOF {
+						return
+					}
+					continue
 				case i := <-transitChan:
 					l := &LogUpdateRandom{
 						LastRandomness:    i.LastRandomness,
@@ -209,9 +210,9 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 		}()
 		return out, errc
 	},
-	SubscribeLogUrl: func(ctx context.Context, proxy *dosproxy.DosproxySession) (chan interface{}, chan interface{}) {
+	SubscribeLogUrl: func(ctx context.Context, proxy *dosproxy.DosproxySession) (chan interface{}, chan error) {
 		out := make(chan interface{})
-		errc := make(chan interface{})
+		errc := make(chan error)
 		opt := &bind.WatchOpts{}
 		go func() {
 			transitChan := make(chan *dosproxy.DosproxyLogUrl)
@@ -221,6 +222,7 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 
 			sub, err := proxy.Contract.WatchLogUrl(opt, transitChan)
 			if err != nil {
+				replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err : %w", err), Idx: getIndex(ctx)})
 				return
 			}
 			for {
@@ -230,8 +232,11 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 					sub.Unsubscribe()
 					return
 				case err := <-sub.Err():
-					errc <- err
-					return
+					replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err : %w", err), Idx: getIndex(ctx)})
+					if err == io.EOF {
+						return
+					}
+					continue
 				case i := <-transitChan:
 					l := &LogUrl{
 						QueryId:           i.QueryId,
@@ -259,9 +264,9 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 		}()
 		return out, errc
 	},
-	SubscribeLogRequestUserRandom: func(ctx context.Context, proxy *dosproxy.DosproxySession) (chan interface{}, chan interface{}) {
+	SubscribeLogRequestUserRandom: func(ctx context.Context, proxy *dosproxy.DosproxySession) (chan interface{}, chan error) {
 		out := make(chan interface{})
-		errc := make(chan interface{})
+		errc := make(chan error)
 		opt := &bind.WatchOpts{}
 		go func() {
 			transitChan := make(chan *dosproxy.DosproxyLogRequestUserRandom)
@@ -271,6 +276,8 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 
 			sub, err := proxy.Contract.WatchLogRequestUserRandom(opt, transitChan)
 			if err != nil {
+				replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err : %w", err), Idx: getIndex(ctx)})
+
 				return
 			}
 			for {
@@ -280,8 +287,12 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 					sub.Unsubscribe()
 					return
 				case err := <-sub.Err():
-					errc <- err
-					return
+					replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err : %w", err), Idx: getIndex(ctx)})
+
+					if err == io.EOF {
+						return
+					}
+					continue
 				case i := <-transitChan:
 					l := &LogRequestUserRandom{
 						RequestId:            i.RequestId,
@@ -307,9 +318,9 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 		}()
 		return out, errc
 	},
-	SubscribeLogValidationResult: func(ctx context.Context, proxy *dosproxy.DosproxySession) (chan interface{}, chan interface{}) {
+	SubscribeLogValidationResult: func(ctx context.Context, proxy *dosproxy.DosproxySession) (chan interface{}, chan error) {
 		out := make(chan interface{})
-		errc := make(chan interface{})
+		errc := make(chan error)
 		opt := &bind.WatchOpts{}
 		go func() {
 			transitChan := make(chan *dosproxy.DosproxyLogValidationResult)
@@ -319,22 +330,23 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 
 			sub, err := proxy.Contract.WatchLogValidationResult(opt, transitChan)
 			if err != nil {
-				fmt.Println("SubscribeLogValidationResult err", err)
+				replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err : %w", err), Idx: getIndex(ctx)})
+
 				return
 			}
 			for {
 				var log *LogCommon
 				select {
 				case <-ctx.Done():
-					fmt.Println("SubscribeLogValidationResult Done")
-
 					sub.Unsubscribe()
 					return
 				case err := <-sub.Err():
-					fmt.Println("SubscribeLogValidationResult err", err)
+					replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err : %w", err), Idx: getIndex(ctx)})
 
-					errc <- err
-					return
+					if err == io.EOF {
+						return
+					}
+					continue
 				case i := <-transitChan:
 					l := &LogValidationResult{
 						TrafficType: i.TrafficType,
@@ -362,9 +374,9 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 		}()
 		return out, errc
 	},
-	SubscribeLogInsufficientPendingNode: func(ctx context.Context, proxy *dosproxy.DosproxySession) (chan interface{}, chan interface{}) {
+	SubscribeLogInsufficientPendingNode: func(ctx context.Context, proxy *dosproxy.DosproxySession) (chan interface{}, chan error) {
 		out := make(chan interface{})
-		errc := make(chan interface{})
+		errc := make(chan error)
 		opt := &bind.WatchOpts{}
 		go func() {
 			transitChan := make(chan *dosproxy.DosproxyLogInsufficientPendingNode)
@@ -373,6 +385,8 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 			defer close(out)
 			sub, err := proxy.Contract.WatchLogInsufficientPendingNode(opt, transitChan)
 			if err != nil {
+				replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err : %w", err), Idx: getIndex(ctx)})
+
 				return
 			}
 			for {
@@ -382,8 +396,12 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 					sub.Unsubscribe()
 					return
 				case err := <-sub.Err():
-					errc <- err
-					return
+					replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err : %w", err), Idx: getIndex(ctx)})
+
+					if err == io.EOF {
+						return
+					}
+					continue
 				case i := <-transitChan:
 					l := &LogInsufficientPendingNode{
 						NumPendingNodes: i.NumPendingNodes,
@@ -406,9 +424,9 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 		}()
 		return out, errc
 	},
-	SubscribeLogInsufficientWorkingGroup: func(ctx context.Context, proxy *dosproxy.DosproxySession) (chan interface{}, chan interface{}) {
+	SubscribeLogInsufficientWorkingGroup: func(ctx context.Context, proxy *dosproxy.DosproxySession) (chan interface{}, chan error) {
 		out := make(chan interface{})
-		errc := make(chan interface{})
+		errc := make(chan error)
 		opt := &bind.WatchOpts{}
 		go func() {
 			transitChan := make(chan *dosproxy.DosproxyLogInsufficientWorkingGroup)
@@ -417,6 +435,8 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 			defer close(out)
 			sub, err := proxy.Contract.WatchLogInsufficientWorkingGroup(opt, transitChan)
 			if err != nil {
+				replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err : %w", err), Idx: getIndex(ctx)})
+
 				return
 			}
 			for {
@@ -426,8 +446,12 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 					sub.Unsubscribe()
 					return
 				case err := <-sub.Err():
-					errc <- err
-					return
+					replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err : %w", err), Idx: getIndex(ctx)})
+
+					if err == io.EOF {
+						return
+					}
+					continue
 				case i := <-transitChan:
 					l := &LogInsufficientWorkingGroup{
 						NumWorkingGroups: i.NumWorkingGroups,
@@ -450,9 +474,9 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 		}()
 		return out, errc
 	},
-	SubscribeLogGroupingInitiated: func(ctx context.Context, proxy *dosproxy.DosproxySession) (chan interface{}, chan interface{}) {
+	SubscribeLogGroupingInitiated: func(ctx context.Context, proxy *dosproxy.DosproxySession) (chan interface{}, chan error) {
 		out := make(chan interface{})
-		errc := make(chan interface{})
+		errc := make(chan error)
 		opt := &bind.WatchOpts{}
 		go func() {
 			transitChan := make(chan *dosproxy.DosproxyLogGroupingInitiated)
@@ -461,6 +485,8 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 			defer close(out)
 			sub, err := proxy.Contract.WatchLogGroupingInitiated(opt, transitChan)
 			if err != nil {
+				replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err : %w", err), Idx: getIndex(ctx)})
+
 				return
 			}
 			for {
@@ -470,8 +496,12 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 					sub.Unsubscribe()
 					return
 				case err := <-sub.Err():
-					errc <- err
-					return
+					replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err : %w", err), Idx: getIndex(ctx)})
+
+					if err == io.EOF {
+						return
+					}
+					continue
 				case i := <-transitChan:
 					l := &LogGroupingInitiated{}
 					log = &LogCommon{
@@ -492,9 +522,9 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 		}()
 		return out, errc
 	},
-	SubscribeDosproxyUpdateGroupSize: func(ctx context.Context, proxy *dosproxy.DosproxySession) (chan interface{}, chan interface{}) {
+	SubscribeDosproxyUpdateGroupSize: func(ctx context.Context, proxy *dosproxy.DosproxySession) (chan interface{}, chan error) {
 		out := make(chan interface{})
-		errc := make(chan interface{})
+		errc := make(chan error)
 		opt := &bind.WatchOpts{}
 		go func() {
 			transitChan := make(chan *dosproxy.DosproxyUpdateGroupSize)
@@ -503,7 +533,9 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 			defer close(out)
 			sub, err := proxy.Contract.WatchUpdateGroupSize(opt, transitChan)
 			if err != nil {
-				fmt.Println("WatchUpdateGroupSize err ", err)
+
+				replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err : %w", err), Idx: getIndex(ctx)})
+
 				return
 			}
 			for {
@@ -513,8 +545,12 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 					sub.Unsubscribe()
 					return
 				case err := <-sub.Err():
-					errc <- err
-					return
+					replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err : %w", err), Idx: getIndex(ctx)})
+
+					if err == io.EOF {
+						return
+					}
+					continue
 				case i := <-transitChan:
 					l := &LogUpdateGroupSize{
 						OldSize: i.OldSize,
@@ -538,9 +574,9 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 		}()
 		return out, errc
 	},
-	SubscribeLogGrouping: func(ctx context.Context, proxy *dosproxy.DosproxySession) (chan interface{}, chan interface{}) {
+	SubscribeLogGrouping: func(ctx context.Context, proxy *dosproxy.DosproxySession) (chan interface{}, chan error) {
 		out := make(chan interface{})
-		errc := make(chan interface{})
+		errc := make(chan error)
 		opt := &bind.WatchOpts{}
 		go func() {
 			transitChan := make(chan *dosproxy.DosproxyLogGrouping)
@@ -549,17 +585,24 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 			defer close(out)
 			sub, err := proxy.Contract.WatchLogGrouping(opt, transitChan)
 			if err != nil {
+				replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err : %w", err), Idx: getIndex(ctx)})
+
 				return
 			}
 			for {
 				var log *LogCommon
 				select {
 				case <-ctx.Done():
+					fmt.Println("SubscribeEvent ctx done")
 					sub.Unsubscribe()
 					return
 				case err := <-sub.Err():
-					errc <- err
-					return
+					replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err : %w", err), Idx: getIndex(ctx)})
+
+					if err == io.EOF {
+						return
+					}
+					continue
 				case i := <-transitChan:
 					var participants [][]byte
 					for _, p := range i.NodeId {
@@ -588,9 +631,9 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 		}()
 		return out, errc
 	},
-	SubscribeLogPublicKeyAccepted: func(ctx context.Context, proxy *dosproxy.DosproxySession) (chan interface{}, chan interface{}) {
+	SubscribeLogPublicKeyAccepted: func(ctx context.Context, proxy *dosproxy.DosproxySession) (chan interface{}, chan error) {
 		out := make(chan interface{})
-		errc := make(chan interface{})
+		errc := make(chan error)
 		opt := &bind.WatchOpts{}
 		go func() {
 			transitChan := make(chan *dosproxy.DosproxyLogPublicKeyAccepted)
@@ -599,6 +642,8 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 			defer close(out)
 			sub, err := proxy.Contract.WatchLogPublicKeyAccepted(opt, transitChan)
 			if err != nil {
+				replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err : %w", err), Idx: getIndex(ctx)})
+
 				return
 			}
 			for {
@@ -608,8 +653,12 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 					sub.Unsubscribe()
 					return
 				case err := <-sub.Err():
-					errc <- err
-					return
+					replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err : %w", err), Idx: getIndex(ctx)})
+
+					if err == io.EOF {
+						return
+					}
+					continue
 				case i := <-transitChan:
 					l := &LogPublicKeyAccepted{
 						GroupId:          i.GroupId,
@@ -633,9 +682,9 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 		}()
 		return out, errc
 	},
-	SubscribeLogPublicKeySuggested: func(ctx context.Context, proxy *dosproxy.DosproxySession) (chan interface{}, chan interface{}) {
+	SubscribeLogPublicKeySuggested: func(ctx context.Context, proxy *dosproxy.DosproxySession) (chan interface{}, chan error) {
 		out := make(chan interface{})
-		errc := make(chan interface{})
+		errc := make(chan error)
 		opt := &bind.WatchOpts{}
 		go func() {
 			transitChan := make(chan *dosproxy.DosproxyLogPublicKeySuggested)
@@ -644,6 +693,8 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 			defer close(out)
 			sub, err := proxy.Contract.WatchLogPublicKeySuggested(opt, transitChan)
 			if err != nil {
+				replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err : %w", err), Idx: getIndex(ctx)})
+
 				return
 			}
 			for {
@@ -653,8 +704,12 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 					sub.Unsubscribe()
 					return
 				case err := <-sub.Err():
-					errc <- err
-					return
+					replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err : %w", err), Idx: getIndex(ctx)})
+
+					if err == io.EOF {
+						return
+					}
+					continue
 				case i := <-transitChan:
 					l := &LogPublicKeySuggested{
 						GroupId: i.GroupId,
@@ -678,9 +733,9 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 		}()
 		return out, errc
 	},
-	SubscribeLogGroupDissolve: func(ctx context.Context, proxy *dosproxy.DosproxySession) (chan interface{}, chan interface{}) {
+	SubscribeLogGroupDissolve: func(ctx context.Context, proxy *dosproxy.DosproxySession) (chan interface{}, chan error) {
 		out := make(chan interface{})
-		errc := make(chan interface{})
+		errc := make(chan error)
 		opt := &bind.WatchOpts{}
 		go func() {
 			transitChan := make(chan *dosproxy.DosproxyLogGroupDissolve)
@@ -689,6 +744,8 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 			defer close(out)
 			sub, err := proxy.Contract.WatchLogGroupDissolve(opt, transitChan)
 			if err != nil {
+				replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err : %w", err), Idx: getIndex(ctx)})
+
 				return
 			}
 			for {
@@ -698,8 +755,12 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 					sub.Unsubscribe()
 					return
 				case err := <-sub.Err():
-					errc <- err
-					return
+					replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err : %w", err), Idx: getIndex(ctx)})
+
+					if err == io.EOF {
+						return
+					}
+					continue
 				case i := <-transitChan:
 					l := &LogGroupDissolve{
 						GroupId: i.GroupId,
@@ -723,10 +784,10 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 		return out, errc
 	},
 }
-var crTable = []func(ctx context.Context, cr *commitreveal.CommitrevealSession) (chan interface{}, chan interface{}){
-	SubscribeCommitrevealLogStartCommitreveal: func(ctx context.Context, cr *commitreveal.CommitrevealSession) (chan interface{}, chan interface{}) {
+var crTable = []func(ctx context.Context, cr *commitreveal.CommitrevealSession) (chan interface{}, chan error){
+	SubscribeCommitrevealLogStartCommitreveal: func(ctx context.Context, cr *commitreveal.CommitrevealSession) (chan interface{}, chan error) {
 		out := make(chan interface{})
-		errc := make(chan interface{})
+		errc := make(chan error)
 		opt := &bind.WatchOpts{}
 		go func() {
 			transitChan := make(chan *commitreveal.CommitrevealLogStartCommitReveal)
@@ -735,6 +796,8 @@ var crTable = []func(ctx context.Context, cr *commitreveal.CommitrevealSession) 
 			defer close(out)
 			sub, err := cr.Contract.WatchLogStartCommitReveal(opt, transitChan)
 			if err != nil {
+				replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err : %w", err), Idx: getIndex(ctx)})
+
 				return
 			}
 			for {
@@ -744,8 +807,12 @@ var crTable = []func(ctx context.Context, cr *commitreveal.CommitrevealSession) 
 					sub.Unsubscribe()
 					return
 				case err := <-sub.Err():
-					errc <- err
-					return
+					replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err : %w", err), Idx: getIndex(ctx)})
+
+					if err == io.EOF {
+						return
+					}
+					continue
 				case i := <-transitChan:
 					l := &LogStartCommitReveal{
 						Cid:             i.Cid,
@@ -772,9 +839,9 @@ var crTable = []func(ctx context.Context, cr *commitreveal.CommitrevealSession) 
 		}()
 		return out, errc
 	},
-	SubscribeCommitrevealLogCommit: func(ctx context.Context, cr *commitreveal.CommitrevealSession) (chan interface{}, chan interface{}) {
+	SubscribeCommitrevealLogCommit: func(ctx context.Context, cr *commitreveal.CommitrevealSession) (chan interface{}, chan error) {
 		out := make(chan interface{})
-		errc := make(chan interface{})
+		errc := make(chan error)
 		opt := &bind.WatchOpts{}
 		go func() {
 			transitChan := make(chan *commitreveal.CommitrevealLogCommit)
@@ -783,6 +850,8 @@ var crTable = []func(ctx context.Context, cr *commitreveal.CommitrevealSession) 
 			defer close(out)
 			sub, err := cr.Contract.WatchLogCommit(opt, transitChan)
 			if err != nil {
+				replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err : %w", err), Idx: getIndex(ctx)})
+
 				return
 			}
 			for {
@@ -792,8 +861,12 @@ var crTable = []func(ctx context.Context, cr *commitreveal.CommitrevealSession) 
 					sub.Unsubscribe()
 					return
 				case err := <-sub.Err():
-					errc <- err
-					return
+					replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err : %w", err), Idx: getIndex(ctx)})
+
+					if err == io.EOF {
+						return
+					}
+					continue
 				case i := <-transitChan:
 					l := &LogCommit{
 						Cid:        i.Cid,
@@ -818,9 +891,9 @@ var crTable = []func(ctx context.Context, cr *commitreveal.CommitrevealSession) 
 		}()
 		return out, errc
 	},
-	SubscribeCommitrevealLogReveal: func(ctx context.Context, cr *commitreveal.CommitrevealSession) (chan interface{}, chan interface{}) {
+	SubscribeCommitrevealLogReveal: func(ctx context.Context, cr *commitreveal.CommitrevealSession) (chan interface{}, chan error) {
 		out := make(chan interface{})
-		errc := make(chan interface{})
+		errc := make(chan error)
 		opt := &bind.WatchOpts{}
 		go func() {
 			transitChan := make(chan *commitreveal.CommitrevealLogReveal)
@@ -829,6 +902,8 @@ var crTable = []func(ctx context.Context, cr *commitreveal.CommitrevealSession) 
 			defer close(out)
 			sub, err := cr.Contract.WatchLogReveal(opt, transitChan)
 			if err != nil {
+				replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err : %w", err), Idx: getIndex(ctx)})
+
 				return
 			}
 			for {
@@ -838,8 +913,12 @@ var crTable = []func(ctx context.Context, cr *commitreveal.CommitrevealSession) 
 					sub.Unsubscribe()
 					return
 				case err := <-sub.Err():
-					errc <- err
-					return
+					replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err : %w", err), Idx: getIndex(ctx)})
+
+					if err == io.EOF {
+						return
+					}
+					continue
 				case i := <-transitChan:
 					l := &LogReveal{
 						Cid:    i.Cid,
@@ -864,9 +943,9 @@ var crTable = []func(ctx context.Context, cr *commitreveal.CommitrevealSession) 
 		}()
 		return out, errc
 	},
-	SubscribeCommitrevealLogRandom: func(ctx context.Context, cr *commitreveal.CommitrevealSession) (chan interface{}, chan interface{}) {
+	SubscribeCommitrevealLogRandom: func(ctx context.Context, cr *commitreveal.CommitrevealSession) (chan interface{}, chan error) {
 		out := make(chan interface{})
-		errc := make(chan interface{})
+		errc := make(chan error)
 		opt := &bind.WatchOpts{}
 		go func() {
 			transitChan := make(chan *commitreveal.CommitrevealLogRandom)
@@ -875,6 +954,8 @@ var crTable = []func(ctx context.Context, cr *commitreveal.CommitrevealSession) 
 			defer close(out)
 			sub, err := cr.Contract.WatchLogRandom(opt, transitChan)
 			if err != nil {
+				replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err : %w", err), Idx: getIndex(ctx)})
+
 				return
 			}
 			for {
@@ -884,8 +965,12 @@ var crTable = []func(ctx context.Context, cr *commitreveal.CommitrevealSession) 
 					sub.Unsubscribe()
 					return
 				case err := <-sub.Err():
-					errc <- err
-					return
+					replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err : %w", err), Idx: getIndex(ctx)})
+
+					if err == io.EOF {
+						return
+					}
+					continue
 				case i := <-transitChan:
 					l := &LogRandom{
 						Cid:    i.Cid,

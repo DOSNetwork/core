@@ -422,6 +422,59 @@ func recoverSign(ctx context.Context, signc chan *vss.Signature, suite suites.Su
 	return out, errc
 }
 
+func registerGroup(ctx context.Context, chain onchain.ProxyAdapter, IdWithPubKeys chan [5]*big.Int) (errc chan error) {
+	errc = make(chan error)
+	go func() {
+		defer close(errc)
+		var err error
+		select {
+		case idPubkey, ok := <-IdWithPubKeys:
+			if ok {
+				err = chain.RegisterGroupPubKey(idPubkey)
+			} else {
+				err = errors.New("no publickey")
+			}
+		case <-ctx.Done():
+			err = ctx.Err()
+			return
+		}
+		if err != nil {
+			select {
+			case errc <- err:
+			case <-ctx.Done():
+			}
+		}
+	}()
+	return
+}
+func reportQueryResult(ctx context.Context, chain onchain.ProxyAdapter, queryType uint32, signC chan *vss.Signature) (errc chan error) {
+	errc = make(chan error)
+	go func() {
+		defer close(errc)
+		var err error
+		select {
+		case signature, ok := <-signC:
+			if ok {
+				if queryType == onchain.TrafficSystemRandom {
+					err = chain.UpdateRandomness(signature)
+				} else {
+					err = chain.DataReturn(signature)
+				}
+			} else {
+				err = errors.New("no signature")
+			}
+		case <-ctx.Done():
+			return
+		}
+		if err != nil {
+			select {
+			case errc <- err:
+			case <-ctx.Done():
+			}
+		}
+	}()
+	return
+}
 func padOrTrim(bb []byte, size int) []byte {
 	l := len(bb)
 	if l == size {

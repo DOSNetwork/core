@@ -1,14 +1,12 @@
 package dosnode
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"math/big"
 	"net/http"
 	"os"
 	"strconv"
-	"time"
 
 	"github.com/DOSNetwork/core/onchain"
 )
@@ -37,9 +35,7 @@ func (d *DosNode) startRESTServer() {
 }
 
 func (d *DosNode) status(w http.ResponseWriter, r *http.Request) {
-	ctx, cancelFunc := context.WithDeadline(context.Background(), time.Now().Add(3*time.Second))
-	defer cancelFunc()
-	isPendingNode, err := d.chain.IsPendingNode(ctx, d.id)
+	isPendingNode, err := d.chain.IsPendingNode(d.id)
 	if err != nil {
 		html := "err" + err.Error() + "\n|"
 		w.Write([]byte(html))
@@ -58,38 +54,38 @@ func (d *DosNode) status(w http.ResponseWriter, r *http.Request) {
 	html = html + "Group Number      : " + strconv.Itoa(d.numOfworkingGroup) + "\n"
 	html = html + "=================================================" + "\n|"
 	//	result := d.dkg.GetGroupNumber()
-	balance, err := d.chain.Balance(ctx)
+	balance, err := d.chain.Balance()
 	if err != nil {
 		html = html + "Balance  : " + err.Error() + "\n|"
 	} else {
 		html = html + "Balance  : " + balance.String() + "\n|"
 	}
-	workingGroupNum, err := d.chain.GetWorkingGroupSize(ctx)
+	workingGroupNum, err := d.chain.GetWorkingGroupSize()
 	if err != nil {
 		html = html + "WorkingGroupSize  : " + err.Error() + "\n|"
 	} else {
 		html = html + "WorkingGroupSize  : " + strconv.FormatUint(workingGroupNum, 10) + "\n|"
 	}
-	expiredGroupNum, err := d.chain.GetExpiredWorkingGroupSize(ctx)
+	expiredGroupNum, err := d.chain.GetExpiredWorkingGroupSize()
 	if err != nil {
 		html = html + "ExpiredGroupSize  : " + err.Error() + "\n|"
 	} else {
 		html = html + "ExpiredGroupSize  : " + strconv.FormatUint(expiredGroupNum, 10) + "\n|"
 	}
-	pendingGroupNum, err := d.chain.NumPendingGroups(ctx)
+	pendingGroupNum, err := d.chain.NumPendingGroups()
 	if err != nil {
 		html = html + "PendingGroupSize  : " + err.Error() + "\n|"
 	} else {
 		html = html + "PendingGroupSize  : " + strconv.FormatUint(pendingGroupNum, 10) + "\n|"
 	}
-	pendingNodeNum, err := d.chain.NumPendingNodes(ctx)
+	pendingNodeNum, err := d.chain.NumPendingNodes()
 	if err != nil {
 		html = html + "PendingNodeSize   : " + err.Error() + "\n|"
 	} else {
 		html = html + "PendingNodeSize   : " + strconv.FormatUint(pendingNodeNum, 10) + "\n|"
 	}
 
-	curBlk, err := d.chain.CurrentBlock(ctx)
+	curBlk, err := d.chain.CurrentBlock()
 	if err != nil {
 		html = html + "CurrentBlock      : " + err.Error() + "\n"
 	} else {
@@ -101,9 +97,7 @@ func (d *DosNode) status(w http.ResponseWriter, r *http.Request) {
 
 func (d *DosNode) balance(w http.ResponseWriter, r *http.Request) {
 	html := "Balance :"
-	ctx, cancelFunc := context.WithDeadline(context.Background(), time.Now().Add(3*time.Second))
-	defer cancelFunc()
-	result, err := d.chain.Balance(ctx)
+	result, err := d.chain.Balance()
 	if err != nil {
 		html = html + err.Error()
 	} else {
@@ -136,20 +130,20 @@ func (d *DosNode) signalBootstrap(w http.ResponseWriter, r *http.Request) {
 	default:
 	}
 	if cid >= 0 {
-		d.chain.SignalBootstrap(context.Background(), big.NewInt(int64(cid)))
+		d.chain.SignalBootstrap(big.NewInt(int64(cid)))
 	}
 }
 
 func (d *DosNode) signalRandom(w http.ResponseWriter, r *http.Request) {
-	d.chain.SignalRandom(context.Background())
+	d.chain.SignalRandom()
 }
 
 func (d *DosNode) signalGroupFormation(w http.ResponseWriter, r *http.Request) {
-	d.chain.SignalGroupFormation(context.Background())
+	d.chain.SignalGroupFormation()
 }
 
 func (d *DosNode) signalGroupDissolve(w http.ResponseWriter, r *http.Request) {
-	d.chain.SignalGroupDissolve(context.Background())
+	d.chain.SignalGroupDissolve()
 }
 
 func (d *DosNode) p2pTest(w http.ResponseWriter, r *http.Request) {
