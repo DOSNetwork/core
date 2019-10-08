@@ -64,7 +64,6 @@ L:
 		}
 	}
 
-	fmt.Println(" tx:", fmt.Sprintf("%x", tx.Hash()))
 	resp := &response{idx, tx, err}
 	go func() {
 		defer close(req.reply)
@@ -94,7 +93,7 @@ func (e *ethAdaptor) waitForReply(req *request) (err error) {
 				fmt.Println(" error ", r.err)
 				return
 			}
-			fmt.Println(" tx:", fmt.Sprintf("%x", r.tx.Hash()))
+			//fmt.Println(" tx:", fmt.Sprintf("%x", r.tx.Hash()))
 		case <-e.ctx.Done():
 			err = e.ctx.Err()
 			return
@@ -127,6 +126,8 @@ func (e *ethAdaptor) SetGroupSize(g uint64) (err error) {
 			tx, err = proxies[idx].SetGroupSize(groupSize)
 			if err != nil {
 				err = &OnchainError{err: errors.Errorf(": %w", err), Idx: idx}
+			} else {
+				fmt.Println("SetGroupSize tx:", fmt.Sprintf("%x", tx.Hash()))
 			}
 		}
 		if err != nil {
@@ -158,6 +159,8 @@ func (e *ethAdaptor) UpdateRandomness(sign *vss.Signature) (err error) {
 			tx, err = proxies[idx].UpdateRandomness(sig)
 			if err != nil {
 				err = &OnchainError{err: errors.Errorf(": %w", err), Idx: idx}
+			} else {
+				fmt.Println("UpdateRandomness tx:", fmt.Sprintf("%x", tx.Hash()))
 			}
 		}
 		if err != nil {
@@ -192,6 +195,8 @@ func (e *ethAdaptor) DataReturn(sign *vss.Signature) (err error) {
 			tx, err = proxies[idx].TriggerCallback(requestId, trafficType, result, sig)
 			if err != nil {
 				err = &OnchainError{err: errors.Errorf(": %w", err), Idx: idx}
+			} else {
+				fmt.Println("DataReturn tx:", fmt.Sprintf("%x", tx.Hash()))
 			}
 		}
 		if err != nil {
@@ -224,6 +229,8 @@ func (e *ethAdaptor) RegisterGroupPubKey(idPubkey [5]*big.Int) (err error) {
 			tx, err = proxies[idx].RegisterGroupPubKey(groupId, pubKey)
 			if err != nil {
 				err = &OnchainError{err: errors.Errorf(": %w", err), Idx: idx}
+			} else {
+				fmt.Println("RegisterGroupPubKey tx:", fmt.Sprintf("%x", tx.Hash()))
 			}
 		}
 		if err != nil {
@@ -253,6 +260,8 @@ func (e *ethAdaptor) RegisterNewNode() (err error) {
 			tx, err = proxies[idx].RegisterNewNode()
 			if err != nil {
 				err = &OnchainError{err: errors.Errorf(": %w", err), Idx: idx}
+			} else {
+				fmt.Println("RegisterNewNode tx:", fmt.Sprintf("%x", tx.Hash()))
 			}
 		}
 		if err != nil {
@@ -282,6 +291,8 @@ func (e *ethAdaptor) UnRegisterNode() (err error) {
 			tx, err = proxies[idx].UnregisterNode()
 			if err != nil {
 				err = &OnchainError{err: errors.Errorf(": %w", err), Idx: idx}
+			} else {
+				fmt.Println("UnRegisterNode tx:", fmt.Sprintf("%x", tx.Hash()))
 			}
 		}
 		if err != nil {
@@ -311,6 +322,8 @@ func (e *ethAdaptor) SignalRandom() (err error) {
 			tx, err = proxies[idx].SignalRandom()
 			if err != nil {
 				err = &OnchainError{err: errors.Errorf(": %w", err), Idx: idx}
+			} else {
+				fmt.Println("SignalRandom tx:", fmt.Sprintf("%x", tx.Hash()))
 			}
 		}
 		if err != nil {
@@ -340,6 +353,8 @@ func (e *ethAdaptor) SignalGroupFormation() (err error) {
 			tx, err = proxies[idx].SignalGroupFormation()
 			if err != nil {
 				err = &OnchainError{err: errors.Errorf(": %w", err), Idx: idx}
+			} else {
+				fmt.Println("SignalGroupFormation tx:", fmt.Sprintf("%x", tx.Hash()))
 			}
 		}
 		if err != nil {
@@ -369,6 +384,8 @@ func (e *ethAdaptor) SignalGroupDissolve() (err error) {
 			tx, err = proxies[idx].SignalGroupDissolve()
 			if err != nil {
 				err = &OnchainError{err: errors.Errorf(": %w", err), Idx: idx}
+			} else {
+				fmt.Println("SignalGroupDissolve tx:", fmt.Sprintf("%x", tx.Hash()))
 			}
 		}
 		if err != nil {
@@ -398,6 +415,8 @@ func (e *ethAdaptor) SignalBootstrap(cid *big.Int) (err error) {
 			tx, err = proxies[idx].SignalBootstrap(cid)
 			if err != nil {
 				err = &OnchainError{err: errors.Errorf(": %w", err), Idx: idx}
+			} else {
+				fmt.Println("SignalBootstrap tx:", fmt.Sprintf("%x", tx.Hash()))
 			}
 		}
 		if err != nil {
@@ -427,6 +446,8 @@ func (e *ethAdaptor) SignalUnregister(addr common.Address) (err error) {
 			tx, err = proxies[idx].SignalUnregister(addr)
 			if err != nil {
 				err = &OnchainError{err: errors.Errorf(": %w", err), Idx: idx}
+			} else {
+				fmt.Println("SignalUnregister tx:", fmt.Sprintf("%x", tx.Hash()))
 			}
 		}
 		if err != nil {
@@ -456,6 +477,8 @@ func (e *ethAdaptor) StartCommitReveal(startBlock int64, commitDuration int64, r
 			tx, err = crs[idx].StartCommitReveal(big.NewInt(startBlock), big.NewInt(commitDuration), big.NewInt(revealDuration), big.NewInt(revealThreshold))
 			if err != nil {
 				err = &OnchainError{err: errors.Errorf(": %w", err), Idx: idx}
+			} else {
+				fmt.Println("StartCommitReveal tx:", fmt.Sprintf("%x", tx.Hash()))
 			}
 		}
 		if err != nil {
@@ -485,6 +508,8 @@ func (e *ethAdaptor) Commit(cid *big.Int, commitment [32]byte) (err error) {
 			tx, err = crs[idx].Commit(cid, commitment)
 			if err != nil {
 				err = &OnchainError{err: errors.Errorf(": %w", err), Idx: idx}
+			} else {
+				fmt.Println("Commit tx:", fmt.Sprintf("%x", tx.Hash()))
 			}
 		}
 		if err != nil {
@@ -514,6 +539,8 @@ func (e *ethAdaptor) Reveal(cid *big.Int, secret *big.Int) (err error) {
 			tx, err = crs[idx].Reveal(cid, secret)
 			if err != nil {
 				err = &OnchainError{err: errors.Errorf(": %w", err), Idx: idx}
+			} else {
+				fmt.Println("Reveal tx:", fmt.Sprintf("%x", tx.Hash()))
 			}
 		}
 		if err != nil {
