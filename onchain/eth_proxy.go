@@ -20,7 +20,6 @@ import (
 )
 
 const (
-	contextKey = "index"
 	//TrafficSystemRandom is a request type to build a corresponding pipeline
 	TrafficSystemRandom = iota // 0
 	//TrafficUserRandom is a request type to build a corresponding pipeline
@@ -191,7 +190,7 @@ func (e *ethAdaptor) Connect(urls []string, t time.Time) (err error) {
 		e.logger.Event("ConnToOnchain", map[string]interface{}{"OnchainURL": result.Url})
 
 		ctx, cancel := context.WithCancel(e.ctx)
-		ctx = context.WithValue(ctx, contextKey, len(e.ctxes))
+		ctx = context.WithValue(ctx, "index", len(e.ctxes))
 		auth := bind.NewKeyedTransactor(e.key.PrivateKey)
 		auth.GasPrice = big.NewInt(e.gasPrice) //1 Gwei
 		auth.GasLimit = uint64(e.gasLimit)

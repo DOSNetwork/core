@@ -144,7 +144,7 @@ func (e *ethAdaptor) SubscribeEvent(subscribeTypes []int) (chan interface{}, cha
 }
 
 func getIndex(ctx context.Context) (idx int) {
-	if v := ctx.Value(contextKey); v != nil {
+	if v := ctx.Value("index"); v != nil {
 		if i, ok := v.(int); ok {
 			idx = i
 		} else {
