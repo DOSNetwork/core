@@ -27,26 +27,17 @@ func (d *DosNode) onchainLoop() {
 	for {
 		//Connect to geth
 		for {
-			ips := d.p.RandomPeerIP()
 			var urls = []string{}
-			urls = append(urls, "ws://"+d.p.GetIP().String()+":8546")
-			for _, ip := range ips {
-				urls = append(urls, "ws://"+ip+":8546")
-				if len(urls) >= 5 {
-					break
-				}
-			}
 			for _, url := range d.config.ChainNodePool {
 				urls = append(urls, url)
 			}
-			if len(urls) >= 5 {
-				t := time.Now().Add(60 * time.Second)
-				if err := d.chain.Connect(urls, t); err != nil {
-					fmt.Print(fmt.Errorf("onchainLoop err :%+v", err))
-					return
-				}
-				break
+			//TODO : Add more geth from other sources
+			t := time.Now().Add(60 * time.Second)
+			if err := d.chain.Connect(d.config.ChainNodePool, t); err != nil {
+				fmt.Print(fmt.Errorf("onchainLoop err :%+v", err))
+				return
 			}
+			break
 		}
 		fmt.Println("Done connect ")
 
@@ -80,7 +71,6 @@ func (d *DosNode) onchainLoop() {
 				return
 			case event := <-membersEvent:
 				if d.isGuardian {
-					//fmt.Println("", event.EventType, fmt.Sprintf("%x", event.NodeID), event.Addr)
 					switch event.EventType {
 					case "member-join":
 						if !inactiveNodes[event.NodeID].IsZero() {
@@ -94,10 +84,8 @@ func (d *DosNode) onchainLoop() {
 				currentBlockNumber, err := d.chain.CurrentBlock()
 				if err != nil {
 					d.logger.Error(err)
-					fmt.Println("Dos node CurrentBlock err ", err)
 					break L
 				}
-				//fmt.Println("currentBlockNumber ",currentBlockNumber, " time ",time.Now())
 				if balance, err := d.chain.Balance(); err != nil {
 					fmt.Println("Dos node CurrentBlock err ", err)
 				} else {
