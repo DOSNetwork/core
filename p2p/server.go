@@ -292,7 +292,9 @@ func (n *server) Request(ctx context.Context, id []byte, msg proto.Message) (p2p
 		result interface{}
 		ok     bool
 	)
-	req := NewP2pRequest(ctx, sendReq, id, "", msg, 0)
+	opCtx, opCancel := context.WithTimeout(ctx, 5*time.Second)
+	defer opCancel()
+	req := NewP2pRequest(opCtx, sendReq, id, "", msg, 0)
 	if err = req.sendReq(n.calling); err != nil {
 		err = &P2PError{err: errors.Errorf("sendReq failed: %w", err), t: time.Now()}
 		n.logger.Error(err)
@@ -313,7 +315,9 @@ func (n *server) Request(ctx context.Context, id []byte, msg proto.Message) (p2p
 
 // Reply sends a reply to the specific node
 func (n *server) Reply(ctx context.Context, id []byte, nonce uint64, msg proto.Message) (err error) {
-	req := NewP2pRequest(ctx, replyReq, id, "", msg, nonce)
+	opCtx, opCancel := context.WithTimeout(ctx, 5*time.Second)
+	defer opCancel()
+	req := NewP2pRequest(opCtx, replyReq, id, "", msg, nonce)
 	if err = req.sendReq(n.replying); err != nil {
 		err = &P2PError{err: errors.Errorf("sendReq failed: %w", err), t: time.Now()}
 		n.logger.Error(err)

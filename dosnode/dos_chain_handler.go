@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
-	"errors"
 	"fmt"
+	"io"
 	"math/big"
 	"time"
 	"unsafe"
@@ -16,6 +16,7 @@ import (
 
 	"github.com/DOSNetwork/core/onchain"
 	"github.com/DOSNetwork/core/share"
+	errors "golang.org/x/xerrors"
 )
 
 func (d *DosNode) onchainLoop() {
@@ -131,6 +132,12 @@ func (d *DosNode) onchainLoop() {
 			case err, ok := <-errc:
 				if !ok {
 					break L
+				}
+				var oError *onchain.OnchainError
+				if errors.As(err, &oError) {
+					if errors.Is(err, io.EOF) {
+						fmt.Println("EOF at: ", oError.Idx)
+					}
 				}
 				fmt.Println("onchainLoop err ", err)
 			case event, ok := <-d.onchainEvent:
