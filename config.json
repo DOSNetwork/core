@@ -11,6 +11,7 @@
         "18.237.179.193"
     ],
     "ChainNodePool": [
+        "wss://rinkeby.infura.io/ws/v3/#REPLACE-WITH-INFURA-APIKEY",
         "ws://#REPLACE-WITH-IP:8546"
     ]
 }

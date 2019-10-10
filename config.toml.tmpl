@@ -27,7 +27,7 @@ Noverify = false
 CacheDir = "ethash"
 CachesInMem = 2
 CachesOnDisk = 3
-DatasetDir = "/home/ubuntu/.ethash"
+DatasetDir = "#REPLACE-WITH-PATH/.ethash"
 DatasetsInMem = 1
 DatasetsOnDisk = 2
 PowMode = 0
@@ -55,17 +55,17 @@ MinimumAcceptedPOW = 2e-01
 RestrictConnectionBetweenLightClients = true
 
 [Node]
-DataDir = "/home/ubuntu/.rinkeby"
+DataDir = "#REPLACE-WITH-PATH//.rinkeby"
 omitempty = ""
 SmartCardDaemonPath = "/run/pcscd/pcscd.comm"
 IPCPath = "geth.ipc"
 HTTPPort = 8545
 HTTPVirtualHosts = ["localhost"]
-HTTPModules = ["net", "web3", "eth", "shh"]
+HTTPModules = ["web3"]
 WSHost = "0.0.0.0"
 WSPort = 8546
-WSOrigins = ["*"]
-WSModules = ["net", "web3", "eth", "shh"]
+WSOrigins = ["http://#REPLACE-WITH-HOSTNAME"]
+WSModules = ["net", "web3", "eth"]
 GraphQLPort = 8547
 GraphQLVirtualHosts = ["localhost"]
 

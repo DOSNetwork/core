@@ -41,11 +41,7 @@ install_LightClient() {
   fi
   yes | sudo cp $(pwd)/geth-linux-amd64-1.9.2-e76047e9/geth /usr/bin/geth
   if [ ! -f /lib/systemd/system/geth.service ]; then
-    yes | sudo chmod 666 geth.service.tmpl
-    sed -i -e 's?#REPLACE-WITH-PATH?'$(pwd)'?g' geth.service.tmpl
-    sed -i -e 's?#REPLACE-WITH-IP?'$nodeIP'?g' geth.service.tmpl
-    yes | sudo chmod 322 geth.service.tmpl
-    yes | sudo cp geth.service.tmpl /lib/systemd/system/geth.service
+    yes | sudo mv geth.service /lib/systemd/system/geth.service
     yes | sudo systemctl enable geth
     yes | sudo systemctl start geth
   fi
@@ -79,11 +75,16 @@ checkConfigs() {
     exit 1
   fi
   if [ ! -f $(pwd)/config.toml ]; then
-    echo "config.toml not found!"
+    yes | sudo cp config.toml.tmpl config.toml
+    sed -i -e 's?#REPLACE-WITH-PATH?'$(pwd)'?g' config.toml
+    sed -i -e 's?#REPLACE-WITH-HOSTNAME?'$(hostname)'?g' config.toml
     exit 1
   fi
-  if [ ! -f $(pwd)/geth.service.tmpl ]; then
-    echo "geth.service not found!"
+  if [ ! -f $(pwd)/geth.service ]; then
+    yes | sudo cp geth.service.tmpl geth.service
+    sed -i -e 's?#REPLACE-WITH-PATH?'$(pwd)'?g' geth.service
+    sed -i -e 's?#REPLACE-WITH-IP?'$nodeIP'?g' geth.service
+    yes | sudo chmod 322 geth.service
     exit 1
   fi
 }
@@ -94,15 +95,19 @@ installAll() {
   findNodeIP
   install_cgroup
   install_LightClient
-  echo "Rebooting!!!"
   yes | sudo systemctl start geth
 }
 
 startClient() {
+  if grep -q "#REPLACE-WITH-INFURA-APIKEY" $(pwd)/config.json; then
+      echo -n "Please provide an infura api key:"
+      sed -i -e 's?#REPLACE-WITH-INFURA-APIKEY?'$reply'?g' $(pwd)/config.json
+      echo "Please provide an infura api key in config.json ."
+  fi
   if grep -q "#REPLACE-WITH-IP" $(pwd)/config.json; then
       findNodeIP
       echo "Is your node public IP :"$nodeIP
-      echo -n "Enter no if it is not correct:"
+      echo -n "Press [Enter] to continue or no if IP is not correct:"
       if [ "$reply" == "no" ]; then
         echo "Please provide node public IP in config.json ."
       exit 1
