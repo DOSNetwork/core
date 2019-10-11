@@ -36,7 +36,7 @@
 ### Run client node using Docker
 - Install:
     ```sh
-    $ wget https://github.com/DOSNetwork/core/archive/v1.3-beta.tar.gz
+    $ wget https://github.com/DOSNetwork/core/archive/Beta1.3.tar.gz
     $ tar -C . -xzf v1.3-beta.tar.gz
     $ cd core-1.3-beta/
     $ mkdir vault
@@ -62,7 +62,7 @@
 ## Run standalone binary
 - Install:
     ```sh
-    $ wget https://github.com/DOSNetwork/core/archive/v1.3-beta.tar.gz
+    $ wget https://github.com/DOSNetwork/core/archive/Beta1.3.tar.gz
     $ tar -C . -xzf v1.3-beta.tar.gz
     $ cd core-1.3-beta/
     $ mkdir vault
