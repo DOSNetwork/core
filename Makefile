@@ -30,7 +30,7 @@ devClient: gen
 .PHONY: client
 # Build a prod/release version client node
 client:
-	go build -o client
+	go build -o dosnode
 
 
 .PHONY: client-docker

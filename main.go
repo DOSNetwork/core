@@ -293,7 +293,7 @@ func createWallet() (string, error) {
 func actionCreateWallet(c *cli.Context) (err error) {
 	// check if there is an account
 	if n := onchain.NumOfAccounts(dosPath); n != 0 {
-		fmt.Println("Found an node account")
+		fmt.Println("Found keystore files")
 		return nil
 	}
 	_, err = createWallet()
