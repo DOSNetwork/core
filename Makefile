@@ -32,7 +32,6 @@ devClient: gen
 client:
 	go build -o dosclient
 
-
 .PHONY: client-docker
 client-docker:
 	docker build -t dosnode -f Dockerfile .
