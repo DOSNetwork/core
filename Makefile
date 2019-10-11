@@ -30,7 +30,7 @@ devClient: gen
 .PHONY: client
 # Build a prod/release version client node
 client:
-	go build -o client
+	go build -o dosclient
 
 
 .PHONY: client-docker
@@ -63,5 +63,5 @@ gen: updateSubmodule
 
 .PHONY: clean
 clean:
-	@ rm -f client*
+	@ rm -f dosclient*
 	@ # rm -f $(GENERATED_FILES)
