@@ -1,30 +1,64 @@
 pragma solidity ^0.5.0;
 
+// Comment out utils library if you don't need it to save gas. (L4 and L17)
 import "./lib/utils.sol";
+import "./Ownable.sol";
 
 contract DOSProxyInterface {
     function query(address, uint, string memory, string memory) public returns (uint);
-    function requestRandom(address, uint8, uint) public returns (uint);
+    function requestRandom(address, uint) public returns (uint);
+}
+
+contract DOSPaymentInterface {
+    function isSupportedToken(address) public view returns(bool);
+    function setPaymentMethod(address consumer,address tokenAddr) public;
 }
 
 contract DOSAddressBridgeInterface {
     function getProxyAddress() public view returns (address);
+    function getPaymentAddress() public view returns (address);
 }
 
-contract DOSOnChainSDK {
+contract ERC20I {
+    function balanceOf(address who) public view returns (uint);
+    function transfer(address to, uint value) public returns (bool);
+    function approve(address spender, uint value) public returns (bool);
+}
+
+contract DOSOnChainSDK is Ownable{
+    // Comment out utils library if you don't need it to save gas. (L4 and L17)
     using utils for *;
 
     DOSProxyInterface dosProxy;
     DOSAddressBridgeInterface dosAddrBridge =
-        DOSAddressBridgeInterface(0x6DDf7C941106E875a96747e785c19dFd408d5117);
+        DOSAddressBridgeInterface(0x848C0Bb953755293230b705464654F647967639A);
+    address _tokenAddr = 0x214e79c85744CD2eBBc64dDc0047131496871bEe;
 
     modifier resolveAddress {
         dosProxy = DOSProxyInterface(dosAddrBridge.getProxyAddress());
         _;
     }
 
+    modifier onlySupportedToken(address tokenAddr) {
+        DOSPaymentInterface payment = DOSPaymentInterface(dosAddrBridge.getPaymentAddress());
+        require(payment.isSupportedToken(tokenAddr), "Not supported token address!");
+        _;
+    }
+
+    constructor() public {
+        address paymentAddr = dosAddrBridge.getPaymentAddress();
+        ERC20I(_tokenAddr).approve(paymentAddr, uint(-1));
+        DOSPaymentInterface payment = DOSPaymentInterface(dosAddrBridge.getPaymentAddress());
+        payment.setPaymentMethod(address(this),_tokenAddr);
+    }
+
     function fromDOSProxyContract() internal view returns (address) {
         return dosAddrBridge.getProxyAddress();
+    }
+
+    function DOSWithdraw() public onlyOwner{
+        uint amount = ERC20I(_tokenAddr).balanceOf(address(this));
+        ERC20I(_tokenAddr).transfer(msg.sender, amount);
     }
 
     // @dev: Call this function to get a unique queryId to differentiate
@@ -49,8 +83,8 @@ contract DOSOnChainSDK {
     //            Check below documentation for details.
     //            (https://dosnetwork.github.io/docs/#/contents/blockchains/ethereum?id=selector).
     function DOSQuery(uint timeout, string memory dataSource, string memory selector)
-        resolveAddress
         internal
+        resolveAddress
         returns (uint)
     {
         return dosProxy.query(address(this), timeout, dataSource, selector);
@@ -71,23 +105,13 @@ contract DOSOnChainSDK {
     //       asynchronously through the __callback__ function.
     //       Depending on the mode, the return value would be a random number
     //       (for fast mode) or a requestId (for safe mode).
-    // @mode: 1: safe mode - The asynchronous but safe way to generate a new
-    //                       secure random number by a group of off-chain
-    //                       clients using VRF and Threshold Signature. There
-    //                       would be a fee to run in safe mode.
-    //        0: fast mode - Return a random number in one invocation directly.
-    //                       The returned random is the sha3 hash of latest
-    //                       generated random number by DOS Network combining
-    //                       with the optional seed.
-    //                       Thus the result should NOT be considered safe and
-    //                       is for testing purpose only. It's free of charge.
     // @seed: Optional random seed provided by caller.
-    function DOSRandom(uint8 mode, uint seed)
-        resolveAddress
+    function DOSRandom(uint seed)
         internal
+        resolveAddress
         returns (uint)
     {
-        return dosProxy.requestRandom(address(this), mode, seed);
+        return dosProxy.requestRandom(address(this), seed);
     }
 
     // @dev: Must override __callback__ to process a corresponding random

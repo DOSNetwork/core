@@ -2,7 +2,7 @@
     "NodeIP": "#REPLACE-WITH-IP",
     "NodePort": "9501",
     "ChainType": "ETH",
-    "DOSAddressBridgeAddress": "0x0654F7eA1Fe38C0EBa25Ff9008FC5bdbb60C29ff",
+    "DOSAddressBridgeAddress": "0xf61Baa6F99a01dF6309E844BB2b744c6FDa0D631",
     "BootStrapIPs": [
         "18.236.117.126",
         "18.236.199.131",
@@ -11,7 +11,6 @@
         "18.237.179.193"
     ],
     "ChainNodePool": [
-        "wss://rinkeby.infura.io/ws/v3/#REPLACE-WITH-INFURA-APIKEY",
-        "ws://#REPLACE-WITH-IP:8546"
+        "wss://rinkeby.infura.io/ws/v3/#REPLACE-WITH-INFURA-APIKEY"
     ]
 }
