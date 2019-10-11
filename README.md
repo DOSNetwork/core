@@ -37,8 +37,8 @@
 - Install:
     ```sh
     $ wget https://github.com/DOSNetwork/core/archive/Beta1.3.tar.gz
-    $ tar -C . -xzf v1.3-beta.tar.gz
-    $ cd core-1.3-beta/
+    $ tar -C . -xzf Beta1.3.tar.gz
+    $ cd core-Beta1.3/
     $ mkdir vault
     ```
 - (optional) Copy existing keystore to ./vault/
@@ -63,8 +63,8 @@
 - Install:
     ```sh
     $ wget https://github.com/DOSNetwork/core/archive/Beta1.3.tar.gz
-    $ tar -C . -xzf v1.3-beta.tar.gz
-    $ cd core-1.3-beta/
+    $ tar -C . -xzf Beta1.3.tar.gz
+    $ cd core-Beta1.3/
     $ mkdir vault
     ```
 - (optional) Copy existing keystore to ./vault/:
