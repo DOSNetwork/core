@@ -35,6 +35,7 @@ func (d *DosNode) onchainLoop() {
 			t := time.Now().Add(60 * time.Second)
 			if err := d.chain.Connect(d.config.ChainNodePool, t); err != nil {
 				fmt.Print(fmt.Errorf("onchainLoop err :%+v", err))
+				d.End()
 				return
 			}
 			break
