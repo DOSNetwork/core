@@ -19,8 +19,8 @@
   - Run `$ dig +short myip.opendns.com @resolver1.opendns.com`
   - Or get it from cloud server providers. Most vps / cloud server 
 - With below ports open:
-  - **udp** port `7946`,`30303`
-  - **tcp** port `7946`,`9501`,`8545`,`8546`,`30303`
+  - **udp** port `7946`
+  - **tcp** port `7946`,`9501`
 - It's recommended to generate ssh login key pairs and setup public key authentication instead of using password login for server security and funds safety:
   - Learn [how to](https://www.digitalocean.com/community/tutorials/how-to-set-up-ssh-keys-on-ubuntu-1604) setup SSH public key authentication on Ubuntu 16.04 and disable password logins.
 
@@ -30,10 +30,16 @@
 - Acquire 50,000 [testnet DOS token](https://rinkeby.etherscan.io/address/0x214e79c85744cd2ebbc64ddc0047131496871bee), (and optional - acquire several [testnet DropBurn token](https://rinkeby.etherscan.io/address/0x9bfe8f5749d90eb4049ad94cc4de9b6c4c31f822)).
 - Please fill in [this](https://docs.google.com/forms/d/e/1FAIpQLSdiWuVdyxpVozEC0uWZIj9HCBX9COBYFj8Dxp2C2qX4Qv5U9g/viewform) form to request testnet tokens.
 
+##### Acquire Infura API key
+- [Acquire Infura API key](https://ethereumico.io/knowledge-base/infura-api-key-guide/)
+
 ### Run client node using Docker
 - Install:
     ```sh
-    $ ./dos_docker.sh install
+    $ wget https://github.com/DOSNetwork/core/archive/v1.3-beta.tar.gz
+    $ tar -C . -xzf v1.3-beta.tar.gz
+    $ cd core-1.3-beta/
+    $ mkdir vault
     ```
 - (optional) Copy existing keystore to ./vault/
 - Start:
@@ -56,10 +62,12 @@
 ## Run standalone binary
 - Install:
     ```sh
-    $ ./dos.sh install
+    $ wget https://github.com/DOSNetwork/core/archive/v1.3-beta.tar.gz
+    $ tar -C . -xzf v1.3-beta.tar.gz
+    $ cd core-1.3-beta/
+    $ mkdir vault
     ```
 - (optional) Copy existing keystore to ./vault/:
-
 - Start:
     ```sh
     $ ./dos.sh start
