@@ -89,7 +89,7 @@ func (l *logger) Warn(msg string) {
 }
 
 func (l *logger) Error(err error) {
-	fmt.Print(fmt.Errorf("%+v", err))
+	fmt.Println(fmt.Errorf("%+v", err))
 	if l.entry == nil {
 		return
 	}

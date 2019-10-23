@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
-	"io"
 	"math/big"
 	"time"
 	"unsafe"
@@ -20,58 +19,73 @@ import (
 )
 
 func (d *DosNode) onchainLoop() {
-	defer fmt.Println("End onchainLoop")
+	defer fmt.Println("[DOS] End onchainLoop")
 	var watchdogInterval int
 	randSeed, _ := new(big.Int).SetString("21888242871839275222246405745257275088548364400416034343698204186575808495617", 10)
 	inactiveNodes := make(map[string]time.Time)
+	reconn := 0
+
+	_, membersEvent, err := d.p.SubscribeEvent()
+	if err != nil {
+		d.logger.Error(err)
+		return
+	}
+	defer func() {
+		for _ = range membersEvent {
+		}
+	}()
+
 	for {
 		//Connect to geth
 		for {
 			var urls = []string{}
+			reconn++
+			if reconn >= 10 {
+				d.logger.Error(errors.New("Can't connect to geth"))
+				d.End()
+				return
+			}
 			for _, url := range d.config.ChainNodePool {
 				urls = append(urls, url)
 			}
 			//TODO : Add more geth from other sources
 			t := time.Now().Add(60 * time.Second)
 			if err := d.chain.Connect(d.config.ChainNodePool, t); err != nil {
-				fmt.Print(fmt.Errorf("onchainLoop err :%+v", err))
-				d.End()
-				return
+				d.logger.Error(err)
+				time.Sleep(5 * time.Second)
+				fmt.Println("[DOS] Reconnecting to geth")
+				continue
 			}
 			break
 		}
-		fmt.Println("Done connect ")
-
-		watchdogInterval = 15
-		watchdog := time.NewTicker(time.Duration(watchdogInterval) * time.Second)
 
 		//TODO: Check to see if it is a valid stacking node first
 		_ = d.chain.RegisterNewNode()
 
 		//var onchainEvent chan interface{}
-		var errc chan error
+		var onchainErrc chan error
 		subescriptions := []int{onchain.SubscribeLogGrouping, onchain.SubscribeLogGroupDissolve, onchain.SubscribeLogUrl,
 			onchain.SubscribeLogUpdateRandom, onchain.SubscribeLogRequestUserRandom,
 			onchain.SubscribeLogPublicKeyAccepted, onchain.SubscribeCommitrevealLogStartCommitreveal}
-		d.onchainEvent, errc = d.chain.SubscribeEvent(subescriptions)
-		_, membersEvent, err := d.p.SubscribeEvent()
-		if err != nil {
-			fmt.Println("SubscribeEvent err ", err)
-			continue
-		}
+		d.onchainEvent, onchainErrc = d.chain.SubscribeEvent(subescriptions)
+
+		watchdogInterval = 15
+		watchdog := time.NewTicker(time.Duration(watchdogInterval) * time.Second)
+		reconn = 0
 	L:
 		for {
 			select {
 			case <-d.ctx.Done():
-				//Drain the events out of the channel
-				for _ = range d.onchainEvent {
+				fmt.Println("[DOS] ctx.Done")
+				d.chain.DisconnectAll()
+				break L
+			case event, ok := <-membersEvent:
+				if !ok {
+					fmt.Println("[DOS] End membersEvent")
+					d.End()
+					continue
 				}
-				for _ = range errc {
-				}
-
-				return
-			case event := <-membersEvent:
-				if d.isGuardian {
+				if d.isAdmin {
 					switch event.EventType {
 					case "member-join":
 						if !inactiveNodes[event.NodeID].IsZero() {
@@ -81,20 +95,24 @@ func (d *DosNode) onchainLoop() {
 						inactiveNodes[event.NodeID] = time.Now()
 					}
 				}
+				d.logger.Event("peersUpdate", map[string]interface{}{"numOfPeers": d.p.NumOfMembers()})
 			case <-watchdog.C:
 				currentBlockNumber, err := d.chain.CurrentBlock()
 				if err != nil {
 					d.logger.Error(err)
-					break L
+					continue
 				}
 				if balance, err := d.chain.Balance(); err != nil {
-					fmt.Println("Dos node CurrentBlock err ", err)
+					d.logger.Error(err)
+					continue
 				} else {
 					if balance.Cmp(big.NewFloat(0.5)) == -1 {
-						fmt.Println("Dos node no enough balance ", balance)
-						go d.End()
+						d.logger.Error(fmt.Errorf("No enough balance %f", balance))
+						d.End()
+						continue
 					}
 				}
+
 				if d.isAdmin {
 					now := time.Now()
 					for nodeID, inactiveTime := range inactiveNodes {
@@ -102,7 +120,7 @@ func (d *DosNode) onchainLoop() {
 							diff := now.Sub(inactiveTime)
 							mins := int(diff.Minutes())
 							if mins >= 5 {
-								fmt.Printf("Diffrence in Minutes over 5: %d Minutes %s\n", mins, fmt.Sprintf("%x", nodeID))
+								fmt.Printf("[DOS] Diffrence in Minutes over 5: %d Minutes %s\n", mins, fmt.Sprintf("%x", nodeID))
 								inactiveNodes[nodeID] = time.Time{}
 								addr := common.Address{}
 								b := []byte(nodeID)
@@ -112,32 +130,40 @@ func (d *DosNode) onchainLoop() {
 						}
 					}
 				}
+
 				if d.isGuardian {
 					d.handleRandom(currentBlockNumber)
 					d.handleGroupFormation(currentBlockNumber)
 					d.handleBootStrap(currentBlockNumber)
-					d.handleGroupDissolve()
 				}
-			case err, ok := <-errc:
+
+			case err, ok := <-onchainErrc:
 				if !ok {
+					fmt.Println("[DOS] End onchainErrc")
 					break L
 				}
 				var oError *onchain.OnchainError
 				if errors.As(err, &oError) {
-					if errors.Is(err, io.EOF) {
-						fmt.Println("EOF at: ", oError.Idx)
-					}
+					d.chain.Disconnect(oError.Idx)
 				}
-				fmt.Println("onchainLoop err ", err)
+				d.logger.Error(err)
 			case event, ok := <-d.onchainEvent:
 				if !ok {
+					fmt.Println("[DOS] End onchainEvent")
 					break L
 				}
 				switch content := event.(type) {
 				case *onchain.LogGrouping:
 					groupID := fmt.Sprintf("%x", content.GroupId)
-					fmt.Println("onchain.LogGrouping")
-
+					if d.isGuardian {
+						go func() {
+							select {
+							case <-d.ctx.Done():
+							case <-time.After(15 * 10 * time.Second):
+								d.handleGroupDissolve()
+							}
+						}()
+					}
 					go d.handleGrouping(content.NodeId, groupID)
 				case *onchain.LogGroupDissolve:
 					groupID := fmt.Sprintf("%x", content.GroupId)
@@ -219,8 +245,24 @@ func (d *DosNode) onchainLoop() {
 				}
 			}
 		}
+		fmt.Println("[DOS] Rest onchainLoop")
 		watchdog.Stop()
-		d.chain.DisconnectAll()
+		//Drain the events out of the channel
+		for _ = range d.onchainEvent {
+		}
+		fmt.Println("[DOS] End Drain onchainEvent")
+
+		for err = range onchainErrc {
+			fmt.Print(fmt.Errorf("[Dos] Drain onchainErrc %+v \n", err))
+		}
+		fmt.Println("[DOS] End Drain onchainErrc")
+
+		select {
+		case <-d.ctx.Done():
+			return
+		default:
+		}
+		fmt.Println("[DOS] Reconnect to geth")
 	}
 }
 
@@ -235,10 +277,10 @@ func (d *DosNode) handleGrouping(participants [][]byte, groupID string) {
 	if !isMember {
 		return
 	}
-	fmt.Println("Grouping start")
+	fmt.Println("[DOS] Grouping start")
 	d.logger.Event("GroupingStart", map[string]interface{}{"GroupID": groupID, "Topic": "Grouping"})
 	defer d.logger.TimeTrack(time.Now(), "GroupingDone", map[string]interface{}{"GroupID": groupID, "Topic": "Grouping"})
-	defer fmt.Println("!!!!!!!!Grouping Done ", groupID)
+	defer fmt.Println("[DOS] Grouping Done !!!!! ", groupID)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(60*60*time.Second))
 	defer cancel()
@@ -314,18 +356,16 @@ func (d *DosNode) handleCR(cr *onchain.LogStartCommitReveal, randSeed *big.Int) 
 	}
 
 	time.Sleep(time.Duration(waitCommit*15) * time.Second)
-	fmt.Println("Commit", *hash)
+	fmt.Println("[DOS] Commit", *hash)
 	d.logger.Event("Commit", map[string]interface{}{"CID": fmt.Sprintf("%x", cid)})
 	if err := d.chain.Commit(cid, *hash); err != nil {
-		fmt.Println("Commit err ", err)
 		d.logger.Error(err)
 	}
 	<-time.After(time.Duration(waitReveal*15) * time.Second)
 
-	fmt.Println("Reveal", fmt.Sprintf("%x", sec))
+	fmt.Println("[DOS] Reveal", fmt.Sprintf("%x", sec))
 	d.logger.Event("Reveal", map[string]interface{}{"CID": fmt.Sprintf("%x", cid)})
 	if err := d.chain.Reveal(cid, sec); err != nil {
-		fmt.Println("Reveal err ", err)
 		d.logger.Error(err)
 	}
 }
@@ -338,6 +378,14 @@ func byte32(s []byte) (a *[32]byte) {
 }
 
 func (d *DosNode) handleGroupFormation(currentBlockNumber uint64) {
+	cid, err := d.chain.BootstrapRound()
+	if err != nil {
+		d.logger.Error(err)
+		return
+	}
+	if cid != 0 {
+		return
+	}
 	groupToPick, err := d.chain.GroupToPick()
 	if err != nil {
 		return
@@ -385,7 +433,14 @@ func (d *DosNode) handleGroupFormation(currentBlockNumber uint64) {
 }
 
 func (d *DosNode) handleRandom(currentBlockNumber uint64) {
-
+	groupSize, err := d.chain.GetWorkingGroupSize()
+	if err != nil {
+		d.logger.Error(err)
+		return
+	}
+	if groupSize == 0 {
+		return
+	}
 	lastUpdatedBlock, err := d.chain.LastUpdatedBlock()
 	if err != nil {
 		d.logger.Error(err)
@@ -417,7 +472,6 @@ func (d *DosNode) handleBootStrap(currentBlockNumber uint64) {
 	}
 	if currentBlockNumber > endBlk {
 		if err := d.chain.SignalBootstrap(big.NewInt(int64(cid))); err != nil {
-			fmt.Println("SignalBootstrap err ", err)
 			d.logger.Error(err)
 		}
 	}

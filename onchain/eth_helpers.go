@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"math"
 	"math/big"
+	"runtime/debug"
 	"sync"
 	"time"
 
@@ -112,6 +113,7 @@ func mergeError(ctx context.Context, cs ...chan error) chan error {
 }
 
 func GenEthkey(credentialPath, passPhrase string) (err error) {
+	debug.FreeOSMemory()
 	newKeyStore := keystore.NewKeyStore(credentialPath, keystore.StandardScryptN, keystore.StandardScryptP)
 	if len(newKeyStore.Accounts()) >= 1 {
 		fmt.Println("", newKeyStore.Accounts()[0].URL.Path)
@@ -119,7 +121,7 @@ func GenEthkey(credentialPath, passPhrase string) (err error) {
 		return
 	}
 	_, err = newKeyStore.NewAccount(passPhrase)
-
+	debug.FreeOSMemory()
 	return
 }
 

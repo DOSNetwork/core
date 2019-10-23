@@ -61,6 +61,22 @@ func handlePeerMsg(sessionMap map[string][]interface{}, sessionReq map[string]re
 			pubkey, ok := p.(*PublicKey)
 			if ok {
 				if pubkey.Index == pubkeyFromPeer.Index {
+					fmt.Println(sessionID, " pubkey.Index == pubkeyFromPeer.Index", pubkey.Index)
+
+					return
+				}
+			}
+		}
+	default:
+	}
+	switch dealFromPeer := content.(type) {
+	case *Deal:
+		deals := sessionMap[sessionID]
+		for _, dd := range deals {
+			d, ok := dd.(*Deal)
+			if ok {
+				if d.Index == dealFromPeer.Index {
+					fmt.Println(sessionID, " dd.Index == dealFromPeer.Index", d.Index)
 					return
 				}
 			}
@@ -70,7 +86,7 @@ func handlePeerMsg(sessionMap map[string][]interface{}, sessionReq map[string]re
 	sessionMap[sessionID] = append(sessionMap[sessionID], content)
 
 	//if sessionMap[sessionID] != nil {
-	//fmt.Println("sessionMap len ", len(sessionMap[sessionID]))
+	fmt.Println(sessionID, " sessionMap len ", len(sessionMap[sessionID]))
 	if len(sessionMap[sessionID]) == sessionReq[sessionID].numOfResps {
 		//go func(req request, m []interface{}) {
 		select {
@@ -102,7 +118,7 @@ func handleRequest(sessionMap map[string][]interface{}, sessionReq map[string]re
 	}
 }
 func (d *pdkg) Loop() {
-
+	defer fmt.Println("[DKG] End Loop")
 	peersToBuf, _ := d.p.SubscribeMsg(50, PublicKey{}, Deal{}, Responses{})
 	sessionPubKeys := make(map[string][]interface{})
 	sessionDeals := make(map[string][]interface{})
@@ -114,19 +130,34 @@ func (d *pdkg) Loop() {
 		select {
 		case msg, ok := <-peersToBuf:
 			if !ok {
+				fmt.Println("[DKG] End peersToBuf")
 				return
 			}
 			switch content := msg.Msg.Message.(type) {
 			case *PublicKey:
-				d.p.Reply(context.Background(), msg.Sender, msg.RequestNonce, content)
+				err := d.p.Reply(context.Background(), msg.Sender, msg.RequestNonce, content)
+				if err != nil {
+					d.logger.Error(&DKGError{err: errors.Errorf("Reply PublicKey failed for GID %s : %w", content.SessionId, err)})
+					//	continue
+				}
 				handlePeerMsg(sessionPubKeys, sessionReqPubs, d.p, content.SessionId, content)
-				//fmt.Println("pkdg :PublicKey nonce", msg.RequestNonce)
+				fmt.Println("pkdg :PublicKey nonce", msg.RequestNonce, " GID ", content.SessionId)
 			case *Deal:
-				d.p.Reply(context.Background(), msg.Sender, msg.RequestNonce, content)
+				err := d.p.Reply(context.Background(), msg.Sender, msg.RequestNonce, content)
+				if err != nil {
+					d.logger.Error(&DKGError{err: errors.Errorf("Reply Deal failed for GID %s : %w", content.SessionId, err)})
+					//	continue
+				}
 				handlePeerMsg(sessionDeals, sessionReqDeals, d.p, content.SessionId, content)
-				//fmt.Println("pkdg :Deal nonce", msg.RequestNonce)
+				fmt.Println("pkdg :Deal nonce", msg.RequestNonce, " GID ", content.SessionId)
 			case *Responses:
-				d.p.Reply(context.Background(), msg.Sender, msg.RequestNonce, content)
+				err := d.p.Reply(context.Background(), msg.Sender, msg.RequestNonce, content)
+				if err != nil {
+					d.logger.Error(&DKGError{err: errors.Errorf("Reply Responses failed for GID %s : %w", content.SessionId, err)})
+					//	continue
+				}
+				fmt.Println("pkdg :Responses nonce", msg.RequestNonce, " GID ", content.SessionId, len(content.Response))
+
 				resps := content.Response
 				for _, resp := range resps {
 					handlePeerMsg(sessionResps, sessionReResps, d.p, content.SessionId, resp)

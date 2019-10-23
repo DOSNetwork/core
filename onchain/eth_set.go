@@ -127,7 +127,7 @@ func (e *ethAdaptor) SetGroupSize(g uint64) (err error) {
 			if err != nil {
 				err = &OnchainError{err: errors.Errorf(": %w", err), Idx: idx}
 			} else {
-				fmt.Println("SetGroupSize tx:", fmt.Sprintf("%x", tx.Hash()))
+				fmt.Println("[ONCHAIN] SetGroupSize tx:", fmt.Sprintf("%x", tx.Hash()))
 			}
 		}
 		if err != nil {
@@ -160,7 +160,7 @@ func (e *ethAdaptor) UpdateRandomness(sign *vss.Signature) (err error) {
 			if err != nil {
 				err = &OnchainError{err: errors.Errorf(": %w", err), Idx: idx}
 			} else {
-				fmt.Println("UpdateRandomness tx:", fmt.Sprintf("%x", tx.Hash()))
+				fmt.Println("[ONCHAIN] UpdateRandomness tx:", fmt.Sprintf("%x", tx.Hash()))
 			}
 		}
 		if err != nil {
@@ -196,7 +196,7 @@ func (e *ethAdaptor) DataReturn(sign *vss.Signature) (err error) {
 			if err != nil {
 				err = &OnchainError{err: errors.Errorf(": %w", err), Idx: idx}
 			} else {
-				fmt.Println("DataReturn tx:", fmt.Sprintf("%x", tx.Hash()))
+				fmt.Println("[ONCHAIN] DataReturn tx:", fmt.Sprintf("%x", tx.Hash()))
 			}
 		}
 		if err != nil {
@@ -230,7 +230,7 @@ func (e *ethAdaptor) RegisterGroupPubKey(idPubkey [5]*big.Int) (err error) {
 			if err != nil {
 				err = &OnchainError{err: errors.Errorf(": %w", err), Idx: idx}
 			} else {
-				fmt.Println("RegisterGroupPubKey tx:", fmt.Sprintf("%x", tx.Hash()))
+				fmt.Println("[ONCHAIN] RegisterGroupPubKey tx:", fmt.Sprintf("%x", tx.Hash()))
 			}
 		}
 		if err != nil {
@@ -261,7 +261,7 @@ func (e *ethAdaptor) RegisterNewNode() (err error) {
 			if err != nil {
 				err = &OnchainError{err: errors.Errorf(": %w", err), Idx: idx}
 			} else {
-				fmt.Println("RegisterNewNode tx:", fmt.Sprintf("%x", tx.Hash()))
+				fmt.Println("[ONCHAIN] RegisterNewNode tx:", fmt.Sprintf("%x", tx.Hash()))
 			}
 		}
 		if err != nil {
@@ -274,7 +274,7 @@ func (e *ethAdaptor) RegisterNewNode() (err error) {
 
 func (e *ethAdaptor) UnRegisterNode() (err error) {
 	if !e.isConnecting() {
-		err = errors.New("not connecting to geth")
+		err = errors.New("[ONCHAIN] not connecting to geth")
 		return
 	}
 
@@ -292,7 +292,7 @@ func (e *ethAdaptor) UnRegisterNode() (err error) {
 			if err != nil {
 				err = &OnchainError{err: errors.Errorf(": %w", err), Idx: idx}
 			} else {
-				fmt.Println("UnRegisterNode tx:", fmt.Sprintf("%x", tx.Hash()))
+				fmt.Println("[ONCHAIN]  UnRegisterNode tx:", fmt.Sprintf("%x", tx.Hash()))
 			}
 		}
 		if err != nil {
@@ -323,7 +323,7 @@ func (e *ethAdaptor) SignalRandom() (err error) {
 			if err != nil {
 				err = &OnchainError{err: errors.Errorf(": %w", err), Idx: idx}
 			} else {
-				fmt.Println("SignalRandom tx:", fmt.Sprintf("%x", tx.Hash()))
+				fmt.Println("[ONCHAIN] SignalRandom tx:", fmt.Sprintf("%x", tx.Hash()))
 			}
 		}
 		if err != nil {
@@ -354,7 +354,7 @@ func (e *ethAdaptor) SignalGroupFormation() (err error) {
 			if err != nil {
 				err = &OnchainError{err: errors.Errorf(": %w", err), Idx: idx}
 			} else {
-				fmt.Println("SignalGroupFormation tx:", fmt.Sprintf("%x", tx.Hash()))
+				fmt.Println("[ONCHAIN] SignalGroupFormation tx:", fmt.Sprintf("%x", tx.Hash()))
 			}
 		}
 		if err != nil {
@@ -385,7 +385,7 @@ func (e *ethAdaptor) SignalGroupDissolve() (err error) {
 			if err != nil {
 				err = &OnchainError{err: errors.Errorf(": %w", err), Idx: idx}
 			} else {
-				fmt.Println("SignalGroupDissolve tx:", fmt.Sprintf("%x", tx.Hash()))
+				fmt.Println("[ONCHAIN] SignalGroupDissolve tx:", fmt.Sprintf("%x", tx.Hash()))
 			}
 		}
 		if err != nil {
@@ -416,7 +416,7 @@ func (e *ethAdaptor) SignalBootstrap(cid *big.Int) (err error) {
 			if err != nil {
 				err = &OnchainError{err: errors.Errorf(": %w", err), Idx: idx}
 			} else {
-				fmt.Println("SignalBootstrap tx:", fmt.Sprintf("%x", tx.Hash()))
+				fmt.Println("[ONCHAIN] SignalBootstrap tx:", fmt.Sprintf("%x", tx.Hash()))
 			}
 		}
 		if err != nil {
@@ -447,7 +447,7 @@ func (e *ethAdaptor) SignalUnregister(addr common.Address) (err error) {
 			if err != nil {
 				err = &OnchainError{err: errors.Errorf(": %w", err), Idx: idx}
 			} else {
-				fmt.Println("SignalUnregister tx:", fmt.Sprintf("%x", tx.Hash()))
+				fmt.Println("[ONCHAIN] SignalUnregister tx:", fmt.Sprintf("%x", tx.Hash()))
 			}
 		}
 		if err != nil {
@@ -478,7 +478,7 @@ func (e *ethAdaptor) StartCommitReveal(startBlock int64, commitDuration int64, r
 			if err != nil {
 				err = &OnchainError{err: errors.Errorf(": %w", err), Idx: idx}
 			} else {
-				fmt.Println("StartCommitReveal tx:", fmt.Sprintf("%x", tx.Hash()))
+				fmt.Println("[ONCHAIN] StartCommitReveal tx:", fmt.Sprintf("%x", tx.Hash()))
 			}
 		}
 		if err != nil {
@@ -509,7 +509,7 @@ func (e *ethAdaptor) Commit(cid *big.Int, commitment [32]byte) (err error) {
 			if err != nil {
 				err = &OnchainError{err: errors.Errorf(": %w", err), Idx: idx}
 			} else {
-				fmt.Println("Commit tx:", fmt.Sprintf("%x", tx.Hash()))
+				fmt.Println("[ONCHAIN] Commit tx:", fmt.Sprintf("%x", tx.Hash()))
 			}
 		}
 		if err != nil {
@@ -540,7 +540,7 @@ func (e *ethAdaptor) Reveal(cid *big.Int, secret *big.Int) (err error) {
 			if err != nil {
 				err = &OnchainError{err: errors.Errorf(": %w", err), Idx: idx}
 			} else {
-				fmt.Println("Reveal tx:", fmt.Sprintf("%x", tx.Hash()))
+				fmt.Println("[ONCHAIN] Reveal tx:", fmt.Sprintf("%x", tx.Hash()))
 			}
 		}
 		if err != nil {

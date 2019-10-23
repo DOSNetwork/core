@@ -1,6 +1,7 @@
 package dosnode
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"math/big"
@@ -11,8 +12,8 @@ import (
 	"github.com/DOSNetwork/core/onchain"
 )
 
-func (d *DosNode) startRESTServer() {
-	fmt.Println("startRESTServer")
+func (d *DosNode) startRESTServer() (err error) {
+	defer fmt.Println("[DOS] End RESTServer")
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", d.status)
 	mux.HandleFunc("/balance", d.balance)
@@ -26,18 +27,19 @@ func (d *DosNode) startRESTServer() {
 	mux.HandleFunc("/p2pTest", d.p2pTest)
 	mux.HandleFunc("/dkgTest", d.dkgTest)
 	mux.HandleFunc("/queryTest", d.queryTest)
+	s := http.Server{Addr: ":8080", Handler: mux}
 	go func() {
-		if err := http.ListenAndServe(":8080", mux); err != nil {
-			fmt.Println("RESTServer err : ", err)
-			os.Exit(1)
-		}
+		<-d.ctx.Done()
+		s.Shutdown(context.Background())
 	}()
+	err = s.ListenAndServe()
+	return
 }
 
 func (d *DosNode) status(w http.ResponseWriter, r *http.Request) {
 	isPendingNode, err := d.chain.IsPendingNode(d.id)
 	if err != nil {
-		html := "err" + err.Error() + "\n|"
+		html := "err : " + err.Error() + "\n|"
 		w.Write([]byte(html))
 		return
 	}
@@ -107,10 +109,12 @@ func (d *DosNode) balance(w http.ResponseWriter, r *http.Request) {
 }
 
 func (d *DosNode) enableAdmin(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("[DOS] isAdmin")
 	d.isAdmin = true
 }
 
 func (d *DosNode) enableGuardian(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("[DOS] enableGuardian")
 	d.isGuardian = true
 }
 
@@ -119,7 +123,7 @@ func (d *DosNode) signalBootstrap(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "GET":
 		for k, v := range r.URL.Query() {
-			fmt.Printf("%s: %s\n", k, v)
+			fmt.Printf("[DOS]  %s: %s\n", k, v)
 			if k == "cid" {
 				i, err := strconv.Atoi(v[0])
 				if err == nil && i >= 0 {
@@ -147,21 +151,7 @@ func (d *DosNode) signalGroupDissolve(w http.ResponseWriter, r *http.Request) {
 }
 
 func (d *DosNode) p2pTest(w http.ResponseWriter, r *http.Request) {
-	members := d.p.MembersID()
-	fmt.Println("p2p test ", len(members))
-	for i := 0; i < len(members); i++ {
-		fmt.Println("p2p test ", members[i])
-	}
-	/*
-		for i := 0; i < len(members); i++ {
-			id, err := d.p.ConnectTo(context.Background(), "", members[i])
-			if err != nil {
-				fmt.Println("ConnectTo err", id, " err ", err)
-			} else {
-				fmt.Println(i, "p2p ConnectTo ", id)
-			}
-			d.p.DisConnectTo(id)
-		}*/
+	d.End()
 }
 func readLines(path string) ([]string, error) {
 	file, err := os.Open(path)
@@ -189,13 +179,12 @@ func readLines(path string) ([]string, error) {
 }
 func (d *DosNode) dkgTest(w http.ResponseWriter, r *http.Request) {
 	groupID := big.NewInt(0)
-	//members := d.p.MembersID()
 	start := -1
 	end := -1
 	switch r.Method {
 	case "GET":
 		for k, v := range r.URL.Query() {
-			fmt.Printf("%s: %s\n", k, v)
+			fmt.Printf("[DOS]  %s: %s\n", k, v)
 			if k == "start" {
 				i, err := strconv.Atoi(v[0])
 				if err == nil && i >= 0 {
@@ -216,13 +205,12 @@ func (d *DosNode) dkgTest(w http.ResponseWriter, r *http.Request) {
 	}
 	members, err := readLines("/vault/members.txt")
 	if err != nil {
-		fmt.Println("readLines err ", err)
+		fmt.Println("[DOS] readLines err ", err)
 		return
 	}
-	fmt.Println("members len ", len(members))
 	if start >= 0 && end >= 0 {
 		if len(members) < (end - start) {
-			fmt.Println("members size not enough:", len(members))
+			fmt.Println("[DOS] members size not enough:", len(members))
 			return
 		}
 		var participants [][]byte
@@ -230,7 +218,6 @@ func (d *DosNode) dkgTest(w http.ResponseWriter, r *http.Request) {
 		for i := start; i < end; i++ {
 			participants = append(participants, []byte(members[i]))
 		}
-		fmt.Println("members participants:", participants)
 
 		d.onchainEvent <- &onchain.LogGrouping{
 			GroupId: groupID,
@@ -246,7 +233,7 @@ func (d *DosNode) queryTest(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "GET":
 		for k, v := range r.URL.Query() {
-			fmt.Printf("%s: %s\n", k, v)
+			fmt.Printf("[DOS]  %s: %s\n", k, v)
 			if k == "gid" {
 				i, err := strconv.Atoi(v[0])
 				if err == nil && i >= 0 {

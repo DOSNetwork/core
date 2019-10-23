@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/big"
+	"sync"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
@@ -15,6 +16,7 @@ import (
 	"github.com/DOSNetwork/core/share/dkg/pedersen"
 	"github.com/DOSNetwork/core/share/vss/pedersen"
 	"github.com/DOSNetwork/core/suites"
+	errors "golang.org/x/xerrors"
 )
 
 const (
@@ -41,6 +43,7 @@ type DosNode struct {
 	isGuardian   bool
 	isAdmin      bool
 	config       configuration.Config
+	m            sync.Mutex
 	//For REST API
 	startTime         time.Time
 	state             string
@@ -115,58 +118,76 @@ func NewDosNode(key *keystore.Key, config configuration.Config) (dosNode *DosNod
 
 //End is an operation that does a graceful shutdown
 func (d *DosNode) End() {
-	d.chain.UnRegisterNode()
-	d.cancel()
-	<-d.ctx.Done()
-	fmt.Println("End")
+	d.m.Lock()
+	defer d.m.Unlock()
+	select {
+	case <-d.ctx.Done():
+	default:
+		d.chain.UnRegisterNode()
+		d.p.Leave()
+		d.cancel()
+	}
 }
 
 func (d *DosNode) Start() {
-	defer fmt.Println("End Start")
+	d.logger.Event("peersUpdate", map[string]interface{}{"numOfPeers": 0})
 	d.state = "Working"
-	d.startRESTServer()
-	//	go d.chain.ReqLoop()
-	go d.onchainLoop()
-
+	var wg sync.WaitGroup
+	wg.Add(5)
 	go func() {
-		if err := d.p.Listen(); err != nil {
-			fmt.Println("Listen() err ", err)
-			return
-		}
+		defer wg.Done()
+		d.startRESTServer()
+		fmt.Println("[DOS] End RESTServer")
+		d.End()
 	}()
-	go d.queryLoop()
-	go d.dkg.Loop()
-	//Bootstrapping p2p network
+	go func() {
+		defer wg.Done()
+		d.onchainLoop()
+		fmt.Println("[DOS] End ONCHAIN Loop")
+		d.End()
+	}()
+	go func() {
+		defer wg.Done()
+		d.p.Listen()
+		fmt.Println("[DOS] End P2P Loop")
+		d.End()
+	}()
+	go func() {
+		defer wg.Done()
+		d.queryLoop()
+		fmt.Println("[DOS] End Query Loop")
+		d.End()
+	}()
+	go func() {
+		defer wg.Done()
+		d.dkg.Loop()
+		fmt.Println("[DOS] End DKG Loop")
+		d.End()
+	}()
 
-	fmt.Println("Join :", d.bootStrapIPs)
+	//Bootstrapping p2p network
+	fmt.Println("[DOS] Join :", d.bootStrapIPs)
 	retry, num := 0, 0
 	var err error
 	for {
 		num, err = d.p.Join(d.bootStrapIPs)
 		if err != nil || num == 0 {
-			fmt.Println("Join ", err, num)
-
+			fmt.Println("[DOS] Join ", err, num)
+			if err != nil {
+				d.logger.Error(errors.Errorf(" : %w", err))
+			}
 			if retry == 10 {
+				d.logger.Error(errors.New("Can't join p2p network"))
 				return
 			}
 			retry++
 			time.Sleep(5 * time.Second)
 		} else {
+			d.logger.Event("peersUpdate", map[string]interface{}{"numOfPeers": num})
 			break
 		}
 	}
-	fmt.Println("Join : num of peer ", num)
-	peerChecker := time.NewTicker(5 * time.Second)
-	for {
-		select {
-		case <-d.ctx.Done():
-			return
-		case <-peerChecker.C:
-			if num != d.p.NumOfMembers() {
-				num = d.p.NumOfMembers()
-				d.logger.Event("peersUpdate", map[string]interface{}{"numOfPeers": num})
-			}
-		}
-	}
-
+	fmt.Println("[DOS] Join : num of peer ", num)
+	wg.Wait()
+	fmt.Println("[DOS] End")
 }
