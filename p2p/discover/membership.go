@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
+	"time"
 
 	"github.com/hashicorp/serf/serf"
 )
@@ -16,6 +17,7 @@ type Membership interface {
 	Listen(ctx context.Context, outch chan P2PEvent)
 	Lookup(id []byte) (addr string)
 	NumOfPeers() int
+	IsAlive() bool
 	MembersIP() (addr []net.IP)
 	MembersID() (list [][]byte)
 }
@@ -36,22 +38,31 @@ func NewSerfNet(Addr net.IP, id, port string) (Membership, error) {
 	conf.MemberlistConfig.LogOutput = ioutil.Discard
 	conf.MemberlistConfig.AdvertiseAddr = Addr.String()
 	conf.NodeName = id + port
+	conf.MemberlistConfig.IndirectChecks = 21             // Use 3 nodes for the indirect ping
+	conf.MemberlistConfig.ProbeTimeout = 1 * time.Second  // Reasonable RTT time for LAN
+	conf.MemberlistConfig.ProbeInterval = 5 * time.Second // Failure check every second
+	conf.MemberlistConfig.DisableTcpPings = false         // TCP pings are safe, even with mixed versions
+	conf.MemberlistConfig.AwarenessMaxMultiplier = 16     // Probe interval backs off to 8 seconds
+
 	eventCh := make(chan serf.Event, 4)
 	conf.EventCh = eventCh
 	serfNet.eventch = eventCh
-	serfNet.serf, err = serf.Create(conf)
+	serfNet._serf, err = serf.Create(conf)
 	return serfNet, err
 }
 
 type serfNet struct {
-	serf    *serf.Serf
+	_serf   *serf.Serf
 	eventch chan serf.Event
 }
 
 //NumOfPeers return the length of members
 func (s *serfNet) Listen(ctx context.Context, outch chan P2PEvent) {
+	defer fmt.Println("[P2P] End MemberList Listen")
+
 	for event := range s.eventch {
 		if e, ok := event.(serf.MemberEvent); ok {
+
 			for _, member := range e.Members {
 				nodeId := member.Name[:20]
 				select {
@@ -60,30 +71,52 @@ func (s *serfNet) Listen(ctx context.Context, outch chan P2PEvent) {
 				}
 			}
 		}
+		//if event.EventType() == serf.EventQuery {
+		//			query := event.(*serf.Query)
+		//fmt.Println("[Gossip ] query", query)
+		//}
 	}
+}
+
+func (s *serfNet) IsAlive() bool {
+	state := s._serf.State()
+	if state != serf.SerfAlive {
+		fmt.Println("[Gossip ] status ", state)
+		return false
+	}
+	return true
 }
 
 //NumOfPeers return the length of members
 func (s *serfNet) NumOfPeers() int {
-	return len(s.serf.Members())
+	members := s._serf.Members()
+	n := 0
+	for i := 0; i < len(members); i++ {
+		if members[i].Status == serf.StatusAlive && members[i].Name != s._serf.LocalMember().Name {
+			n++
+		}
+
+	}
+	return n
 }
 
 // Join joins an existing Serf cluster. Returns the number of nodes
 // successfully contacted.
 func (s *serfNet) Join(bootstrapIp []string) (num int, err error) {
-	num, err = s.serf.Join(bootstrapIp, true)
+	num, err = s._serf.Join(bootstrapIp, true)
 	return
 }
 
 // Join leaves an Serf cluster.
 func (s *serfNet) Leave() {
-	s.Leave()
+	s._serf.Leave()
+	close(s.eventch)
 	return
 }
 
 // Lookup return the IP address of the given ID
 func (s *serfNet) Lookup(id []byte) (addr string) {
-	members := s.serf.Members()
+	members := s._serf.Members()
 	var nodeId, port string
 	for i := 0; i < len(members); i++ {
 		if len(members[i].Name) < 20 {
@@ -96,9 +129,8 @@ func (s *serfNet) Lookup(id []byte) (addr string) {
 		} else {
 			port = members[i].Name[20:]
 		}
-		if nodeId == string(id) {
+		if nodeId == string(id) && members[i].Status == serf.StatusAlive {
 			fmt.Println("ID ", []byte(nodeId), " ", members[i].Addr.String()+":"+port)
-
 			return members[i].Addr.String() + ":" + port
 		}
 	}
@@ -107,12 +139,11 @@ func (s *serfNet) Lookup(id []byte) (addr string) {
 
 // MembersIP return the all IP address of an existing cluster
 func (s *serfNet) MembersIP() (addr []net.IP) {
-	//fmt.Println("members len ", len(s.serf.Members()))
 
-	members := s.serf.Members()
+	members := s._serf.Members()
 	for i := 0; i < len(members); i++ {
 		//fmt.Println("localMember ", []byte(s.serf.LocalMember().Name), "members[i].Name ", []byte(members[i].Name), " status ", members[i].Status, " addr ", members[i].Addr)
-		if members[i].Name != s.serf.LocalMember().Name {
+		if members[i].Name != s._serf.LocalMember().Name {
 			addr = append(addr, members[i].Addr)
 		}
 	}
@@ -121,7 +152,7 @@ func (s *serfNet) MembersIP() (addr []net.IP) {
 
 // MembersID return the all ID of an existing cluster
 func (s *serfNet) MembersID() (list [][]byte) {
-	members := s.serf.Members()
+	members := s._serf.Members()
 	for i := 0; i < len(members); i++ {
 		var port string
 		if len(members[i].Name) < 20 {

@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"net"
 	"reflect"
+	"sync"
 	"time"
 
 	"github.com/dedis/kyber"
@@ -77,30 +78,55 @@ type subscription struct {
 }
 
 func (n *server) Listen() (err error) {
-	defer fmt.Println("end Listen")
-	go n.receiveHandler()
-	go n.callHandler()
-	go n.messageDispatch()
-	go n.eventDispatch()
+	defer fmt.Println("[P2P] End P2P ListenLoop")
+
 	p := fmt.Sprintf(":%s", n.port)
 	if n.listener, err = net.Listen("tcp", p); err != nil {
 		err = &P2PError{err: errors.Errorf("server Listen failed: %w", err), t: time.Now()}
 		n.logger.Error(err)
 		return
 	}
-	fmt.Println("Listen to ", n.addr, " ", n.port)
+	fmt.Println("[P2P] Listen to ", n.addr, " ", n.port)
 
+	var wg sync.WaitGroup
+	wg.Add(4)
+	go func() {
+		defer wg.Done()
+		n.receiveHandler()
+		fmt.Println("[P2P] End P2P receiveHandler")
+	}()
+	go func() {
+		defer wg.Done()
+		err = n.callHandler()
+		fmt.Println("[P2P] End P2P callHandler")
+		n.listener.Close()
+	}()
+	go func() {
+		defer wg.Done()
+		n.messageDispatch()
+		fmt.Println("[P2P] End P2P messageDispatch")
+	}()
+	go func() {
+		defer wg.Done()
+		n.eventDispatch()
+		fmt.Println("[P2P] End P2P eventDispatch")
+	}()
+L:
 	for {
 		select {
 		case <-n.ctx.Done():
-			return
+			break L
 		default:
-			var fd net.Conn
-			fd, err = n.listener.Accept()
-			if err != nil {
-				err = &P2PError{err: errors.Errorf("listener accept failed: %w", err), t: time.Now()}
+			fd, errL := n.listener.Accept()
+			if errL != nil {
+				if err != nil {
+					err = &P2PError{err: errors.Errorf("listener accept failed: %w", err), t: time.Now()}
+				} else {
+					err = &P2PError{err: errors.Errorf("listener accept failed: %w", errL), t: time.Now()}
+				}
 				n.logger.Error(err)
-				return
+				n.cancel()
+				break L
 			}
 			go func() {
 				ctx, cancel := context.WithTimeout(n.ctx, 2*time.Second)
@@ -127,12 +153,11 @@ func (n *server) Listen() (err error) {
 			}()
 		}
 	}
-
+	wg.Wait()
 	return
 }
 
 func (n *server) receiveHandler() {
-	defer fmt.Println("end receiveHandler")
 	clients := make(map[string]*client)
 	for {
 		select {
@@ -173,10 +198,10 @@ func (n *server) receiveHandler() {
 	}
 }
 
-func (n *server) callHandler() {
+func (n *server) callHandler() (err error) {
 	addrToid := make(map[string][]byte)
 	clients := make(map[string]*client)
-
+	watchDog := time.NewTicker(5 * time.Second)
 	for {
 		select {
 		case <-n.ctx.Done():
@@ -186,7 +211,14 @@ func (n *server) callHandler() {
 					n.logger.Error(err)
 				}
 			}
+			err = n.ctx.Err()
 			return
+		case <-watchDog.C:
+			if !n.members.IsAlive() {
+				err = errors.New("p2p cluster status is not alive")
+				n.logger.Error(err)
+				return
+			}
 		case id, ok := <-n.removeCallingC:
 			if ok {
 				c := clients[string(id)]
@@ -271,9 +303,6 @@ func (n *server) Leave() {
 		n.logger.Error(err)
 	}
 
-	if n.members != nil {
-		n.members.Leave()
-	}
 	return
 }
 
@@ -292,22 +321,29 @@ func (n *server) Request(ctx context.Context, id []byte, msg proto.Message) (p2p
 		result interface{}
 		ok     bool
 	)
+	addr := n.members.Lookup(id)
+	if addr == "" {
+		err = &P2PError{err: errors.New("No IP info"), dest: addr, t: time.Now()}
+		n.logger.Error(err)
+		return
+	}
+	defer n.logger.TimeTrack(time.Now(), "TimeRequest", nil)
 	opCtx, opCancel := context.WithTimeout(ctx, 5*time.Second)
 	defer opCancel()
 	req := NewP2pRequest(opCtx, sendReq, id, "", msg, 0)
 	if err = req.sendReq(n.calling); err != nil {
-		err = &P2PError{err: errors.Errorf("sendReq failed: %w", err), t: time.Now()}
+		err = &P2PError{err: errors.Errorf("Request sendReq failed: %w", err), dest: addr, t: time.Now()}
 		n.logger.Error(err)
 		return
 	}
 	if result, err = req.waitForResult(); err != nil {
-		err = &P2PError{err: errors.Errorf("req.waitForResult: %w", err), t: time.Now()}
+		err = &P2PError{err: errors.Errorf("Request waitForResult: %w", err), dest: addr, t: time.Now()}
 		n.logger.Error(err)
 		return
 	}
 
 	if p2pmsg, ok = result.(P2PMessage); !ok {
-		err = &P2PError{err: errors.Errorf("P2PMessage casting failed: %w", err), t: time.Now()}
+		err = &P2PError{err: errors.Errorf("Request P2PMessage casting failed: %w", err), dest: addr, t: time.Now()}
 		n.logger.Error(err)
 	}
 	return
@@ -315,36 +351,41 @@ func (n *server) Request(ctx context.Context, id []byte, msg proto.Message) (p2p
 
 // Reply sends a reply to the specific node
 func (n *server) Reply(ctx context.Context, id []byte, nonce uint64, msg proto.Message) (err error) {
-	opCtx, opCancel := context.WithTimeout(ctx, 5*time.Second)
+	opCtx, opCancel := context.WithTimeout(ctx, 15*time.Second)
 	defer opCancel()
 	req := NewP2pRequest(opCtx, replyReq, id, "", msg, nonce)
 	if err = req.sendReq(n.replying); err != nil {
-		err = &P2PError{err: errors.Errorf("sendReq failed: %w", err), t: time.Now()}
+		err = &P2PError{err: errors.Errorf("Reply sendReq failed: %w", err), dest: req.addr, t: time.Now()}
 		n.logger.Error(err)
 		return
 	}
 	if _, err = req.waitForResult(); err != nil {
-		err = &P2PError{err: errors.Errorf("waitForResult failed: %w", err), t: time.Now()}
+		err = &P2PError{err: errors.Errorf("Reply waitForResult failed: %w", err), dest: req.addr, t: time.Now()}
 		n.logger.Error(err)
 	}
 	return
 }
 
 func (n *server) eventDispatch() {
-	go n.members.Listen(n.ctx, n.peersEvent)
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		n.members.Listen(n.ctx, n.peersEvent)
+	}()
+
 	subscriptions := make(map[int]chan discover.P2PEvent)
 	subID := 1
+L:
 	for {
 		select {
 		case e, ok := <-n.peersEvent:
 			if ok {
 				for _, eventCh := range subscriptions {
-					go func() {
-						select {
-						case <-n.ctx.Done():
-						case eventCh <- e:
-						}
-					}()
+					select {
+					case <-n.ctx.Done():
+					case eventCh <- e:
+					}
 				}
 			}
 		case sub, ok := <-n.subscribeEvent:
@@ -353,24 +394,26 @@ func (n *server) eventDispatch() {
 				sub.subID = subID
 				subID++
 				subscriptions[sub.subID] = sub.eventCh
-				go func() {
-					select {
-					case <-n.ctx.Done():
-					case sub.replyCh <- sub:
-					}
-				}()
+				select {
+				case <-n.ctx.Done():
+				case sub.replyCh <- sub:
+				}
 			}
 		case subID, ok := <-n.unscribeEvent:
 			if ok {
+				close(subscriptions[subID])
 				delete(subscriptions, subID)
 			}
 		case <-n.ctx.Done():
-			for _, outch := range subscriptions {
-				close(outch)
+			n.members.Leave()
+			for _, eventCh := range subscriptions {
+				close(eventCh)
 			}
-			return
+			break L
 		}
 	}
+	wg.Wait()
+	return
 }
 
 func (n *server) messageDispatch() {
@@ -387,12 +430,10 @@ func (n *server) messageDispatch() {
 					messagetype = messagetype[1:]
 				}
 				if out := subscriptions[messagetype]; out != nil {
-					go func() {
-						select {
-						case <-n.ctx.Done():
-						case out <- msg:
-						}
-					}()
+					select {
+					case <-n.ctx.Done():
+					case out <- msg:
+					}
 				}
 			}
 		case sub, ok := <-n.subscribeMsg:
@@ -404,8 +445,11 @@ func (n *server) messageDispatch() {
 				delete(subscriptions, msgType)
 			}
 		case <-n.ctx.Done():
-			for _, outch := range subscriptions {
-				close(outch)
+			for i, outch := range subscriptions {
+				fmt.Println("[P2P] Close outch ", i)
+				if outch != nil {
+					close(outch)
+				}
 			}
 			return
 		}
@@ -414,8 +458,7 @@ func (n *server) messageDispatch() {
 
 // SubscribeEvent is a message subscription operation binding the P2PMessage
 func (n *server) SubscribeEvent() (subID int, outch chan discover.P2PEvent, err error) {
-
-	reply := make(chan *subscription)
+	reply := make(chan *subscription, 1)
 	defer close(reply)
 	select {
 	case <-n.ctx.Done():
@@ -441,20 +484,55 @@ func (n *server) UnSubscribeEvent(subID int) {
 	return
 }
 
+func merge(ctx context.Context, cs ...chan P2PMessage) chan P2PMessage {
+	var wg sync.WaitGroup
+	out := make(chan P2PMessage)
+
+	// Start an output goroutine for each input channel in cs.  output
+	// copies values from c to out until c is closed, then calls wg.Done.
+	output := func(c <-chan P2PMessage) {
+		defer fmt.Println("[P2P] merge close c ")
+		for n := range c {
+			select {
+			case <-ctx.Done():
+				return
+			case out <- n:
+			}
+		}
+		wg.Done()
+	}
+	wg.Add(len(cs))
+	for _, c := range cs {
+		go output(c)
+	}
+
+	// Start a goroutine to close out once all the output goroutines are
+	// done.  This must start after the wg.Add call.
+	go func() {
+		wg.Wait()
+		fmt.Println("[P2P] End merge")
+		close(out)
+	}()
+	return out
+}
+
 // SubscribeMsg is a message subscription operation binding the P2PMessage
 func (n *server) SubscribeMsg(chanBuffer int, peersFeed ...interface{}) (outch chan P2PMessage, err error) {
-	if chanBuffer > 0 {
-		outch = make(chan P2PMessage, chanBuffer)
-	} else {
-		outch = make(chan P2PMessage)
-	}
+
+	var eventList []chan P2PMessage
 	for _, m := range peersFeed {
-		fmt.Println("SubscribeEvent ", reflect.TypeOf(m).String())
+		if chanBuffer > 0 {
+			outch = make(chan P2PMessage, chanBuffer)
+		} else {
+			outch = make(chan P2PMessage)
+		}
+		eventList = append(eventList, outch)
 		select {
 		case <-n.ctx.Done():
 		case n.subscribeMsg <- &subscription{msgType: reflect.TypeOf(m).String(), msgCh: outch}:
 		}
 	}
+	outch = merge(n.ctx, eventList...)
 	return
 }
 
@@ -475,6 +553,9 @@ func (n *server) Join(bootstrapIP []string) (num int, err error) {
 		err = n.ctx.Err()
 	default:
 		num, err = n.members.Join(bootstrapIP)
+		if err != nil {
+			n.logger.Error(errors.Errorf(" : %w", err))
+		}
 	}
 	return
 }

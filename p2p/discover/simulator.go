@@ -13,6 +13,10 @@ func NewSimulator() (Membership, error) {
 type simulator struct {
 }
 
+func (s *simulator) IsAlive() bool {
+	return true
+}
+
 //NumOfPeers return the length of members
 func (s *simulator) NumOfPeers() int {
 	return 1

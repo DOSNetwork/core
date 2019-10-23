@@ -18,6 +18,7 @@ var (
 
 type P2PError struct {
 	frame errors.Frame
+	dest  string
 	t     time.Time // the time when the error happened
 	err   error     // the wrapped error
 }
@@ -27,7 +28,7 @@ func (e *P2PError) Format(f fmt.State, c rune) {
 }
 
 func (e *P2PError) FormatError(p errors.Printer) error {
-	p.Printf("Ocurred at: %s", e.t)
+	p.Printf("IP : %s", e.dest)
 	e.frame.Format(p)
 	return e.err
 }
