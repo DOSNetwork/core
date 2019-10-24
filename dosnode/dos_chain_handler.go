@@ -69,6 +69,12 @@ func (d *DosNode) onchainLoop() {
 			onchain.SubscribeLogPublicKeyAccepted, onchain.SubscribeCommitrevealLogStartCommitreveal}
 		d.onchainEvent, onchainErrc = d.chain.SubscribeEvent(subescriptions)
 
+		currentBlockNumber, err := d.chain.CurrentBlock()
+		if err != nil {
+			d.logger.Error(err)
+			continue
+		}
+		checkBlkNumberPeriod := 100
 		watchdogInterval = 15
 		watchdog := time.NewTicker(time.Duration(watchdogInterval) * time.Second)
 		reconn = 0
@@ -97,10 +103,16 @@ func (d *DosNode) onchainLoop() {
 				}
 				d.logger.Event("peersUpdate", map[string]interface{}{"numOfPeers": d.p.NumOfMembers()})
 			case <-watchdog.C:
-				currentBlockNumber, err := d.chain.CurrentBlock()
-				if err != nil {
-					d.logger.Error(err)
-					continue
+				checkBlkNumberPeriod--
+				if checkBlkNumberPeriod <= 0 {
+					currentBlockNumber, err = d.chain.CurrentBlock()
+					if err != nil {
+						d.logger.Error(err)
+						continue
+					}
+					checkBlkNumberPeriod = 100
+				} else {
+					currentBlockNumber++
 				}
 				if balance, err := d.chain.Balance(); err != nil {
 					d.logger.Error(err)
