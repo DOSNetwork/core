@@ -282,7 +282,7 @@ func (d *DosNode) handleGrouping(participants [][]byte, groupID string) {
 	defer d.logger.TimeTrack(time.Now(), "GroupingDone", map[string]interface{}{"GroupID": groupID, "Topic": "Grouping"})
 	defer fmt.Println("[DOS] Grouping Done !!!!! ", groupID)
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(60*60*time.Second))
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(10*15*time.Second))
 	defer cancel()
 
 	var errcList []chan error

@@ -153,7 +153,7 @@ func sendToMembers(ctx context.Context, logger log.Logger, msgc chan interface{}
 										if _, err := p.Request(ctx, id, m); err != nil {
 											err := &DKGError{err: errors.Errorf("sendToMembers failed for GID %s : %w", sessionID, err)}
 											logger.Error(err)
-											time.Sleep(100 * time.Millisecond)
+											time.Sleep(500 * time.Millisecond)
 											continue
 										}
 										return
@@ -277,7 +277,7 @@ func genDealsAndSend(ctx context.Context, logger log.Logger, dkgc chan *DistKeyG
 									err := &DKGError{err: errors.Errorf("genDealsAndSend failed for GID %s : %w", sessionID, err)}
 									logger.Error(err)
 									//reportErr(ctx, errc, err)
-									time.Sleep(100 * time.Millisecond)
+									time.Sleep(500 * time.Millisecond)
 									continue
 								}
 								return
