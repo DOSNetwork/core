@@ -20,6 +20,7 @@ import (
 	"github.com/DOSNetwork/core/onchain/dosbridge"
 	"github.com/DOSNetwork/core/onchain/dospayment"
 	"github.com/DOSNetwork/core/onchain/dosproxy"
+	"github.com/DOSNetwork/core/onchain/dosstaking"
 	"github.com/DOSNetwork/core/testing/dosUser/contract"
 	"github.com/DOSNetwork/core/testing/dosUser/eth"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -34,6 +35,14 @@ const (
 	proxyAddressType = iota
 	crAddressType
 	paymentAddressType
+)
+
+var (
+	dosTokenAddr            = common.HexToAddress("0x214e79c85744CD2eBBc64dDc0047131496871bEe")
+	dbtokenAddr             = common.HexToAddress("0x9bfE8F5749d90eB4049Ad94CC4De9b6C4C31f822")
+	dosFundsAddr            = common.HexToAddress("0x2a3B59AC638F90d82BdAF5E2dA5D37C1a31B29f3")
+	guardianFundsAddr       = common.HexToAddress("0x2a3B59AC638F90d82BdAF5E2dA5D37C1a31B29f3")
+	stakingRewardsVaultAddr = common.HexToAddress("0x2a3B59AC638F90d82BdAF5E2dA5D37C1a31B29f3")
 )
 
 func between(value string, a string, b string) string {
@@ -226,12 +235,13 @@ func deployContract(contractPath, targetTask, configPath string, config configur
 		if err := updateBridgeAddr(contractPath+"/DOSOnChainSDK.sol", address.Hex()); err != nil {
 			log.Fatal(err)
 		}
-		if err := updateBridgeAddr(contractPath+"/DOSPayment.sol", address.Hex()); err != nil {
-			log.Fatal(err)
-		}
-		if err := updateBridgeAddr(contractPath+"/DOSProxy.sol", address.Hex()); err != nil {
-			log.Fatal(err)
-		}
+		/*
+			if err := updateBridgeAddr(contractPath+"/DOSPayment.sol", address.Hex()); err != nil {
+				log.Fatal(err)
+			}
+			if err := updateBridgeAddr(contractPath+"/DOSProxy.sol", address.Hex()); err != nil {
+				log.Fatal(err)
+			}*/
 		return
 	}
 
@@ -239,15 +249,14 @@ func deployContract(contractPath, targetTask, configPath string, config configur
 		return
 	}
 	bridgeAddr := common.HexToAddress(config.DOSAddressBridgeAddress)
-
 	if targetTask == "deployPayment" {
 		fmt.Println("Starting deploy DOSPayment.sol...")
-		address, tx, _, err = dospayment.DeployDospayment(auth, client)
+		address, tx, _, err = dospayment.DeployDospayment(auth, client, bridgeAddr, guardianFundsAddr, dosTokenAddr)
 		for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
 			fmt.Println(err)
 			time.Sleep(time.Second)
 			fmt.Println("transaction retry...")
-			address, tx, _, err = dospayment.DeployDospayment(auth, client)
+			address, tx, _, err = dospayment.DeployDospayment(auth, client, bridgeAddr, guardianFundsAddr, dosTokenAddr)
 		}
 		if err != nil {
 			fmt.Println(err)
@@ -264,15 +273,19 @@ func deployContract(contractPath, targetTask, configPath string, config configur
 		if err != nil {
 			log.Fatal(err)
 		}
+	} else if targetTask == "deployStaking" {
+		fmt.Println("Starting deploy Staking.sol...")
 
-	} else if targetTask == "deployCommitReveal" {
-		fmt.Println("Starting deploy Commitreveal.sol...")
-		address, tx, _, err = commitreveal.DeployCommitreveal(auth, client)
+		address, tx, _, err = staking.DeployStaking(auth, client, dosTokenAddr, dbtokenAddr, stakingRewardsVaultAddr, bridgeAddr)
 		for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
 			fmt.Println(err)
 			time.Sleep(time.Second)
 			fmt.Println("transaction retry...")
-			address, tx, _, err = commitreveal.DeployCommitreveal(auth, client)
+			address, tx, _, err = staking.DeployStaking(auth, client, dosTokenAddr, dbtokenAddr, stakingRewardsVaultAddr, bridgeAddr)
+		}
+		if err != nil {
+			fmt.Println(err)
+			log.Fatal(err)
 		}
 		fmt.Println("contract Address: ", address.Hex())
 		fmt.Println("tx sent: ", tx.Hash().Hex())
@@ -281,20 +294,15 @@ func deployContract(contractPath, targetTask, configPath string, config configur
 		if err != nil {
 			fmt.Println(err)
 		}
-		err := updateBridge(client, key, crAddressType, bridgeAddr, address)
-		if err != nil {
-			log.Fatal(err)
-		}
-
 	} else if targetTask == "deployProxy" {
 		fmt.Println("Starting deploy DOSProxy.sol...")
-		//tokenAddr:=common.HexToAddress("0xe90EF85fff4f38e742769Ad45DB7eCd3FC935973")
-		address, tx, _, err = dosproxy.DeployDosproxy(auth, client)
+		proxyFundsAddr := dosFundsAddr
+		address, tx, _, err = dosproxy.DeployDosproxy(auth, client, bridgeAddr, proxyFundsAddr, dosTokenAddr)
 		for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
 			fmt.Println(err)
 			time.Sleep(time.Second)
 			fmt.Println("transaction retry...")
-			address, tx, _, err = dosproxy.DeployDosproxy(auth, client)
+			address, tx, _, err = dosproxy.DeployDosproxy(auth, client, bridgeAddr, proxyFundsAddr, dosTokenAddr)
 		}
 		if err != nil {
 			fmt.Println(err)
@@ -312,11 +320,27 @@ func deployContract(contractPath, targetTask, configPath string, config configur
 		if err != nil {
 			log.Fatal(err)
 		}
-
-		err = addProxyToCRWhiteList(client, key, bridgeAddr)
+	} else if targetTask == "deployCommitReveal" {
+		fmt.Println("Starting deploy Commitreveal.sol...")
+		address, tx, _, err = commitreveal.DeployCommitreveal(auth, client, bridgeAddr)
+		for err != nil && (err.Error() == core.ErrNonceTooLow.Error() || err.Error() == core.ErrReplaceUnderpriced.Error()) {
+			fmt.Println(err)
+			time.Sleep(time.Second)
+			fmt.Println("transaction retry...")
+			address, tx, _, err = commitreveal.DeployCommitreveal(auth, client, bridgeAddr)
+		}
+		fmt.Println("contract Address: ", address.Hex())
+		fmt.Println("tx sent: ", tx.Hash().Hex())
+		fmt.Println("contract deployed, waiting for confirmation...")
+		err = onchain.CheckTransaction(client, tx)
+		if err != nil {
+			fmt.Println(err)
+		}
+		err := updateBridge(client, key, crAddressType, bridgeAddr, address)
 		if err != nil {
 			log.Fatal(err)
 		}
+
 	} else if targetTask == "deployAMA" {
 		fmt.Println("Starting deploy AskMeAnyThing.sol...")
 		amaConfig := eth.AMAConfig{}
@@ -392,7 +416,7 @@ func main() {
 		return
 	}
 	var c *ethclient.Client
-	results := onchain.DialToEth(context.Background(), []string{"ws://:8546"})
+	results := onchain.DialToEth(context.Background(), []string{"wss://rinkeby.infura.io/ws/v3/8e609c76fce442f8a1735fbea9999747"})
 	for result := range results {
 		if result.Err != nil {
 			continue

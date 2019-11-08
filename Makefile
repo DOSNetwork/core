@@ -5,8 +5,9 @@ DOSPROXY_GOPATH := onchain/dosproxy
 DOSPAYMENT_GOPATH := onchain/dospayment
 DOSBRIDGE_GOPATH := onchain/dosbridge
 COMMITREVEAL_GOPATH := onchain/commitreveal
+DOSSTAKING_GOPATH := onchain/dosstaking
 TEST_CONTRACTS_GOPATH := testing/dosUser/contract
-GENERATED_FILES := $(shell find $(DOSPROXY_GOPATH) $(DOSBRIDGE_GOPATH) $(DOSPAYMENT_GOPATH) $(COMMITREVEAL_GOPATH) $(TEST_CONTRACTS_GOPATH) -name '*.go')
+GENERATED_FILES := $(shell find $(DOSPROXY_GOPATH) $(DOSBRIDGE_GOPATH) $(DOSPAYMENT_GOPATH) $(DOSSTAKING_GOPATH) $(COMMITREVEAL_GOPATH) $(TEST_CONTRACTS_GOPATH) -name '*.go')
 ETH_CONTRACTS := onchain/eth/contracts
 BOOT_CREDENTIAL := testAccounts/bootCredential
 UNAME_S := $(shell uname -s)
@@ -58,6 +59,8 @@ gen: updateSubmodule
 	abigen --abi="$(DOSPAYMENT_GOPATH)/DOSPayment.abi" --bin="$(DOSPAYMENT_GOPATH)/DOSPayment.bin" --pkg dospayment --out $(DOSPAYMENT_GOPATH)/DOSPayment.go
 	solc --optimize --overwrite --abi  --bin $(ETH_CONTRACTS)/CommitReveal.sol -o $(COMMITREVEAL_GOPATH)
 	abigen --abi="$(COMMITREVEAL_GOPATH)/CommitReveal.abi" --bin="$(COMMITREVEAL_GOPATH)/CommitReveal.bin" --pkg commitreveal --out $(COMMITREVEAL_GOPATH)/CommitReveal.go
+	solc --optimize --overwrite --abi  --bin $(ETH_CONTRACTS)/Staking.sol -o $(DOSSTAKING_GOPATH)
+	abigen --abi="$(DOSSTAKING_GOPATH)/Staking.abi" --bin="$(DOSSTAKING_GOPATH)/Staking.bin" --pkg staking --out $(DOSSTAKING_GOPATH)/Staking.go
 
 
 .PHONY: clean

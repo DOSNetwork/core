@@ -12,6 +12,7 @@ AMA_CONFIGPATH := dosUser/ama.json
 DOSPROXY_GOPATH := onchain/dosproxy
 DOSPAYMENT_GOPATH := onchain/dospayment
 DOSBRIDGE_GOPATH := onchain/dosbridge
+DOSSTAKING_GOPATH := onchain/dosstaking
 COMMITREVEAL_GOPATH := onchain/commitreveal
 UNAME_S := $(shell uname)
 
@@ -31,6 +32,12 @@ deploy-payment:
 	abigen --abi="../$(DOSPAYMENT_GOPATH)/DOSPayment.abi" --bin="../$(DOSPAYMENT_GOPATH)/DOSPayment.bin" --pkg dospayment --out ../$(DOSPAYMENT_GOPATH)/DOSPayment.go
 	go run contracts_deploy/deploy.go -credentialPath $(BOOT_CREDENTIAL) -contractPath $(ETH_CONTRACTS) -target deployPayment
 
+deploy-staking:
+	rm ../$(DOSSTAKING_GOPATH)/*
+	solc --optimize --abi --bin $(ETH_CONTRACTS)/Staking.sol -o ../$(DOSSTAKING_GOPATH)
+	abigen --abi="../$(DOSSTAKING_GOPATH)/Staking.abi" --bin="../$(DOSSTAKING_GOPATH)/Staking.bin" --pkg staking --out ../$(DOSSTAKING_GOPATH)/Staking.go
+	go run contracts_deploy/deploy.go -credentialPath $(BOOT_CREDENTIAL) -contractPath $(ETH_CONTRACTS) -target deployStaking
+
 deploy-proxy:
 	rm ../$(DOSPROXY_GOPATH)/*
 	solc --optimize --abi --bin $(ETH_CONTRACTS)/DOSProxy.sol -o ../$(DOSPROXY_GOPATH)
@@ -46,6 +53,7 @@ deploy-cr:
 deploy-dos:
 	$(MAKE) deploy-bridge
 	$(MAKE) deploy-payment
+	$(MAKE) deploy-staking
 	$(MAKE) deploy-cr
 	$(MAKE) deploy-proxy
 
