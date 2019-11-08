@@ -74,7 +74,7 @@ func (d *DosNode) onchainLoop() {
 			d.logger.Error(err)
 			continue
 		}
-		checkBlkNumberPeriod := 100
+		checkBlkNumberPeriod := 50
 		watchdogInterval = 15
 		watchdog := time.NewTicker(time.Duration(watchdogInterval) * time.Second)
 		reconn = 0
@@ -110,7 +110,7 @@ func (d *DosNode) onchainLoop() {
 						d.logger.Error(err)
 						continue
 					}
-					checkBlkNumberPeriod = 100
+					checkBlkNumberPeriod = 50
 				} else {
 					currentBlockNumber++
 				}
@@ -268,7 +268,7 @@ func (d *DosNode) onchainLoop() {
 			fmt.Print(fmt.Errorf("[Dos] Drain onchainErrc %+v \n", err))
 		}
 		fmt.Println("[DOS] End Drain onchainErrc")
-
+		d.chain.DisconnectAll()
 		select {
 		case <-d.ctx.Done():
 			return
