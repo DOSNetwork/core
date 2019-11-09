@@ -15,19 +15,31 @@ import (
 	"github.com/ethereum/go-ethereum/event"
 )
 
+// Reference imports to suppress errors if they are not otherwise used.
+var (
+	_ = big.NewInt
+	_ = strings.NewReader
+	_ = ethereum.NotFound
+	_ = abi.U256
+	_ = bind.Bind
+	_ = common.Big1
+	_ = types.BloomLookup
+	_ = event.NewSubscription
+)
+
 // DospaymentABI is the input ABI used to generate the binding from.
-const DospaymentABI = "[{\"constant\":true,\"inputs\":[],\"name\":\"_defaultGuardianFee\",\"outputs\":[{\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"nodeAddr\",\"type\":\"address\"},{\"name\":\"idx\",\"type\":\"uint256\"}],\"name\":\"nodeTokenAddres\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"addr\",\"type\":\"address\"}],\"name\":\"setNetworkToken\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"requestID\",\"type\":\"uint256\"}],\"name\":\"refundServiceFee\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"\",\"type\":\"address\"}],\"name\":\"_paymentMethods\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"guardianAddr\",\"type\":\"address\"}],\"name\":\"claimGuardianReward\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"tokenAddr\",\"type\":\"address\"}],\"name\":\"isSupportedToken\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"requestID\",\"type\":\"uint256\"}],\"name\":\"paymentInfo\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"},{\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"minStake\",\"outputs\":[{\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"tokenAddr\",\"type\":\"address\"},{\"name\":\"serviceType\",\"type\":\"uint256\"},{\"name\":\"fee\",\"type\":\"uint256\"}],\"name\":\"setServiceFee\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[],\"name\":\"withdraw\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"nodeAddr\",\"type\":\"address\"}],\"name\":\"nodeTokenAddresLength\",\"outputs\":[{\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"quo\",\"type\":\"uint256\"}],\"name\":\"setDropBurnMaxQuota\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"fundsAddr\",\"type\":\"address\"},{\"name\":\"tokenAddr\",\"type\":\"address\"}],\"name\":\"setGuardianFunds\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"_guardianFundsTokenAddr\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"_defaultTokenAddr\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"_defaultSubmitterRate\",\"outputs\":[{\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"networkToken\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[],\"name\":\"renounceOwnership\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"consumer\",\"type\":\"address\"},{\"name\":\"requestID\",\"type\":\"uint256\"},{\"name\":\"serviceType\",\"type\":\"uint256\"}],\"name\":\"chargeServiceFee\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"isOwner\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"tokenAddr\",\"type\":\"uint256\"}],\"name\":\"withdrawAll\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"_payments\",\"outputs\":[{\"name\":\"consumer\",\"type\":\"address\"},{\"name\":\"tokenAddr\",\"type\":\"address\"},{\"name\":\"serviceType\",\"type\":\"uint256\"},{\"name\":\"amount\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"_defaultWorkerRate\",\"outputs\":[{\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"dropburnToken\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"consumer\",\"type\":\"address\"},{\"name\":\"tokenAddr\",\"type\":\"address\"}],\"name\":\"setPaymentMethod\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"\",\"type\":\"address\"}],\"name\":\"_feeList\",\"outputs\":[{\"name\":\"submitterRate\",\"type\":\"uint256\"},{\"name\":\"workerRate\",\"type\":\"uint256\"},{\"name\":\"denominator\",\"type\":\"uint256\"},{\"name\":\"guardianFee\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"node\",\"type\":\"address\"}],\"name\":\"fromValidStakingNode\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"_defaultUserQueryFee\",\"outputs\":[{\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"_defaultSystemRandomFee\",\"outputs\":[{\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"tokenAddr\",\"type\":\"address\"},{\"name\":\"submitterRate\",\"type\":\"uint256\"},{\"name\":\"workerRate\",\"type\":\"uint256\"},{\"name\":\"denominator\",\"type\":\"uint256\"}],\"name\":\"setFeeDividend\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"_guardianFundsAddr\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"_defaultDenominator\",\"outputs\":[{\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"dropburnMaxQuota\",\"outputs\":[{\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"addr\",\"type\":\"address\"}],\"name\":\"setDropBurnToken\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"tokenAddr\",\"type\":\"address\"},{\"name\":\"fee\",\"type\":\"uint256\"}],\"name\":\"setGuardianFee\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"nodeAddr\",\"type\":\"address\"},{\"name\":\"idx\",\"type\":\"uint256\"}],\"name\":\"nodeTokenAmount\",\"outputs\":[{\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"_defaultUserRandomFee\",\"outputs\":[{\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"requestID\",\"type\":\"uint256\"},{\"name\":\"submitter\",\"type\":\"address\"},{\"name\":\"workers\",\"type\":\"address[]\"}],\"name\":\"claimServiceFee\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"oldAddress\",\"type\":\"address\"},{\"indexed\":false,\"name\":\"newAddress\",\"type\":\"address\"}],\"name\":\"UpdateNetworkTokenAddress\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"oldAddress\",\"type\":\"address\"},{\"indexed\":false,\"name\":\"newAddress\",\"type\":\"address\"}],\"name\":\"UpdateDropBurnTokenAddress\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"oldQuota\",\"type\":\"uint256\"},{\"indexed\":false,\"name\":\"newQuota\",\"type\":\"uint256\"}],\"name\":\"UpdateDropBurnMaxQuota\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"consumer\",\"type\":\"address\"},{\"indexed\":false,\"name\":\"tokenAddr\",\"type\":\"address\"},{\"indexed\":false,\"name\":\"requestID\",\"type\":\"uint256\"},{\"indexed\":false,\"name\":\"serviceType\",\"type\":\"uint256\"},{\"indexed\":false,\"name\":\"fee\",\"type\":\"uint256\"}],\"name\":\"LogChargeServiceFee\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"consumer\",\"type\":\"address\"},{\"indexed\":false,\"name\":\"tokenAddr\",\"type\":\"address\"},{\"indexed\":false,\"name\":\"requestID\",\"type\":\"uint256\"},{\"indexed\":false,\"name\":\"serviceType\",\"type\":\"uint256\"},{\"indexed\":false,\"name\":\"fee\",\"type\":\"uint256\"}],\"name\":\"LogRefundServiceFee\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"nodeAddr\",\"type\":\"address\"},{\"indexed\":false,\"name\":\"tokenAddr\",\"type\":\"address\"},{\"indexed\":false,\"name\":\"requestID\",\"type\":\"uint256\"},{\"indexed\":false,\"name\":\"serviceType\",\"type\":\"uint256\"},{\"indexed\":false,\"name\":\"feeForSubmitter\",\"type\":\"uint256\"}],\"name\":\"LogClaimServiceFee\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"nodeAddr\",\"type\":\"address\"},{\"indexed\":false,\"name\":\"tokenAddr\",\"type\":\"address\"},{\"indexed\":false,\"name\":\"feeForSubmitter\",\"type\":\"uint256\"},{\"indexed\":false,\"name\":\"sender\",\"type\":\"address\"}],\"name\":\"LogClaimGuardianFee\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"previousOwner\",\"type\":\"address\"}],\"name\":\"OwnershipRenounced\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"previousOwner\",\"type\":\"address\"},{\"indexed\":true,\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"}]"
+const DospaymentABI = "[{\"constant\":true,\"inputs\":[],\"name\":\"_defaultGuardianFee\",\"outputs\":[{\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"nodeAddr\",\"type\":\"address\"},{\"name\":\"idx\",\"type\":\"uint256\"}],\"name\":\"nodeTokenAddres\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"_bridgeAddr\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"requestID\",\"type\":\"uint256\"}],\"name\":\"refundServiceFee\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"\",\"type\":\"address\"}],\"name\":\"_paymentMethods\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"guardianAddr\",\"type\":\"address\"}],\"name\":\"claimGuardianReward\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"tokenAddr\",\"type\":\"address\"}],\"name\":\"isSupportedToken\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"requestID\",\"type\":\"uint256\"}],\"name\":\"paymentInfo\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"},{\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"tokenAddr\",\"type\":\"address\"},{\"name\":\"serviceType\",\"type\":\"uint256\"},{\"name\":\"fee\",\"type\":\"uint256\"}],\"name\":\"setServiceFee\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[],\"name\":\"withdraw\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"nodeAddr\",\"type\":\"address\"}],\"name\":\"nodeTokenAddresLength\",\"outputs\":[{\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"fundsAddr\",\"type\":\"address\"},{\"name\":\"tokenAddr\",\"type\":\"address\"}],\"name\":\"setGuardianFunds\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"_guardianFundsTokenAddr\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"_defaultTokenAddr\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"_defaultSubmitterRate\",\"outputs\":[{\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[],\"name\":\"renounceOwnership\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"consumer\",\"type\":\"address\"},{\"name\":\"requestID\",\"type\":\"uint256\"},{\"name\":\"serviceType\",\"type\":\"uint256\"}],\"name\":\"chargeServiceFee\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"isOwner\",\"outputs\":[{\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"tokenAddr\",\"type\":\"uint256\"}],\"name\":\"withdrawAll\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"_payments\",\"outputs\":[{\"name\":\"consumer\",\"type\":\"address\"},{\"name\":\"tokenAddr\",\"type\":\"address\"},{\"name\":\"serviceType\",\"type\":\"uint256\"},{\"name\":\"amount\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"_defaultWorkerRate\",\"outputs\":[{\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"consumer\",\"type\":\"address\"},{\"name\":\"tokenAddr\",\"type\":\"address\"}],\"name\":\"setPaymentMethod\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"\",\"type\":\"address\"}],\"name\":\"_feeList\",\"outputs\":[{\"name\":\"submitterRate\",\"type\":\"uint256\"},{\"name\":\"workerRate\",\"type\":\"uint256\"},{\"name\":\"denominator\",\"type\":\"uint256\"},{\"name\":\"guardianFee\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"_defaultUserQueryFee\",\"outputs\":[{\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"_defaultSystemRandomFee\",\"outputs\":[{\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"tokenAddr\",\"type\":\"address\"},{\"name\":\"submitterRate\",\"type\":\"uint256\"},{\"name\":\"workerRate\",\"type\":\"uint256\"},{\"name\":\"denominator\",\"type\":\"uint256\"}],\"name\":\"setFeeDividend\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"_guardianFundsAddr\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"_defaultDenominator\",\"outputs\":[{\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"tokenAddr\",\"type\":\"address\"},{\"name\":\"fee\",\"type\":\"uint256\"}],\"name\":\"setGuardianFee\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"_addressBridge\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"name\":\"nodeAddr\",\"type\":\"address\"},{\"name\":\"idx\",\"type\":\"uint256\"}],\"name\":\"nodeTokenAmount\",\"outputs\":[{\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"_defaultUserRandomFee\",\"outputs\":[{\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"requestID\",\"type\":\"uint256\"},{\"name\":\"submitter\",\"type\":\"address\"},{\"name\":\"workers\",\"type\":\"address[]\"}],\"name\":\"claimServiceFee\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"name\":\"bridgeAddr\",\"type\":\"address\"},{\"name\":\"guardianFundsAddr\",\"type\":\"address\"},{\"name\":\"tokenAddr\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"oldAddress\",\"type\":\"address\"},{\"indexed\":false,\"name\":\"newAddress\",\"type\":\"address\"}],\"name\":\"UpdateNetworkTokenAddress\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"oldAddress\",\"type\":\"address\"},{\"indexed\":false,\"name\":\"newAddress\",\"type\":\"address\"}],\"name\":\"UpdateDropBurnTokenAddress\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"consumer\",\"type\":\"address\"},{\"indexed\":false,\"name\":\"tokenAddr\",\"type\":\"address\"},{\"indexed\":false,\"name\":\"requestID\",\"type\":\"uint256\"},{\"indexed\":false,\"name\":\"serviceType\",\"type\":\"uint256\"},{\"indexed\":false,\"name\":\"fee\",\"type\":\"uint256\"}],\"name\":\"LogChargeServiceFee\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"consumer\",\"type\":\"address\"},{\"indexed\":false,\"name\":\"tokenAddr\",\"type\":\"address\"},{\"indexed\":false,\"name\":\"requestID\",\"type\":\"uint256\"},{\"indexed\":false,\"name\":\"serviceType\",\"type\":\"uint256\"},{\"indexed\":false,\"name\":\"fee\",\"type\":\"uint256\"}],\"name\":\"LogRefundServiceFee\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"nodeAddr\",\"type\":\"address\"},{\"indexed\":false,\"name\":\"tokenAddr\",\"type\":\"address\"},{\"indexed\":false,\"name\":\"requestID\",\"type\":\"uint256\"},{\"indexed\":false,\"name\":\"serviceType\",\"type\":\"uint256\"},{\"indexed\":false,\"name\":\"feeForSubmitter\",\"type\":\"uint256\"}],\"name\":\"LogClaimServiceFee\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"nodeAddr\",\"type\":\"address\"},{\"indexed\":false,\"name\":\"tokenAddr\",\"type\":\"address\"},{\"indexed\":false,\"name\":\"feeForSubmitter\",\"type\":\"uint256\"},{\"indexed\":false,\"name\":\"sender\",\"type\":\"address\"}],\"name\":\"LogClaimGuardianFee\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"previousOwner\",\"type\":\"address\"}],\"name\":\"OwnershipRenounced\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"name\":\"previousOwner\",\"type\":\"address\"},{\"indexed\":true,\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"}]"
 
 // DospaymentBin is the compiled bytecode used for deploying new contracts.
-const DospaymentBin = `6080604052600580546001600160a01b031990811673214e79c85744cd2ebbc64ddc0047131496871bee908117808455600693909355600360078190556002600855674563918244f400006009819055600a819055600b55670de0b6b3a7640000600c55600d80548416732a3b59ac638f90d82bdaf5e2da5d37c1a31b29f3179055600e805484166001600160a01b039590951694909417909355600f80548316738811ccb0d8128eee3bd48553a69f62205da1dea2179055601080548316909117905560118054909116739bfe8f5749d90eb4049ad94cc4de9b6c4c31f82217905561c3506012556013553480156100f757600080fd5b50600080546001600160a01b031916331781556005546001600160a01b031681526002602081815260408084206009548580529281905281852092909255600a54600180865282862091909155600b548486529185209190915560075490820155600854918101919091556006546003820155600c546004909101556121f190819061018390396000f3fe608060405234801561001057600080fd5b50600436106102535760003560e01c80638da5cb5b11610146578063d5fd1f0f116100c3578063eac051f911610087578063eac051f91461065e578063eebede8314610684578063f2fde38b146106b0578063f87059c1146106d6578063fe7b663514610702578063fedb8b6a1461070a57610253565b8063d5fd1f0f14610606578063de439e9a1461060e578063e2edf58c14610646578063e65449041461064e578063e8c3470c1461065657610253565b8063b26584b81161010a578063b26584b814610556578063b73a3f8f1461055e578063c5e7ffef1461058c578063c7e6a9bc146105d8578063d40f68d1146105fe57610253565b80638da5cb5b146104d25780638f32d59b146104da578063958e2d31146104e25780639ed713b4146104ff578063a387722b1461054e57610253565b80633ccfd60b116101d4578063635c971d11610198578063635c971d1461048057806365e46041146104885780636ca95a4e14610490578063715018a6146104985780637aa9181b146104a057610253565b80633ccfd60b146103ff5780633e698ad5146104075780633f3381e11461042d5780635a1fa5031461044a578063610c3b961461047857610253565b806323ff34cb1161021b57806323ff34cb14610325578063240028e81461034b5780633157f16d14610385578063375b3c0a146103c55780633939c401146103cd57610253565b806311bbe27614610258578063139bcedb1461027257806317107c49146102ba5780631efa5a98146102e257806322e60ea5146102ff575b600080fd5b6102606107c2565b60408051918252519081900360200190f35b61029e6004803603604081101561028857600080fd5b506001600160a01b0381351690602001356107c8565b604080516001600160a01b039092168252519081900360200190f35b6102e0600480360360208110156102d057600080fd5b50356001600160a01b0316610874565b005b6102e0600480360360208110156102f857600080fd5b50356108ef565b61029e6004803603602081101561031557600080fd5b50356001600160a01b0316610b6f565b6102e06004803603602081101561033b57600080fd5b50356001600160a01b0316610b8a565b6103716004803603602081101561036157600080fd5b50356001600160a01b0316610e06565b604080519115158252519081900360200190f35b6103a26004803603602081101561039b57600080fd5b5035610eae565b604080516001600160a01b03909316835260208301919091528051918290030190f35b610260610ed5565b6102e0600480360360608110156103e357600080fd5b506001600160a01b038135169060208101359060400135610edb565b6102e0610f6a565b6102606004803603602081101561041d57600080fd5b50356001600160a01b03166110d7565b6102e06004803603602081101561044357600080fd5b50356110f5565b6102e06004803603604081101561046057600080fd5b506001600160a01b0381358116916020013516611198565b61029e611236565b61029e611245565b610260611254565b61029e61125a565b6102e0611269565b6102e0600480360360608110156104b657600080fd5b506001600160a01b0381351690602081013590604001356112c2565b61029e611518565b610371611527565b6102e0600480360360208110156104f857600080fd5b5035611538565b61051c6004803603602081101561051557600080fd5b5035611618565b604080516001600160a01b03958616815293909416602084015282840191909152606082015290519081900360800190f35b61026061164e565b61029e611654565b6102e06004803603604081101561057457600080fd5b506001600160a01b0381358116916020013516611663565b6105b2600480360360208110156105a257600080fd5b50356001600160a01b03166116f0565b604080519485526020850193909352838301919091526060830152519081900360800190f35b610371600480360360208110156105ee57600080fd5b50356001600160a01b031661171b565b610260611974565b61026061197a565b6102e06004803603608081101561062457600080fd5b506001600160a01b038135169060208101359060408101359060600135611980565b61029e611a16565b610260611a25565b610260611a2b565b6102e06004803603602081101561067457600080fd5b50356001600160a01b0316611a31565b6102e06004803603604081101561069a57600080fd5b506001600160a01b038135169060200135611aac565b6102e0600480360360208110156106c657600080fd5b50356001600160a01b0316611b34565b610260600480360360408110156106ec57600080fd5b506001600160a01b038135169060200135611b51565b610260611c1a565b6102e06004803603606081101561072057600080fd5b8135916001600160a01b036020820135169181019060608101604082013564010000000081111561075057600080fd5b82018360208201111561076257600080fd5b8035906020019184602083028401116401000000008311171561078457600080fd5b919080806020026020016040519081016040528093929190818152602001838360200280828437600092019190915250929550611c20945050505050565b600c5481565b6001600160a01b03821660009081526004602052604081206001015482106108315760408051600160e51b62461bcd0281526020600482015260116024820152600160781b704e6f20746f6b656e20616464726573732102604482015290519081900360640190fd5b6001600160a01b038316600090815260046020526040902060010180548390811061085857fe5b6000918252602090912001546001600160a01b03169392505050565b61087c611527565b61088557600080fd5b601054604080516001600160a01b039283168152918316602083015280517f4d27a2adceae86b92fb74fb7e8f96dc902d917e243fbff389b5a793c9040dafe9281900390910190a1601080546001600160a01b0319166001600160a01b0392909216919091179055565b6108f7611527565b61090057600080fd5b6000818152600360208190526040909120015481906109615760408051600160e51b62461bcd0281526020600482015260126024820152600160701b714e6f2066656520696e666f6d6174696f6e2102604482015290519081900360640190fd5b6000818152600360205260409020546001600160a01b03166109cd5760408051600160e51b62461bcd02815260206004820152601760248201527f4e6f20636f6e73756d657220696e666f6d6174696f6e21000000000000000000604482015290519081900360640190fd5b6000818152600360205260409020600101546001600160a01b0316610a3c5760408051600160e51b62461bcd02815260206004820152601860248201527f4e6f20746f6b656e4164647220696e666f6d6174696f6e210000000000000000604482015290519081900360640190fd5b6000828152600360208181526040808420928301805460028501805460018701805488546001600160a01b0319808216909a55988116909155918890559690925582516001600160a01b039586168082529590921693820184905281830188905260608201869052608082018190529151919493917fde0a5183bfc8c743f7b95ecaaf7815e8f82d8ae05ca1ade1eac1ff9d961a2eaa9181900360a00190a1816001600160a01b031663a9059cbb82866040518363ffffffff1660e01b815260040180836001600160a01b03166001600160a01b0316815260200182815260200192505050602060405180830381600087803b158015610b3b57600080fd5b505af1158015610b4f573d6000803e3d6000fd5b505050506040513d6020811015610b6557600080fd5b5050505050505050565b6001602052600090815260409020546001600160a01b031681565b600f60009054906101000a90046001600160a01b03166001600160a01b03166343a73d9a6040518163ffffffff1660e01b815260040160206040518083038186803b158015610bd857600080fd5b505afa158015610bec573d6000803e3d6000fd5b505050506040513d6020811015610c0257600080fd5b50516001600160a01b03163314610c5c5760408051600160e51b62461bcd0281526020600482015260136024820152600160681b724e6f742066726f6d20444f532070726f78792102604482015290519081900360640190fd5b600d546001600160a01b0316610ca657604051600160e51b62461bcd02815260040180806020018281038252602381526020018061217f6023913960400191505060405180910390fd5b600e546001600160a01b0316610d065760408051600160e51b62461bcd02815260206004820152601a60248201527f4e6f7420612076616c696420746f6b656e206164647265737321000000000000604482015290519081900360640190fd5b600e546001600160a01b039081166000818152600260209081526040918290206004015482519486168552908401929092528281018290523360608401525190917f47ad88344c408450ef0ccab93ed97dd83af7a27dedfaa205c0725cfc4ca819cd919081900360800190a1600e54600d5460408051600160e01b6323b872dd0281526001600160a01b039283166004820152858316602482015260448101859052905191909216916323b872dd9160648083019260209291908290030181600087803b158015610dd657600080fd5b505af1158015610dea573d6000803e3d6000fd5b505050506040513d6020811015610e0057600080fd5b50505050565b60006001600160a01b0382161580610e3f57506001600160a01b0382166000908152600260209081526040808320838052909152902054155b80610e6c57506001600160a01b038216600090815260026020908152604080832060018452909152902054155b80610e9857506001600160a01b0382166000908152600260208181526040808420928452919052902054155b15610ea557506000610ea9565b5060015b919050565b600090815260036020819052604090912060018101549101546001600160a01b0390911691565b60125481565b610ee3611527565b610eec57600080fd5b6001600160a01b038316610f445760408051600160e51b62461bcd0281526020600482015260146024820152600160601b734e6f7420612076616c696420616464726573732102604482015290519081900360640190fd5b6001600160a01b0390921660009081526002602090815260408083209383529290522055565b33600090815260046020526040902060010154610fc25760408051600160e51b62461bcd02815260206004820152600b6024820152600160a81b6a4e6f20726577617264732102604482015290519081900360640190fd5b3360009081526004602052604081206001810180549192916000198101908110610fe857fe5b6000918252602090912001546001830180546001600160a01b039092169250908061100f57fe5b60008281526020808220830160001990810180546001600160a01b03191690559092019092556001600160a01b038316825283905260408120805491905580156110d25760408051600160e01b63a9059cbb0281523360048201526024810183905290516001600160a01b0384169163a9059cbb9160448083019260209291908290030181600087803b1580156110a557600080fd5b505af11580156110b9573d6000803e3d6000fd5b505050506040513d60208110156110cf57600080fd5b50505b505050565b6001600160a01b031660009081526004602052604090206001015490565b6110fd611527565b61110657600080fd5b60135481141580156111185750600a81105b61115657604051600160e51b62461bcd0281526004018080602001828103825260248152602001806121a26024913960400191505060405180910390fd5b601354604080519182526020820183905280517f0aee95cca46da64ee373e28dee5994361b4002c54035d92932c9825b76382e999281900390910190a1601355565b6111a0611527565b6111a957600080fd5b806111b381610e06565b6112075760408051600160e51b62461bcd02815260206004820152601e60248201527f4e6f74206120737570706f7274656420746f6b656e2061646472657373210000604482015290519081900360640190fd5b50600d80546001600160a01b039384166001600160a01b031991821617909155600e8054929093169116179055565b600e546001600160a01b031681565b6005546001600160a01b031681565b60075481565b6010546001600160a01b031681565b611271611527565b61127a57600080fd5b600080546040516001600160a01b03909116917ff8df31144d9c2f0f6b59d69b8b98abd5459d07f2742c4df920b25aae33c6482091a2600080546001600160a01b0319169055565b600f60009054906101000a90046001600160a01b03166001600160a01b03166343a73d9a6040518163ffffffff1660e01b815260040160206040518083038186803b15801561131057600080fd5b505afa158015611324573d6000803e3d6000fd5b505050506040513d602081101561133a57600080fd5b50516001600160a01b031633146113945760408051600160e51b62461bcd0281526020600482015260136024820152600160681b724e6f742066726f6d20444f532070726f78792102604482015290519081900360640190fd5b6001600160a01b03808416600090815260016020526040902054166113b881610e06565b61140c5760408051600160e51b62461bcd02815260206004820152601960248201527f4e6f7420612076616c696420746f6b656e206164647265737300000000000000604482015290519081900360640190fd5b6001600160a01b0380821660008181526002602081815260408084208885528252808420548985526003808452948290208054978c166001600160a01b0319988916811782559481018a90556001810180549098168717909755938601849055805192835290820193909352808301879052606081018690526080810182905291519092917fa94e9ce5d0a7b76275efad947367b7999d9900f23bec1377d98f522ecad1b7ba919081900360a00190a160408051600160e01b6323b872dd0281526001600160a01b038881166004830152306024830152604482018590529151918516916323b872dd916064808201926020929091908290030181600087803b158015610b3b57600080fd5b6000546001600160a01b031690565b6000546001600160a01b0316331490565b611540611527565b61154957600080fd5b60408051600160e01b6370a0823102815230600482015290516000916001600160a01b038416916370a0823191602480820192602092909190829003018186803b15801561159657600080fd5b505afa1580156115aa573d6000803e3d6000fd5b505050506040513d60208110156115c057600080fd5b505160408051600160e01b63a9059cbb0281523360048201526024810183905290519192506001600160a01b0384169163a9059cbb916044808201926020929091908290030181600087803b158015610dd657600080fd5b600360208190526000918252604090912080546001820154600283015492909301546001600160a01b0391821693909116919084565b60085481565b6011546001600160a01b031681565b8061166d81610e06565b6116c15760408051600160e51b62461bcd02815260206004820152601e60248201527f4e6f74206120737570706f7274656420746f6b656e2061646472657373210000604482015290519081900360640190fd5b506001600160a01b03918216600090815260016020526040902080546001600160a01b03191691909216179055565b6002602081905260009182526040909120600181015491810154600382015460049092015490919084565b60105460408051600160e01b6370a082310281526001600160a01b0384811660048301529151600093849316916370a08231916024808301926020929190829003018186803b15801561176d57600080fd5b505afa158015611781573d6000803e3d6000fd5b505050506040513d602081101561179757600080fd5b505160105460408051600160e01b63313ce56702815290519293506000926001600160a01b039092169163313ce56791600480820192602092909190829003018186803b1580156117e757600080fd5b505afa1580156117fb573d6000803e3d6000fd5b505050506040513d602081101561181157600080fd5b5051601254909150600a82900a028083106118325760019350505050610ea9565b6011546001600160a01b031661184e5760009350505050610ea9565b60115460408051600160e01b63313ce56702815290516000926001600160a01b03169163313ce567916004808301926020929190829003018186803b15801561189657600080fd5b505afa1580156118aa573d6000803e3d6000fd5b505050506040513d60208110156118c057600080fd5b505160115460408051600160e01b6370a082310281526001600160a01b038a811660048301529151600a9490940a9391909216916370a08231916024808301926020929190829003018186803b15801561191957600080fd5b505afa15801561192d573d6000803e3d6000fd5b505050506040513d602081101561194357600080fd5b50518161194c57fe5b04905060135481111561195e57506013545b600a818103830204841015945050505050610ea9565b600b5481565b60095481565b611988611527565b61199157600080fd5b6001600160a01b0384166119e95760408051600160e51b62461bcd0281526020600482015260146024820152600160601b734e6f7420612076616c696420616464726573732102604482015290519081900360640190fd5b6001600160a01b039093166000908152600260208190526040909120600181019390935582015560030155565b600d546001600160a01b031681565b60065481565b60135481565b611a39611527565b611a4257600080fd5b601154604080516001600160a01b039283168152918316602083015280517ffc8013dfb0c8d38f3bcab9239bd5712457c48919b272cdb109488549199a01739281900390910190a1601180546001600160a01b0319166001600160a01b0392909216919091179055565b611ab4611527565b611abd57600080fd5b6001600160a01b038216611b155760408051600160e51b62461bcd0281526020600482015260146024820152600160601b734e6f7420612076616c696420616464726573732102604482015290519081900360640190fd5b6001600160a01b03909116600090815260026020526040902060040155565b611b3c611527565b611b4557600080fd5b611b4e81612079565b50565b6001600160a01b0382166000908152600460205260408120600101548210611bba5760408051600160e51b62461bcd0281526020600482015260116024820152600160781b704e6f20746f6b656e20616464726573732102604482015290519081900360640190fd5b6001600160a01b0383166000908152600460205260408120600101805484908110611be157fe5b60009182526020808320909101546001600160a01b03878116845260048352604080852091909216845290915290205491505092915050565b600a5481565b600f60009054906101000a90046001600160a01b03166001600160a01b03166343a73d9a6040518163ffffffff1660e01b815260040160206040518083038186803b158015611c6e57600080fd5b505afa158015611c82573d6000803e3d6000fd5b505050506040513d6020811015611c9857600080fd5b50516001600160a01b03163314611cf25760408051600160e51b62461bcd0281526020600482015260136024820152600160681b724e6f742066726f6d20444f532070726f78792102604482015290519081900360640190fd5b600083815260036020819052604090912001548390611d535760408051600160e51b62461bcd0281526020600482015260126024820152600160701b714e6f2066656520696e666f6d6174696f6e2102604482015290519081900360640190fd5b6000818152600360205260409020546001600160a01b0316611dbf5760408051600160e51b62461bcd02815260206004820152601760248201527f4e6f20636f6e73756d657220696e666f6d6174696f6e21000000000000000000604482015290519081900360640190fd5b6000818152600360205260409020600101546001600160a01b0316611e2e5760408051600160e51b62461bcd02815260206004820152601860248201527f4e6f20746f6b656e4164647220696e666f6d6174696f6e210000000000000000604482015290519081900360640190fd5b60008481526003602081905260408220600181018054928201805460028401805485546001600160a01b031990811690965594861690935591859055939093556001600160a01b039091169190611e83612156565b506001600160a01b03831660009081526002602081815260409283902083516080810185526001820154815292810154918301919091526003810154928201839052600401546060820152908381611ed757fe5b60208301518851929091049450840290600090600019018281611ef657fe5b6001600160a01b038b1660009081526004602052604090209190049150611f1e9087846120e7565b604080516001600160a01b03808c168252881660208201528082018c9052606081018690526080810184905290517fab9fe896064c2c9dfd31acebc7d522b311e5f2e7d1b4965ac0cfd5a4abec813a9181900360a00190a160005b885181101561206c57896001600160a01b0316898281518110611f9857fe5b60200260200101516001600160a01b03161461206457611ff0600460008b8481518110611fc157fe5b60200260200101516001600160a01b03166001600160a01b0316815260200190815260200160002088846120e7565b7fab9fe896064c2c9dfd31acebc7d522b311e5f2e7d1b4965ac0cfd5a4abec813a89828151811061201d57fe5b602090810291909101810151604080516001600160a01b039283168152918b16928201929092528082018e9052606081018890526080810186905290519081900360a00190a15b600101611f79565b5050505050505050505050565b6001600160a01b03811661208c57600080fd5b600080546040516001600160a01b03808516939216917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e091a3600080546001600160a01b0319166001600160a01b0392909216919091179055565b6001600160a01b03821660009081526020849052604090205480612135576001848101805491820181556000908152602090200180546001600160a01b0319166001600160a01b0385161790555b6001600160a01b039092166000908152602093909352604090922091019055565b604051806080016040528060008152602001600081526020016000815260200160008152509056fe4e6f7420612076616c696420677561726469616e2066756e647320616464726573732156616c69642064726f706275726e4d617851756f74612077697468696e203020746f2039a165627a7a7230582050fdfa82be2368132fdb7d4c1c34cbbe90f367f502c75582cf4856e6e95642380029`
+const DospaymentBin = `60806040526005805560036006556002600755674563918244f40000600855674563918244f40000600955674563918244f40000600a55670de0b6b3a7640000600b5534801561004e57600080fd5b50604051606080611e518339810180604052606081101561006e57600080fd5b508051602080830151604093840151600080546001600160a01b031990811633178255600c80546001600160a01b03948516908316811791829055600d805496861696841696909617909555600e80548316909517909455928216815260028085528682206008548380529581905287832095909555600954600180845288842091909155600a548284529783209790975560065496850196909655600754958401959095556005546003840155600b546004909301929092556010805482169383169390931792839055600f8054939092169216919091179055611cf890819061015990396000f3fe608060405234801561001057600080fd5b50600436106102115760003560e01c80638da5cb5b11610125578063de439e9a116100ad578063f0612ffe1161007c578063f0612ffe146105c7578063f2fde38b146105cf578063f87059c1146105f5578063fe7b663514610621578063fedb8b6a1461062957610211565b8063de439e9a14610553578063e2edf58c1461058b578063e654490414610593578063eebede831461059b57610211565b8063a387722b116100f4578063a387722b146104c1578063b73a3f8f146104c9578063c5e7ffef146104f7578063d40f68d114610543578063d5fd1f0f1461054b57610211565b80638da5cb5b146104455780638f32d59b1461044d578063958e2d31146104555780639ed713b41461047257610211565b80633939c401116101a8578063610c3b9611610177578063610c3b96146103f3578063635c971d146103fb57806365e4604114610403578063715018a61461040b5780637aa9181b1461041357610211565b80633939c401146103655780633ccfd60b146103975780633e698ad51461039f5780635a1fa503146103c557610211565b806322e60ea5116101e457806322e60ea51461029f57806323ff34cb146102c5578063240028e8146102eb5780633157f16d1461032557610211565b806311bbe27614610216578063139bcedb146102305780631aab7941146102785780631efa5a9814610280575b600080fd5b61021e6106e1565b60408051918252519081900360200190f35b61025c6004803603604081101561024657600080fd5b506001600160a01b0381351690602001356106e7565b604080516001600160a01b039092168252519081900360200190f35b61025c610793565b61029d6004803603602081101561029657600080fd5b50356107a2565b005b61025c600480360360208110156102b557600080fd5b50356001600160a01b0316610a22565b61029d600480360360208110156102db57600080fd5b50356001600160a01b0316610a3d565b6103116004803603602081101561030157600080fd5b50356001600160a01b0316610cb9565b604080519115158252519081900360200190f35b6103426004803603602081101561033b57600080fd5b5035610d6b565b604080516001600160a01b03909316835260208301919091528051918290030190f35b61029d6004803603606081101561037b57600080fd5b506001600160a01b038135169060208101359060400135610d92565b61029d610e21565b61021e600480360360208110156103b557600080fd5b50356001600160a01b0316610f8e565b61029d600480360360408110156103db57600080fd5b506001600160a01b0381358116916020013516610fac565b61025c61104a565b61025c611059565b61021e611068565b61029d61106e565b61029d6004803603606081101561042957600080fd5b506001600160a01b0381351690602081013590604001356110c7565b61025c61131d565b61031161132c565b61029d6004803603602081101561046b57600080fd5b503561133d565b61048f6004803603602081101561048857600080fd5b503561141d565b604080516001600160a01b03958616815293909416602084015282840191909152606082015290519081900360800190f35b61021e611453565b61029d600480360360408110156104df57600080fd5b506001600160a01b0381358116916020013516611459565b61051d6004803603602081101561050d57600080fd5b50356001600160a01b03166114e6565b604080519485526020850193909352838301919091526060830152519081900360800190f35b61021e611511565b61021e611517565b61029d6004803603608081101561056957600080fd5b506001600160a01b03813516906020810135906040810135906060013561151d565b61025c6115b3565b61021e6115c2565b61029d600480360360408110156105b157600080fd5b506001600160a01b0381351690602001356115c8565b61025c611650565b61029d600480360360208110156105e557600080fd5b50356001600160a01b031661165f565b61021e6004803603604081101561060b57600080fd5b506001600160a01b03813516906020013561167c565b61021e611745565b61029d6004803603606081101561063f57600080fd5b8135916001600160a01b036020820135169181019060608101604082013564010000000081111561066f57600080fd5b82018360208201111561068157600080fd5b803590602001918460208302840111640100000000831117156106a357600080fd5b91908080602002602001604051908101604052809392919081815260200183836020028082843760009201919091525092955061174b945050505050565b600b5481565b6001600160a01b03821660009081526004602052604081206001015482106107505760408051600160e51b62461bcd0281526020600482015260116024820152600160781b704e6f20746f6b656e20616464726573732102604482015290519081900360640190fd5b6001600160a01b038316600090815260046020526040902060010180548390811061077757fe5b6000918252602090912001546001600160a01b03169392505050565b6010546001600160a01b031681565b6107aa61132c565b6107b357600080fd5b6000818152600360208190526040909120015481906108145760408051600160e51b62461bcd0281526020600482015260126024820152600160701b714e6f2066656520696e666f6d6174696f6e2102604482015290519081900360640190fd5b6000818152600360205260409020546001600160a01b03166108805760408051600160e51b62461bcd02815260206004820152601760248201527f4e6f20636f6e73756d657220696e666f6d6174696f6e21000000000000000000604482015290519081900360640190fd5b6000818152600360205260409020600101546001600160a01b03166108ef5760408051600160e51b62461bcd02815260206004820152601860248201527f4e6f20746f6b656e4164647220696e666f6d6174696f6e210000000000000000604482015290519081900360640190fd5b6000828152600360208181526040808420928301805460028501805460018701805488546001600160a01b0319808216909a55988116909155918890559690925582516001600160a01b039586168082529590921693820184905281830188905260608201869052608082018190529151919493917fde0a5183bfc8c743f7b95ecaaf7815e8f82d8ae05ca1ade1eac1ff9d961a2eaa9181900360a00190a1816001600160a01b031663a9059cbb82866040518363ffffffff1660e01b815260040180836001600160a01b03166001600160a01b0316815260200182815260200192505050602060405180830381600087803b1580156109ee57600080fd5b505af1158015610a02573d6000803e3d6000fd5b505050506040513d6020811015610a1857600080fd5b5050505050505050565b6001602052600090815260409020546001600160a01b031681565b600f60009054906101000a90046001600160a01b03166001600160a01b03166343a73d9a6040518163ffffffff1660e01b815260040160206040518083038186803b158015610a8b57600080fd5b505afa158015610a9f573d6000803e3d6000fd5b505050506040513d6020811015610ab557600080fd5b50516001600160a01b03163314610b0f5760408051600160e51b62461bcd0281526020600482015260136024820152600160681b724e6f742066726f6d20444f532070726f78792102604482015290519081900360640190fd5b600d546001600160a01b0316610b5957604051600160e51b62461bcd028152600401808060200182810382526023815260200180611caa6023913960400191505060405180910390fd5b600e546001600160a01b0316610bb95760408051600160e51b62461bcd02815260206004820152601a60248201527f4e6f7420612076616c696420746f6b656e206164647265737321000000000000604482015290519081900360640190fd5b600e546001600160a01b039081166000818152600260209081526040918290206004015482519486168552908401929092528281018290523360608401525190917f47ad88344c408450ef0ccab93ed97dd83af7a27dedfaa205c0725cfc4ca819cd919081900360800190a1600e54600d5460408051600160e01b6323b872dd0281526001600160a01b039283166004820152858316602482015260448101859052905191909216916323b872dd9160648083019260209291908290030181600087803b158015610c8957600080fd5b505af1158015610c9d573d6000803e3d6000fd5b505050506040513d6020811015610cb357600080fd5b50505050565b60006001600160a01b038216610cd157506000610d66565b6001600160a01b0382166000908152600260209081526040808320838052909152902054610d0157506000610d66565b6001600160a01b038216600090815260026020908152604080832060018452909152902054610d3257506000610d66565b6001600160a01b0382166000908152600260208181526040808420928452919052902054610d6257506000610d66565b5060015b919050565b600090815260036020819052604090912060018101549101546001600160a01b0390911691565b610d9a61132c565b610da357600080fd5b6001600160a01b038316610dfb5760408051600160e51b62461bcd0281526020600482015260146024820152600160601b734e6f7420612076616c696420616464726573732102604482015290519081900360640190fd5b6001600160a01b0390921660009081526002602090815260408083209383529290522055565b33600090815260046020526040902060010154610e795760408051600160e51b62461bcd02815260206004820152600b6024820152600160a81b6a4e6f20726577617264732102604482015290519081900360640190fd5b3360009081526004602052604081206001810180549192916000198101908110610e9f57fe5b6000918252602090912001546001830180546001600160a01b0390921692509080610ec657fe5b60008281526020808220830160001990810180546001600160a01b03191690559092019092556001600160a01b03831682528390526040812080549190558015610f895760408051600160e01b63a9059cbb0281523360048201526024810183905290516001600160a01b0384169163a9059cbb9160448083019260209291908290030181600087803b158015610f5c57600080fd5b505af1158015610f70573d6000803e3d6000fd5b505050506040513d6020811015610f8657600080fd5b50505b505050565b6001600160a01b031660009081526004602052604090206001015490565b610fb461132c565b610fbd57600080fd5b80610fc781610cb9565b61101b5760408051600160e51b62461bcd02815260206004820152601e60248201527f4e6f74206120737570706f7274656420746f6b656e2061646472657373210000604482015290519081900360640190fd5b50600d80546001600160a01b039384166001600160a01b031991821617909155600e8054929093169116179055565b600e546001600160a01b031681565b600c546001600160a01b031681565b60065481565b61107661132c565b61107f57600080fd5b600080546040516001600160a01b03909116917ff8df31144d9c2f0f6b59d69b8b98abd5459d07f2742c4df920b25aae33c6482091a2600080546001600160a01b0319169055565b600f60009054906101000a90046001600160a01b03166001600160a01b03166343a73d9a6040518163ffffffff1660e01b815260040160206040518083038186803b15801561111557600080fd5b505afa158015611129573d6000803e3d6000fd5b505050506040513d602081101561113f57600080fd5b50516001600160a01b031633146111995760408051600160e51b62461bcd0281526020600482015260136024820152600160681b724e6f742066726f6d20444f532070726f78792102604482015290519081900360640190fd5b6001600160a01b03808416600090815260016020526040902054166111bd81610cb9565b6112115760408051600160e51b62461bcd02815260206004820152601960248201527f4e6f7420612076616c696420746f6b656e206164647265737300000000000000604482015290519081900360640190fd5b6001600160a01b0380821660008181526002602081815260408084208885528252808420548985526003808452948290208054978c166001600160a01b0319988916811782559481018a90556001810180549098168717909755938601849055805192835290820193909352808301879052606081018690526080810182905291519092917fa94e9ce5d0a7b76275efad947367b7999d9900f23bec1377d98f522ecad1b7ba919081900360a00190a160408051600160e01b6323b872dd0281526001600160a01b038881166004830152306024830152604482018590529151918516916323b872dd916064808201926020929091908290030181600087803b1580156109ee57600080fd5b6000546001600160a01b031690565b6000546001600160a01b0316331490565b61134561132c565b61134e57600080fd5b60408051600160e01b6370a0823102815230600482015290516000916001600160a01b038416916370a0823191602480820192602092909190829003018186803b15801561139b57600080fd5b505afa1580156113af573d6000803e3d6000fd5b505050506040513d60208110156113c557600080fd5b505160408051600160e01b63a9059cbb0281523360048201526024810183905290519192506001600160a01b0384169163a9059cbb916044808201926020929091908290030181600087803b158015610c8957600080fd5b600360208190526000918252604090912080546001820154600283015492909301546001600160a01b0391821693909116919084565b60075481565b8061146381610cb9565b6114b75760408051600160e51b62461bcd02815260206004820152601e60248201527f4e6f74206120737570706f7274656420746f6b656e2061646472657373210000604482015290519081900360640190fd5b506001600160a01b03918216600090815260016020526040902080546001600160a01b03191691909216179055565b6002602081905260009182526040909120600181015491810154600382015460049092015490919084565b600a5481565b60085481565b61152561132c565b61152e57600080fd5b6001600160a01b0384166115865760408051600160e51b62461bcd0281526020600482015260146024820152600160601b734e6f7420612076616c696420616464726573732102604482015290519081900360640190fd5b6001600160a01b039093166000908152600260208190526040909120600181019390935582015560030155565b600d546001600160a01b031681565b60055481565b6115d061132c565b6115d957600080fd5b6001600160a01b0382166116315760408051600160e51b62461bcd0281526020600482015260146024820152600160601b734e6f7420612076616c696420616464726573732102604482015290519081900360640190fd5b6001600160a01b03909116600090815260026020526040902060040155565b600f546001600160a01b031681565b61166761132c565b61167057600080fd5b61167981611ba4565b50565b6001600160a01b03821660009081526004602052604081206001015482106116e55760408051600160e51b62461bcd0281526020600482015260116024820152600160781b704e6f20746f6b656e20616464726573732102604482015290519081900360640190fd5b6001600160a01b038316600090815260046020526040812060010180548490811061170c57fe5b60009182526020808320909101546001600160a01b03878116845260048352604080852091909216845290915290205491505092915050565b60095481565b600f60009054906101000a90046001600160a01b03166001600160a01b03166343a73d9a6040518163ffffffff1660e01b815260040160206040518083038186803b15801561179957600080fd5b505afa1580156117ad573d6000803e3d6000fd5b505050506040513d60208110156117c357600080fd5b50516001600160a01b0316331461181d5760408051600160e51b62461bcd0281526020600482015260136024820152600160681b724e6f742066726f6d20444f532070726f78792102604482015290519081900360640190fd5b60008381526003602081905260409091200154839061187e5760408051600160e51b62461bcd0281526020600482015260126024820152600160701b714e6f2066656520696e666f6d6174696f6e2102604482015290519081900360640190fd5b6000818152600360205260409020546001600160a01b03166118ea5760408051600160e51b62461bcd02815260206004820152601760248201527f4e6f20636f6e73756d657220696e666f6d6174696f6e21000000000000000000604482015290519081900360640190fd5b6000818152600360205260409020600101546001600160a01b03166119595760408051600160e51b62461bcd02815260206004820152601860248201527f4e6f20746f6b656e4164647220696e666f6d6174696f6e210000000000000000604482015290519081900360640190fd5b60008481526003602081905260408220600181018054928201805460028401805485546001600160a01b031990811690965594861690935591859055939093556001600160a01b0390911691906119ae611c81565b506001600160a01b03831660009081526002602081815260409283902083516080810185526001820154815292810154918301919091526003810154928201839052600401546060820152908381611a0257fe5b60208301518851929091049450840290600090600019018281611a2157fe5b6001600160a01b038b1660009081526004602052604090209190049150611a49908784611c12565b604080516001600160a01b03808c168252881660208201528082018c9052606081018690526080810184905290517fab9fe896064c2c9dfd31acebc7d522b311e5f2e7d1b4965ac0cfd5a4abec813a9181900360a00190a160005b8851811015611b9757896001600160a01b0316898281518110611ac357fe5b60200260200101516001600160a01b031614611b8f57611b1b600460008b8481518110611aec57fe5b60200260200101516001600160a01b03166001600160a01b031681526020019081526020016000208884611c12565b7fab9fe896064c2c9dfd31acebc7d522b311e5f2e7d1b4965ac0cfd5a4abec813a898281518110611b4857fe5b602090810291909101810151604080516001600160a01b039283168152918b16928201929092528082018e9052606081018890526080810186905290519081900360a00190a15b600101611aa4565b5050505050505050505050565b6001600160a01b038116611bb757600080fd5b600080546040516001600160a01b03808516939216917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e091a3600080546001600160a01b0319166001600160a01b0392909216919091179055565b6001600160a01b03821660009081526020849052604090205480611c60576001848101805491820181556000908152602090200180546001600160a01b0319166001600160a01b0385161790555b6001600160a01b039092166000908152602093909352604090922091019055565b604051806080016040528060008152602001600081526020016000815260200160008152509056fe4e6f7420612076616c696420677561726469616e2066756e6473206164647265737321a165627a7a723058203122a9c021eb48869467c350e1352c8b07ba82a806da4417ef3d173f109e18ef0029`
 
 // DeployDospayment deploys a new Ethereum contract, binding an instance of Dospayment to it.
-func DeployDospayment(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *Dospayment, error) {
+func DeployDospayment(auth *bind.TransactOpts, backend bind.ContractBackend, bridgeAddr common.Address, guardianFundsAddr common.Address, tokenAddr common.Address) (common.Address, *types.Transaction, *Dospayment, error) {
 	parsed, err := abi.JSON(strings.NewReader(DospaymentABI))
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}
-	address, tx, contract, err := bind.DeployContract(auth, parsed, common.FromHex(DospaymentBin), backend)
+	address, tx, contract, err := bind.DeployContract(auth, parsed, common.FromHex(DospaymentBin), backend, bridgeAddr, guardianFundsAddr, tokenAddr)
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}
@@ -174,6 +186,58 @@ func (_Dospayment *DospaymentTransactorRaw) Transfer(opts *bind.TransactOpts) (*
 // Transact invokes the (paid) contract method with params as input values.
 func (_Dospayment *DospaymentTransactorRaw) Transact(opts *bind.TransactOpts, method string, params ...interface{}) (*types.Transaction, error) {
 	return _Dospayment.Contract.contract.Transact(opts, method, params...)
+}
+
+// AddressBridge is a free data retrieval call binding the contract method 0xf0612ffe.
+//
+// Solidity: function _addressBridge() constant returns(address)
+func (_Dospayment *DospaymentCaller) AddressBridge(opts *bind.CallOpts) (common.Address, error) {
+	var (
+		ret0 = new(common.Address)
+	)
+	out := ret0
+	err := _Dospayment.contract.Call(opts, out, "_addressBridge")
+	return *ret0, err
+}
+
+// AddressBridge is a free data retrieval call binding the contract method 0xf0612ffe.
+//
+// Solidity: function _addressBridge() constant returns(address)
+func (_Dospayment *DospaymentSession) AddressBridge() (common.Address, error) {
+	return _Dospayment.Contract.AddressBridge(&_Dospayment.CallOpts)
+}
+
+// AddressBridge is a free data retrieval call binding the contract method 0xf0612ffe.
+//
+// Solidity: function _addressBridge() constant returns(address)
+func (_Dospayment *DospaymentCallerSession) AddressBridge() (common.Address, error) {
+	return _Dospayment.Contract.AddressBridge(&_Dospayment.CallOpts)
+}
+
+// BridgeAddr is a free data retrieval call binding the contract method 0x1aab7941.
+//
+// Solidity: function _bridgeAddr() constant returns(address)
+func (_Dospayment *DospaymentCaller) BridgeAddr(opts *bind.CallOpts) (common.Address, error) {
+	var (
+		ret0 = new(common.Address)
+	)
+	out := ret0
+	err := _Dospayment.contract.Call(opts, out, "_bridgeAddr")
+	return *ret0, err
+}
+
+// BridgeAddr is a free data retrieval call binding the contract method 0x1aab7941.
+//
+// Solidity: function _bridgeAddr() constant returns(address)
+func (_Dospayment *DospaymentSession) BridgeAddr() (common.Address, error) {
+	return _Dospayment.Contract.BridgeAddr(&_Dospayment.CallOpts)
+}
+
+// BridgeAddr is a free data retrieval call binding the contract method 0x1aab7941.
+//
+// Solidity: function _bridgeAddr() constant returns(address)
+func (_Dospayment *DospaymentCallerSession) BridgeAddr() (common.Address, error) {
+	return _Dospayment.Contract.BridgeAddr(&_Dospayment.CallOpts)
 }
 
 // DefaultDenominator is a free data retrieval call binding the contract method 0xe6544904.
@@ -386,7 +450,7 @@ func (_Dospayment *DospaymentCallerSession) DefaultWorkerRate() (*big.Int, error
 
 // FeeList is a free data retrieval call binding the contract method 0xc5e7ffef.
 //
-// Solidity: function _feeList( address) constant returns(submitterRate uint256, workerRate uint256, denominator uint256, guardianFee uint256)
+// Solidity: function _feeList(address ) constant returns(uint256 submitterRate, uint256 workerRate, uint256 denominator, uint256 guardianFee)
 func (_Dospayment *DospaymentCaller) FeeList(opts *bind.CallOpts, arg0 common.Address) (struct {
 	SubmitterRate *big.Int
 	WorkerRate    *big.Int
@@ -406,7 +470,7 @@ func (_Dospayment *DospaymentCaller) FeeList(opts *bind.CallOpts, arg0 common.Ad
 
 // FeeList is a free data retrieval call binding the contract method 0xc5e7ffef.
 //
-// Solidity: function _feeList( address) constant returns(submitterRate uint256, workerRate uint256, denominator uint256, guardianFee uint256)
+// Solidity: function _feeList(address ) constant returns(uint256 submitterRate, uint256 workerRate, uint256 denominator, uint256 guardianFee)
 func (_Dospayment *DospaymentSession) FeeList(arg0 common.Address) (struct {
 	SubmitterRate *big.Int
 	WorkerRate    *big.Int
@@ -418,7 +482,7 @@ func (_Dospayment *DospaymentSession) FeeList(arg0 common.Address) (struct {
 
 // FeeList is a free data retrieval call binding the contract method 0xc5e7ffef.
 //
-// Solidity: function _feeList( address) constant returns(submitterRate uint256, workerRate uint256, denominator uint256, guardianFee uint256)
+// Solidity: function _feeList(address ) constant returns(uint256 submitterRate, uint256 workerRate, uint256 denominator, uint256 guardianFee)
 func (_Dospayment *DospaymentCallerSession) FeeList(arg0 common.Address) (struct {
 	SubmitterRate *big.Int
 	WorkerRate    *big.Int
@@ -482,7 +546,7 @@ func (_Dospayment *DospaymentCallerSession) GuardianFundsTokenAddr() (common.Add
 
 // PaymentMethods is a free data retrieval call binding the contract method 0x22e60ea5.
 //
-// Solidity: function _paymentMethods( address) constant returns(address)
+// Solidity: function _paymentMethods(address ) constant returns(address)
 func (_Dospayment *DospaymentCaller) PaymentMethods(opts *bind.CallOpts, arg0 common.Address) (common.Address, error) {
 	var (
 		ret0 = new(common.Address)
@@ -494,21 +558,21 @@ func (_Dospayment *DospaymentCaller) PaymentMethods(opts *bind.CallOpts, arg0 co
 
 // PaymentMethods is a free data retrieval call binding the contract method 0x22e60ea5.
 //
-// Solidity: function _paymentMethods( address) constant returns(address)
+// Solidity: function _paymentMethods(address ) constant returns(address)
 func (_Dospayment *DospaymentSession) PaymentMethods(arg0 common.Address) (common.Address, error) {
 	return _Dospayment.Contract.PaymentMethods(&_Dospayment.CallOpts, arg0)
 }
 
 // PaymentMethods is a free data retrieval call binding the contract method 0x22e60ea5.
 //
-// Solidity: function _paymentMethods( address) constant returns(address)
+// Solidity: function _paymentMethods(address ) constant returns(address)
 func (_Dospayment *DospaymentCallerSession) PaymentMethods(arg0 common.Address) (common.Address, error) {
 	return _Dospayment.Contract.PaymentMethods(&_Dospayment.CallOpts, arg0)
 }
 
 // Payments is a free data retrieval call binding the contract method 0x9ed713b4.
 //
-// Solidity: function _payments( uint256) constant returns(consumer address, tokenAddr address, serviceType uint256, amount uint256)
+// Solidity: function _payments(uint256 ) constant returns(address consumer, address tokenAddr, uint256 serviceType, uint256 amount)
 func (_Dospayment *DospaymentCaller) Payments(opts *bind.CallOpts, arg0 *big.Int) (struct {
 	Consumer    common.Address
 	TokenAddr   common.Address
@@ -528,7 +592,7 @@ func (_Dospayment *DospaymentCaller) Payments(opts *bind.CallOpts, arg0 *big.Int
 
 // Payments is a free data retrieval call binding the contract method 0x9ed713b4.
 //
-// Solidity: function _payments( uint256) constant returns(consumer address, tokenAddr address, serviceType uint256, amount uint256)
+// Solidity: function _payments(uint256 ) constant returns(address consumer, address tokenAddr, uint256 serviceType, uint256 amount)
 func (_Dospayment *DospaymentSession) Payments(arg0 *big.Int) (struct {
 	Consumer    common.Address
 	TokenAddr   common.Address
@@ -540,7 +604,7 @@ func (_Dospayment *DospaymentSession) Payments(arg0 *big.Int) (struct {
 
 // Payments is a free data retrieval call binding the contract method 0x9ed713b4.
 //
-// Solidity: function _payments( uint256) constant returns(consumer address, tokenAddr address, serviceType uint256, amount uint256)
+// Solidity: function _payments(uint256 ) constant returns(address consumer, address tokenAddr, uint256 serviceType, uint256 amount)
 func (_Dospayment *DospaymentCallerSession) Payments(arg0 *big.Int) (struct {
 	Consumer    common.Address
 	TokenAddr   common.Address
@@ -548,84 +612,6 @@ func (_Dospayment *DospaymentCallerSession) Payments(arg0 *big.Int) (struct {
 	Amount      *big.Int
 }, error) {
 	return _Dospayment.Contract.Payments(&_Dospayment.CallOpts, arg0)
-}
-
-// DropburnMaxQuota is a free data retrieval call binding the contract method 0xe8c3470c.
-//
-// Solidity: function dropburnMaxQuota() constant returns(uint256)
-func (_Dospayment *DospaymentCaller) DropburnMaxQuota(opts *bind.CallOpts) (*big.Int, error) {
-	var (
-		ret0 = new(*big.Int)
-	)
-	out := ret0
-	err := _Dospayment.contract.Call(opts, out, "dropburnMaxQuota")
-	return *ret0, err
-}
-
-// DropburnMaxQuota is a free data retrieval call binding the contract method 0xe8c3470c.
-//
-// Solidity: function dropburnMaxQuota() constant returns(uint256)
-func (_Dospayment *DospaymentSession) DropburnMaxQuota() (*big.Int, error) {
-	return _Dospayment.Contract.DropburnMaxQuota(&_Dospayment.CallOpts)
-}
-
-// DropburnMaxQuota is a free data retrieval call binding the contract method 0xe8c3470c.
-//
-// Solidity: function dropburnMaxQuota() constant returns(uint256)
-func (_Dospayment *DospaymentCallerSession) DropburnMaxQuota() (*big.Int, error) {
-	return _Dospayment.Contract.DropburnMaxQuota(&_Dospayment.CallOpts)
-}
-
-// DropburnToken is a free data retrieval call binding the contract method 0xb26584b8.
-//
-// Solidity: function dropburnToken() constant returns(address)
-func (_Dospayment *DospaymentCaller) DropburnToken(opts *bind.CallOpts) (common.Address, error) {
-	var (
-		ret0 = new(common.Address)
-	)
-	out := ret0
-	err := _Dospayment.contract.Call(opts, out, "dropburnToken")
-	return *ret0, err
-}
-
-// DropburnToken is a free data retrieval call binding the contract method 0xb26584b8.
-//
-// Solidity: function dropburnToken() constant returns(address)
-func (_Dospayment *DospaymentSession) DropburnToken() (common.Address, error) {
-	return _Dospayment.Contract.DropburnToken(&_Dospayment.CallOpts)
-}
-
-// DropburnToken is a free data retrieval call binding the contract method 0xb26584b8.
-//
-// Solidity: function dropburnToken() constant returns(address)
-func (_Dospayment *DospaymentCallerSession) DropburnToken() (common.Address, error) {
-	return _Dospayment.Contract.DropburnToken(&_Dospayment.CallOpts)
-}
-
-// FromValidStakingNode is a free data retrieval call binding the contract method 0xc7e6a9bc.
-//
-// Solidity: function fromValidStakingNode(node address) constant returns(bool)
-func (_Dospayment *DospaymentCaller) FromValidStakingNode(opts *bind.CallOpts, node common.Address) (bool, error) {
-	var (
-		ret0 = new(bool)
-	)
-	out := ret0
-	err := _Dospayment.contract.Call(opts, out, "fromValidStakingNode", node)
-	return *ret0, err
-}
-
-// FromValidStakingNode is a free data retrieval call binding the contract method 0xc7e6a9bc.
-//
-// Solidity: function fromValidStakingNode(node address) constant returns(bool)
-func (_Dospayment *DospaymentSession) FromValidStakingNode(node common.Address) (bool, error) {
-	return _Dospayment.Contract.FromValidStakingNode(&_Dospayment.CallOpts, node)
-}
-
-// FromValidStakingNode is a free data retrieval call binding the contract method 0xc7e6a9bc.
-//
-// Solidity: function fromValidStakingNode(node address) constant returns(bool)
-func (_Dospayment *DospaymentCallerSession) FromValidStakingNode(node common.Address) (bool, error) {
-	return _Dospayment.Contract.FromValidStakingNode(&_Dospayment.CallOpts, node)
 }
 
 // IsOwner is a free data retrieval call binding the contract method 0x8f32d59b.
@@ -656,7 +642,7 @@ func (_Dospayment *DospaymentCallerSession) IsOwner() (bool, error) {
 
 // IsSupportedToken is a free data retrieval call binding the contract method 0x240028e8.
 //
-// Solidity: function isSupportedToken(tokenAddr address) constant returns(bool)
+// Solidity: function isSupportedToken(address tokenAddr) constant returns(bool)
 func (_Dospayment *DospaymentCaller) IsSupportedToken(opts *bind.CallOpts, tokenAddr common.Address) (bool, error) {
 	var (
 		ret0 = new(bool)
@@ -668,73 +654,21 @@ func (_Dospayment *DospaymentCaller) IsSupportedToken(opts *bind.CallOpts, token
 
 // IsSupportedToken is a free data retrieval call binding the contract method 0x240028e8.
 //
-// Solidity: function isSupportedToken(tokenAddr address) constant returns(bool)
+// Solidity: function isSupportedToken(address tokenAddr) constant returns(bool)
 func (_Dospayment *DospaymentSession) IsSupportedToken(tokenAddr common.Address) (bool, error) {
 	return _Dospayment.Contract.IsSupportedToken(&_Dospayment.CallOpts, tokenAddr)
 }
 
 // IsSupportedToken is a free data retrieval call binding the contract method 0x240028e8.
 //
-// Solidity: function isSupportedToken(tokenAddr address) constant returns(bool)
+// Solidity: function isSupportedToken(address tokenAddr) constant returns(bool)
 func (_Dospayment *DospaymentCallerSession) IsSupportedToken(tokenAddr common.Address) (bool, error) {
 	return _Dospayment.Contract.IsSupportedToken(&_Dospayment.CallOpts, tokenAddr)
 }
 
-// MinStake is a free data retrieval call binding the contract method 0x375b3c0a.
-//
-// Solidity: function minStake() constant returns(uint256)
-func (_Dospayment *DospaymentCaller) MinStake(opts *bind.CallOpts) (*big.Int, error) {
-	var (
-		ret0 = new(*big.Int)
-	)
-	out := ret0
-	err := _Dospayment.contract.Call(opts, out, "minStake")
-	return *ret0, err
-}
-
-// MinStake is a free data retrieval call binding the contract method 0x375b3c0a.
-//
-// Solidity: function minStake() constant returns(uint256)
-func (_Dospayment *DospaymentSession) MinStake() (*big.Int, error) {
-	return _Dospayment.Contract.MinStake(&_Dospayment.CallOpts)
-}
-
-// MinStake is a free data retrieval call binding the contract method 0x375b3c0a.
-//
-// Solidity: function minStake() constant returns(uint256)
-func (_Dospayment *DospaymentCallerSession) MinStake() (*big.Int, error) {
-	return _Dospayment.Contract.MinStake(&_Dospayment.CallOpts)
-}
-
-// NetworkToken is a free data retrieval call binding the contract method 0x6ca95a4e.
-//
-// Solidity: function networkToken() constant returns(address)
-func (_Dospayment *DospaymentCaller) NetworkToken(opts *bind.CallOpts) (common.Address, error) {
-	var (
-		ret0 = new(common.Address)
-	)
-	out := ret0
-	err := _Dospayment.contract.Call(opts, out, "networkToken")
-	return *ret0, err
-}
-
-// NetworkToken is a free data retrieval call binding the contract method 0x6ca95a4e.
-//
-// Solidity: function networkToken() constant returns(address)
-func (_Dospayment *DospaymentSession) NetworkToken() (common.Address, error) {
-	return _Dospayment.Contract.NetworkToken(&_Dospayment.CallOpts)
-}
-
-// NetworkToken is a free data retrieval call binding the contract method 0x6ca95a4e.
-//
-// Solidity: function networkToken() constant returns(address)
-func (_Dospayment *DospaymentCallerSession) NetworkToken() (common.Address, error) {
-	return _Dospayment.Contract.NetworkToken(&_Dospayment.CallOpts)
-}
-
 // NodeTokenAddres is a free data retrieval call binding the contract method 0x139bcedb.
 //
-// Solidity: function nodeTokenAddres(nodeAddr address, idx uint256) constant returns(address)
+// Solidity: function nodeTokenAddres(address nodeAddr, uint256 idx) constant returns(address)
 func (_Dospayment *DospaymentCaller) NodeTokenAddres(opts *bind.CallOpts, nodeAddr common.Address, idx *big.Int) (common.Address, error) {
 	var (
 		ret0 = new(common.Address)
@@ -746,21 +680,21 @@ func (_Dospayment *DospaymentCaller) NodeTokenAddres(opts *bind.CallOpts, nodeAd
 
 // NodeTokenAddres is a free data retrieval call binding the contract method 0x139bcedb.
 //
-// Solidity: function nodeTokenAddres(nodeAddr address, idx uint256) constant returns(address)
+// Solidity: function nodeTokenAddres(address nodeAddr, uint256 idx) constant returns(address)
 func (_Dospayment *DospaymentSession) NodeTokenAddres(nodeAddr common.Address, idx *big.Int) (common.Address, error) {
 	return _Dospayment.Contract.NodeTokenAddres(&_Dospayment.CallOpts, nodeAddr, idx)
 }
 
 // NodeTokenAddres is a free data retrieval call binding the contract method 0x139bcedb.
 //
-// Solidity: function nodeTokenAddres(nodeAddr address, idx uint256) constant returns(address)
+// Solidity: function nodeTokenAddres(address nodeAddr, uint256 idx) constant returns(address)
 func (_Dospayment *DospaymentCallerSession) NodeTokenAddres(nodeAddr common.Address, idx *big.Int) (common.Address, error) {
 	return _Dospayment.Contract.NodeTokenAddres(&_Dospayment.CallOpts, nodeAddr, idx)
 }
 
 // NodeTokenAddresLength is a free data retrieval call binding the contract method 0x3e698ad5.
 //
-// Solidity: function nodeTokenAddresLength(nodeAddr address) constant returns(uint256)
+// Solidity: function nodeTokenAddresLength(address nodeAddr) constant returns(uint256)
 func (_Dospayment *DospaymentCaller) NodeTokenAddresLength(opts *bind.CallOpts, nodeAddr common.Address) (*big.Int, error) {
 	var (
 		ret0 = new(*big.Int)
@@ -772,21 +706,21 @@ func (_Dospayment *DospaymentCaller) NodeTokenAddresLength(opts *bind.CallOpts, 
 
 // NodeTokenAddresLength is a free data retrieval call binding the contract method 0x3e698ad5.
 //
-// Solidity: function nodeTokenAddresLength(nodeAddr address) constant returns(uint256)
+// Solidity: function nodeTokenAddresLength(address nodeAddr) constant returns(uint256)
 func (_Dospayment *DospaymentSession) NodeTokenAddresLength(nodeAddr common.Address) (*big.Int, error) {
 	return _Dospayment.Contract.NodeTokenAddresLength(&_Dospayment.CallOpts, nodeAddr)
 }
 
 // NodeTokenAddresLength is a free data retrieval call binding the contract method 0x3e698ad5.
 //
-// Solidity: function nodeTokenAddresLength(nodeAddr address) constant returns(uint256)
+// Solidity: function nodeTokenAddresLength(address nodeAddr) constant returns(uint256)
 func (_Dospayment *DospaymentCallerSession) NodeTokenAddresLength(nodeAddr common.Address) (*big.Int, error) {
 	return _Dospayment.Contract.NodeTokenAddresLength(&_Dospayment.CallOpts, nodeAddr)
 }
 
 // NodeTokenAmount is a free data retrieval call binding the contract method 0xf87059c1.
 //
-// Solidity: function nodeTokenAmount(nodeAddr address, idx uint256) constant returns(uint256)
+// Solidity: function nodeTokenAmount(address nodeAddr, uint256 idx) constant returns(uint256)
 func (_Dospayment *DospaymentCaller) NodeTokenAmount(opts *bind.CallOpts, nodeAddr common.Address, idx *big.Int) (*big.Int, error) {
 	var (
 		ret0 = new(*big.Int)
@@ -798,14 +732,14 @@ func (_Dospayment *DospaymentCaller) NodeTokenAmount(opts *bind.CallOpts, nodeAd
 
 // NodeTokenAmount is a free data retrieval call binding the contract method 0xf87059c1.
 //
-// Solidity: function nodeTokenAmount(nodeAddr address, idx uint256) constant returns(uint256)
+// Solidity: function nodeTokenAmount(address nodeAddr, uint256 idx) constant returns(uint256)
 func (_Dospayment *DospaymentSession) NodeTokenAmount(nodeAddr common.Address, idx *big.Int) (*big.Int, error) {
 	return _Dospayment.Contract.NodeTokenAmount(&_Dospayment.CallOpts, nodeAddr, idx)
 }
 
 // NodeTokenAmount is a free data retrieval call binding the contract method 0xf87059c1.
 //
-// Solidity: function nodeTokenAmount(nodeAddr address, idx uint256) constant returns(uint256)
+// Solidity: function nodeTokenAmount(address nodeAddr, uint256 idx) constant returns(uint256)
 func (_Dospayment *DospaymentCallerSession) NodeTokenAmount(nodeAddr common.Address, idx *big.Int) (*big.Int, error) {
 	return _Dospayment.Contract.NodeTokenAmount(&_Dospayment.CallOpts, nodeAddr, idx)
 }
@@ -838,7 +772,7 @@ func (_Dospayment *DospaymentCallerSession) Owner() (common.Address, error) {
 
 // PaymentInfo is a free data retrieval call binding the contract method 0x3157f16d.
 //
-// Solidity: function paymentInfo(requestID uint256) constant returns(address, uint256)
+// Solidity: function paymentInfo(uint256 requestID) constant returns(address, uint256)
 func (_Dospayment *DospaymentCaller) PaymentInfo(opts *bind.CallOpts, requestID *big.Int) (common.Address, *big.Int, error) {
 	var (
 		ret0 = new(common.Address)
@@ -854,98 +788,98 @@ func (_Dospayment *DospaymentCaller) PaymentInfo(opts *bind.CallOpts, requestID 
 
 // PaymentInfo is a free data retrieval call binding the contract method 0x3157f16d.
 //
-// Solidity: function paymentInfo(requestID uint256) constant returns(address, uint256)
+// Solidity: function paymentInfo(uint256 requestID) constant returns(address, uint256)
 func (_Dospayment *DospaymentSession) PaymentInfo(requestID *big.Int) (common.Address, *big.Int, error) {
 	return _Dospayment.Contract.PaymentInfo(&_Dospayment.CallOpts, requestID)
 }
 
 // PaymentInfo is a free data retrieval call binding the contract method 0x3157f16d.
 //
-// Solidity: function paymentInfo(requestID uint256) constant returns(address, uint256)
+// Solidity: function paymentInfo(uint256 requestID) constant returns(address, uint256)
 func (_Dospayment *DospaymentCallerSession) PaymentInfo(requestID *big.Int) (common.Address, *big.Int, error) {
 	return _Dospayment.Contract.PaymentInfo(&_Dospayment.CallOpts, requestID)
 }
 
 // ChargeServiceFee is a paid mutator transaction binding the contract method 0x7aa9181b.
 //
-// Solidity: function chargeServiceFee(consumer address, requestID uint256, serviceType uint256) returns()
+// Solidity: function chargeServiceFee(address consumer, uint256 requestID, uint256 serviceType) returns()
 func (_Dospayment *DospaymentTransactor) ChargeServiceFee(opts *bind.TransactOpts, consumer common.Address, requestID *big.Int, serviceType *big.Int) (*types.Transaction, error) {
 	return _Dospayment.contract.Transact(opts, "chargeServiceFee", consumer, requestID, serviceType)
 }
 
 // ChargeServiceFee is a paid mutator transaction binding the contract method 0x7aa9181b.
 //
-// Solidity: function chargeServiceFee(consumer address, requestID uint256, serviceType uint256) returns()
+// Solidity: function chargeServiceFee(address consumer, uint256 requestID, uint256 serviceType) returns()
 func (_Dospayment *DospaymentSession) ChargeServiceFee(consumer common.Address, requestID *big.Int, serviceType *big.Int) (*types.Transaction, error) {
 	return _Dospayment.Contract.ChargeServiceFee(&_Dospayment.TransactOpts, consumer, requestID, serviceType)
 }
 
 // ChargeServiceFee is a paid mutator transaction binding the contract method 0x7aa9181b.
 //
-// Solidity: function chargeServiceFee(consumer address, requestID uint256, serviceType uint256) returns()
+// Solidity: function chargeServiceFee(address consumer, uint256 requestID, uint256 serviceType) returns()
 func (_Dospayment *DospaymentTransactorSession) ChargeServiceFee(consumer common.Address, requestID *big.Int, serviceType *big.Int) (*types.Transaction, error) {
 	return _Dospayment.Contract.ChargeServiceFee(&_Dospayment.TransactOpts, consumer, requestID, serviceType)
 }
 
 // ClaimGuardianReward is a paid mutator transaction binding the contract method 0x23ff34cb.
 //
-// Solidity: function claimGuardianReward(guardianAddr address) returns()
+// Solidity: function claimGuardianReward(address guardianAddr) returns()
 func (_Dospayment *DospaymentTransactor) ClaimGuardianReward(opts *bind.TransactOpts, guardianAddr common.Address) (*types.Transaction, error) {
 	return _Dospayment.contract.Transact(opts, "claimGuardianReward", guardianAddr)
 }
 
 // ClaimGuardianReward is a paid mutator transaction binding the contract method 0x23ff34cb.
 //
-// Solidity: function claimGuardianReward(guardianAddr address) returns()
+// Solidity: function claimGuardianReward(address guardianAddr) returns()
 func (_Dospayment *DospaymentSession) ClaimGuardianReward(guardianAddr common.Address) (*types.Transaction, error) {
 	return _Dospayment.Contract.ClaimGuardianReward(&_Dospayment.TransactOpts, guardianAddr)
 }
 
 // ClaimGuardianReward is a paid mutator transaction binding the contract method 0x23ff34cb.
 //
-// Solidity: function claimGuardianReward(guardianAddr address) returns()
+// Solidity: function claimGuardianReward(address guardianAddr) returns()
 func (_Dospayment *DospaymentTransactorSession) ClaimGuardianReward(guardianAddr common.Address) (*types.Transaction, error) {
 	return _Dospayment.Contract.ClaimGuardianReward(&_Dospayment.TransactOpts, guardianAddr)
 }
 
 // ClaimServiceFee is a paid mutator transaction binding the contract method 0xfedb8b6a.
 //
-// Solidity: function claimServiceFee(requestID uint256, submitter address, workers address[]) returns()
+// Solidity: function claimServiceFee(uint256 requestID, address submitter, address[] workers) returns()
 func (_Dospayment *DospaymentTransactor) ClaimServiceFee(opts *bind.TransactOpts, requestID *big.Int, submitter common.Address, workers []common.Address) (*types.Transaction, error) {
 	return _Dospayment.contract.Transact(opts, "claimServiceFee", requestID, submitter, workers)
 }
 
 // ClaimServiceFee is a paid mutator transaction binding the contract method 0xfedb8b6a.
 //
-// Solidity: function claimServiceFee(requestID uint256, submitter address, workers address[]) returns()
+// Solidity: function claimServiceFee(uint256 requestID, address submitter, address[] workers) returns()
 func (_Dospayment *DospaymentSession) ClaimServiceFee(requestID *big.Int, submitter common.Address, workers []common.Address) (*types.Transaction, error) {
 	return _Dospayment.Contract.ClaimServiceFee(&_Dospayment.TransactOpts, requestID, submitter, workers)
 }
 
 // ClaimServiceFee is a paid mutator transaction binding the contract method 0xfedb8b6a.
 //
-// Solidity: function claimServiceFee(requestID uint256, submitter address, workers address[]) returns()
+// Solidity: function claimServiceFee(uint256 requestID, address submitter, address[] workers) returns()
 func (_Dospayment *DospaymentTransactorSession) ClaimServiceFee(requestID *big.Int, submitter common.Address, workers []common.Address) (*types.Transaction, error) {
 	return _Dospayment.Contract.ClaimServiceFee(&_Dospayment.TransactOpts, requestID, submitter, workers)
 }
 
 // RefundServiceFee is a paid mutator transaction binding the contract method 0x1efa5a98.
 //
-// Solidity: function refundServiceFee(requestID uint256) returns()
+// Solidity: function refundServiceFee(uint256 requestID) returns()
 func (_Dospayment *DospaymentTransactor) RefundServiceFee(opts *bind.TransactOpts, requestID *big.Int) (*types.Transaction, error) {
 	return _Dospayment.contract.Transact(opts, "refundServiceFee", requestID)
 }
 
 // RefundServiceFee is a paid mutator transaction binding the contract method 0x1efa5a98.
 //
-// Solidity: function refundServiceFee(requestID uint256) returns()
+// Solidity: function refundServiceFee(uint256 requestID) returns()
 func (_Dospayment *DospaymentSession) RefundServiceFee(requestID *big.Int) (*types.Transaction, error) {
 	return _Dospayment.Contract.RefundServiceFee(&_Dospayment.TransactOpts, requestID)
 }
 
 // RefundServiceFee is a paid mutator transaction binding the contract method 0x1efa5a98.
 //
-// Solidity: function refundServiceFee(requestID uint256) returns()
+// Solidity: function refundServiceFee(uint256 requestID) returns()
 func (_Dospayment *DospaymentTransactorSession) RefundServiceFee(requestID *big.Int) (*types.Transaction, error) {
 	return _Dospayment.Contract.RefundServiceFee(&_Dospayment.TransactOpts, requestID)
 }
@@ -971,191 +905,128 @@ func (_Dospayment *DospaymentTransactorSession) RenounceOwnership() (*types.Tran
 	return _Dospayment.Contract.RenounceOwnership(&_Dospayment.TransactOpts)
 }
 
-// SetDropBurnMaxQuota is a paid mutator transaction binding the contract method 0x3f3381e1.
-//
-// Solidity: function setDropBurnMaxQuota(quo uint256) returns()
-func (_Dospayment *DospaymentTransactor) SetDropBurnMaxQuota(opts *bind.TransactOpts, quo *big.Int) (*types.Transaction, error) {
-	return _Dospayment.contract.Transact(opts, "setDropBurnMaxQuota", quo)
-}
-
-// SetDropBurnMaxQuota is a paid mutator transaction binding the contract method 0x3f3381e1.
-//
-// Solidity: function setDropBurnMaxQuota(quo uint256) returns()
-func (_Dospayment *DospaymentSession) SetDropBurnMaxQuota(quo *big.Int) (*types.Transaction, error) {
-	return _Dospayment.Contract.SetDropBurnMaxQuota(&_Dospayment.TransactOpts, quo)
-}
-
-// SetDropBurnMaxQuota is a paid mutator transaction binding the contract method 0x3f3381e1.
-//
-// Solidity: function setDropBurnMaxQuota(quo uint256) returns()
-func (_Dospayment *DospaymentTransactorSession) SetDropBurnMaxQuota(quo *big.Int) (*types.Transaction, error) {
-	return _Dospayment.Contract.SetDropBurnMaxQuota(&_Dospayment.TransactOpts, quo)
-}
-
-// SetDropBurnToken is a paid mutator transaction binding the contract method 0xeac051f9.
-//
-// Solidity: function setDropBurnToken(addr address) returns()
-func (_Dospayment *DospaymentTransactor) SetDropBurnToken(opts *bind.TransactOpts, addr common.Address) (*types.Transaction, error) {
-	return _Dospayment.contract.Transact(opts, "setDropBurnToken", addr)
-}
-
-// SetDropBurnToken is a paid mutator transaction binding the contract method 0xeac051f9.
-//
-// Solidity: function setDropBurnToken(addr address) returns()
-func (_Dospayment *DospaymentSession) SetDropBurnToken(addr common.Address) (*types.Transaction, error) {
-	return _Dospayment.Contract.SetDropBurnToken(&_Dospayment.TransactOpts, addr)
-}
-
-// SetDropBurnToken is a paid mutator transaction binding the contract method 0xeac051f9.
-//
-// Solidity: function setDropBurnToken(addr address) returns()
-func (_Dospayment *DospaymentTransactorSession) SetDropBurnToken(addr common.Address) (*types.Transaction, error) {
-	return _Dospayment.Contract.SetDropBurnToken(&_Dospayment.TransactOpts, addr)
-}
-
 // SetFeeDividend is a paid mutator transaction binding the contract method 0xde439e9a.
 //
-// Solidity: function setFeeDividend(tokenAddr address, submitterRate uint256, workerRate uint256, denominator uint256) returns()
+// Solidity: function setFeeDividend(address tokenAddr, uint256 submitterRate, uint256 workerRate, uint256 denominator) returns()
 func (_Dospayment *DospaymentTransactor) SetFeeDividend(opts *bind.TransactOpts, tokenAddr common.Address, submitterRate *big.Int, workerRate *big.Int, denominator *big.Int) (*types.Transaction, error) {
 	return _Dospayment.contract.Transact(opts, "setFeeDividend", tokenAddr, submitterRate, workerRate, denominator)
 }
 
 // SetFeeDividend is a paid mutator transaction binding the contract method 0xde439e9a.
 //
-// Solidity: function setFeeDividend(tokenAddr address, submitterRate uint256, workerRate uint256, denominator uint256) returns()
+// Solidity: function setFeeDividend(address tokenAddr, uint256 submitterRate, uint256 workerRate, uint256 denominator) returns()
 func (_Dospayment *DospaymentSession) SetFeeDividend(tokenAddr common.Address, submitterRate *big.Int, workerRate *big.Int, denominator *big.Int) (*types.Transaction, error) {
 	return _Dospayment.Contract.SetFeeDividend(&_Dospayment.TransactOpts, tokenAddr, submitterRate, workerRate, denominator)
 }
 
 // SetFeeDividend is a paid mutator transaction binding the contract method 0xde439e9a.
 //
-// Solidity: function setFeeDividend(tokenAddr address, submitterRate uint256, workerRate uint256, denominator uint256) returns()
+// Solidity: function setFeeDividend(address tokenAddr, uint256 submitterRate, uint256 workerRate, uint256 denominator) returns()
 func (_Dospayment *DospaymentTransactorSession) SetFeeDividend(tokenAddr common.Address, submitterRate *big.Int, workerRate *big.Int, denominator *big.Int) (*types.Transaction, error) {
 	return _Dospayment.Contract.SetFeeDividend(&_Dospayment.TransactOpts, tokenAddr, submitterRate, workerRate, denominator)
 }
 
 // SetGuardianFee is a paid mutator transaction binding the contract method 0xeebede83.
 //
-// Solidity: function setGuardianFee(tokenAddr address, fee uint256) returns()
+// Solidity: function setGuardianFee(address tokenAddr, uint256 fee) returns()
 func (_Dospayment *DospaymentTransactor) SetGuardianFee(opts *bind.TransactOpts, tokenAddr common.Address, fee *big.Int) (*types.Transaction, error) {
 	return _Dospayment.contract.Transact(opts, "setGuardianFee", tokenAddr, fee)
 }
 
 // SetGuardianFee is a paid mutator transaction binding the contract method 0xeebede83.
 //
-// Solidity: function setGuardianFee(tokenAddr address, fee uint256) returns()
+// Solidity: function setGuardianFee(address tokenAddr, uint256 fee) returns()
 func (_Dospayment *DospaymentSession) SetGuardianFee(tokenAddr common.Address, fee *big.Int) (*types.Transaction, error) {
 	return _Dospayment.Contract.SetGuardianFee(&_Dospayment.TransactOpts, tokenAddr, fee)
 }
 
 // SetGuardianFee is a paid mutator transaction binding the contract method 0xeebede83.
 //
-// Solidity: function setGuardianFee(tokenAddr address, fee uint256) returns()
+// Solidity: function setGuardianFee(address tokenAddr, uint256 fee) returns()
 func (_Dospayment *DospaymentTransactorSession) SetGuardianFee(tokenAddr common.Address, fee *big.Int) (*types.Transaction, error) {
 	return _Dospayment.Contract.SetGuardianFee(&_Dospayment.TransactOpts, tokenAddr, fee)
 }
 
 // SetGuardianFunds is a paid mutator transaction binding the contract method 0x5a1fa503.
 //
-// Solidity: function setGuardianFunds(fundsAddr address, tokenAddr address) returns()
+// Solidity: function setGuardianFunds(address fundsAddr, address tokenAddr) returns()
 func (_Dospayment *DospaymentTransactor) SetGuardianFunds(opts *bind.TransactOpts, fundsAddr common.Address, tokenAddr common.Address) (*types.Transaction, error) {
 	return _Dospayment.contract.Transact(opts, "setGuardianFunds", fundsAddr, tokenAddr)
 }
 
 // SetGuardianFunds is a paid mutator transaction binding the contract method 0x5a1fa503.
 //
-// Solidity: function setGuardianFunds(fundsAddr address, tokenAddr address) returns()
+// Solidity: function setGuardianFunds(address fundsAddr, address tokenAddr) returns()
 func (_Dospayment *DospaymentSession) SetGuardianFunds(fundsAddr common.Address, tokenAddr common.Address) (*types.Transaction, error) {
 	return _Dospayment.Contract.SetGuardianFunds(&_Dospayment.TransactOpts, fundsAddr, tokenAddr)
 }
 
 // SetGuardianFunds is a paid mutator transaction binding the contract method 0x5a1fa503.
 //
-// Solidity: function setGuardianFunds(fundsAddr address, tokenAddr address) returns()
+// Solidity: function setGuardianFunds(address fundsAddr, address tokenAddr) returns()
 func (_Dospayment *DospaymentTransactorSession) SetGuardianFunds(fundsAddr common.Address, tokenAddr common.Address) (*types.Transaction, error) {
 	return _Dospayment.Contract.SetGuardianFunds(&_Dospayment.TransactOpts, fundsAddr, tokenAddr)
 }
 
-// SetNetworkToken is a paid mutator transaction binding the contract method 0x17107c49.
-//
-// Solidity: function setNetworkToken(addr address) returns()
-func (_Dospayment *DospaymentTransactor) SetNetworkToken(opts *bind.TransactOpts, addr common.Address) (*types.Transaction, error) {
-	return _Dospayment.contract.Transact(opts, "setNetworkToken", addr)
-}
-
-// SetNetworkToken is a paid mutator transaction binding the contract method 0x17107c49.
-//
-// Solidity: function setNetworkToken(addr address) returns()
-func (_Dospayment *DospaymentSession) SetNetworkToken(addr common.Address) (*types.Transaction, error) {
-	return _Dospayment.Contract.SetNetworkToken(&_Dospayment.TransactOpts, addr)
-}
-
-// SetNetworkToken is a paid mutator transaction binding the contract method 0x17107c49.
-//
-// Solidity: function setNetworkToken(addr address) returns()
-func (_Dospayment *DospaymentTransactorSession) SetNetworkToken(addr common.Address) (*types.Transaction, error) {
-	return _Dospayment.Contract.SetNetworkToken(&_Dospayment.TransactOpts, addr)
-}
-
 // SetPaymentMethod is a paid mutator transaction binding the contract method 0xb73a3f8f.
 //
-// Solidity: function setPaymentMethod(consumer address, tokenAddr address) returns()
+// Solidity: function setPaymentMethod(address consumer, address tokenAddr) returns()
 func (_Dospayment *DospaymentTransactor) SetPaymentMethod(opts *bind.TransactOpts, consumer common.Address, tokenAddr common.Address) (*types.Transaction, error) {
 	return _Dospayment.contract.Transact(opts, "setPaymentMethod", consumer, tokenAddr)
 }
 
 // SetPaymentMethod is a paid mutator transaction binding the contract method 0xb73a3f8f.
 //
-// Solidity: function setPaymentMethod(consumer address, tokenAddr address) returns()
+// Solidity: function setPaymentMethod(address consumer, address tokenAddr) returns()
 func (_Dospayment *DospaymentSession) SetPaymentMethod(consumer common.Address, tokenAddr common.Address) (*types.Transaction, error) {
 	return _Dospayment.Contract.SetPaymentMethod(&_Dospayment.TransactOpts, consumer, tokenAddr)
 }
 
 // SetPaymentMethod is a paid mutator transaction binding the contract method 0xb73a3f8f.
 //
-// Solidity: function setPaymentMethod(consumer address, tokenAddr address) returns()
+// Solidity: function setPaymentMethod(address consumer, address tokenAddr) returns()
 func (_Dospayment *DospaymentTransactorSession) SetPaymentMethod(consumer common.Address, tokenAddr common.Address) (*types.Transaction, error) {
 	return _Dospayment.Contract.SetPaymentMethod(&_Dospayment.TransactOpts, consumer, tokenAddr)
 }
 
 // SetServiceFee is a paid mutator transaction binding the contract method 0x3939c401.
 //
-// Solidity: function setServiceFee(tokenAddr address, serviceType uint256, fee uint256) returns()
+// Solidity: function setServiceFee(address tokenAddr, uint256 serviceType, uint256 fee) returns()
 func (_Dospayment *DospaymentTransactor) SetServiceFee(opts *bind.TransactOpts, tokenAddr common.Address, serviceType *big.Int, fee *big.Int) (*types.Transaction, error) {
 	return _Dospayment.contract.Transact(opts, "setServiceFee", tokenAddr, serviceType, fee)
 }
 
 // SetServiceFee is a paid mutator transaction binding the contract method 0x3939c401.
 //
-// Solidity: function setServiceFee(tokenAddr address, serviceType uint256, fee uint256) returns()
+// Solidity: function setServiceFee(address tokenAddr, uint256 serviceType, uint256 fee) returns()
 func (_Dospayment *DospaymentSession) SetServiceFee(tokenAddr common.Address, serviceType *big.Int, fee *big.Int) (*types.Transaction, error) {
 	return _Dospayment.Contract.SetServiceFee(&_Dospayment.TransactOpts, tokenAddr, serviceType, fee)
 }
 
 // SetServiceFee is a paid mutator transaction binding the contract method 0x3939c401.
 //
-// Solidity: function setServiceFee(tokenAddr address, serviceType uint256, fee uint256) returns()
+// Solidity: function setServiceFee(address tokenAddr, uint256 serviceType, uint256 fee) returns()
 func (_Dospayment *DospaymentTransactorSession) SetServiceFee(tokenAddr common.Address, serviceType *big.Int, fee *big.Int) (*types.Transaction, error) {
 	return _Dospayment.Contract.SetServiceFee(&_Dospayment.TransactOpts, tokenAddr, serviceType, fee)
 }
 
 // TransferOwnership is a paid mutator transaction binding the contract method 0xf2fde38b.
 //
-// Solidity: function transferOwnership(newOwner address) returns()
+// Solidity: function transferOwnership(address newOwner) returns()
 func (_Dospayment *DospaymentTransactor) TransferOwnership(opts *bind.TransactOpts, newOwner common.Address) (*types.Transaction, error) {
 	return _Dospayment.contract.Transact(opts, "transferOwnership", newOwner)
 }
 
 // TransferOwnership is a paid mutator transaction binding the contract method 0xf2fde38b.
 //
-// Solidity: function transferOwnership(newOwner address) returns()
+// Solidity: function transferOwnership(address newOwner) returns()
 func (_Dospayment *DospaymentSession) TransferOwnership(newOwner common.Address) (*types.Transaction, error) {
 	return _Dospayment.Contract.TransferOwnership(&_Dospayment.TransactOpts, newOwner)
 }
 
 // TransferOwnership is a paid mutator transaction binding the contract method 0xf2fde38b.
 //
-// Solidity: function transferOwnership(newOwner address) returns()
+// Solidity: function transferOwnership(address newOwner) returns()
 func (_Dospayment *DospaymentTransactorSession) TransferOwnership(newOwner common.Address) (*types.Transaction, error) {
 	return _Dospayment.Contract.TransferOwnership(&_Dospayment.TransactOpts, newOwner)
 }
@@ -1183,21 +1054,21 @@ func (_Dospayment *DospaymentTransactorSession) Withdraw() (*types.Transaction, 
 
 // WithdrawAll is a paid mutator transaction binding the contract method 0x958e2d31.
 //
-// Solidity: function withdrawAll(tokenAddr uint256) returns()
+// Solidity: function withdrawAll(uint256 tokenAddr) returns()
 func (_Dospayment *DospaymentTransactor) WithdrawAll(opts *bind.TransactOpts, tokenAddr *big.Int) (*types.Transaction, error) {
 	return _Dospayment.contract.Transact(opts, "withdrawAll", tokenAddr)
 }
 
 // WithdrawAll is a paid mutator transaction binding the contract method 0x958e2d31.
 //
-// Solidity: function withdrawAll(tokenAddr uint256) returns()
+// Solidity: function withdrawAll(uint256 tokenAddr) returns()
 func (_Dospayment *DospaymentSession) WithdrawAll(tokenAddr *big.Int) (*types.Transaction, error) {
 	return _Dospayment.Contract.WithdrawAll(&_Dospayment.TransactOpts, tokenAddr)
 }
 
 // WithdrawAll is a paid mutator transaction binding the contract method 0x958e2d31.
 //
-// Solidity: function withdrawAll(tokenAddr uint256) returns()
+// Solidity: function withdrawAll(uint256 tokenAddr) returns()
 func (_Dospayment *DospaymentTransactorSession) WithdrawAll(tokenAddr *big.Int) (*types.Transaction, error) {
 	return _Dospayment.Contract.WithdrawAll(&_Dospayment.TransactOpts, tokenAddr)
 }
@@ -1281,7 +1152,7 @@ type DospaymentLogChargeServiceFee struct {
 
 // FilterLogChargeServiceFee is a free log retrieval operation binding the contract event 0xa94e9ce5d0a7b76275efad947367b7999d9900f23bec1377d98f522ecad1b7ba.
 //
-// Solidity: e LogChargeServiceFee(consumer address, tokenAddr address, requestID uint256, serviceType uint256, fee uint256)
+// Solidity: event LogChargeServiceFee(address consumer, address tokenAddr, uint256 requestID, uint256 serviceType, uint256 fee)
 func (_Dospayment *DospaymentFilterer) FilterLogChargeServiceFee(opts *bind.FilterOpts) (*DospaymentLogChargeServiceFeeIterator, error) {
 
 	logs, sub, err := _Dospayment.contract.FilterLogs(opts, "LogChargeServiceFee")
@@ -1293,7 +1164,7 @@ func (_Dospayment *DospaymentFilterer) FilterLogChargeServiceFee(opts *bind.Filt
 
 // WatchLogChargeServiceFee is a free log subscription operation binding the contract event 0xa94e9ce5d0a7b76275efad947367b7999d9900f23bec1377d98f522ecad1b7ba.
 //
-// Solidity: e LogChargeServiceFee(consumer address, tokenAddr address, requestID uint256, serviceType uint256, fee uint256)
+// Solidity: event LogChargeServiceFee(address consumer, address tokenAddr, uint256 requestID, uint256 serviceType, uint256 fee)
 func (_Dospayment *DospaymentFilterer) WatchLogChargeServiceFee(opts *bind.WatchOpts, sink chan<- *DospaymentLogChargeServiceFee) (event.Subscription, error) {
 
 	logs, sub, err := _Dospayment.contract.WatchLogs(opts, "LogChargeServiceFee")
@@ -1406,7 +1277,7 @@ type DospaymentLogClaimGuardianFee struct {
 
 // FilterLogClaimGuardianFee is a free log retrieval operation binding the contract event 0x47ad88344c408450ef0ccab93ed97dd83af7a27dedfaa205c0725cfc4ca819cd.
 //
-// Solidity: e LogClaimGuardianFee(nodeAddr address, tokenAddr address, feeForSubmitter uint256, sender address)
+// Solidity: event LogClaimGuardianFee(address nodeAddr, address tokenAddr, uint256 feeForSubmitter, address sender)
 func (_Dospayment *DospaymentFilterer) FilterLogClaimGuardianFee(opts *bind.FilterOpts) (*DospaymentLogClaimGuardianFeeIterator, error) {
 
 	logs, sub, err := _Dospayment.contract.FilterLogs(opts, "LogClaimGuardianFee")
@@ -1418,7 +1289,7 @@ func (_Dospayment *DospaymentFilterer) FilterLogClaimGuardianFee(opts *bind.Filt
 
 // WatchLogClaimGuardianFee is a free log subscription operation binding the contract event 0x47ad88344c408450ef0ccab93ed97dd83af7a27dedfaa205c0725cfc4ca819cd.
 //
-// Solidity: e LogClaimGuardianFee(nodeAddr address, tokenAddr address, feeForSubmitter uint256, sender address)
+// Solidity: event LogClaimGuardianFee(address nodeAddr, address tokenAddr, uint256 feeForSubmitter, address sender)
 func (_Dospayment *DospaymentFilterer) WatchLogClaimGuardianFee(opts *bind.WatchOpts, sink chan<- *DospaymentLogClaimGuardianFee) (event.Subscription, error) {
 
 	logs, sub, err := _Dospayment.contract.WatchLogs(opts, "LogClaimGuardianFee")
@@ -1532,7 +1403,7 @@ type DospaymentLogClaimServiceFee struct {
 
 // FilterLogClaimServiceFee is a free log retrieval operation binding the contract event 0xab9fe896064c2c9dfd31acebc7d522b311e5f2e7d1b4965ac0cfd5a4abec813a.
 //
-// Solidity: e LogClaimServiceFee(nodeAddr address, tokenAddr address, requestID uint256, serviceType uint256, feeForSubmitter uint256)
+// Solidity: event LogClaimServiceFee(address nodeAddr, address tokenAddr, uint256 requestID, uint256 serviceType, uint256 feeForSubmitter)
 func (_Dospayment *DospaymentFilterer) FilterLogClaimServiceFee(opts *bind.FilterOpts) (*DospaymentLogClaimServiceFeeIterator, error) {
 
 	logs, sub, err := _Dospayment.contract.FilterLogs(opts, "LogClaimServiceFee")
@@ -1544,7 +1415,7 @@ func (_Dospayment *DospaymentFilterer) FilterLogClaimServiceFee(opts *bind.Filte
 
 // WatchLogClaimServiceFee is a free log subscription operation binding the contract event 0xab9fe896064c2c9dfd31acebc7d522b311e5f2e7d1b4965ac0cfd5a4abec813a.
 //
-// Solidity: e LogClaimServiceFee(nodeAddr address, tokenAddr address, requestID uint256, serviceType uint256, feeForSubmitter uint256)
+// Solidity: event LogClaimServiceFee(address nodeAddr, address tokenAddr, uint256 requestID, uint256 serviceType, uint256 feeForSubmitter)
 func (_Dospayment *DospaymentFilterer) WatchLogClaimServiceFee(opts *bind.WatchOpts, sink chan<- *DospaymentLogClaimServiceFee) (event.Subscription, error) {
 
 	logs, sub, err := _Dospayment.contract.WatchLogs(opts, "LogClaimServiceFee")
@@ -1658,7 +1529,7 @@ type DospaymentLogRefundServiceFee struct {
 
 // FilterLogRefundServiceFee is a free log retrieval operation binding the contract event 0xde0a5183bfc8c743f7b95ecaaf7815e8f82d8ae05ca1ade1eac1ff9d961a2eaa.
 //
-// Solidity: e LogRefundServiceFee(consumer address, tokenAddr address, requestID uint256, serviceType uint256, fee uint256)
+// Solidity: event LogRefundServiceFee(address consumer, address tokenAddr, uint256 requestID, uint256 serviceType, uint256 fee)
 func (_Dospayment *DospaymentFilterer) FilterLogRefundServiceFee(opts *bind.FilterOpts) (*DospaymentLogRefundServiceFeeIterator, error) {
 
 	logs, sub, err := _Dospayment.contract.FilterLogs(opts, "LogRefundServiceFee")
@@ -1670,7 +1541,7 @@ func (_Dospayment *DospaymentFilterer) FilterLogRefundServiceFee(opts *bind.Filt
 
 // WatchLogRefundServiceFee is a free log subscription operation binding the contract event 0xde0a5183bfc8c743f7b95ecaaf7815e8f82d8ae05ca1ade1eac1ff9d961a2eaa.
 //
-// Solidity: e LogRefundServiceFee(consumer address, tokenAddr address, requestID uint256, serviceType uint256, fee uint256)
+// Solidity: event LogRefundServiceFee(address consumer, address tokenAddr, uint256 requestID, uint256 serviceType, uint256 fee)
 func (_Dospayment *DospaymentFilterer) WatchLogRefundServiceFee(opts *bind.WatchOpts, sink chan<- *DospaymentLogRefundServiceFee) (event.Subscription, error) {
 
 	logs, sub, err := _Dospayment.contract.WatchLogs(opts, "LogRefundServiceFee")
@@ -1780,7 +1651,7 @@ type DospaymentOwnershipRenounced struct {
 
 // FilterOwnershipRenounced is a free log retrieval operation binding the contract event 0xf8df31144d9c2f0f6b59d69b8b98abd5459d07f2742c4df920b25aae33c64820.
 //
-// Solidity: e OwnershipRenounced(previousOwner indexed address)
+// Solidity: event OwnershipRenounced(address indexed previousOwner)
 func (_Dospayment *DospaymentFilterer) FilterOwnershipRenounced(opts *bind.FilterOpts, previousOwner []common.Address) (*DospaymentOwnershipRenouncedIterator, error) {
 
 	var previousOwnerRule []interface{}
@@ -1797,7 +1668,7 @@ func (_Dospayment *DospaymentFilterer) FilterOwnershipRenounced(opts *bind.Filte
 
 // WatchOwnershipRenounced is a free log subscription operation binding the contract event 0xf8df31144d9c2f0f6b59d69b8b98abd5459d07f2742c4df920b25aae33c64820.
 //
-// Solidity: e OwnershipRenounced(previousOwner indexed address)
+// Solidity: event OwnershipRenounced(address indexed previousOwner)
 func (_Dospayment *DospaymentFilterer) WatchOwnershipRenounced(opts *bind.WatchOpts, sink chan<- *DospaymentOwnershipRenounced, previousOwner []common.Address) (event.Subscription, error) {
 
 	var previousOwnerRule []interface{}
@@ -1913,7 +1784,7 @@ type DospaymentOwnershipTransferred struct {
 
 // FilterOwnershipTransferred is a free log retrieval operation binding the contract event 0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0.
 //
-// Solidity: e OwnershipTransferred(previousOwner indexed address, newOwner indexed address)
+// Solidity: event OwnershipTransferred(address indexed previousOwner, address indexed newOwner)
 func (_Dospayment *DospaymentFilterer) FilterOwnershipTransferred(opts *bind.FilterOpts, previousOwner []common.Address, newOwner []common.Address) (*DospaymentOwnershipTransferredIterator, error) {
 
 	var previousOwnerRule []interface{}
@@ -1934,7 +1805,7 @@ func (_Dospayment *DospaymentFilterer) FilterOwnershipTransferred(opts *bind.Fil
 
 // WatchOwnershipTransferred is a free log subscription operation binding the contract event 0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0.
 //
-// Solidity: e OwnershipTransferred(previousOwner indexed address, newOwner indexed address)
+// Solidity: event OwnershipTransferred(address indexed previousOwner, address indexed newOwner)
 func (_Dospayment *DospaymentFilterer) WatchOwnershipTransferred(opts *bind.WatchOpts, sink chan<- *DospaymentOwnershipTransferred, previousOwner []common.Address, newOwner []common.Address) (event.Subscription, error) {
 
 	var previousOwnerRule []interface{}
@@ -1958,129 +1829,6 @@ func (_Dospayment *DospaymentFilterer) WatchOwnershipTransferred(opts *bind.Watc
 				// New log arrived, parse the event and forward to the user
 				event := new(DospaymentOwnershipTransferred)
 				if err := _Dospayment.contract.UnpackLog(event, "OwnershipTransferred", log); err != nil {
-					return err
-				}
-				event.Raw = log
-
-				select {
-				case sink <- event:
-				case err := <-sub.Err():
-					return err
-				case <-quit:
-					return nil
-				}
-			case err := <-sub.Err():
-				return err
-			case <-quit:
-				return nil
-			}
-		}
-	}), nil
-}
-
-// DospaymentUpdateDropBurnMaxQuotaIterator is returned from FilterUpdateDropBurnMaxQuota and is used to iterate over the raw logs and unpacked data for UpdateDropBurnMaxQuota events raised by the Dospayment contract.
-type DospaymentUpdateDropBurnMaxQuotaIterator struct {
-	Event *DospaymentUpdateDropBurnMaxQuota // Event containing the contract specifics and raw log
-
-	contract *bind.BoundContract // Generic contract to use for unpacking event data
-	event    string              // Event name to use for unpacking event data
-
-	logs chan types.Log        // Log channel receiving the found contract events
-	sub  ethereum.Subscription // Subscription for errors, completion and termination
-	done bool                  // Whether the subscription completed delivering logs
-	fail error                 // Occurred error to stop iteration
-}
-
-// Next advances the iterator to the subsequent event, returning whether there
-// are any more events found. In case of a retrieval or parsing error, false is
-// returned and Error() can be queried for the exact failure.
-func (it *DospaymentUpdateDropBurnMaxQuotaIterator) Next() bool {
-	// If the iterator failed, stop iterating
-	if it.fail != nil {
-		return false
-	}
-	// If the iterator completed, deliver directly whatever's available
-	if it.done {
-		select {
-		case log := <-it.logs:
-			it.Event = new(DospaymentUpdateDropBurnMaxQuota)
-			if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-				it.fail = err
-				return false
-			}
-			it.Event.Raw = log
-			return true
-
-		default:
-			return false
-		}
-	}
-	// Iterator still in progress, wait for either a data or an error event
-	select {
-	case log := <-it.logs:
-		it.Event = new(DospaymentUpdateDropBurnMaxQuota)
-		if err := it.contract.UnpackLog(it.Event, it.event, log); err != nil {
-			it.fail = err
-			return false
-		}
-		it.Event.Raw = log
-		return true
-
-	case err := <-it.sub.Err():
-		it.done = true
-		it.fail = err
-		return it.Next()
-	}
-}
-
-// Error returns any retrieval or parsing error occurred during filtering.
-func (it *DospaymentUpdateDropBurnMaxQuotaIterator) Error() error {
-	return it.fail
-}
-
-// Close terminates the iteration process, releasing any pending underlying
-// resources.
-func (it *DospaymentUpdateDropBurnMaxQuotaIterator) Close() error {
-	it.sub.Unsubscribe()
-	return nil
-}
-
-// DospaymentUpdateDropBurnMaxQuota represents a UpdateDropBurnMaxQuota event raised by the Dospayment contract.
-type DospaymentUpdateDropBurnMaxQuota struct {
-	OldQuota *big.Int
-	NewQuota *big.Int
-	Raw      types.Log // Blockchain specific contextual infos
-}
-
-// FilterUpdateDropBurnMaxQuota is a free log retrieval operation binding the contract event 0x0aee95cca46da64ee373e28dee5994361b4002c54035d92932c9825b76382e99.
-//
-// Solidity: e UpdateDropBurnMaxQuota(oldQuota uint256, newQuota uint256)
-func (_Dospayment *DospaymentFilterer) FilterUpdateDropBurnMaxQuota(opts *bind.FilterOpts) (*DospaymentUpdateDropBurnMaxQuotaIterator, error) {
-
-	logs, sub, err := _Dospayment.contract.FilterLogs(opts, "UpdateDropBurnMaxQuota")
-	if err != nil {
-		return nil, err
-	}
-	return &DospaymentUpdateDropBurnMaxQuotaIterator{contract: _Dospayment.contract, event: "UpdateDropBurnMaxQuota", logs: logs, sub: sub}, nil
-}
-
-// WatchUpdateDropBurnMaxQuota is a free log subscription operation binding the contract event 0x0aee95cca46da64ee373e28dee5994361b4002c54035d92932c9825b76382e99.
-//
-// Solidity: e UpdateDropBurnMaxQuota(oldQuota uint256, newQuota uint256)
-func (_Dospayment *DospaymentFilterer) WatchUpdateDropBurnMaxQuota(opts *bind.WatchOpts, sink chan<- *DospaymentUpdateDropBurnMaxQuota) (event.Subscription, error) {
-
-	logs, sub, err := _Dospayment.contract.WatchLogs(opts, "UpdateDropBurnMaxQuota")
-	if err != nil {
-		return nil, err
-	}
-	return event.NewSubscription(func(quit <-chan struct{}) error {
-		defer sub.Unsubscribe()
-		for {
-			select {
-			case log := <-logs:
-				// New log arrived, parse the event and forward to the user
-				event := new(DospaymentUpdateDropBurnMaxQuota)
-				if err := _Dospayment.contract.UnpackLog(event, "UpdateDropBurnMaxQuota", log); err != nil {
 					return err
 				}
 				event.Raw = log
@@ -2177,7 +1925,7 @@ type DospaymentUpdateDropBurnTokenAddress struct {
 
 // FilterUpdateDropBurnTokenAddress is a free log retrieval operation binding the contract event 0xfc8013dfb0c8d38f3bcab9239bd5712457c48919b272cdb109488549199a0173.
 //
-// Solidity: e UpdateDropBurnTokenAddress(oldAddress address, newAddress address)
+// Solidity: event UpdateDropBurnTokenAddress(address oldAddress, address newAddress)
 func (_Dospayment *DospaymentFilterer) FilterUpdateDropBurnTokenAddress(opts *bind.FilterOpts) (*DospaymentUpdateDropBurnTokenAddressIterator, error) {
 
 	logs, sub, err := _Dospayment.contract.FilterLogs(opts, "UpdateDropBurnTokenAddress")
@@ -2189,7 +1937,7 @@ func (_Dospayment *DospaymentFilterer) FilterUpdateDropBurnTokenAddress(opts *bi
 
 // WatchUpdateDropBurnTokenAddress is a free log subscription operation binding the contract event 0xfc8013dfb0c8d38f3bcab9239bd5712457c48919b272cdb109488549199a0173.
 //
-// Solidity: e UpdateDropBurnTokenAddress(oldAddress address, newAddress address)
+// Solidity: event UpdateDropBurnTokenAddress(address oldAddress, address newAddress)
 func (_Dospayment *DospaymentFilterer) WatchUpdateDropBurnTokenAddress(opts *bind.WatchOpts, sink chan<- *DospaymentUpdateDropBurnTokenAddress) (event.Subscription, error) {
 
 	logs, sub, err := _Dospayment.contract.WatchLogs(opts, "UpdateDropBurnTokenAddress")
@@ -2300,7 +2048,7 @@ type DospaymentUpdateNetworkTokenAddress struct {
 
 // FilterUpdateNetworkTokenAddress is a free log retrieval operation binding the contract event 0x4d27a2adceae86b92fb74fb7e8f96dc902d917e243fbff389b5a793c9040dafe.
 //
-// Solidity: e UpdateNetworkTokenAddress(oldAddress address, newAddress address)
+// Solidity: event UpdateNetworkTokenAddress(address oldAddress, address newAddress)
 func (_Dospayment *DospaymentFilterer) FilterUpdateNetworkTokenAddress(opts *bind.FilterOpts) (*DospaymentUpdateNetworkTokenAddressIterator, error) {
 
 	logs, sub, err := _Dospayment.contract.FilterLogs(opts, "UpdateNetworkTokenAddress")
@@ -2312,7 +2060,7 @@ func (_Dospayment *DospaymentFilterer) FilterUpdateNetworkTokenAddress(opts *bin
 
 // WatchUpdateNetworkTokenAddress is a free log subscription operation binding the contract event 0x4d27a2adceae86b92fb74fb7e8f96dc902d917e243fbff389b5a793c9040dafe.
 //
-// Solidity: e UpdateNetworkTokenAddress(oldAddress address, newAddress address)
+// Solidity: event UpdateNetworkTokenAddress(address oldAddress, address newAddress)
 func (_Dospayment *DospaymentFilterer) WatchUpdateNetworkTokenAddress(opts *bind.WatchOpts, sink chan<- *DospaymentUpdateNetworkTokenAddress) (event.Subscription, error) {
 
 	logs, sub, err := _Dospayment.contract.WatchLogs(opts, "UpdateNetworkTokenAddress")

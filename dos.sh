@@ -1,5 +1,5 @@
 #!/bin/bash
-RELEASE="https://github.com/DOSNetwork/core/releases/download/v1.0-beta.14/dosclient"
+RELEASE="https://github.com/DOSNetwork/core/releases/download/v1.0-beta.16/dosclient"
 findNodeIP() {
   if [ -z "$nodeIP" ]; then
     nodeIP=$(host myip.opendns.com resolver1.opendns.com | grep "myip.opendns.com has address" | awk -F " " '{print $NF}')
