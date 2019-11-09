@@ -4,6 +4,7 @@
 package dosbridge
 
 import (
+	"math/big"
 	"strings"
 
 	ethereum "github.com/ethereum/go-ethereum"
@@ -12,6 +13,18 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/event"
+)
+
+// Reference imports to suppress errors if they are not otherwise used.
+var (
+	_ = big.NewInt
+	_ = strings.NewReader
+	_ = ethereum.NotFound
+	_ = abi.U256
+	_ = bind.Bind
+	_ = common.Big1
+	_ = types.BloomLookup
+	_ = event.NewSubscription
 )
 
 // DosbridgeABI is the input ABI used to generate the binding from.
@@ -354,105 +367,105 @@ func (_Dosbridge *DosbridgeTransactorSession) RenounceOwnership() (*types.Transa
 
 // SetCommitRevealAddress is a paid mutator transaction binding the contract method 0x7b08cd03.
 //
-// Solidity: function setCommitRevealAddress(newAddr address) returns()
+// Solidity: function setCommitRevealAddress(address newAddr) returns()
 func (_Dosbridge *DosbridgeTransactor) SetCommitRevealAddress(opts *bind.TransactOpts, newAddr common.Address) (*types.Transaction, error) {
 	return _Dosbridge.contract.Transact(opts, "setCommitRevealAddress", newAddr)
 }
 
 // SetCommitRevealAddress is a paid mutator transaction binding the contract method 0x7b08cd03.
 //
-// Solidity: function setCommitRevealAddress(newAddr address) returns()
+// Solidity: function setCommitRevealAddress(address newAddr) returns()
 func (_Dosbridge *DosbridgeSession) SetCommitRevealAddress(newAddr common.Address) (*types.Transaction, error) {
 	return _Dosbridge.Contract.SetCommitRevealAddress(&_Dosbridge.TransactOpts, newAddr)
 }
 
 // SetCommitRevealAddress is a paid mutator transaction binding the contract method 0x7b08cd03.
 //
-// Solidity: function setCommitRevealAddress(newAddr address) returns()
+// Solidity: function setCommitRevealAddress(address newAddr) returns()
 func (_Dosbridge *DosbridgeTransactorSession) SetCommitRevealAddress(newAddr common.Address) (*types.Transaction, error) {
 	return _Dosbridge.Contract.SetCommitRevealAddress(&_Dosbridge.TransactOpts, newAddr)
 }
 
 // SetPaymentAddress is a paid mutator transaction binding the contract method 0x5e1e1004.
 //
-// Solidity: function setPaymentAddress(newAddr address) returns()
+// Solidity: function setPaymentAddress(address newAddr) returns()
 func (_Dosbridge *DosbridgeTransactor) SetPaymentAddress(opts *bind.TransactOpts, newAddr common.Address) (*types.Transaction, error) {
 	return _Dosbridge.contract.Transact(opts, "setPaymentAddress", newAddr)
 }
 
 // SetPaymentAddress is a paid mutator transaction binding the contract method 0x5e1e1004.
 //
-// Solidity: function setPaymentAddress(newAddr address) returns()
+// Solidity: function setPaymentAddress(address newAddr) returns()
 func (_Dosbridge *DosbridgeSession) SetPaymentAddress(newAddr common.Address) (*types.Transaction, error) {
 	return _Dosbridge.Contract.SetPaymentAddress(&_Dosbridge.TransactOpts, newAddr)
 }
 
 // SetPaymentAddress is a paid mutator transaction binding the contract method 0x5e1e1004.
 //
-// Solidity: function setPaymentAddress(newAddr address) returns()
+// Solidity: function setPaymentAddress(address newAddr) returns()
 func (_Dosbridge *DosbridgeTransactorSession) SetPaymentAddress(newAddr common.Address) (*types.Transaction, error) {
 	return _Dosbridge.Contract.SetPaymentAddress(&_Dosbridge.TransactOpts, newAddr)
 }
 
 // SetProxyAddress is a paid mutator transaction binding the contract method 0x46a7dadc.
 //
-// Solidity: function setProxyAddress(newAddr address) returns()
+// Solidity: function setProxyAddress(address newAddr) returns()
 func (_Dosbridge *DosbridgeTransactor) SetProxyAddress(opts *bind.TransactOpts, newAddr common.Address) (*types.Transaction, error) {
 	return _Dosbridge.contract.Transact(opts, "setProxyAddress", newAddr)
 }
 
 // SetProxyAddress is a paid mutator transaction binding the contract method 0x46a7dadc.
 //
-// Solidity: function setProxyAddress(newAddr address) returns()
+// Solidity: function setProxyAddress(address newAddr) returns()
 func (_Dosbridge *DosbridgeSession) SetProxyAddress(newAddr common.Address) (*types.Transaction, error) {
 	return _Dosbridge.Contract.SetProxyAddress(&_Dosbridge.TransactOpts, newAddr)
 }
 
 // SetProxyAddress is a paid mutator transaction binding the contract method 0x46a7dadc.
 //
-// Solidity: function setProxyAddress(newAddr address) returns()
+// Solidity: function setProxyAddress(address newAddr) returns()
 func (_Dosbridge *DosbridgeTransactorSession) SetProxyAddress(newAddr common.Address) (*types.Transaction, error) {
 	return _Dosbridge.Contract.SetProxyAddress(&_Dosbridge.TransactOpts, newAddr)
 }
 
 // SetRegistryAddress is a paid mutator transaction binding the contract method 0xab7b4993.
 //
-// Solidity: function setRegistryAddress(newAddr address) returns()
+// Solidity: function setRegistryAddress(address newAddr) returns()
 func (_Dosbridge *DosbridgeTransactor) SetRegistryAddress(opts *bind.TransactOpts, newAddr common.Address) (*types.Transaction, error) {
 	return _Dosbridge.contract.Transact(opts, "setRegistryAddress", newAddr)
 }
 
 // SetRegistryAddress is a paid mutator transaction binding the contract method 0xab7b4993.
 //
-// Solidity: function setRegistryAddress(newAddr address) returns()
+// Solidity: function setRegistryAddress(address newAddr) returns()
 func (_Dosbridge *DosbridgeSession) SetRegistryAddress(newAddr common.Address) (*types.Transaction, error) {
 	return _Dosbridge.Contract.SetRegistryAddress(&_Dosbridge.TransactOpts, newAddr)
 }
 
 // SetRegistryAddress is a paid mutator transaction binding the contract method 0xab7b4993.
 //
-// Solidity: function setRegistryAddress(newAddr address) returns()
+// Solidity: function setRegistryAddress(address newAddr) returns()
 func (_Dosbridge *DosbridgeTransactorSession) SetRegistryAddress(newAddr common.Address) (*types.Transaction, error) {
 	return _Dosbridge.Contract.SetRegistryAddress(&_Dosbridge.TransactOpts, newAddr)
 }
 
 // TransferOwnership is a paid mutator transaction binding the contract method 0xf2fde38b.
 //
-// Solidity: function transferOwnership(newOwner address) returns()
+// Solidity: function transferOwnership(address newOwner) returns()
 func (_Dosbridge *DosbridgeTransactor) TransferOwnership(opts *bind.TransactOpts, newOwner common.Address) (*types.Transaction, error) {
 	return _Dosbridge.contract.Transact(opts, "transferOwnership", newOwner)
 }
 
 // TransferOwnership is a paid mutator transaction binding the contract method 0xf2fde38b.
 //
-// Solidity: function transferOwnership(newOwner address) returns()
+// Solidity: function transferOwnership(address newOwner) returns()
 func (_Dosbridge *DosbridgeSession) TransferOwnership(newOwner common.Address) (*types.Transaction, error) {
 	return _Dosbridge.Contract.TransferOwnership(&_Dosbridge.TransactOpts, newOwner)
 }
 
 // TransferOwnership is a paid mutator transaction binding the contract method 0xf2fde38b.
 //
-// Solidity: function transferOwnership(newOwner address) returns()
+// Solidity: function transferOwnership(address newOwner) returns()
 func (_Dosbridge *DosbridgeTransactorSession) TransferOwnership(newOwner common.Address) (*types.Transaction, error) {
 	return _Dosbridge.Contract.TransferOwnership(&_Dosbridge.TransactOpts, newOwner)
 }
@@ -533,7 +546,7 @@ type DosbridgeCommitRevealAddressUpdated struct {
 
 // FilterCommitRevealAddressUpdated is a free log retrieval operation binding the contract event 0x23b082fc42fcc9c7d42de567b56abef6a737aa2600b8036ee5c304086a2545c3.
 //
-// Solidity: e CommitRevealAddressUpdated(previousAddr address, newAddr address)
+// Solidity: event CommitRevealAddressUpdated(address previousAddr, address newAddr)
 func (_Dosbridge *DosbridgeFilterer) FilterCommitRevealAddressUpdated(opts *bind.FilterOpts) (*DosbridgeCommitRevealAddressUpdatedIterator, error) {
 
 	logs, sub, err := _Dosbridge.contract.FilterLogs(opts, "CommitRevealAddressUpdated")
@@ -545,7 +558,7 @@ func (_Dosbridge *DosbridgeFilterer) FilterCommitRevealAddressUpdated(opts *bind
 
 // WatchCommitRevealAddressUpdated is a free log subscription operation binding the contract event 0x23b082fc42fcc9c7d42de567b56abef6a737aa2600b8036ee5c304086a2545c3.
 //
-// Solidity: e CommitRevealAddressUpdated(previousAddr address, newAddr address)
+// Solidity: event CommitRevealAddressUpdated(address previousAddr, address newAddr)
 func (_Dosbridge *DosbridgeFilterer) WatchCommitRevealAddressUpdated(opts *bind.WatchOpts, sink chan<- *DosbridgeCommitRevealAddressUpdated) (event.Subscription, error) {
 
 	logs, sub, err := _Dosbridge.contract.WatchLogs(opts, "CommitRevealAddressUpdated")
@@ -655,7 +668,7 @@ type DosbridgeOwnershipRenounced struct {
 
 // FilterOwnershipRenounced is a free log retrieval operation binding the contract event 0xf8df31144d9c2f0f6b59d69b8b98abd5459d07f2742c4df920b25aae33c64820.
 //
-// Solidity: e OwnershipRenounced(previousOwner indexed address)
+// Solidity: event OwnershipRenounced(address indexed previousOwner)
 func (_Dosbridge *DosbridgeFilterer) FilterOwnershipRenounced(opts *bind.FilterOpts, previousOwner []common.Address) (*DosbridgeOwnershipRenouncedIterator, error) {
 
 	var previousOwnerRule []interface{}
@@ -672,7 +685,7 @@ func (_Dosbridge *DosbridgeFilterer) FilterOwnershipRenounced(opts *bind.FilterO
 
 // WatchOwnershipRenounced is a free log subscription operation binding the contract event 0xf8df31144d9c2f0f6b59d69b8b98abd5459d07f2742c4df920b25aae33c64820.
 //
-// Solidity: e OwnershipRenounced(previousOwner indexed address)
+// Solidity: event OwnershipRenounced(address indexed previousOwner)
 func (_Dosbridge *DosbridgeFilterer) WatchOwnershipRenounced(opts *bind.WatchOpts, sink chan<- *DosbridgeOwnershipRenounced, previousOwner []common.Address) (event.Subscription, error) {
 
 	var previousOwnerRule []interface{}
@@ -788,7 +801,7 @@ type DosbridgeOwnershipTransferred struct {
 
 // FilterOwnershipTransferred is a free log retrieval operation binding the contract event 0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0.
 //
-// Solidity: e OwnershipTransferred(previousOwner indexed address, newOwner indexed address)
+// Solidity: event OwnershipTransferred(address indexed previousOwner, address indexed newOwner)
 func (_Dosbridge *DosbridgeFilterer) FilterOwnershipTransferred(opts *bind.FilterOpts, previousOwner []common.Address, newOwner []common.Address) (*DosbridgeOwnershipTransferredIterator, error) {
 
 	var previousOwnerRule []interface{}
@@ -809,7 +822,7 @@ func (_Dosbridge *DosbridgeFilterer) FilterOwnershipTransferred(opts *bind.Filte
 
 // WatchOwnershipTransferred is a free log subscription operation binding the contract event 0x8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e0.
 //
-// Solidity: e OwnershipTransferred(previousOwner indexed address, newOwner indexed address)
+// Solidity: event OwnershipTransferred(address indexed previousOwner, address indexed newOwner)
 func (_Dosbridge *DosbridgeFilterer) WatchOwnershipTransferred(opts *bind.WatchOpts, sink chan<- *DosbridgeOwnershipTransferred, previousOwner []common.Address, newOwner []common.Address) (event.Subscription, error) {
 
 	var previousOwnerRule []interface{}
@@ -929,7 +942,7 @@ type DosbridgePaymentAddressUpdated struct {
 
 // FilterPaymentAddressUpdated is a free log retrieval operation binding the contract event 0xb3d3f832f05d764f8934189cba7879e2dd829dd3f92749ec959339fd5cd8b0be.
 //
-// Solidity: e PaymentAddressUpdated(previousPayment address, newPayment address)
+// Solidity: event PaymentAddressUpdated(address previousPayment, address newPayment)
 func (_Dosbridge *DosbridgeFilterer) FilterPaymentAddressUpdated(opts *bind.FilterOpts) (*DosbridgePaymentAddressUpdatedIterator, error) {
 
 	logs, sub, err := _Dosbridge.contract.FilterLogs(opts, "PaymentAddressUpdated")
@@ -941,7 +954,7 @@ func (_Dosbridge *DosbridgeFilterer) FilterPaymentAddressUpdated(opts *bind.Filt
 
 // WatchPaymentAddressUpdated is a free log subscription operation binding the contract event 0xb3d3f832f05d764f8934189cba7879e2dd829dd3f92749ec959339fd5cd8b0be.
 //
-// Solidity: e PaymentAddressUpdated(previousPayment address, newPayment address)
+// Solidity: event PaymentAddressUpdated(address previousPayment, address newPayment)
 func (_Dosbridge *DosbridgeFilterer) WatchPaymentAddressUpdated(opts *bind.WatchOpts, sink chan<- *DosbridgePaymentAddressUpdated) (event.Subscription, error) {
 
 	logs, sub, err := _Dosbridge.contract.WatchLogs(opts, "PaymentAddressUpdated")
@@ -1052,7 +1065,7 @@ type DosbridgeProxyAddressUpdated struct {
 
 // FilterProxyAddressUpdated is a free log retrieval operation binding the contract event 0xafa5c16901af5d392255707d27b3e2687e79a18df187b9f1525e7f0fc2144f6f.
 //
-// Solidity: e ProxyAddressUpdated(previousProxy address, newProxy address)
+// Solidity: event ProxyAddressUpdated(address previousProxy, address newProxy)
 func (_Dosbridge *DosbridgeFilterer) FilterProxyAddressUpdated(opts *bind.FilterOpts) (*DosbridgeProxyAddressUpdatedIterator, error) {
 
 	logs, sub, err := _Dosbridge.contract.FilterLogs(opts, "ProxyAddressUpdated")
@@ -1064,7 +1077,7 @@ func (_Dosbridge *DosbridgeFilterer) FilterProxyAddressUpdated(opts *bind.Filter
 
 // WatchProxyAddressUpdated is a free log subscription operation binding the contract event 0xafa5c16901af5d392255707d27b3e2687e79a18df187b9f1525e7f0fc2144f6f.
 //
-// Solidity: e ProxyAddressUpdated(previousProxy address, newProxy address)
+// Solidity: event ProxyAddressUpdated(address previousProxy, address newProxy)
 func (_Dosbridge *DosbridgeFilterer) WatchProxyAddressUpdated(opts *bind.WatchOpts, sink chan<- *DosbridgeProxyAddressUpdated) (event.Subscription, error) {
 
 	logs, sub, err := _Dosbridge.contract.WatchLogs(opts, "ProxyAddressUpdated")
@@ -1175,7 +1188,7 @@ type DosbridgeRegistryAddressUpdated struct {
 
 // FilterRegistryAddressUpdated is a free log retrieval operation binding the contract event 0x6144918c239a794463afd709d2affba8e0a35b21444f4d461c9d700a2d6bb504.
 //
-// Solidity: e RegistryAddressUpdated(previousRegistry address, newRegistry address)
+// Solidity: event RegistryAddressUpdated(address previousRegistry, address newRegistry)
 func (_Dosbridge *DosbridgeFilterer) FilterRegistryAddressUpdated(opts *bind.FilterOpts) (*DosbridgeRegistryAddressUpdatedIterator, error) {
 
 	logs, sub, err := _Dosbridge.contract.FilterLogs(opts, "RegistryAddressUpdated")
@@ -1187,7 +1200,7 @@ func (_Dosbridge *DosbridgeFilterer) FilterRegistryAddressUpdated(opts *bind.Fil
 
 // WatchRegistryAddressUpdated is a free log subscription operation binding the contract event 0x6144918c239a794463afd709d2affba8e0a35b21444f4d461c9d700a2d6bb504.
 //
-// Solidity: e RegistryAddressUpdated(previousRegistry address, newRegistry address)
+// Solidity: event RegistryAddressUpdated(address previousRegistry, address newRegistry)
 func (_Dosbridge *DosbridgeFilterer) WatchRegistryAddressUpdated(opts *bind.WatchOpts, sink chan<- *DosbridgeRegistryAddressUpdated) (event.Subscription, error) {
 
 	logs, sub, err := _Dosbridge.contract.WatchLogs(opts, "RegistryAddressUpdated")
