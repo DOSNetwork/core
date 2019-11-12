@@ -21,6 +21,7 @@ import (
 func (d *DosNode) onchainLoop() {
 	defer fmt.Println("[DOS] End onchainLoop")
 	var watchdogInterval int
+	var currentBlockNumber uint64
 	randSeed, _ := new(big.Int).SetString("21888242871839275222246405745257275088548364400416034343698204186575808495617", 10)
 	inactiveNodes := make(map[string]time.Time)
 	reconn := 0
@@ -69,12 +70,7 @@ func (d *DosNode) onchainLoop() {
 			onchain.SubscribeLogPublicKeyAccepted, onchain.SubscribeCommitrevealLogStartCommitreveal}
 		d.onchainEvent, onchainErrc = d.chain.SubscribeEvent(subescriptions)
 
-		currentBlockNumber, err := d.chain.CurrentBlock()
-		if err != nil {
-			d.logger.Error(err)
-			continue
-		}
-		checkBlkNumberPeriod := 50
+		checkBlkNumberPeriod := 0
 		watchdogInterval = 15
 		watchdog := time.NewTicker(time.Duration(watchdogInterval) * time.Second)
 		reconn = 0
