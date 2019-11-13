@@ -2,7 +2,7 @@
     "NodeIP": "#REPLACE-WITH-IP",
     "NodePort": "9501",
     "ChainType": "ETH",
-    "DOSAddressBridgeAddress": "0x63DF380b49e13fc4879bb8e333Ab409375d7ffa7",
+    "DOSAddressBridgeAddress": "0xf1c72A25c3fE50c3Ab29A59527ec0E2CF1A51036",
     "BootStrapIPs": [
         "18.236.117.126",
         "18.236.199.131",
