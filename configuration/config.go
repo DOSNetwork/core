@@ -20,10 +20,9 @@ const (
 	defaultChainType = "ETH"
 	defaultPort      = "9501"
 )
-
+var path string
 // Config is the configuration for creating a DOS client instance.
 type Config struct {
-	ConfigPath              string
 	NodeIP                  string
 	NodePort                string
 	ChainType               string
@@ -66,7 +65,7 @@ func LoadConfig(path string, c interface{}) (err error) {
 
 // LoadConfig loads configuration file from path.
 func (c *Config) LoadConfig() (err error) {
-	path := os.Getenv(envConfigPath)
+	path = os.Getenv(envConfigPath)
 	if path == "" {
 		path, err = os.Getwd()
 		if err != nil {
@@ -76,13 +75,13 @@ func (c *Config) LoadConfig() (err error) {
 			path = "."
 		}
 	}
-	c.ConfigPath = path + "/config.json"
-	err = LoadConfig(c.ConfigPath, c)
+	path = path + "/config.json"
+
+	err = LoadConfig(path, c)
 	if err != nil {
 		fmt.Println("LoadConfig  err", err)
 		return
 	}
-
 	err = c.overWrite()
 
 	return
@@ -125,9 +124,7 @@ func (c *Config) overWrite() (err error) {
 
 // UpdateConfig saves configuration to a file.
 func (c *Config) UpdateConfig() (err error) {
-	if c.ConfigPath != "" {
-		configJson, _ := json.MarshalIndent(c, "", "    ")
-		err = ioutil.WriteFile(c.ConfigPath, configJson, 0644)
-	}
+	configJson, _ := json.MarshalIndent(c, "", "    ")
+	err = ioutil.WriteFile(path, configJson, 0644)
 	return
 }
