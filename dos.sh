@@ -1,5 +1,5 @@
 #!/bin/bash
-RELEASE="v1.0-beta.18"
+RELEASE="v1.0-beta.17"
 findNodeIP() {
   if [ -z "$nodeIP" ]; then
     nodeIP=$(host myip.opendns.com resolver1.opendns.com | grep "myip.opendns.com has address" | awk -F " " '{print $NF}')
@@ -21,6 +21,10 @@ startClient() {
     echo "-->Downloading dosnode from "$URL
     wget $URL
     chmod +x dosclient
+  fi
+  if [ ! -f $(pwd)/dosclient ]; then
+    echo "dosclient doesn't exist"
+    exit
   fi
   echo "2) Check if config.json includes Infura API key"
   if grep -q "#REPLACE-WITH-INFURA-APIKEY" $(pwd)/config.json; then
@@ -57,16 +61,7 @@ stop() {
 }
 
 log() {
-  #cat $(pwd)/vault/doslog.txt
-  result="$(
-    curl http://localhost:80/api/explorer/search?text= &
-    pageSize=20 &
-    pageIndex=0
-  )"
-  if [ "$?" = "7" ]; then
-    echo "fail"
-  fi
-  echo "result: "$result
+  cat $(pwd)/vault/doslog.txt
 }
 
 case "$1" in
