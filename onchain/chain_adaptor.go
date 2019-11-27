@@ -57,6 +57,7 @@ type ProxyAdapter interface {
 	RefreshSystemRandomHardLimit() (limit uint64, err error)
 	GroupPubKey(idx int) (groupPubKeys [4]*big.Int, err error)
 	IsPendingNode(id []byte) (bool, error)
+	BootStrapUrl() string
 }
 
 //NewProxyAdapter constructs a new ProxyAdapter with the given type of blockchain and contract addresses

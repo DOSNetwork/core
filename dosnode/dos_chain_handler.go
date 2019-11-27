@@ -37,28 +37,6 @@ func (d *DosNode) onchainLoop() {
 	}()
 
 	for {
-		//Connect to geth
-		for {
-			var urls = []string{}
-			reconn++
-			if reconn >= 10 {
-				d.logger.Error(errors.New("Can't connect to geth"))
-				d.End()
-				return
-			}
-			for _, url := range d.config.ChainNodePool {
-				urls = append(urls, url)
-			}
-			//TODO : Add more geth from other sources
-			t := time.Now().Add(60 * time.Second)
-			if err := d.chain.Connect(d.config.ChainNodePool, t); err != nil {
-				d.logger.Error(err)
-				time.Sleep(5 * time.Second)
-				fmt.Println("[DOS] Reconnecting to geth")
-				continue
-			}
-			break
-		}
 
 		//TODO: Check to see if it is a valid stacking node first
 		_ = d.chain.RegisterNewNode()
@@ -271,6 +249,24 @@ func (d *DosNode) onchainLoop() {
 		default:
 		}
 		fmt.Println("[DOS] Reconnect to geth")
+		//Connect to geth
+		for {
+			reconn++
+			if reconn >= 10 {
+				d.logger.Error(errors.New("Can't connect to geth"))
+				d.End()
+				return
+			}
+			//TODO : Add more geth from other sources
+			t := time.Now().Add(60 * time.Second)
+			if err := d.chain.Connect(d.config.ChainNodePool, t); err != nil {
+				d.logger.Error(err)
+				time.Sleep(5 * time.Second)
+				fmt.Println("[DOS] Reconnecting to geth")
+				continue
+			}
+			break
+		}
 	}
 }
 

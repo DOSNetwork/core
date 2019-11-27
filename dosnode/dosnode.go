@@ -3,7 +3,10 @@ package dosnode
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"math/big"
+	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -140,6 +143,11 @@ func (d *DosNode) Start() {
 		fmt.Println("[DOS] End RESTServer")
 		d.End()
 	}()
+	t := time.Now().Add(60 * time.Second)
+	if err := d.chain.Connect(d.config.ChainNodePool, t); err != nil {
+		d.logger.Error(err)
+		return
+	}
 	go func() {
 		defer wg.Done()
 		d.onchainLoop()
@@ -165,11 +173,17 @@ func (d *DosNode) Start() {
 		d.End()
 	}()
 
-	//Bootstrapping p2p network
-	fmt.Println("[DOS] Join :", d.bootStrapIPs)
 	retry, num := 0, 0
 	var err error
 	for {
+		//Bootstrap p2p network
+		ips := getBootIps(d.chain.BootStrapUrl())
+		if len(ips) != 0 {
+			d.bootStrapIPs = append(d.bootStrapIPs, ips...)
+			d.bootStrapIPs = unique(d.bootStrapIPs)
+		}
+
+		fmt.Println("[DOS] Join :", d.bootStrapIPs)
 		num, err = d.p.Join(d.bootStrapIPs)
 		if err != nil || num == 0 {
 			fmt.Println("[DOS] Join ", err, num)
@@ -183,6 +197,8 @@ func (d *DosNode) Start() {
 			retry++
 			time.Sleep(5 * time.Second)
 		} else {
+			d.config.BootStrapIPs = d.bootStrapIPs
+			d.config.UpdateConfig()
 			d.logger.Event("peersUpdate", map[string]interface{}{"numOfPeers": num})
 			break
 		}
@@ -190,4 +206,35 @@ func (d *DosNode) Start() {
 	fmt.Println("[DOS] Join : num of peer ", num)
 	wg.Wait()
 	fmt.Println("[DOS] End")
+}
+
+func getBootIps(bootStrapUrl string) []string {
+	req, err := http.NewRequest("GET", bootStrapUrl, nil)
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil
+	}
+	defer resp.Body.Close()
+	r, err := ioutil.ReadAll(resp.Body)
+
+	str := string(r)
+	strlist := strings.Split(str, ",")
+	nodeIPs := make([]string, len(strlist)-1)
+	for i := 0; i < len(strlist)-1; i++ {
+		nodeIPs[i] = strlist[i]
+	}
+	return nodeIPs
+}
+
+func unique(intSlice []string) []string {
+	keys := make(map[string]bool)
+	list := []string{}
+	for _, entry := range intSlice {
+		if _, value := keys[entry]; !value {
+			keys[entry] = true
+			list = append(list, entry)
+		}
+	}
+	return list
 }

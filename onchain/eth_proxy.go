@@ -39,6 +39,7 @@ type ethAdaptor struct {
 	bridgeAddr       common.Address
 	proxyAddr        common.Address
 	commitRevealAddr common.Address
+	bootStrapUrl     string
 	httpUrls         []string
 	wsUrls           []string
 	key              *keystore.Key
@@ -172,6 +173,13 @@ func (e *ethAdaptor) Connect(urls []string, t time.Time) (err error) {
 			continue
 		}
 
+		bootStrapUrl, err := bridge.GetBootStrapUrl(&bind.CallOpts{Context: dialCtx})
+		if err != nil {
+			e.logger.Error(errors.Errorf(": %w", err))
+			client.Close()
+			continue
+		}
+
 		p, err := dosproxy.NewDosproxy(proxyAddr, client)
 		if err != nil {
 			err = errors.Errorf("NewDosproxy failed: %w", err)
@@ -196,6 +204,9 @@ func (e *ethAdaptor) Connect(urls []string, t time.Time) (err error) {
 		auth.GasLimit = uint64(e.gasLimit)
 		auth.Context = ctx
 
+		if bootStrapUrl != "" {
+			e.bootStrapUrl = bootStrapUrl
+		}
 		e.clients = append(e.clients, client)
 		e.proxies = append(e.proxies, &dosproxy.DosproxySession{Contract: p, CallOpts: bind.CallOpts{Context: ctx}, TransactOpts: *auth})
 		e.crs = append(e.crs, &commitreveal.CommitrevealSession{Contract: cr, CallOpts: bind.CallOpts{Context: ctx}, TransactOpts: *auth})
@@ -216,6 +227,9 @@ func (e *ethAdaptor) Connect(urls []string, t time.Time) (err error) {
 	go e.ReqLoop()
 	fmt.Println("Connect :", "client :", len(e.clients), "proxy :", len(e.proxies), "cs :", len(e.crs))
 	return
+}
+func (e *ethAdaptor) BootStrapUrl() string {
+	return e.bootStrapUrl
 }
 
 // Address gets the string representation of the underlying address.
