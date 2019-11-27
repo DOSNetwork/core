@@ -24,6 +24,7 @@ import (
 const pidFile string = "./vault/dosclient.pid"
 const logFile string = "./vault/doslog.txt"
 const dosPath string = "./vault"
+const bootStrapUrl string = "https://testnet.dos.network/api/bootStrap"
 
 func init() {
 	// Check for the directory's existence and create it if it doesn't exist
@@ -99,6 +100,35 @@ func getPassword(s string) (p string) {
 	fmt.Println("")
 	return
 }
+func getBootIps() []string {
+	req, err := http.NewRequest("GET", bootStrapUrl, nil)
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil
+	}
+	defer resp.Body.Close()
+	r, err := ioutil.ReadAll(resp.Body)
+
+	str := string(r)
+	strlist := strings.Split(str, ",")
+	nodeIPs := make([]string, len(strlist)-1)
+	for i := 0; i < len(strlist)-1; i++ {
+		nodeIPs[i] = strlist[i]
+	}
+	return nodeIPs
+}
+func unique(intSlice []string) []string {
+	keys := make(map[string]bool)
+	list := []string{}
+	for _, entry := range intSlice {
+		if _, value := keys[entry]; !value {
+			keys[entry] = true
+			list = append(list, entry)
+		}
+	}
+	return list
+}
 
 func actionStart(c *cli.Context) (err error) {
 	password := ""
@@ -134,6 +164,16 @@ func actionStart(c *cli.Context) (err error) {
 	//Check if config has all information
 	if len(config.ChainNodePool) == 0 {
 		fmt.Println("Please provides geth ws address in config.json")
+		return nil
+	}
+	ips := getBootIps()
+	if len(ips) != 0 {
+		config.BootStrapIPs = append(config.BootStrapIPs, ips...)
+		config.BootStrapIPs = unique(config.BootStrapIPs)
+		config.UpdateConfig()
+	}
+	if len(config.BootStrapIPs) == 0 {
+		fmt.Println("No bootStrap IP in config.json")
 		return nil
 	}
 	hasWsAddr := false
