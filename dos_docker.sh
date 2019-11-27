@@ -1,4 +1,5 @@
 #!/bin/bash
+RELEASE="beta"
 install_docker() {
   if [ ! -x "$(command -v docker)" ]; then
     echo "Install docker"
@@ -36,23 +37,25 @@ findNodeIP() {
 }
 
 startClient() {
+  mkdir -p $(pwd)/vault
   install_docker
+  echo "1) Get dosclient from dosnetwork/dosnode:"$RELEASE
+  docker pull dosnetwork/dosnode:$RELEASE
   echo "2) Check if config.json includes Infura API key"
   if grep -q "#REPLACE-WITH-INFURA-APIKEY" $(pwd)/config.json; then
-      echo -n "Enter your infura api key [Enter]: "
-      read apikey
-      sed -i -e 's?#REPLACE-WITH-INFURA-APIKEY?'$apikey'?g' $(pwd)/config.json
+    echo -n "Enter your infura api key [Enter]: "
+    read apikey
+    sed -i -e 's?#REPLACE-WITH-INFURA-APIKEY?'$apikey'?g' $(pwd)/config.json
   fi
   echo "3) Check if config.json includes a node public IP"
   if grep -q "#REPLACE-WITH-IP" $(pwd)/config.json; then
-      findNodeIP
-      sed -i -e 's?#REPLACE-WITH-IP?'$nodeIP'?g' $(pwd)/config.json
+    findNodeIP
+    sed -i -e 's?#REPLACE-WITH-IP?'$nodeIP'?g' $(pwd)/config.json
   fi
-  echo "4) Pull dosnetwork/dosnode:beta"
-  docker pull dosnetwork/dosnode:beta
-  echo "5) Check if node keystore exists"
+  echo "4) Check if node keystore exists"
   docker run -it --mount type=bind,source=$(pwd)/vault,target=/vault \
-    dosnetwork/dosnode:beta /dosclient wallet create
+    dosnetwork/dosnode:$RELEASE /dosclient wallet create
+  echo "5) Run dosclient"
   echo -n Keystore Password [Enter]:
   read -s password
   docker run -it -d -p 7946:7946 -p 8080:8080 -p 9501:9501 \
@@ -60,11 +63,16 @@ startClient() {
     --mount type=bind,source=$(pwd),target=/config \
     --mount type=bind,source=$(pwd)/vault,target=/vault \
     -e CONFIGPATH=config -e PASSPHRASE=$password \
-    dosnetwork/dosnode:beta /dosclient start
+    dosnetwork/dosnode:$RELEASE /dosclient start
+  sleep 3
+  pgrep -x dosclient >/dev/null && echo "dosclient is running" || echo "dosclient is not running"
 }
 
 status() {
   curl http://localhost:8080/
+  if [ "$?" = "7" ]; then
+    log
+  fi
 }
 
 stop() {
