@@ -1,5 +1,5 @@
 #!/bin/bash
-RELEASE="v1.0-beta.17"
+RELEASE=$(grep VERSION config.json | awk '{print $2}'| sed -e 's/.*"\(.*\)".*/\1/')
 findNodeIP() {
   if [ -z "$nodeIP" ]; then
     nodeIP=$(host myip.opendns.com resolver1.opendns.com | grep "myip.opendns.com has address" | awk -F " " '{print $NF}')

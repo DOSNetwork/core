@@ -1,5 +1,5 @@
 #!/bin/bash
-RELEASE="beta"
+RELEASE=$(grep VERSION config.json | awk '{print $2}'| sed -e 's/.*"\(.*\)".*/\1/')
 install_docker() {
   if [ ! -x "$(command -v docker)" ]; then
     echo "Install docker"

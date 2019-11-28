@@ -1,4 +1,5 @@
 {
+    "VERSION": "v1.0-beta.17",
     "NodeIP": "#REPLACE-WITH-IP",
     "NodePort": "9501",
     "ChainType": "ETH",
