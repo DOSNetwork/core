@@ -1,15 +1,10 @@
 {
-    "VERSION": "v1.0-beta.17",
+    "VERSION": "v1.0-beta.19",
     "NodeIP": "#REPLACE-WITH-IP",
     "NodePort": "9501",
     "ChainType": "ETH",
-    "DOSAddressBridgeAddress": "0xf1c72A25c3fE50c3Ab29A59527ec0E2CF1A51036",
+    "DOSAddressBridgeAddress": "0x1729C59ef3D52c76Abbeff4de59B954DAF4E6815",
     "BootStrapIPs": [
-        "18.236.117.126",
-        "18.236.199.131",
-        "18.236.80.51",
-        "18.237.0.120",
-        "18.237.179.193"
     ],
     "ChainNodePool": [
         "wss://rinkeby.infura.io/ws/v3/#REPLACE-WITH-INFURA-APIKEY"
