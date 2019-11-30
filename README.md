@@ -14,7 +14,7 @@
 - .
 
 ##### Verified and recommended installation environment
-- Ubuntu 16.04 x64 LTS or higher 
+- Ubuntu 18.04 x64 LTS or higher 
 - An IPv4 address
   - Run `$ dig +short myip.opendns.com @resolver1.opendns.com`
   - Or get it from cloud server providers. Most vps / cloud server 
@@ -22,7 +22,7 @@
   - **udp** port `7946`
   - **tcp** port `7946`,`9501`
 - It's recommended to generate ssh login key pairs and setup public key authentication instead of using password login for server security and funds safety:
-  - Learn [how to](https://www.digitalocean.com/community/tutorials/how-to-set-up-ssh-keys-on-ubuntu-1604) setup SSH public key authentication on Ubuntu 16.04 and disable password logins.
+  - Learn [how to](https://www.digitalocean.com/community/tutorials/how-to-set-up-ssh-keys-on-ubuntu-1604) setup SSH public key authentication on Ubuntu 18.04 and disable password logins.
 
 
 ##### Acquire testnet ether and testnet tokens
@@ -36,13 +36,16 @@
 ### Run client node using Docker
 - Install:
     ```sh
-    $ wget https://github.com/DOSNetwork/core/archive/Beta1.3.tar.gz
-    $ tar -C . -xzf Beta1.3.tar.gz
-    $ cd core-Beta1.3/
-    $ mkdir vault
+    $ wget https://github.com/DOSNetwork/core/releases/download/v1.0-beta.19/config.json
+    $ wget https://github.com/DOSNetwork/core/releases/download/v1.0-beta.19/dos_docker.sh
+    $ sudo chmod +x dos_docker.sh
     ```
-- (optional) Copy existing keystore to ./vault/
-- Start:
+- Use a existing keystore (optional):
+    ```sh
+    $ mkdir vault
+    $ cp oldKeyStore vault/
+    ```
+- Start:(need to provide infura API key in this step)
     ```sh
     $ ./dos_docker.sh start
     ```
@@ -62,12 +65,15 @@
 ## Run standalone binary
 - Install:
     ```sh
-    $ wget https://github.com/DOSNetwork/core/archive/Beta1.3.tar.gz
-    $ tar -C . -xzf Beta1.3.tar.gz
-    $ cd core-Beta1.3/
-    $ mkdir vault
+    $ wget https://github.com/DOSNetwork/core/releases/download/v1.0-beta.19/config.json
+    $ wget https://github.com/DOSNetwork/core/releases/download/v1.0-beta.19/dos.sh
+    $ sudo chmod +x dos.sh
     ```
-- (optional) Copy existing keystore to ./vault/:
+- Use a existing keystore (optional):
+    ```sh
+    $ mkdir vault
+    $ cp oldKeyStore vault/
+    ```
 - Start:
     ```sh
     $ ./dos.sh start
@@ -88,9 +94,9 @@
 ## Building from source
 - [Install](https://golang.org/doc/install) Go and setup golang workingspace like below:
     ```sh
-    $ cd /usr/local
-    $ wget https://dl.google.com/go/go1.12.6.linux-amd64.tar.gz
-    $ tar -C /usr/local -xzf go1.12.6.linux-amd64.tar.gz
+    $ sudo apt-get install golang 
+    $ sudo apt-get install go-dep 
+    $ sudo apt-get install build-essential
     ```
     
 - Open `~/.bashrc` and set `$GOPATH` and `$PATH` environmental variables:
@@ -100,28 +106,23 @@
       export PATH=$PATH:/usr/local/go/bin:$GOPATH/bin
     $ source ~/.bashrc
     ```
-- Install [dep](https://golang.github.io/dep/docs/installation.html#binary-installation) to manage package dependencies.
 
 - Download source code:
     ```sh
     $ mkdir -p $GOPATH/src/github.com/DOSNetwork
     $ cd $GOPATH/src/github.com/DOSNetwork && git clone https://github.com/DOSNetwork/core.git
     $ cd core
+    $ git checkout v1.0-beta.19
     ```
 
-- Install `build-essential` if not already done
-    ```sh
-    $ sudo apt-get install build-essential
-    ```
-- Install `go-dep` if not already done
-    ```sh
-    $ cd $GOPATH
-    $ mkdir -p bin
-    $ curl https://raw.githubusercontent.com/golang/dep/master/install.sh | sh
-    ```    
 - Build:
   - `$ make vendor` - to prepare dependencies for building 
   - `$ make` - to build release version client
+
+- Run:
+    ```sh
+    $ ./dos.sh start
+    ```
 
 - Dev tips:
   - `$ go fmt ./...` to reformat go source code.
