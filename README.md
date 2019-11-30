@@ -36,8 +36,8 @@
 ### Run client node using Docker
 - Install:
     ```sh
-    $ wget https://github.com/DOSNetwork/core/releases/download/v1.0-beta.19/config.json
-    $ wget https://github.com/DOSNetwork/core/releases/download/v1.0-beta.19/dos_docker.sh
+    $ wget https://github.com/DOSNetwork/core/releases/download/v1.0-beta.20/config.json
+    $ wget https://github.com/DOSNetwork/core/releases/download/v1.0-beta.20/dos_docker.sh
     $ sudo chmod +x dos_docker.sh
     ```
 - Use a existing keystore (optional):
@@ -65,8 +65,8 @@
 ## Run standalone binary
 - Install:
     ```sh
-    $ wget https://github.com/DOSNetwork/core/releases/download/v1.0-beta.19/config.json
-    $ wget https://github.com/DOSNetwork/core/releases/download/v1.0-beta.19/dos.sh
+    $ wget https://github.com/DOSNetwork/core/releases/download/v1.0-beta.20/config.json
+    $ wget https://github.com/DOSNetwork/core/releases/download/v1.0-beta.20/dos.sh
     $ sudo chmod +x dos.sh
     ```
 - Use a existing keystore (optional):
@@ -112,7 +112,7 @@
     $ mkdir -p $GOPATH/src/github.com/DOSNetwork
     $ cd $GOPATH/src/github.com/DOSNetwork && git clone https://github.com/DOSNetwork/core.git
     $ cd core
-    $ git checkout v1.0-beta.19
+    $ git checkout v1.0-beta.20
     ```
 
 - Build:
