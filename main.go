@@ -150,15 +150,15 @@ func actionStart(c *cli.Context) (err error) {
 		fmt.Println("Please provides at least one geth ws address in config.json")
 		return nil
 	}
-	/*
-		fErr, err := os.OpenFile(logFile, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0666)
-		if err != nil {
-			fmt.Println("OpenLogFile err ", err)
-			return err
-		}
-	*/
-	//syscall.Dup2(int(fErr.Fd()), 1) /* -- stdout */
-	//syscall.Dup2(int(fErr.Fd()), 2) /* -- stderr */
+
+	fErr, err := os.OpenFile(logFile, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0666)
+	if err != nil {
+		fmt.Println("OpenLogFile err ", err)
+		return err
+	}
+
+	syscall.Dup2(int(fErr.Fd()), 1) /* -- stdout */
+	syscall.Dup2(int(fErr.Fd()), 2) /* -- stderr */
 
 	dosclient, err := dosnode.NewDosNode(key, config)
 	if err != nil {
