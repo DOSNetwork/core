@@ -33,35 +33,6 @@
 ##### Acquire Infura API key
 - [Acquire Infura API key](https://ethereumico.io/knowledge-base/infura-api-key-guide/)
 
-### Run client node using Docker
-- Install:
-    ```sh
-    $ wget https://github.com/DOSNetwork/core/releases/download/v1.0-beta.20/config.json
-    $ wget https://github.com/DOSNetwork/core/releases/download/v1.0-beta.20/dos_docker.sh
-    $ sudo chmod +x dos_docker.sh
-    ```
-- Use a existing keystore (optional):
-    ```sh
-    $ mkdir vault
-    $ cp oldKeyStore vault/
-    ```
-- Start:(need to provide infura API key in this step)
-    ```sh
-    $ ./dos_docker.sh start
-    ```
-- Check client status :
-    ```sh
-    $ ./vps_docker.sh status
-    ```
-- Stop client :
-    ```sh
-    $ ./vps_docker.sh stop
-    ```
-- Debuging an issue :
-    ```sh
-    $ ./dos_docker.sh log
-    ```
-
 ## Run standalone binary
 - Install:
     ```sh
