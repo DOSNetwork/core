@@ -1,9 +1,9 @@
 {
-    "VERSION": "v1.0-beta.20",
+    "VERSION": "v1.0-beta.21",
     "NodeIP": "#REPLACE-WITH-IP",
     "NodePort": "9501",
     "ChainType": "ETH",
-    "DOSAddressBridgeAddress": "0x01f85C2E59725a80F950d99fBdEdB40327269173",
+    "DOSAddressBridgeAddress": "0x5d4d5B3C5Cfa1683b4C1472E2bcba371700296dd",
     "BootStrapIPs": [
     ],
     "ChainNodePool": [

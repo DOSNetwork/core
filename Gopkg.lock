@@ -2,14 +2,6 @@
 
 
 [[projects]]
-  digest = "1:80afadfd05cefd407063c0809d333005408a97fbc9e36d54ae737be45278b0cd"
-  name = "github.com/alecthomas/gometalinter"
-  packages = ["."]
-  pruneopts = ""
-  revision = "df395bfa67c5d0630d936c0044cf07ff05086655"
-  version = "v3.0.0"
-
-[[projects]]
   branch = "master"
   digest = "1:86ea497979270399c5e544bbdc6f3a846078cd7c6d9be40fd0012ab54fee4052"
   name = "github.com/alecthomas/units"
@@ -197,17 +189,6 @@
   pruneopts = ""
   revision = "2fee6af1a9795aafbe0253a0cfbdf668e1fb8a9a"
   version = "v1.8.0"
-
-[[projects]]
-  branch = "travis-1.9"
-  digest = "1:d45f5fe0f8bf6cd0bc592502e7e8ec647d769e55387fe326eb624d67282a7d15"
-  name = "github.com/golang/lint"
-  packages = [
-    ".",
-    "golint",
-  ]
-  pruneopts = ""
-  revision = "883fe33ffc4344bad1ecd881f61afd5ec5d80e0a"
 
 [[projects]]
   digest = "1:3dd078fda7500c341bc26cfbc6c6a34614f295a2457149fc1045cab767cbcf18"
