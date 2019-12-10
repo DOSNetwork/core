@@ -2,8 +2,49 @@ package utils
 
 import (
 	"context"
+	"fmt"
+	"os/exec"
 	"sync"
 )
+
+func AllowConnection(ip, port string) error {
+	args := []string{"allow", "from", fmt.Sprintf("%s", ip), "to", "any", "port", port}
+	out, err := exec.Command("ufw", args...).Output()
+	if err != nil {
+		fmt.Println(fmt.Sprint(err))
+		return err
+	}
+	fmt.Printf("ufw: %s\n", out)
+	return nil
+}
+
+func ResetConnList() error {
+	out, err := exec.Command("ufw", "--force", "reset").Output()
+	if err != nil {
+		fmt.Println(fmt.Sprint(err))
+		return err
+	}
+	fmt.Printf("ufw: %s\n", out)
+	out, err = exec.Command("ufw", "allow", "22/tcp").Output()
+	if err != nil {
+		fmt.Println(fmt.Sprint(err))
+		return err
+	}
+	fmt.Printf("ufw: %s\n", out)
+	out, err = exec.Command("ufw", "allow", "7946").Output()
+	if err != nil {
+		fmt.Println(fmt.Sprint(err))
+		return err
+	}
+	fmt.Printf("ufw: %s\n", out)
+	out, err = exec.Command("ufw", "--force", "enable").Output()
+	if err != nil {
+		fmt.Println(fmt.Sprint(err))
+		return err
+	}
+	fmt.Printf("ufw: %s\n", out)
+	return nil
+}
 
 func ReportError(ctx context.Context, errc chan error, err error) {
 	select {
