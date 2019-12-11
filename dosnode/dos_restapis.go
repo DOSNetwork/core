@@ -44,6 +44,7 @@ func (d *DosNode) status(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	html := "=================================================" + "\n|"
+	html = html + "Version         : " + d.config.VERSION
 	html = html + "StartTime         : " + d.startTime.Format("2006-01-02T15:04:05.999999-07:00") + "\n|"
 	html = html + "Address           : " + fmt.Sprintf("%x", d.p.GetID()) + "\n|"
 	html = html + "IP                : " + fmt.Sprintf("%s", d.p.GetIP()) + "\n|"

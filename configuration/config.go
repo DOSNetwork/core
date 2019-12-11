@@ -20,9 +20,12 @@ const (
 	defaultChainType = "ETH"
 	defaultPort      = "9501"
 )
+
 var path string
+
 // Config is the configuration for creating a DOS client instance.
 type Config struct {
+	VERSION                 string
 	NodeIP                  string
 	NodePort                string
 	ChainType               string

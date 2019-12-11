@@ -11,6 +11,11 @@ ETH_CONTRACTS := onchain/eth/contracts
 BOOT_CREDENTIAL := testAccounts/bootCredential
 UNAME_S := $(shell uname -s)
 
+VERSION=`git describe --tags`
+BUILD=`date +%FT%T%z`
+
+# Setup the -ldflags option for go build here, interpolate the variable values
+LDFLAGS=-ldflags "-w -s -X main.Version=${VERSION} -X main.Build=${BUILD}"
 
 .PHONY: build
 build: vendor client
@@ -30,7 +35,7 @@ devClient: gen
 .PHONY: client
 # Build a prod/release version client node
 client:
-	go build -o dosclient
+	go build ${LDFLAGS} -o dosclient
 
 .PHONY: client-docker
 client-docker:
@@ -39,7 +44,7 @@ client-docker:
 
 .PHONY: install
 install: vendor client
-	go install
+	go install ${LDFLAGS}
 
 
 .PHONY: updateSubmodule

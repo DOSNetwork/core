@@ -25,6 +25,11 @@ const pidFile string = "./vault/dosclient.pid"
 const logFile string = "./vault/doslog.txt"
 const dosPath string = "./vault"
 
+var (
+	Version string
+	Build   string
+)
+
 func init() {
 	// Check for the directory's existence and create it if it doesn't exist
 	if _, err := os.Stat(dosPath); os.IsNotExist(err) {
@@ -156,7 +161,10 @@ func actionStart(c *cli.Context) (err error) {
 		fmt.Println("OpenLogFile err ", err)
 		return err
 	}
-
+	if config.VERSION != Version {
+		fmt.Println("config version ", config.VERSION, " not match with binary version ", Version)
+		return err
+	}
 	syscall.Dup2(int(fErr.Fd()), 1) /* -- stdout */
 	syscall.Dup2(int(fErr.Fd()), 2) /* -- stderr */
 
@@ -323,6 +331,12 @@ func actionEnableGuardian(c *cli.Context) error {
 	return err
 }
 
+func actionShowVersion(c *cli.Context) error {
+	fmt.Println("Version: ", Version)
+	fmt.Println("Build Time: ", Build)
+	return nil
+}
+
 // main
 func main() {
 
@@ -332,6 +346,11 @@ func main() {
 	app.Usage = "CLI for dos client"
 
 	app.Commands = []cli.Command{
+		{
+			Name:   "version",
+			Usage:  "show version",
+			Action: actionShowVersion,
+		},
 		{
 			Name:   "start",
 			Usage:  "Start a dos client daemon",
