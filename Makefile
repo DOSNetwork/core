@@ -15,6 +15,7 @@ VERSION=`git describe --tags`
 BUILD=`date +%FT%T%z`
 
 # Setup the -ldflags option for go build here, interpolate the variable values
+LDFLAGS_STATIC=-ldflags "-linkmode external -extldflags -static -w -s -X main.Version=${VERSION} -X main.Build=${BUILD}"
 LDFLAGS=-ldflags "-w -s -X main.Version=${VERSION} -X main.Build=${BUILD}"
 
 .PHONY: build
@@ -29,13 +30,16 @@ vendor:
 .PHONY: devClient
 # Build a development version client node
 devClient: gen
-	go build -o client.dev
+	go build -a -o client.dev
 
 
 .PHONY: client
 # Build a prod/release version client node
 client:
 	go build ${LDFLAGS} -o dosclient
+
+client-static:
+	go build ${LDFLAGS_STATIC} -o dosclient
 
 .PHONY: client-docker
 client-docker:

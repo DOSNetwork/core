@@ -72,8 +72,8 @@ func NewEthAdaptor(key *keystore.Key, bridgeAddr string, l logger) (adaptor *eth
 	adaptor.logger = l
 	adaptor.reqQueue = make(chan *request)
 	// Use SuggestGasPrice and EstimateGas instead of hard coding
-	//adaptor.gasPrice = 10000000000
-	//adaptor.gasLimit = 6000000
+	adaptor.gasPrice = 3000000000
+	adaptor.gasLimit = 6000000
 	adaptor.connTimeout = 60 * time.Second
 	adaptor.getTimeout = 60 * time.Second
 	adaptor.setTimeout = 60 * time.Second
