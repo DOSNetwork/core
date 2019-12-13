@@ -409,6 +409,11 @@ func (d *DosNode) handleGroupFormation(currentBlockNumber uint64) {
 		d.logger.Error(err)
 		return
 	}
+	bootStarpThreshold, err := d.chain.BootstrapStartThreshold()
+	if err != nil {
+		d.logger.Error(err)
+		return
+	}
 	expiredGroupSize, err := d.chain.GetExpiredWorkingGroupSize()
 	if err != nil {
 		d.logger.Error(err)
@@ -430,7 +435,7 @@ func (d *DosNode) handleGroupFormation(currentBlockNumber uint64) {
 		d.chain.SignalGroupFormation()
 		return
 	}
-	if workingGroup == 0 {
+	if workingGroup == 0 && pendingNodeSize >= bootStarpThreshold {
 		d.chain.SignalGroupFormation()
 		return
 	}
