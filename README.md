@@ -36,8 +36,8 @@
 ## Run standalone binary
 - Install:
     ```sh
-    $ wget https://github.com/DOSNetwork/core/releases/download/v1.0-beta.20/config.json
-    $ wget https://github.com/DOSNetwork/core/releases/download/v1.0-beta.20/dos.sh
+    $ wget https://github.com/DOSNetwork/core/releases/download/v1.0-beta.23/config.json
+    $ wget https://github.com/DOSNetwork/core/releases/download/v1.0-beta.23/dos.sh
     $ sudo chmod +x dos.sh
     ```
 - Use a existing keystore (optional):
