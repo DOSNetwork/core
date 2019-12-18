@@ -161,10 +161,10 @@ func actionStart(c *cli.Context) (err error) {
 		fmt.Println("OpenLogFile err ", err)
 		return err
 	}
-	if config.VERSION != Version {
-		fmt.Println("config version ", config.VERSION, " not match with binary version ", Version)
-		return err
-	}
+	//if config.VERSION != Version {
+	//	fmt.Println("config version ", config.VERSION, " not match with binary version ", Version)
+	//	return err
+	//}
 	syscall.Dup2(int(fErr.Fd()), 1) /* -- stdout */
 	syscall.Dup2(int(fErr.Fd()), 2) /* -- stderr */
 

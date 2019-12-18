@@ -1,6 +1,7 @@
 package log
 
 import (
+	"bufio"
 	"encoding/hex"
 	"fmt"
 	"io/ioutil"
@@ -8,6 +9,8 @@ import (
 	"time"
 
 	"github.com/bshuster-repo/logrus-logstash-hook"
+	rotatelogs "github.com/lestrrat-go/file-rotatelogs"
+	"github.com/rifflock/lfshook"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/sha3"
 )
@@ -44,6 +47,23 @@ func Init(id []byte) {
 		}
 		logrus.AddHook(hook)
 	}
+
+	path := "/vault/doslog.txt"
+	writer, _ := rotatelogs.New(
+		path+".%Y%m%d%H%M",
+		rotatelogs.WithLinkName(path),
+		rotatelogs.WithMaxAge(time.Duration(86400)*time.Second),
+		rotatelogs.WithRotationTime(time.Duration(604800)*time.Second),
+	)
+
+	logrus.AddHook(lfshook.NewHook(
+		lfshook.WriterMap{
+			logrus.InfoLevel:  writer,
+			logrus.ErrorLevel: writer,
+		},
+		&logrus.JSONFormatter{},
+	))
+	//}
 	root.entry = logrus.WithFields(logrus.Fields{
 		"appSession": appSession,
 		"appName":    appName,
@@ -51,7 +71,14 @@ func Init(id []byte) {
 		"nodeID":     nodId,
 	})
 }
-
+func setNull() {
+	src, err := os.OpenFile(os.DevNull, os.O_APPEND|os.O_WRONLY, os.ModeAppend)
+	if err != nil {
+		fmt.Println("err", err)
+	}
+	writer := bufio.NewWriter(src)
+	logrus.SetOutput(writer)
+}
 func byteTohex(a []byte) string {
 	unchecksummed := hex.EncodeToString(a[:])
 	sha := sha3.NewLegacyKeccak256()

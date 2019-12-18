@@ -424,11 +424,13 @@ func (d *DosNode) handleGroupFormation(currentBlockNumber uint64) {
 		d.logger.Error(err)
 		return
 	}
+	fmt.Println("pendingNodeSize ", pendingNodeSize, " expiredGroupSize ", expiredGroupSize, " groupingThreshold ", groupingThreshold)
+	fmt.Println("workingGroup ", workingGroup, " bootStarpThreshold ", bootStarpThreshold)
 	if pendingNodeSize < (groupSize * groupingThreshold / 100) {
 		if expiredGroupSize != 0 {
 			d.chain.SignalGroupFormation()
+			return
 		}
-		return
 	}
 
 	if expiredGroupSize >= groupToPick {
