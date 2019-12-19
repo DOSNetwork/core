@@ -135,7 +135,7 @@ func genUserRandom(ctx context.Context, submitterc chan []byte, requestId []byte
 			}
 			defer logger.TimeTrack(time.Now(), "GenUserRandom",
 				map[string]interface{}{"GroupID": ctx.Value(ctxKey("GroupID")), "RequestID": ctx.Value(ctxKey("RequestID"))})
-			fmt.Println("GenUserRandom ")
+			logger.Info("GenUserRandom ")
 
 			// signed message: concat(requestId, lastSystemRandom, userSeed, submitter address)
 			random := append(requestId, lastSysRand...)
@@ -167,7 +167,7 @@ func genSysRandom(ctx context.Context, submitterc chan []byte, lastSysRand []byt
 			defer logger.TimeTrack(time.Now(), "GenSysRandom",
 				map[string]interface{}{"GroupID": ctx.Value(ctxKey("GroupID")),
 					"RequestID": ctx.Value(ctxKey("RequestID"))})
-			fmt.Println("genSysRandom ")
+			logger.Info("genSysRandom ")
 			// signed message: concat(lastSystemRandom, submitter address)
 			paddedLastSysRand := padOrTrim(lastSysRand, randNumberSize)
 			random := append(paddedLastSysRand, submitter...)
@@ -320,14 +320,13 @@ func dispatchSign(ctx context.Context, submitterc chan []byte, signc chan *vss.S
 			if r := bytes.Compare(p.GetID(), submitter); r != 0 {
 				logger.Event("dispatchSignToSubmitter", map[string]interface{}{"GroupID": ctx.Value(ctxKey("GroupID")), "RequestID": ctx.Value(ctxKey("RequestID"))})
 				//Send signature to submitter
-				fmt.Println("dispatchSign to ", fmt.Sprintf("%x", submitter))
+				logger.Info(fmt.Sprintf("dispatchSign to  %x", submitter))
 				select {
 				case <-ctx.Done():
 				case sign := <-signc:
 					logger.Event("dispatchSendToSubmitter", map[string]interface{}{"GroupID": ctx.Value(ctxKey("GroupID")), "RequestID": ctx.Value(ctxKey("RequestID"))})
 					if _, err := p.Request(ctx, submitter, sign); err != nil {
 						logger.Error(err)
-						fmt.Println("dispatchSign err ", err)
 					}
 				}
 				close(out)
@@ -376,7 +375,7 @@ func recoverSign(ctx context.Context, signc chan *vss.Signature, suite suites.Su
 				}
 				logger.Event("recoverSign", map[string]interface{}{"GroupID": ctx.Value(ctxKey("GroupID")), "RequestID": ctx.Value(ctxKey("RequestID"))})
 
-				fmt.Println("recoverSign ", len(signShares))
+				logger.Info(fmt.Sprintf("recoverSign %d", len(signShares)))
 				if len(signShares) == 0 {
 					defer logger.TimeTrack(time.Now(), "RecoverSign", map[string]interface{}{"GroupID": ctx.Value(ctxKey("GroupID")), "RequestID": ctx.Value(ctxKey("RequestID"))})
 				}
@@ -397,7 +396,7 @@ func recoverSign(ctx context.Context, signc chan *vss.Signature, suite suites.Su
 						continue
 					}
 					x, y := sign.ToBigInt()
-					fmt.Println("Verify success signature ", x.String(), y.String())
+					logger.Info(fmt.Sprintf("Verify success signature %s %s", x.String(), y.String()))
 
 					//Contract will append sender address to content to verify if it is a right submitter
 					t := len(sign.Content) - addrLen

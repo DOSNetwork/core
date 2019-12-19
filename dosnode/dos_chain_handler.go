@@ -19,7 +19,7 @@ import (
 )
 
 func (d *DosNode) onchainLoop() {
-	defer fmt.Println("[DOS] End onchainLoop")
+	defer d.logger.Info("[DOS] End onchainLoop")
 	var watchdogInterval int
 	var currentBlockNumber uint64
 	randSeed, _ := new(big.Int).SetString("21888242871839275222246405745257275088548364400416034343698204186575808495617", 10)
@@ -56,12 +56,12 @@ func (d *DosNode) onchainLoop() {
 		for {
 			select {
 			case <-d.ctx.Done():
-				fmt.Println("[DOS] ctx.Done")
+				d.logger.Info("[DOS] ctx.Done")
 				d.chain.DisconnectAll()
 				break L
 			case event, ok := <-membersEvent:
 				if !ok {
-					fmt.Println("[DOS] End membersEvent")
+					d.logger.Info("[DOS] End membersEvent")
 					d.End()
 					continue
 				}
@@ -125,7 +125,7 @@ func (d *DosNode) onchainLoop() {
 
 			case err, ok := <-onchainErrc:
 				if !ok {
-					fmt.Println("[DOS] End onchainErrc")
+					d.logger.Info("[DOS] End onchainErrc")
 					break L
 				}
 				var oError *onchain.OnchainError
@@ -135,7 +135,7 @@ func (d *DosNode) onchainLoop() {
 				d.logger.Error(err)
 			case event, ok := <-d.onchainEvent:
 				if !ok {
-					fmt.Println("[DOS] End onchainEvent")
+					d.logger.Info("[DOS] End onchainEvent")
 					break L
 				}
 				switch content := event.(type) {
@@ -226,29 +226,29 @@ func (d *DosNode) onchainLoop() {
 						"StartBlock": content.StartBlock.String(),
 					}
 					d.logger.Event("StartCR", f)
-					fmt.Println("startBlock ", content.StartBlock.String(), " commitDur ", content.CommitDuration.String(), "revealDur", content.RevealDuration.String())
+					d.logger.Info(fmt.Sprintf("startBlock %s commitDur %s revealDur %s", content.StartBlock.String(), content.CommitDuration.String(), content.RevealDuration.String()))
 					go d.handleCR(content, randSeed)
 				}
 			}
 		}
-		fmt.Println("[DOS] Rest onchainLoop")
+		d.logger.Info("[DOS] Rest onchainLoop")
 		watchdog.Stop()
 		//Drain the events out of the channel
 		for _ = range d.onchainEvent {
 		}
-		fmt.Println("[DOS] End Drain onchainEvent")
+		d.logger.Info("[DOS] End Drain onchainEvent")
 
 		for err = range onchainErrc {
 			fmt.Print(fmt.Errorf("[Dos] Drain onchainErrc %+v \n", err))
 		}
-		fmt.Println("[DOS] End Drain onchainErrc")
+		d.logger.Info("[DOS] End Drain onchainErrc")
 		d.chain.DisconnectAll()
 		select {
 		case <-d.ctx.Done():
 			return
 		default:
 		}
-		fmt.Println("[DOS] Reconnect to geth")
+		d.logger.Info("[DOS] Reconnect to geth")
 		//Connect to geth
 		for {
 			reconn++
@@ -262,7 +262,7 @@ func (d *DosNode) onchainLoop() {
 			if err := d.chain.Connect(d.config.ChainNodePool, t); err != nil {
 				d.logger.Error(err)
 				time.Sleep(5 * time.Second)
-				fmt.Println("[DOS] Reconnecting to geth")
+				d.logger.Info("[DOS] Reconnecting to geth")
 				continue
 			}
 			break
@@ -281,10 +281,10 @@ func (d *DosNode) handleGrouping(participants [][]byte, groupID string) {
 	if !isMember {
 		return
 	}
-	fmt.Println("[DOS] Grouping start")
+	d.logger.Info("[DOS] Grouping start")
 	d.logger.Event("GroupingStart", map[string]interface{}{"GroupID": groupID, "Topic": "Grouping"})
 	defer d.logger.TimeTrack(time.Now(), "GroupingDone", map[string]interface{}{"GroupID": groupID, "Topic": "Grouping"})
-	defer fmt.Println("[DOS] Grouping Done !!!!! ", groupID)
+	defer d.logger.Info(fmt.Sprintf("Grouping Done %x", groupID))
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(10*15*time.Second))
 	defer cancel()
@@ -360,14 +360,14 @@ func (d *DosNode) handleCR(cr *onchain.LogStartCommitReveal, randSeed *big.Int) 
 	}
 
 	time.Sleep(time.Duration(waitCommit*15) * time.Second)
-	fmt.Println("[DOS] Commit", *hash)
+	d.logger.Info("[DOS] Commit")
 	d.logger.Event("Commit", map[string]interface{}{"CID": fmt.Sprintf("%x", cid)})
 	if err := d.chain.Commit(cid, *hash); err != nil {
 		d.logger.Error(err)
 	}
 	<-time.After(time.Duration(waitReveal*15) * time.Second)
 
-	fmt.Println("[DOS] Reveal", fmt.Sprintf("%x", sec))
+	d.logger.Info("[DOS] Reveal")
 	d.logger.Event("Reveal", map[string]interface{}{"CID": fmt.Sprintf("%x", cid)})
 	if err := d.chain.Reveal(cid, sec); err != nil {
 		d.logger.Error(err)
@@ -424,8 +424,7 @@ func (d *DosNode) handleGroupFormation(currentBlockNumber uint64) {
 		d.logger.Error(err)
 		return
 	}
-	fmt.Println("pendingNodeSize ", pendingNodeSize, " expiredGroupSize ", expiredGroupSize, " groupingThreshold ", groupingThreshold)
-	fmt.Println("workingGroup ", workingGroup, " bootStarpThreshold ", bootStarpThreshold)
+
 	if pendingNodeSize < (groupSize * groupingThreshold / 100) {
 		if expiredGroupSize != 0 {
 			d.chain.SignalGroupFormation()

@@ -2,7 +2,6 @@ package dkg
 
 import (
 	"context"
-	"fmt"
 	"math/big"
 	"sync"
 	"time"
@@ -61,8 +60,6 @@ func handlePeerMsg(sessionMap map[string][]interface{}, sessionReq map[string]re
 			pubkey, ok := p.(*PublicKey)
 			if ok {
 				if pubkey.Index == pubkeyFromPeer.Index {
-					fmt.Println(sessionID, " pubkey.Index == pubkeyFromPeer.Index", pubkey.Index)
-
 					return
 				}
 			}
@@ -76,7 +73,6 @@ func handlePeerMsg(sessionMap map[string][]interface{}, sessionReq map[string]re
 			d, ok := dd.(*Deal)
 			if ok {
 				if d.Index == dealFromPeer.Index {
-					fmt.Println(sessionID, " dd.Index == dealFromPeer.Index", d.Index)
 					return
 				}
 			}
@@ -84,22 +80,16 @@ func handlePeerMsg(sessionMap map[string][]interface{}, sessionReq map[string]re
 	default:
 	}
 	sessionMap[sessionID] = append(sessionMap[sessionID], content)
-
-	//if sessionMap[sessionID] != nil {
-	fmt.Println(sessionID, " sessionMap len ", len(sessionMap[sessionID]))
 	if len(sessionMap[sessionID]) == sessionReq[sessionID].numOfResps {
-		//go func(req request, m []interface{}) {
 		select {
 		case <-sessionReq[sessionID].ctx.Done():
 		case sessionReq[sessionID].reply <- sessionMap[sessionID]:
 		}
 		close(sessionReq[sessionID].reply)
-		//}(sessionReq[sessionID], sessionMap[sessionID])
 
 		delete(sessionMap, sessionID)
 		delete(sessionReq, sessionID)
 	}
-	//}
 }
 
 func handleRequest(sessionMap map[string][]interface{}, sessionReq map[string]request, req request) {
@@ -118,7 +108,7 @@ func handleRequest(sessionMap map[string][]interface{}, sessionReq map[string]re
 	}
 }
 func (d *pdkg) Loop() {
-	defer fmt.Println("[DKG] End Loop")
+	defer d.logger.Info("End Loop")
 	peersToBuf, _ := d.p.SubscribeMsg(400, PublicKey{}, Deal{}, Responses{})
 	sessionPubKeys := make(map[string][]interface{})
 	sessionDeals := make(map[string][]interface{})
@@ -130,7 +120,7 @@ func (d *pdkg) Loop() {
 		select {
 		case msg, ok := <-peersToBuf:
 			if !ok {
-				fmt.Println("[DKG] End peersToBuf")
+				d.logger.Info("End peersToBuf")
 				return
 			}
 			switch content := msg.Msg.Message.(type) {
@@ -141,7 +131,6 @@ func (d *pdkg) Loop() {
 					//	continue
 				}
 				handlePeerMsg(sessionPubKeys, sessionReqPubs, d.p, content.SessionId, content)
-				fmt.Println("pkdg :PublicKey nonce", msg.RequestNonce, " GID ", content.SessionId)
 			case *Deal:
 				err := d.p.Reply(context.Background(), msg.Sender, msg.RequestNonce, content)
 				if err != nil {
@@ -149,14 +138,11 @@ func (d *pdkg) Loop() {
 					//	continue
 				}
 				handlePeerMsg(sessionDeals, sessionReqDeals, d.p, content.SessionId, content)
-				fmt.Println("pkdg :Deal nonce", msg.RequestNonce, " GID ", content.SessionId)
 			case *Responses:
 				err := d.p.Reply(context.Background(), msg.Sender, msg.RequestNonce, content)
 				if err != nil {
 					d.logger.Error(&DKGError{err: errors.Errorf("Reply Responses failed for GID %s : %w", content.SessionId, err)})
-					//	continue
 				}
-				fmt.Println("pkdg :Responses nonce", msg.RequestNonce, " GID ", content.SessionId, len(content.Response))
 
 				resps := content.Response
 				for _, resp := range resps {
@@ -178,8 +164,7 @@ func (d *pdkg) Loop() {
 					handleRequest(sessionResps, sessionReResps, r)
 				}
 			} else {
-				fmt.Println("handleRequest cast error")
-
+				d.logger.Error(&DKGError{err: errors.Errorf("handleRequest cast error")})
 			}
 		}
 	}

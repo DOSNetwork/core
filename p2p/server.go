@@ -26,6 +26,7 @@ const (
 )
 
 type logger interface {
+	Info(msg string)
 	Error(err error)
 	TimeTrack(start time.Time, e string, info map[string]interface{})
 	Event(e string, info map[string]interface{})
@@ -78,7 +79,7 @@ type subscription struct {
 }
 
 func (n *server) Listen() (err error) {
-	defer fmt.Println("[P2P] End P2P ListenLoop")
+	defer n.logger.Info("[P2P] End P2P ListenLoop")
 
 	p := fmt.Sprintf(":%s", n.port)
 	if n.listener, err = net.Listen("tcp", p); err != nil {
@@ -86,30 +87,30 @@ func (n *server) Listen() (err error) {
 		n.logger.Error(err)
 		return
 	}
-	fmt.Println("[P2P] Listen to ", n.addr, " ", n.port)
+	n.logger.Info(fmt.Sprintf("Listen to %s:%s", n.addr, n.port))
 
 	var wg sync.WaitGroup
 	wg.Add(4)
 	go func() {
 		defer wg.Done()
 		n.receiveHandler()
-		fmt.Println("[P2P] End P2P receiveHandler")
+		n.logger.Info("[P2P] End P2P receiveHandler")
 	}()
 	go func() {
 		defer wg.Done()
 		err = n.callHandler()
-		fmt.Println("[P2P] End P2P callHandler")
+		n.logger.Info("[P2P] End P2P callHandler")
 		n.listener.Close()
 	}()
 	go func() {
 		defer wg.Done()
 		n.messageDispatch()
-		fmt.Println("[P2P] End P2P messageDispatch")
+		n.logger.Info("[P2P] End P2P messageDispatch")
 	}()
 	go func() {
 		defer wg.Done()
 		n.eventDispatch()
-		fmt.Println("[P2P] End P2P eventDispatch")
+		n.logger.Info("[P2P] End P2P eventDispatch")
 	}()
 L:
 	for {
@@ -445,8 +446,7 @@ func (n *server) messageDispatch() {
 				delete(subscriptions, msgType)
 			}
 		case <-n.ctx.Done():
-			for i, outch := range subscriptions {
-				fmt.Println("[P2P] Close outch ", i)
+			for _, outch := range subscriptions {
 				if outch != nil {
 					close(outch)
 				}
@@ -491,7 +491,6 @@ func merge(ctx context.Context, cs ...chan P2PMessage) chan P2PMessage {
 	// Start an output goroutine for each input channel in cs.  output
 	// copies values from c to out until c is closed, then calls wg.Done.
 	output := func(c <-chan P2PMessage) {
-		defer fmt.Println("[P2P] merge close c ")
 		for n := range c {
 			select {
 			case <-ctx.Done():
@@ -510,7 +509,6 @@ func merge(ctx context.Context, cs ...chan P2PMessage) chan P2PMessage {
 	// done.  This must start after the wg.Add call.
 	go func() {
 		wg.Wait()
-		fmt.Println("[P2P] End merge")
 		close(out)
 	}()
 	return out

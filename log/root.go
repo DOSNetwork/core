@@ -1,7 +1,6 @@
 package log
 
 import (
-	"bufio"
 	"encoding/hex"
 	"fmt"
 	"io/ioutil"
@@ -31,15 +30,14 @@ func New(key string, value interface{}) Logger {
 // Init setups default field and add hook
 func Init(id []byte) {
 	appSession := os.Getenv("APPSESSION")
-	appName := os.Getenv("APPNAME")
 	nodId := byteTohex(id)
 	logIp := os.Getenv("LOGIP")
 	clientIP := os.Getenv("NODEIP")
-	logrus.SetLevel(logrus.DebugLevel)
 	logrus.SetOutput(ioutil.Discard)
-	//IP,Subject and appName should read from environment variables
 
 	if logIp != "" {
+		logrus.SetLevel(logrus.DebugLevel)
+
 		hook, err := logrustash.NewHook("tcp", logIp, appSession)
 		if err != nil {
 			fmt.Println(err)
@@ -48,13 +46,16 @@ func Init(id []byte) {
 		logrus.AddHook(hook)
 	}
 
-	path := "/vault/doslog.txt"
-	writer, _ := rotatelogs.New(
+	path := "./vault/doslog.txt"
+	writer, err := rotatelogs.New(
 		path+".%Y%m%d%H%M",
 		rotatelogs.WithLinkName(path),
 		rotatelogs.WithMaxAge(time.Duration(86400)*time.Second),
 		rotatelogs.WithRotationTime(time.Duration(604800)*time.Second),
 	)
+	if err != nil {
+		fmt.Println("rotatelogs.New err", err)
+	}
 
 	logrus.AddHook(lfshook.NewHook(
 		lfshook.WriterMap{
@@ -63,22 +64,20 @@ func Init(id []byte) {
 		},
 		&logrus.JSONFormatter{},
 	))
-	//}
-	root.entry = logrus.WithFields(logrus.Fields{
-		"appSession": appSession,
-		"appName":    appName,
-		"clientip":   clientIP,
-		"nodeID":     nodId,
-	})
-}
-func setNull() {
-	src, err := os.OpenFile(os.DevNull, os.O_APPEND|os.O_WRONLY, os.ModeAppend)
-	if err != nil {
-		fmt.Println("err", err)
+	if appSession != "" {
+		root.entry = logrus.WithFields(logrus.Fields{
+			"appSession": appSession,
+			"clientip":   clientIP,
+			"nodeID":     nodId,
+		})
+	} else {
+		root.entry = logrus.WithFields(logrus.Fields{
+			"clientip": clientIP,
+			"nodeID":   nodId,
+		})
 	}
-	writer := bufio.NewWriter(src)
-	logrus.SetOutput(writer)
 }
+
 func byteTohex(a []byte) string {
 	unchecksummed := hex.EncodeToString(a[:])
 	sha := sha3.NewLegacyKeccak256()

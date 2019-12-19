@@ -2,16 +2,13 @@ package onchain
 
 import (
 	"context"
-	"fmt"
 	"math/big"
-	//	"reflect"
 	"strings"
-	//	"github.com/DOSNetwork/core/onchain/dosproxy"
+
 	"github.com/DOSNetwork/core/utils"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
-	//"github.com/ethereum/go-ethereum/ethclient"
 	errors "golang.org/x/xerrors"
 )
 
@@ -50,7 +47,6 @@ func (e *ethAdaptor) get(f getFunc) (result interface{}, err error) {
 				return
 			}
 			if strings.Contains(err.Error(), "use of closed network connection") {
-				fmt.Print(fmt.Errorf("%+v", err))
 				var oError *OnchainError
 				if errors.As(err, &oError) {
 					e.cancels[oError.Idx]()

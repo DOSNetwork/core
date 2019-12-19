@@ -2,7 +2,6 @@ package onchain
 
 import (
 	"context"
-	"fmt"
 	"math/big"
 	"strings"
 	"time"
@@ -29,6 +28,7 @@ const (
 )
 
 type logger interface {
+	Info(msg string)
 	Error(err error)
 	TimeTrack(start time.Time, e string, info map[string]interface{})
 	Event(e string, info map[string]interface{})
@@ -226,7 +226,6 @@ func (e *ethAdaptor) Connect(urls []string, t time.Time) (err error) {
 		return
 	}
 	go e.ReqLoop()
-	fmt.Println("Connect :", "client :", len(e.clients), "proxy :", len(e.proxies), "cs :", len(e.crs))
 	return
 }
 func (e *ethAdaptor) BootStrapUrl() string {

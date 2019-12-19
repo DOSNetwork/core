@@ -79,14 +79,14 @@ func NewDosNode(key *keystore.Key, config configuration.Config) (dosNode *DosNod
 	chainConn, err := onchain.NewProxyAdapter(config.ChainType, key, config.DOSAddressBridgeAddress)
 	if err != nil {
 		if err.Error() != "No any working eth client for event tracking" {
-			fmt.Println("NewDosNode failed ", err)
+			l.Error(err)
 			return
 		}
 	}
 	//Build a p2p network
 	p, err := p2p.CreateP2PNetwork(id.Bytes(), config.NodeIP, config.NodePort, p2p.GossipDiscover)
 	if err != nil {
-		fmt.Println("CreateP2PNetwork err ", err)
+		l.Error(err)
 		return
 	}
 
@@ -140,7 +140,7 @@ func (d *DosNode) Start() {
 	go func() {
 		defer wg.Done()
 		d.startRESTServer()
-		fmt.Println("[DOS] End RESTServer")
+		d.logger.Info("[DOS] End RESTServer")
 		d.End()
 	}()
 	t := time.Now().Add(60 * time.Second)
@@ -151,25 +151,26 @@ func (d *DosNode) Start() {
 	go func() {
 		defer wg.Done()
 		d.onchainLoop()
-		fmt.Println("[DOS] End ONCHAIN Loop")
+		d.logger.Info("[DOS] End ONCHAIN Loop")
 		d.End()
 	}()
 	go func() {
 		defer wg.Done()
 		d.p.Listen()
-		fmt.Println("[DOS] End P2P Loop")
+		d.logger.Info("[DOS] End P2P Loop")
 		d.End()
 	}()
 	go func() {
 		defer wg.Done()
 		d.queryLoop()
-		fmt.Println("[DOS] End Query Loop")
+		d.logger.Info("[DOS] End Query Loop")
 		d.End()
 	}()
 	go func() {
 		defer wg.Done()
 		d.dkg.Loop()
-		fmt.Println("[DOS] End DKG Loop")
+		d.logger.Info("[DOS] End DKG Loop")
+
 		d.End()
 	}()
 
@@ -177,16 +178,19 @@ func (d *DosNode) Start() {
 	var err error
 	for {
 		//Bootstrap p2p network
-		ips := getBootIps(d.chain.BootStrapUrl())
-		if len(ips) != 0 {
-			d.bootStrapIPs = append(d.bootStrapIPs, ips...)
-			d.bootStrapIPs = unique(d.bootStrapIPs)
+		if d.chain.BootStrapUrl() != "" {
+			d.logger.Info(fmt.Sprintf("BootStrapUrl : %s", d.chain.BootStrapUrl()))
+
+			ips := getBootIps(d.chain.BootStrapUrl())
+			if len(ips) != 0 {
+				d.bootStrapIPs = append(d.bootStrapIPs, ips...)
+				d.bootStrapIPs = unique(d.bootStrapIPs)
+			}
 		}
 
-		fmt.Println("[DOS] Join :", d.bootStrapIPs)
+		d.logger.Info("Bootstraping ...")
 		num, err = d.p.Join(d.bootStrapIPs)
 		if err != nil || num == 0 {
-			fmt.Println("[DOS] Join ", err, num)
 			if err != nil {
 				d.logger.Error(errors.Errorf(" : %w", err))
 			}
@@ -203,9 +207,9 @@ func (d *DosNode) Start() {
 			break
 		}
 	}
-	fmt.Println("[DOS] Join : num of peer ", num)
+	d.logger.Info(fmt.Sprintf("[DOS] Join : num of peer %d\n", num))
 	wg.Wait()
-	fmt.Println("[DOS] End")
+	d.logger.Info("[DOS] End")
 }
 
 func getBootIps(bootStrapUrl string) []string {

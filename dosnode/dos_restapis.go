@@ -3,7 +3,6 @@ package dosnode
 import (
 	"context"
 	"fmt"
-	"io"
 	"math/big"
 	"net/http"
 	"os"
@@ -110,12 +109,12 @@ func (d *DosNode) balance(w http.ResponseWriter, r *http.Request) {
 }
 
 func (d *DosNode) enableAdmin(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("[DOS] isAdmin")
+	d.logger.Info("[DOS] isAdmin")
 	d.isAdmin = true
 }
 
 func (d *DosNode) enableGuardian(w http.ResponseWriter, r *http.Request) {
-	fmt.Println("[DOS] enableGuardian")
+	d.logger.Info("[DOS] enableGuardian")
 	d.isGuardian = true
 }
 
@@ -168,10 +167,6 @@ func readLines(path string) ([]string, error) {
 		bytesread, err := file.Read(buffer)
 
 		if err != nil {
-			if err != io.EOF {
-				fmt.Println(err)
-			}
-
 			break
 		}
 		lines = append(lines, string(buffer[:bytesread]))
@@ -206,12 +201,12 @@ func (d *DosNode) dkgTest(w http.ResponseWriter, r *http.Request) {
 	}
 	members, err := readLines("/vault/members.txt")
 	if err != nil {
-		fmt.Println("[DOS] readLines err ", err)
+		d.logger.Error(err)
 		return
 	}
 	if start >= 0 && end >= 0 {
 		if len(members) < (end - start) {
-			fmt.Println("[DOS] members size not enough:", len(members))
+			d.logger.Info(fmt.Sprintf("[DOS] members size not enough:%d", len(members)))
 			return
 		}
 		var participants [][]byte

@@ -89,7 +89,6 @@ func (l *logger) Warn(msg string) {
 }
 
 func (l *logger) Error(err error) {
-	fmt.Println(fmt.Errorf("%+v", err))
 	if l.entry == nil {
 		return
 	}
@@ -104,8 +103,7 @@ func (l *logger) Error(err error) {
 		c := strings.Split(ss[len(ss)-1], ":")
 		errCause = c[0]
 	}
-	//
-	l.entry.WithFields(logrus.Fields{"errCause": errCause, "errDetail": fmt.Sprintf("%+v", err), "errType": reflect.TypeOf(err).String(), "Time": time.Now()}).Error()
+	l.entry.WithFields(logrus.Fields{"errCause": errCause, "errDetail": fmt.Sprintf("%+v", err), "errType": reflect.TypeOf(err).String()}).Error()
 
 }
 
@@ -123,9 +121,9 @@ func (l *logger) Event(e string, info map[string]interface{}) {
 		return
 	}
 	if info != nil {
-		l.entry.WithFields(logrus.Fields{"EVENT": e, "Time": time.Now()}).WithFields(info).Debug("")
+		l.entry.WithFields(logrus.Fields{"EVENT": e}).WithFields(info).Debug("")
 	} else {
-		l.entry.WithFields(logrus.Fields{"EVENT": e, "Time": time.Now()}).Debug("")
+		l.entry.WithFields(logrus.Fields{"EVENT": e}).Debug("")
 
 	}
 }
@@ -137,8 +135,8 @@ func (l *logger) TimeTrack(start time.Time, e string, info map[string]interface{
 		return
 	}
 	if info != nil {
-		l.entry.WithFields(logrus.Fields{"EVENT": e, e: elapsed, "Time": time.Now()}).WithFields(info).Debug("")
+		l.entry.WithFields(logrus.Fields{"EVENT": e, e: elapsed}).WithFields(info).Debug("")
 	} else {
-		l.entry.WithFields(logrus.Fields{"EVENT": e, e: elapsed, "Time": time.Now()}).Debug("")
+		l.entry.WithFields(logrus.Fields{"EVENT": e, e: elapsed}).Debug("")
 	}
 }
