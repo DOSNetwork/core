@@ -114,6 +114,6 @@
 - [x] Dockerization and Client Deployment Script
 - [x] Integration with Ethereum On-chain [System Contracts](https://github.com/DOSNetwork/eth-contracts)
 - [x] P2P Network Performance Tuning
+- [x] Staking & Delegation Contracts with a User-friendly Dashboard
+- [x] Network Status Scanner/Explorer
 - [ ] Test with geth lightnode mode and experiment with parity clients
-- [ ] Staking & Delegation Contracts with a User-friendly Dashboard
-- [ ] Network Status Scanner/Explorer
