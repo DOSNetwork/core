@@ -27,13 +27,17 @@
 
 ##### Acquire testnet ether and testnet tokens
 - Acquire testnet ether from rinkeby [faucet](https://faucet.rinkeby.io/).
-- Acquire 50,000 [testnet DOS token](https://rinkeby.etherscan.io/address/0x214e79c85744cd2ebbc64ddc0047131496871bee), (and optional - acquire several [testnet DropBurn token](https://rinkeby.etherscan.io/address/0x9bfe8f5749d90eb4049ad94cc4de9b6c4c31f822)).
+- Acquire 100,000 [testnet DOS token](https://rinkeby.etherscan.io/address/0x214e79c85744cd2ebbc64ddc0047131496871bee), (and optional - acquire several [testnet DropBurn token](https://rinkeby.etherscan.io/address/0x9bfe8f5749d90eb4049ad94cc4de9b6c4c31f822)).
 - Please fill in [this](https://docs.google.com/forms/d/e/1FAIpQLSdiWuVdyxpVozEC0uWZIj9HCBX9COBYFj8Dxp2C2qX4Qv5U9g/viewform) form to request testnet tokens.
+- Replace your node ip address in [config.json](https://github.com/DOSNetwork/core/blob/master/config.json#L3)
 
-##### Acquire Infura API key
-- [Acquire Infura API key](https://ethereumico.io/knowledge-base/infura-api-key-guide/)
 
-## Run standalone binary
+##### Register and setup Infura api key
+- Register and get [Infura api key](https://ethereumico.io/knowledge-base/infura-api-key-guide/)
+- Replace your infura api key in [config.json](https://github.com/DOSNetwork/core/blob/master/config.json#L10)
+
+
+## Run binary from github releases
 - Install:
     ```sh
     $ wget https://github.com/DOSNetwork/core/releases/download/v1.0-beta.23/config.json
@@ -62,7 +66,7 @@
     $ ./dos.sh log
     ```
 
-## Building from source
+## Building binary from source
 - [Install](https://golang.org/doc/install) Go and setup golang workingspace like below:
     ```sh
     $ sudo apt-get install golang 
@@ -102,6 +106,11 @@
   - `$ make updateSubmodule` to fetch latest system contracts from [repo](https://github.com/DOSNetwork/eth-contracts), instead of making contract modifications locally.
   - `$ make gen` to generate binding files for system contracts.
   - `$ make clean` to remove built binaries or unnecessary generated files.
+
+
+## Run with docker image
+- TODO
+
 
 ## Status
 - [x] Verifiable Secret Sharing
