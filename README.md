@@ -7,10 +7,10 @@
 
 ## Prerequisites:
 ##### Cloud Server / VPS Recommendations
-- [AWS Lightsail](https://aws.amazon.com/lightsail/pricing/?opdp1=pricing) - $5 monthly plan (1CPU, 1GB Memory, 40GB SSD, 2TB Bandwidth)
-- [Vultr](https://www.vultr.com/?ref=7806004-4F) - Cloud Compute $5 monthly plan (1CPU, 1GB Memory, 25GB SSD, 1TB Bandwidth)
-- [Digital Ocean](https://m.do.co/c/a912bdc08b78) - Droplet $5 monthly plan (1CPU, 25GB SSD, 1TB Bandwidth)
-- [Linode](https://www.linode.com/?r=35c0c22d412b3fc8bd98b4c7c6f5ac42ae3bc2e2) - $5 monthly plan (1CPU, 1GB Memory, 25GB SSD, 1TB Bandwidth)
+- [AWS Lightsail](https://aws.amazon.com/lightsail/pricing/?opdp1=pricing) - $5 monthly plan (1 cpu, 1GB memory, 40GB ssd, 2TB bandwidth)
+- [Vultr](https://www.vultr.com/?ref=7806004-4F) - Cloud Compute $5 monthly plan (1 cpu, 1GB memory, 25GB ssd, 1TB bandwidth)
+- [Digital Ocean](https://m.do.co/c/a912bdc08b78) - Droplet $5 monthly plan (1 cpu, 25GB ssd, 1TB bandwidth)
+- [Linode](https://www.linode.com/?r=35c0c22d412b3fc8bd98b4c7c6f5ac42ae3bc2e2) - $5 monthly plan (1 cpu, 1GB memory, 25GB ssd, 1TB bandwidth)
 - .
 
 ##### Verified and recommended installation environment
