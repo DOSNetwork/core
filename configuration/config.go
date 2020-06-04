@@ -117,9 +117,15 @@ func (c *Config) overWrite() (err error) {
 
 	gethIP := os.Getenv(envGethPool)
 	if gethIP != "" {
-		ipPool := strings.Split(gethIP, ";")
+		nodeList := make(map[string]bool)
+		for _, ethNode := range c.ChainNodePool {
+			nodeList[ethNode] = true
+		}
+		ipPool := strings.Split(gethIP, ",")
 		for _, ip := range ipPool {
-			c.ChainNodePool = append(c.ChainNodePool, ip)
+			if !nodeList[ip] {
+				c.ChainNodePool = append(c.ChainNodePool, ip)
+			}
 		}
 	}
 	return

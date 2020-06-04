@@ -17,15 +17,13 @@ func (d *DosNode) startRESTServer() (err error) {
 	mux.HandleFunc("/", d.status)
 	mux.HandleFunc("/balance", d.balance)
 	mux.HandleFunc("/enableAdmin", d.enableAdmin)
+	mux.HandleFunc("/disableAdmin", d.disableAdmin)
 	mux.HandleFunc("/enableGuardian", d.enableGuardian)
+	mux.HandleFunc("/disableGuardian", d.disableGuardian)
 	mux.HandleFunc("/signalGroupFormation", d.signalGroupFormation)
 	mux.HandleFunc("/signalGroupDissolve", d.signalGroupDissolve)
 	mux.HandleFunc("/signalBootstrap", d.signalBootstrap)
 	mux.HandleFunc("/signalRandom", d.signalRandom)
-	//TODO : Remove after beta .Only used for dev test
-	mux.HandleFunc("/p2pTest", d.p2pTest)
-	mux.HandleFunc("/dkgTest", d.dkgTest)
-	mux.HandleFunc("/queryTest", d.queryTest)
 	s := http.Server{Addr: ":8080", Handler: mux}
 	go func() {
 		<-d.ctx.Done()
@@ -43,17 +41,16 @@ func (d *DosNode) status(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	html := "=================================================" + "\n|"
-	html = html + "Version         : " + d.config.VERSION
+	html = html + "Version           : " + d.config.VERSION + "\n|"
 	html = html + "StartTime         : " + d.startTime.Format("2006-01-02T15:04:05.999999-07:00") + "\n|"
 	html = html + "Address           : " + fmt.Sprintf("%x", d.p.GetID()) + "\n|"
 	html = html + "IP                : " + fmt.Sprintf("%s", d.p.GetIP()) + "\n|"
 	html = html + "NumOfMembers      : " + strconv.Itoa(d.p.NumOfMembers()) + "\n|"
 	html = html + "State             : " + d.state + "\n|"
-	html = html + "IsPendingnNode    : " + strconv.FormatBool(isPendingNode) + "\n|"
+	html = html + "IsPendingNode     : " + strconv.FormatBool(isPendingNode) + "\n|"
 	html = html + "TotalQuery        : " + strconv.Itoa(d.totalQuery) + "\n|"
 	html = html + "FulfilledQuery    : " + strconv.Itoa(d.fulfilledQuery) + "\n|"
 	html = html + "Group Number      : " + strconv.Itoa(d.numOfworkingGroup) + "\n|"
-	html = html + "Group Number      : " + strconv.Itoa(d.numOfworkingGroup) + "\n"
 	html = html + "=================================================" + "\n|"
 	//	result := d.dkg.GetGroupNumber()
 	balance, err := d.chain.Balance()
@@ -113,9 +110,19 @@ func (d *DosNode) enableAdmin(w http.ResponseWriter, r *http.Request) {
 	d.isAdmin = true
 }
 
+func (d *DosNode) disableAdmin(w http.ResponseWriter, r *http.Request) {
+	d.logger.Info("[DOS] disable admin")
+	d.isAdmin = false
+}
+
 func (d *DosNode) enableGuardian(w http.ResponseWriter, r *http.Request) {
 	d.logger.Info("[DOS] enableGuardian")
 	d.isGuardian = true
+}
+
+func (d *DosNode) disableGuardian(w http.ResponseWriter, r *http.Request) {
+	d.logger.Info("[DOS] disable guardian")
+	d.isGuardian = false
 }
 
 func (d *DosNode) signalBootstrap(w http.ResponseWriter, r *http.Request) {

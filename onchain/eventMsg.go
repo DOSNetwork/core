@@ -52,9 +52,8 @@ type LogValidationResult struct {
 
 //LogGroupingInitiated is an onchain event that DOSProxy has requested a random number to form a new group
 type LogGroupingInitiated struct {
-	NumPendingNodes   *big.Int
-	GroupSize         *big.Int
-	GroupingThreshold *big.Int
+	NumPendingNodes *big.Int
+	GroupSize       *big.Int
 }
 
 //LogInsufficientWorkingGroup is an onchain event that means there are no enough working groups to mix with pending nodes to form a new group

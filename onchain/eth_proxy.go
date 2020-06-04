@@ -2,7 +2,6 @@ package onchain
 
 import (
 	"context"
-	"math/big"
 	"strings"
 	"time"
 
@@ -72,8 +71,7 @@ func NewEthAdaptor(key *keystore.Key, bridgeAddr string, l logger) (adaptor *eth
 	adaptor.logger = l
 	adaptor.reqQueue = make(chan *request)
 	// Use SuggestGasPrice and EstimateGas instead of hard coding
-	adaptor.gasPrice = 3000000000
-	adaptor.gasLimit = 6000000
+	adaptor.gasLimit = 1000000
 	adaptor.connTimeout = 60 * time.Second
 	adaptor.getTimeout = 60 * time.Second
 	adaptor.setTimeout = 60 * time.Second
@@ -201,7 +199,6 @@ func (e *ethAdaptor) Connect(urls []string, t time.Time) (err error) {
 		ctx, cancel := context.WithCancel(e.ctx)
 		ctx = context.WithValue(ctx, "index", len(e.ctxes))
 		auth := bind.NewKeyedTransactor(e.key.PrivateKey)
-		auth.GasPrice = big.NewInt(e.gasPrice) //1 Gwei
 		auth.GasLimit = uint64(e.gasLimit)
 		auth.Context = ctx
 

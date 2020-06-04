@@ -203,41 +203,7 @@ func (e *ethAdaptor) GetWorkingGroupSize() (result uint64, err error) {
 	}
 	return
 }
-func (e *ethAdaptor) GroupingThreshold() (result uint64, err error) {
-	if !e.isConnecting() {
-		err = errors.New("not connecting to geth")
-	}
-	proxies := e.proxies
-	f := func(ctx context.Context) (chan interface{}, chan error) {
-		outc := make(chan interface{})
-		errc := make(chan error)
-		go func() {
-			defer close(outc)
-			defer close(errc)
-			idx := getIndex(ctx)
-			if idx == -1 {
-				err = errors.New("no client index in context")
-			} else {
-				if val, err := proxies[idx].GroupingThreshold(); err != nil {
-					replyError(ctx, errc, &OnchainError{err: errors.Errorf("get err : %w", err), Idx: idx})
-				} else {
-					utils.ReportResult(ctx, outc, val)
-				}
-			}
-		}()
-		return outc, errc
-	}
-	var r interface{}
-	if r, err = e.get(f); err != nil {
-		return
-	}
-	if v, ok := r.(*big.Int); ok {
-		result = v.Uint64()
-	} else {
-		err = errors.New("casting error")
-	}
-	return
-}
+
 func (e *ethAdaptor) LastUpdatedBlock() (result uint64, err error) {
 	if !e.isConnecting() {
 		err = errors.New("not connecting to geth")

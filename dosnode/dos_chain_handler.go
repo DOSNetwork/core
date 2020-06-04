@@ -419,13 +419,8 @@ func (d *DosNode) handleGroupFormation(currentBlockNumber uint64) {
 		d.logger.Error(err)
 		return
 	}
-	groupingThreshold, err := d.chain.GroupingThreshold()
-	if err != nil {
-		d.logger.Error(err)
-		return
-	}
 
-	if pendingNodeSize < (groupSize * groupingThreshold / 100) {
+	if pendingNodeSize < groupSize {
 		if expiredGroupSize != 0 {
 			d.chain.SignalGroupFormation()
 			return
