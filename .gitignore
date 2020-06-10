@@ -4,3 +4,4 @@ testAccounts/
 credential/
 vault/
 .idea
+*.*.swp
