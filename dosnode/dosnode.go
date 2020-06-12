@@ -45,7 +45,7 @@ type DosNode struct {
 	logger       log.Logger
 	isGuardian   bool
 	isAdmin      bool
-	config       configuration.Config
+	config       *configuration.Config
 	m            sync.Mutex
 	//For REST API
 	startTime         time.Time
@@ -71,12 +71,12 @@ type crDurations struct {
 }
 
 //NewDosNode creates a DosNode struct
-func NewDosNode(key *keystore.Key, config configuration.Config) (dosNode *DosNode, err error) {
+func NewDosNode(key *keystore.Key, config *configuration.Config) (dosNode *DosNode, err error) {
 	id := key.Address
 	l := log.New("module", "dosclient")
 
 	//Set up an onchain adapter
-	chainConn, err := onchain.NewProxyAdapter(config.ChainType, key, config.DOSAddressBridgeAddress)
+	chainConn, err := onchain.NewProxyAdapter(key, config)
 	if err != nil {
 		if err.Error() != "No any working eth client for event tracking" {
 			l.Error(err)

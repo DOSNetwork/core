@@ -131,7 +131,7 @@ func actionStart(c *cli.Context) (err error) {
 	log.Init(key.Address.Bytes()[:])
 
 	//Read Configuration
-	config := configuration.Config{}
+	config := &configuration.Config{}
 	if err := config.LoadConfig(); err != nil {
 		fmt.Println("LoadConfig Error : ", err)
 		return err

@@ -2,11 +2,13 @@ package onchain
 
 import (
 	"context"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/ethereum/go-ethereum/accounts/keystore"
 
+	"github.com/DOSNetwork/core/configuration"
 	"github.com/DOSNetwork/core/onchain/commitreveal"
 	"github.com/DOSNetwork/core/onchain/dosbridge"
 	"github.com/DOSNetwork/core/onchain/dosproxy"
@@ -58,20 +60,23 @@ type ethAdaptor struct {
 }
 
 //NewEthAdaptor creates an eth implemention of ProxyAdapter
-func NewEthAdaptor(key *keystore.Key, bridgeAddr string, l logger) (adaptor *ethAdaptor, err error) {
+func NewEthAdaptor(key *keystore.Key, config *configuration.Config, l logger) (adaptor *ethAdaptor, err error) {
 	if key == nil {
 		return nil, errors.New("no keystore")
 	}
-	if !common.IsHexAddress(bridgeAddr) {
+	if !common.IsHexAddress(config.DOSAddressBridgeAddress) {
 		return nil, errors.New("not a valid hex address")
 	}
+	gasLimitInt, err := strconv.Atoi(config.EthGasLimit)
+	if err != nil {
+		return nil, err
+	}
 	adaptor = &ethAdaptor{}
-	adaptor.bridgeAddr = common.HexToAddress(bridgeAddr)
+	adaptor.bridgeAddr = common.HexToAddress(config.DOSAddressBridgeAddress)
 	adaptor.key = key
 	adaptor.logger = l
 	adaptor.reqQueue = make(chan *request)
-	// Use SuggestGasPrice and EstimateGas instead of hard coding
-	adaptor.gasLimit = 1000000
+	adaptor.gasLimit = int64(gasLimitInt)
 	adaptor.connTimeout = 60 * time.Second
 	adaptor.getTimeout = 60 * time.Second
 	adaptor.setTimeout = 60 * time.Second

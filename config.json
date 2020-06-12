@@ -4,6 +4,7 @@
     "NodePort": "9501",
     "ChainType": "ETH",
     "DOSAddressBridgeAddress": "0x72840b59CeE8f0ce40f33219DDf9Ca73B6B29ab2",
+    "EthGasLimit": "1500000",
     "BootStrapIPs": [
     ],
     "ChainNodePool": [

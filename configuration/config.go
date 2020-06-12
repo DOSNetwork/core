@@ -30,6 +30,7 @@ type Config struct {
 	NodePort                string
 	ChainType               string
 	DOSAddressBridgeAddress string
+	EthGasLimit             string
 	BootStrapIPs            []string
 	ChainNodePool           []string
 }
