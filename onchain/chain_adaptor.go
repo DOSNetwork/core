@@ -46,6 +46,7 @@ type ProxyAdapter interface {
 	GetExpiredWorkingGroupSize() (r uint64, err error)
 	GroupSize() (r uint64, err error)
 	GetWorkingGroupSize() (r uint64, err error)
+	LastGroupFormationRequestId() (r uint64, err error)
 	LastUpdatedBlock() (r uint64, err error)
 	NumPendingGroups() (r uint64, err error)
 	NumPendingNodes() (r uint64, err error)

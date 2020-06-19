@@ -427,6 +427,15 @@ func (d *DosNode) handleGroupFormation() {
 	}
 	if workingGroup > 0 {
 		if expiredGroupSize >= groupToPick {
+			lastGrpFormReqId, err := d.chain.LastGroupFormationRequestId()
+			if err != nil {
+				d.logger.Error(err)
+				return
+			}
+			if lastGrpFormReqId != 0 {
+				d.logger.Debug("[DOS] Already in Group Formation Stage, skipping ...")
+				return
+			}
 			d.logger.Debug("[DOS] Signaling new group formation ...")
 			d.chain.SignalGroupFormation()
 			return
