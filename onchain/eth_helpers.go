@@ -272,14 +272,12 @@ func CheckTransaction(client *ethclient.Client, tx *types.Transaction) (err erro
 	start := time.Now()
 	receipt, err := client.TransactionReceipt(context.Background(), tx.Hash())
 	for err == ethereum.NotFound {
-		fmt.Println("ethereum.NotFound ", err)
 		if time.Since(start).Minutes() > 30 {
 			err = errors.New("transaction not found")
 			fmt.Println("transaction failed. tx ", fmt.Sprintf("%x", tx.Hash()))
 			return
 		}
-
-		time.Sleep(1 * time.Second)
+		time.Sleep(15 * time.Second)
 		receipt, err = client.TransactionReceipt(context.Background(), tx.Hash())
 	}
 	if err != nil {
@@ -293,7 +291,6 @@ func CheckTransaction(client *ethclient.Client, tx *types.Transaction) (err erro
 		err = errors.New("transaction failed")
 		fmt.Println("transaction Status != 0 .  tx ", fmt.Sprintf("%x", tx.Hash()))
 	}
-
 	return
 }
 

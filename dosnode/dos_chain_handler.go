@@ -21,7 +21,6 @@ import (
 func (d *DosNode) onchainLoop() {
 	defer d.logger.Info("[DOS] End onchainLoop")
 	var watchdogInterval int
-	var currentBlockNumber uint64
 	randSeed, _ := new(big.Int).SetString("21888242871839275222246405745257275088548364400416034343698204186575808495617", 10)
 	inactiveNodes := make(map[string]time.Time)
 	reconn := 0
@@ -46,7 +45,6 @@ func (d *DosNode) onchainLoop() {
 			onchain.SubscribeLogPublicKeyAccepted, onchain.SubscribeCommitrevealLogStartCommitreveal}
 		d.onchainEvent, onchainErrc = d.chain.SubscribeEvent(subescriptions)
 
-		checkBlkNumberPeriod := 0
 		watchdogInterval = 15
 		watchdog := time.NewTicker(time.Duration(watchdogInterval) * time.Second)
 		reconn = 0
@@ -75,28 +73,16 @@ func (d *DosNode) onchainLoop() {
 				}
 				d.logger.Event("peersUpdate", map[string]interface{}{"numOfPeers": d.p.NumOfMembers()})
 			case <-watchdog.C:
-				checkBlkNumberPeriod--
-				if checkBlkNumberPeriod <= 0 {
-					currentBlockNumber, err = d.chain.CurrentBlock()
-					if err != nil {
-						d.logger.Error(err)
-						continue
-					}
-					checkBlkNumberPeriod = 50
-				} else {
-					currentBlockNumber++
-				}
 				if balance, err := d.chain.Balance(); err != nil {
 					d.logger.Error(err)
 					continue
 				} else {
-					if balance.Cmp(big.NewFloat(0.5)) == -1 {
+					if balance.Cmp(big.NewFloat(0.1)) == -1 {
 						d.logger.Error(fmt.Errorf("No enough balance %f", balance))
 						d.End()
 						continue
 					}
 				}
-
 				if d.isAdmin {
 					now := time.Now()
 					for nodeID, inactiveTime := range inactiveNodes {
@@ -114,13 +100,6 @@ func (d *DosNode) onchainLoop() {
 						}
 					}
 				}
-
-				if d.isGuardian {
-					d.handleRandom(currentBlockNumber)
-					d.handleGroupFormation()
-					d.handleBootstrap(currentBlockNumber)
-				}
-
 			case err, ok := <-onchainErrc:
 				if !ok {
 					d.logger.Info("[DOS] End onchainErrc")
@@ -379,149 +358,157 @@ func byte32(s []byte) (a *[32]byte) {
 	return a
 }
 
-func (d *DosNode) handleGroupFormation() {
+func (d *DosNode) handleGroupFormation() bool {
 	groupSize, err := d.chain.GroupSize()
 	if err != nil {
 		d.logger.Error(err)
-		return
+		return false
 	}
 	pendingNodeSize, err := d.chain.NumPendingNodes()
 	if err != nil {
 		d.logger.Error(err)
-		return
+		return false
 	}
 	expiredGroupSize, err := d.chain.GetExpiredWorkingGroupSize()
 	if err != nil {
 		d.logger.Error(err)
-		return
+		return false
 	}
 	if pendingNodeSize < groupSize && expiredGroupSize > 0 {
 		d.chain.SignalGroupFormation()
-		return
+		return true
 	}
 
 	workingGroup, err := d.chain.GetWorkingGroupSize()
 	if err != nil {
 		d.logger.Error(err)
-		return
+		return false
 	}
 	bootstrapThreshold, err := d.chain.BootstrapStartThreshold()
 	if err != nil {
 		d.logger.Error(err)
-		return
+		return false
 	}
 	if workingGroup == 0 && pendingNodeSize < bootstrapThreshold && expiredGroupSize > 0 {
 		d.chain.SignalGroupFormation()
-		return
+		return true
 	}
 
 	if pendingNodeSize < groupSize {
 		d.logger.Debug(fmt.Sprintf("[DOS] Not enough pendingNodes (%v) vs groupSize (%v), skipping group formation ...", pendingNodeSize, groupSize))
-		return
+		return false
 	}
 
 	groupToPick, err := d.chain.GroupToPick()
 	if err != nil {
 		d.logger.Error(err)
-		return
+		return false
 	}
 	if workingGroup > 0 {
 		if expiredGroupSize >= groupToPick {
 			lastGrpFormReqId, err := d.chain.LastGroupFormationRequestId()
 			if err != nil {
 				d.logger.Error(err)
-				return
+				return false
 			}
 			if lastGrpFormReqId != 0 {
 				d.logger.Debug("[DOS] Already in Group Formation Stage, skipping ...")
-				return
+				return false
 			}
 			d.logger.Debug("[DOS] Signaling new group formation ...")
 			d.chain.SignalGroupFormation()
-			return
+			return true
 		}
 	} else if pendingNodeSize >= bootstrapThreshold {
 		cid, err := d.chain.BootstrapRound()
 		if err != nil {
 			d.logger.Error(err)
-			return
+			return false
 		}
 		if cid == 0 {
 			d.logger.Debug("[DOS] Bootstrap condition matches, signaling ...")
 			d.chain.SignalGroupFormation()
-			return
+			return true
 		}
 	}
+	return false
 }
 
-func (d *DosNode) handleRandom(currentBlockNumber uint64) {
+func (d *DosNode) handleRandom(currentBlockNumber uint64) bool {
 	groupSize, err := d.chain.GetWorkingGroupSize()
 	if err != nil {
 		d.logger.Error(err)
-		return
+		return false
 	}
 	if groupSize == 0 {
 		d.logger.Debug("[DOS] No live working group, skipping...")
-		return
+		return false
 	}
 	lastUpdatedBlock, err := d.chain.LastUpdatedBlock()
 	if err != nil {
 		d.logger.Error(err)
-		return
+		return false
 	}
-	sysrandInterval, err := d.chain.RefreshSystemRandomHardLimit()
+	sysRandInterval, err := d.chain.RefreshSystemRandomHardLimit()
 	if err != nil {
 		d.logger.Error(err)
-		return
+		return false
 	}
-	diff := currentBlockNumber - lastUpdatedBlock
-	if diff > sysrandInterval {
-		d.logger.Debug("[DOS] Signaling system randomness refresh...")
-		d.chain.SignalRandom()
+	if lastUpdatedBlock+sysRandInterval > currentBlockNumber {
+		d.logger.Debug("[DOS] System random not expired yet, skipping...")
+		return false
 	}
+	d.logger.Debug("[DOS] Signaling system randomness refresh...")
+	if err := d.chain.SignalRandom(); err != nil {
+		d.logger.Error(err)
+		return false
+	}
+	return true
 }
 
-func (d *DosNode) handleBootstrap(currentBlockNumber uint64) {
+func (d *DosNode) handleBootstrap(currentBlockNumber uint64) bool {
 	cid, err := d.chain.BootstrapRound()
 	if err != nil {
 		d.logger.Error(err)
-		return
+		return false
 	}
 	if cid == 0 {
 		d.logger.Debug("[DOS] Not in bootstrap phase ...")
-		return
+		return false
 	}
 	bootstrapEndBlk, err := d.chain.BootstrapEndBlk()
 	if err != nil {
 		d.logger.Error(err)
-		return
+		return false
 	}
 	if currentBlockNumber <= bootstrapEndBlk {
 		d.logger.Debug("[DOS] Waiting for bootstrap to end before next step ...")
-		return
+		return false
 	}
 	pendingNodeSize, err := d.chain.NumPendingNodes()
 	if err != nil {
 		d.logger.Error(err)
-		return
+		return false
 	}
 	bootstrapThreshold, err := d.chain.BootstrapStartThreshold()
 	if err != nil {
 		d.logger.Error(err)
-		return
+		return false
 	}
 	if pendingNodeSize < bootstrapThreshold {
 		d.logger.Debug(
 			fmt.Sprintf(
 				"[DOS] Not enough registered pendingNodes (%v) vs minimum bootstrap threshold (%v), skipping bootstrap ...",
 				pendingNodeSize, bootstrapThreshold))
-		return
+		return false
 	}
 
 	d.logger.Debug("[DOS] Signaling system to bootstrap ...")
 	if err := d.chain.SignalBootstrap(big.NewInt(int64(cid))); err != nil {
 		d.logger.Error(err)
+		return false
 	}
+	return true
 }
 
 func (d *DosNode) handleGroupDissolve() {

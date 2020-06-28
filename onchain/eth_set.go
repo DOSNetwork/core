@@ -306,30 +306,17 @@ func (e *ethAdaptor) SignalRandom() (err error) {
 		err = errors.New("not connecting to geth")
 		return
 	}
-
-	// define how to parse parameters and execute proxy function
-	opCtx, opCancel := context.WithTimeout(e.ctx, e.setTimeout)
-	defer opCancel()
-	proxies := e.proxies
-
-	f := func(ctx context.Context) (tx *types.Transaction, err error) {
-		idx := getIndex(ctx)
-		if idx == -1 {
-			err = errors.New("no client index in context")
-		} else {
-			tx, err = proxies[idx].SignalRandom()
-			if err != nil {
-				err = &OnchainError{err: errors.Errorf(": %w", err), Idx: idx}
-			} else {
-				e.logger.Info(fmt.Sprintf("SignalRandom %x", tx.Hash()))
-			}
-		}
+	if len(e.proxies) != 0 && len(e.clients) != 0 {
+		tx, err := e.proxies[0].SignalRandom()
 		if err != nil {
+			return err
+		}
+		e.logger.Info(fmt.Sprintf("SignalRandom tx sent: %x, waiting for confirmation...", tx.Hash()))
+		if err = CheckTransaction(e.clients[0], tx); err != nil {
 			e.logger.Error(err)
 		}
-		return
 	}
-	return e.waitForReply(&request{opCtx: opCtx, f: f, reply: make(chan *response)})
+	return
 }
 
 func (e *ethAdaptor) SignalGroupFormation() (err error) {
@@ -337,30 +324,17 @@ func (e *ethAdaptor) SignalGroupFormation() (err error) {
 		err = errors.New("not connecting to geth")
 		return
 	}
-
-	// define how to parse parameters and execute proxy function
-	opCtx, opCancel := context.WithTimeout(e.ctx, e.setTimeout)
-	defer opCancel()
-	proxies := e.proxies
-
-	f := func(ctx context.Context) (tx *types.Transaction, err error) {
-		idx := getIndex(ctx)
-		if idx == -1 {
-			err = errors.New("no client index in context")
-		} else {
-			tx, err = proxies[idx].SignalGroupFormation()
-			if err != nil {
-				err = &OnchainError{err: errors.Errorf(": %w", err), Idx: idx}
-			} else {
-				e.logger.Info(fmt.Sprintf("SignalGroupFormation %x", tx.Hash()))
-			}
-		}
+	if len(e.proxies) != 0 && len(e.clients) != 0 {
+		tx, err := e.proxies[0].SignalGroupFormation()
 		if err != nil {
+			return err
+		}
+		e.logger.Info(fmt.Sprintf("SignalGroupFormation tx sent: %x, waiting for confirmation...", tx.Hash()))
+		if err = CheckTransaction(e.clients[0], tx); err != nil {
 			e.logger.Error(err)
 		}
-		return
 	}
-	return e.waitForReply(&request{opCtx: opCtx, f: f, reply: make(chan *response)})
+	return
 }
 
 func (e *ethAdaptor) SignalGroupDissolve() (err error) {
@@ -399,31 +373,17 @@ func (e *ethAdaptor) SignalBootstrap(cid *big.Int) (err error) {
 		err = errors.New("not connecting to geth")
 		return
 	}
-
-	// define how to parse parameters and execute proxy function
-	opCtx, opCancel := context.WithTimeout(e.ctx, e.setTimeout)
-	defer opCancel()
-	proxies := e.proxies
-
-	f := func(ctx context.Context) (tx *types.Transaction, err error) {
-		idx := getIndex(ctx)
-		if idx == -1 {
-			err = errors.New("no client index in context")
-		} else {
-			tx, err = proxies[idx].SignalBootstrap(cid)
-			if err != nil {
-				err = &OnchainError{err: errors.Errorf(": %w", err), Idx: idx}
-			} else {
-
-				e.logger.Info(fmt.Sprintf("SignalBootstrap %x", tx.Hash()))
-			}
-		}
+	if len(e.proxies) != 0 && len(e.clients) != 0 {
+		tx, err := e.proxies[0].SignalBootstrap(cid)
 		if err != nil {
+			return err
+		}
+		e.logger.Info(fmt.Sprintf("SignalBootstrap tx sent: %x, waiting for confirmation...", tx.Hash()))
+		if err = CheckTransaction(e.clients[0], tx); err != nil {
 			e.logger.Error(err)
 		}
-		return
 	}
-	return e.waitForReply(&request{opCtx: opCtx, f: f, reply: make(chan *response)})
+	return
 }
 
 func (e *ethAdaptor) SignalUnregister(addr common.Address) (err error) {
