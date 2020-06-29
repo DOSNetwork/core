@@ -19,7 +19,7 @@ import (
 )
 
 func (d *DosNode) onchainLoop() {
-	defer d.logger.Info("[DOS] End onchainLoop")
+	defer d.logger.Info("End onchainLoop")
 	var watchdogInterval int
 	randSeed, _ := new(big.Int).SetString("21888242871839275222246405745257275088548364400416034343698204186575808495617", 10)
 	inactiveNodes := make(map[string]time.Time)
@@ -52,12 +52,12 @@ func (d *DosNode) onchainLoop() {
 		for {
 			select {
 			case <-d.ctx.Done():
-				d.logger.Info("[DOS] ctx.Done")
+				d.logger.Info("ctx.Done")
 				d.chain.DisconnectAll()
 				break L
 			case event, ok := <-membersEvent:
 				if !ok {
-					d.logger.Info("[DOS] End membersEvent")
+					d.logger.Info("End membersEvent")
 					d.End()
 					continue
 				}
@@ -90,7 +90,7 @@ func (d *DosNode) onchainLoop() {
 							diff := now.Sub(inactiveTime)
 							mins := int(diff.Minutes())
 							if mins >= 5 {
-								d.logger.Debug(fmt.Sprintf("[DOS] Difference in Minutes over 5: %d Minutes %x", mins, nodeID))
+								d.logger.Debug(fmt.Sprintf("Difference in Minutes over 5: %d Minutes %x", mins, nodeID))
 								inactiveNodes[nodeID] = time.Time{}
 								addr := common.Address{}
 								b := []byte(nodeID)
@@ -102,7 +102,7 @@ func (d *DosNode) onchainLoop() {
 				}
 			case err, ok := <-onchainErrc:
 				if !ok {
-					d.logger.Info("[DOS] End onchainErrc")
+					d.logger.Info("End onchainErrc")
 					break L
 				}
 				var oError *onchain.OnchainError
@@ -112,7 +112,7 @@ func (d *DosNode) onchainLoop() {
 				d.logger.Error(err)
 			case event, ok := <-d.onchainEvent:
 				if !ok {
-					d.logger.Info("[DOS] End onchainEvent")
+					d.logger.Info("End onchainEvent")
 					break L
 				}
 				switch content := event.(type) {
@@ -199,24 +199,24 @@ func (d *DosNode) onchainLoop() {
 				}
 			}
 		}
-		d.logger.Info("[DOS] Rest onchainLoop")
+		d.logger.Info("Rest onchainLoop")
 		watchdog.Stop()
 		//Drain the events out of the channel
 		for _ = range d.onchainEvent {
 		}
-		d.logger.Info("[DOS] End Drain onchainEvent")
+		d.logger.Info("End Drain onchainEvent")
 
 		for err = range onchainErrc {
-			d.logger.Error(fmt.Errorf("[DOS] Drain onchainErrc %+v \n", err))
+			d.logger.Error(fmt.Errorf("Drain onchainErrc %+v \n", err))
 		}
-		d.logger.Info("[DOS] End Drain onchainErrc")
+		d.logger.Info("End Drain onchainErrc")
 		d.chain.DisconnectAll()
 		select {
 		case <-d.ctx.Done():
 			return
 		default:
 		}
-		d.logger.Info("[DOS] Reconnect to geth")
+		d.logger.Info("Reconnect to geth")
 		//Connect to geth
 		for {
 			reconn++
@@ -230,7 +230,7 @@ func (d *DosNode) onchainLoop() {
 			if err := d.chain.Connect(d.config.ChainNodePool, t); err != nil {
 				d.logger.Error(err)
 				time.Sleep(10 * time.Second)
-				d.logger.Info("[DOS] Reconnecting to geth")
+				d.logger.Info("Reconnecting to geth")
 				continue
 			}
 			break
@@ -249,7 +249,7 @@ func (d *DosNode) handleGrouping(participants [][]byte, groupID string) {
 	if !isMember {
 		return
 	}
-	d.logger.Info("[DOS] Grouping start")
+	d.logger.Info("Grouping start")
 	d.logger.Event("GroupingStart", map[string]interface{}{"GroupID": groupID, "Topic": "Grouping"})
 	defer d.logger.TimeTrack(time.Now(), "GroupingDone", map[string]interface{}{"GroupID": groupID, "Topic": "Grouping"})
 	defer d.logger.Info(fmt.Sprintf("Grouping Done %x", groupID))
@@ -328,14 +328,14 @@ func (d *DosNode) handleCR(cr *onchain.LogStartCommitReveal, randSeed *big.Int) 
 	}
 
 	time.Sleep(time.Duration(waitCommit*15) * time.Second)
-	d.logger.Info("[DOS] Commit")
+	d.logger.Info("Commit")
 	d.logger.Event("Commit", map[string]interface{}{"CID": fmt.Sprintf("%x", cid)})
 	if err := d.chain.Commit(cid, *hash); err != nil {
 		d.logger.Error(err)
 	}
 	<-time.After(time.Duration(waitReveal*15) * time.Second)
 
-	d.logger.Info("[DOS] Reveal")
+	d.logger.Info("Reveal")
 	d.logger.Event("Reveal", map[string]interface{}{"CID": fmt.Sprintf("%x", cid)})
 	if err := d.chain.Reveal(cid, sec); err != nil {
 		d.logger.Error(err)
@@ -386,7 +386,7 @@ func (d *DosNode) handleGroupFormation() bool {
 	}
 
 	if pendingNodeSize < groupSize {
-		d.logger.Debug(fmt.Sprintf("[DOS] Not enough pendingNodes (%v) vs groupSize (%v), skipping group formation ...", pendingNodeSize, groupSize))
+		d.logger.Debug(fmt.Sprintf("Not enough pendingNodes (%v) vs groupSize (%v), skipping group formation ...", pendingNodeSize, groupSize))
 		return false
 	}
 
@@ -403,10 +403,10 @@ func (d *DosNode) handleGroupFormation() bool {
 				return false
 			}
 			if lastGrpFormReqId != 0 {
-				d.logger.Debug("[DOS] Already in Group Formation Stage, skipping ...")
+				d.logger.Debug("Already in Group Formation Stage, skipping ...")
 				return false
 			}
-			d.logger.Debug("[DOS] Signaling new group formation ...")
+			d.logger.Debug("Signaling new group formation ...")
 			d.chain.SignalGroupFormation()
 			return true
 		}
@@ -417,7 +417,7 @@ func (d *DosNode) handleGroupFormation() bool {
 			return false
 		}
 		if cid == 0 {
-			d.logger.Debug("[DOS] Bootstrap condition matches, signaling ...")
+			d.logger.Debug("Bootstrap condition matches, signaling ...")
 			d.chain.SignalGroupFormation()
 			return true
 		}
@@ -432,7 +432,7 @@ func (d *DosNode) handleRandom(currentBlockNumber uint64) bool {
 		return false
 	}
 	if groupSize == 0 {
-		d.logger.Debug("[DOS] No live working group, skipping...")
+		d.logger.Debug("No live working group, skipping...")
 		return false
 	}
 	lastUpdatedBlock, err := d.chain.LastUpdatedBlock()
@@ -446,10 +446,10 @@ func (d *DosNode) handleRandom(currentBlockNumber uint64) bool {
 		return false
 	}
 	if lastUpdatedBlock+sysRandInterval > currentBlockNumber {
-		d.logger.Debug("[DOS] System random not expired yet, skipping...")
+		d.logger.Debug("System random not expired yet, skipping...")
 		return false
 	}
-	d.logger.Debug("[DOS] Signaling system randomness refresh...")
+	d.logger.Debug("Signaling system randomness refresh...")
 	if err := d.chain.SignalRandom(); err != nil {
 		d.logger.Error(err)
 		return false
@@ -464,7 +464,7 @@ func (d *DosNode) handleBootstrap(currentBlockNumber uint64) bool {
 		return false
 	}
 	if cid == 0 {
-		d.logger.Debug("[DOS] Not in bootstrap phase ...")
+		d.logger.Debug("Not in bootstrap phase ...")
 		return false
 	}
 	bootstrapEndBlk, err := d.chain.BootstrapEndBlk()
@@ -473,7 +473,7 @@ func (d *DosNode) handleBootstrap(currentBlockNumber uint64) bool {
 		return false
 	}
 	if currentBlockNumber <= bootstrapEndBlk {
-		d.logger.Debug("[DOS] Waiting for bootstrap to end before next step ...")
+		d.logger.Debug("Waiting for bootstrap to end before next step ...")
 		return false
 	}
 	pendingNodeSize, err := d.chain.NumPendingNodes()
@@ -489,12 +489,12 @@ func (d *DosNode) handleBootstrap(currentBlockNumber uint64) bool {
 	if pendingNodeSize < bootstrapThreshold {
 		d.logger.Debug(
 			fmt.Sprintf(
-				"[DOS] Not enough registered pendingNodes (%v) vs minimum bootstrap threshold (%v), skipping bootstrap ...",
+				"Not enough registered pendingNodes (%v) vs minimum bootstrap threshold (%v), skipping bootstrap ...",
 				pendingNodeSize, bootstrapThreshold))
 		return false
 	}
 
-	d.logger.Debug("[DOS] Signaling system to bootstrap ...")
+	d.logger.Debug("Signaling system to bootstrap ...")
 	if err := d.chain.SignalBootstrap(big.NewInt(int64(cid))); err != nil {
 		d.logger.Error(err)
 		return false
@@ -509,10 +509,10 @@ func (d *DosNode) handleGroupDissolve(currentBlockNumber uint64) bool {
 		return false
 	}
 	if gid == 1 {
-		d.logger.Debug("[DOS] Empty Pending Group List, skip group dissolve...")
+		d.logger.Debug("Empty Pending Group List, skip group dissolve...")
 		return false
 	} else if gid == 0 {
-		d.logger.Debug("[DOS] Invalid groupId, skip group dissolve...")
+		d.logger.Debug("Invalid groupId, skip group dissolve...")
 		return false
 	}
 	startBlock, err := d.chain.PendingGroupStartBlock(gid)
@@ -526,7 +526,7 @@ func (d *DosNode) handleGroupDissolve(currentBlockNumber uint64) bool {
 		return false
 	}
 	if startBlock+pgMaxLife < currentBlockNumber {
-		d.logger.Info("[DOS] Signaling group dissolve ...")
+		d.logger.Info("Signaling group dissolve ...")
 		d.chain.SignalGroupDissolve()
 		return true
 	}

@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"math/big"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -25,6 +26,17 @@ import (
 const (
 	envPassPhrase = "PASSPHRASE"
 )
+
+const bootStr = `
+
+██████╗  ██████╗ ███████╗    ███╗   ██╗███████╗████████╗██╗    ██╗ ██████╗ ██████╗ ██╗  ██╗
+██╔══██╗██╔═══██╗██╔════╝    ████╗  ██║██╔════╝╚══██╔══╝██║    ██║██╔═══██╗██╔══██╗██║ ██╔╝
+██║  ██║██║   ██║███████╗    ██╔██╗ ██║█████╗     ██║   ██║ █╗ ██║██║   ██║██████╔╝█████╔╝
+██║  ██║██║   ██║╚════██║    ██║╚██╗██║██╔══╝     ██║   ██║███╗██║██║   ██║██╔══██╗██╔═██╗
+██████╔╝╚██████╔╝███████║    ██║ ╚████║███████╗   ██║   ╚███╔███╔╝╚██████╔╝██║  ██║██║  ██╗
+╚═════╝  ╚═════╝ ╚══════╝    ╚═╝  ╚═══╝╚══════╝   ╚═╝    ╚══╝╚══╝  ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═╝
+
+`
 
 type ctxKey string
 
@@ -140,7 +152,7 @@ func (d *DosNode) Start() {
 	go func() {
 		defer wg.Done()
 		d.startRESTServer()
-		d.logger.Info("[DOS] End RESTServer")
+		d.logger.Info("End RESTServer")
 		d.End()
 	}()
 	t := time.Now().Add(60 * time.Second)
@@ -151,25 +163,25 @@ func (d *DosNode) Start() {
 	go func() {
 		defer wg.Done()
 		d.onchainLoop()
-		d.logger.Info("[DOS] End ONCHAIN Loop")
+		d.logger.Info("End ONCHAIN Loop")
 		d.End()
 	}()
 	go func() {
 		defer wg.Done()
 		d.p.Listen()
-		d.logger.Info("[DOS] End P2P Loop")
+		d.logger.Info("End P2P Loop")
 		d.End()
 	}()
 	go func() {
 		defer wg.Done()
 		d.queryLoop()
-		d.logger.Info("[DOS] End Query Loop")
+		d.logger.Info("End Query Loop")
 		d.End()
 	}()
 	go func() {
 		defer wg.Done()
 		d.dkg.Loop()
-		d.logger.Info("[DOS] End DKG Loop")
+		d.logger.Info("End DKG Loop")
 		d.End()
 	}()
 	go func() {
@@ -177,7 +189,7 @@ func (d *DosNode) Start() {
 		for {
 			select {
 			case <-d.ctx.Done():
-				d.logger.Info("[DOS] ctx.Done")
+				d.logger.Info("ctx.Done")
 				return
 			default:
 				if d.isGuardian {
@@ -197,6 +209,7 @@ func (d *DosNode) Start() {
 						handled = d.handleBootstrap(currentBlockNumber)
 					}
 				}
+				d.logger.Debug("Node heartbeat...")
 				time.Sleep(15 * time.Second)
 			}
 		}
@@ -235,9 +248,13 @@ func (d *DosNode) Start() {
 			break
 		}
 	}
-	d.logger.Info(fmt.Sprintf("[DOS] Join : num of peer %d\n", num))
+	d.logger.Info(fmt.Sprintf("Join : num of peer %d", num))
+	appSession := os.Getenv("APPSESSION")
+	clientIP := os.Getenv("NODEIP")
+	nodeId := os.Getenv("NODEID")
+	d.logger.Info(fmt.Sprintf("%s - Version: %s, Node IP: %s, Node ID: %s\n", bootStr, appSession, clientIP, nodeId))
 	wg.Wait()
-	d.logger.Info("[DOS] End")
+	d.logger.Info("Node end")
 }
 
 func getBootIps(bootStrapUrl string) []string {

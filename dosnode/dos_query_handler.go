@@ -13,7 +13,7 @@ import (
 )
 
 func (d *DosNode) queryLoop() {
-	defer d.logger.Info("[DOS] End queryLoop")
+	defer d.logger.Info("End queryLoop")
 	bufSign := make(map[string][]*vss.Signature)
 	reqSign := make(map[string]request)
 	peerMsg, _ := d.p.SubscribeMsg(50, vss.Signature{})
@@ -23,7 +23,7 @@ func (d *DosNode) queryLoop() {
 	for {
 		select {
 		case <-d.ctx.Done():
-			defer d.logger.Info("[DOS] End queryLoop ctx.Done")
+			defer d.logger.Info("End queryLoop ctx.Done")
 			return
 		case <-watchdog.C:
 			for _, req := range reqSign {

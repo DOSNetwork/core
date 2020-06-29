@@ -12,7 +12,7 @@ import (
 )
 
 func (d *DosNode) startRESTServer() (err error) {
-	defer fmt.Println("[DOS] End RESTServer")
+	defer fmt.Println("End RESTServer")
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", d.status)
 	mux.HandleFunc("/balance", d.balance)
@@ -106,22 +106,22 @@ func (d *DosNode) balance(w http.ResponseWriter, r *http.Request) {
 }
 
 func (d *DosNode) enableAdmin(w http.ResponseWriter, r *http.Request) {
-	d.logger.Info("[DOS] isAdmin")
+	d.logger.Info("isAdmin")
 	d.isAdmin = true
 }
 
 func (d *DosNode) disableAdmin(w http.ResponseWriter, r *http.Request) {
-	d.logger.Info("[DOS] disable admin")
+	d.logger.Info("disable admin")
 	d.isAdmin = false
 }
 
 func (d *DosNode) enableGuardian(w http.ResponseWriter, r *http.Request) {
-	d.logger.Info("[DOS] enableGuardian")
+	d.logger.Info("enableGuardian")
 	d.isGuardian = true
 }
 
 func (d *DosNode) disableGuardian(w http.ResponseWriter, r *http.Request) {
-	d.logger.Info("[DOS] disable guardian")
+	d.logger.Info("disable guardian")
 	d.isGuardian = false
 }
 
@@ -130,7 +130,7 @@ func (d *DosNode) signalBootstrap(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "GET":
 		for k, v := range r.URL.Query() {
-			fmt.Printf("[DOS]  %s: %s\n", k, v)
+			fmt.Printf(" %s: %s\n", k, v)
 			if k == "cid" {
 				i, err := strconv.Atoi(v[0])
 				if err == nil && i >= 0 {
@@ -187,7 +187,7 @@ func (d *DosNode) dkgTest(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "GET":
 		for k, v := range r.URL.Query() {
-			fmt.Printf("[DOS]  %s: %s\n", k, v)
+			fmt.Printf(" %s: %s\n", k, v)
 			if k == "start" {
 				i, err := strconv.Atoi(v[0])
 				if err == nil && i >= 0 {
@@ -213,7 +213,7 @@ func (d *DosNode) dkgTest(w http.ResponseWriter, r *http.Request) {
 	}
 	if start >= 0 && end >= 0 {
 		if len(members) < (end - start) {
-			d.logger.Info(fmt.Sprintf("[DOS] members size not enough:%d", len(members)))
+			d.logger.Info(fmt.Sprintf("members size not enough: %d", len(members)))
 			return
 		}
 		var participants [][]byte
@@ -236,7 +236,7 @@ func (d *DosNode) queryTest(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case "GET":
 		for k, v := range r.URL.Query() {
-			fmt.Printf("[DOS]  %s: %s\n", k, v)
+			fmt.Printf("%s: %s\n", k, v)
 			if k == "gid" {
 				i, err := strconv.Atoi(v[0])
 				if err == nil && i >= 0 {

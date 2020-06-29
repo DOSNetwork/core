@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/bshuster-repo/logrus-logstash-hook"
@@ -18,6 +19,26 @@ var (
 	root = &logger{}
 )
 
+type dosFormatter struct {
+	logrus.TextFormatter
+}
+
+func (f *dosFormatter) Format(entry *logrus.Entry) ([]byte, error) {
+	// this whole mess of dealing with ansi color codes is required if you want the colored output otherwise you will lose colors in the log levels
+	var levelColor int
+	switch entry.Level {
+	case logrus.DebugLevel, logrus.TraceLevel:
+		levelColor = 31 // gray
+	case logrus.WarnLevel:
+		levelColor = 33 // yellow
+	case logrus.ErrorLevel, logrus.FatalLevel, logrus.PanicLevel:
+		levelColor = 31 // red
+	default:
+		levelColor = 36 // blue
+	}
+	return []byte(fmt.Sprintf("[%s] - \x1b[%dm%s\x1b[0m - %s\n", entry.Time.Format(f.TimestampFormat), levelColor, strings.ToUpper(entry.Level.String()), entry.Message)), nil
+}
+
 // New returns a new logger with the given key/value .
 // New is a convenient alias for Root().New
 func New(key string, value interface{}) Logger {
@@ -30,9 +51,9 @@ func New(key string, value interface{}) Logger {
 // Init setups default field and add hook
 func Init(id []byte) {
 	appSession := os.Getenv("APPSESSION")
-	nodId := byteTohex(id)
 	logIp := os.Getenv("LOGIP")
-	clientIP := os.Getenv("NODEIP")
+	nodeId := byteTohex(id)
+	os.Setenv("NODEID", nodeId)
 	logrus.SetOutput(ioutil.Discard)
 
 	if logIp != "" {
@@ -48,7 +69,7 @@ func Init(id []byte) {
 
 	path := "./vault/doslog.txt"
 	writer, err := rotatelogs.New(
-		path+".%Y%m%d%H%M",
+		path+".%Y-%m-%d-%H-%M-%S",
 		rotatelogs.WithLinkName(path),
 		rotatelogs.WithMaxAge(time.Duration(86400)*time.Second),
 		rotatelogs.WithRotationTime(time.Duration(604800)*time.Second),
@@ -60,22 +81,18 @@ func Init(id []byte) {
 	logrus.AddHook(lfshook.NewHook(
 		lfshook.WriterMap{
 			logrus.InfoLevel:  writer,
+			logrus.DebugLevel: writer,
 			logrus.ErrorLevel: writer,
 		},
-		&logrus.JSONFormatter{},
+		&dosFormatter{
+			logrus.TextFormatter{
+				ForceColors:     true,
+				TimestampFormat: "2006-01-02 15:04:05",
+				FullTimestamp:   true,
+			},
+		},
 	))
-	if appSession != "" {
-		root.entry = logrus.WithFields(logrus.Fields{
-			"appSession": appSession,
-			"clientip":   clientIP,
-			"nodeID":     nodId,
-		})
-	} else {
-		root.entry = logrus.WithFields(logrus.Fields{
-			"clientip": clientIP,
-			"nodeID":   nodId,
-		})
-	}
+	root.entry = logrus.WithFields(logrus.Fields{})
 }
 
 func byteTohex(a []byte) string {
