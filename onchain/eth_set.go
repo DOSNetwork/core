@@ -342,30 +342,17 @@ func (e *ethAdaptor) SignalGroupDissolve() (err error) {
 		err = errors.New("not connecting to geth")
 		return
 	}
-
-	// define how to parse parameters and execute proxy function
-	opCtx, opCancel := context.WithTimeout(e.ctx, e.setTimeout)
-	defer opCancel()
-	proxies := e.proxies
-
-	f := func(ctx context.Context) (tx *types.Transaction, err error) {
-		idx := getIndex(ctx)
-		if idx == -1 {
-			err = errors.New("no client index in context")
-		} else {
-			tx, err = proxies[idx].SignalGroupDissolve()
-			if err != nil {
-				err = &OnchainError{err: errors.Errorf(": %w", err), Idx: idx}
-			} else {
-				e.logger.Info(fmt.Sprintf("SignalGroupDissolve %x", tx.Hash()))
-			}
-		}
+	if len(e.proxies) != 0 && len(e.clients) != 0 {
+		tx, err := e.proxies[0].SignalGroupDissolve()
 		if err != nil {
+			return err
+		}
+		e.logger.Info(fmt.Sprintf("SignalGroupDissolve tx sent: %x, waiting for confirmation...", tx.Hash()))
+		if err = CheckTransaction(e.clients[0], tx); err != nil {
 			e.logger.Error(err)
 		}
-		return
 	}
-	return e.waitForReply(&request{opCtx: opCtx, f: f, reply: make(chan *response)})
+	return
 }
 
 func (e *ethAdaptor) SignalBootstrap(cid *big.Int) (err error) {

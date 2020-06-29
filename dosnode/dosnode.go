@@ -172,34 +172,35 @@ func (d *DosNode) Start() {
 		d.logger.Info("[DOS] End DKG Loop")
 		d.End()
 	}()
-	if d.isGuardian {
-		go func() {
-			defer wg.Done()
-			for {
-				select {
-				case <-d.ctx.Done():
-					d.logger.Info("[DOS] ctx.Done")
-					return
-				default:
-					if d.isGuardian {
-						currentBlockNumber, err := d.chain.CurrentBlock()
-						if err != nil {
-							d.logger.Error(err)
-							continue
-						}
-						handled := d.handleRandom(currentBlockNumber)
-						if !handled {
-							handled = d.handleGroupFormation()
-						}
-						if !handled {
-							handled = d.handleBootstrap(currentBlockNumber)
-						}
+	go func() {
+		defer wg.Done()
+		for {
+			select {
+			case <-d.ctx.Done():
+				d.logger.Info("[DOS] ctx.Done")
+				return
+			default:
+				if d.isGuardian {
+					currentBlockNumber, err := d.chain.CurrentBlock()
+					if err != nil {
+						d.logger.Error(err)
+						continue
 					}
-					time.Sleep(15 * time.Second)
+					handled := d.handleRandom(currentBlockNumber)
+					if !handled {
+						handled = d.handleGroupFormation()
+					}
+					if !handled {
+						handled = d.handleGroupDissolve(currentBlockNumber)
+					}
+					if !handled {
+						handled = d.handleBootstrap(currentBlockNumber)
+					}
 				}
+				time.Sleep(15 * time.Second)
 			}
-		}()
-	}
+		}
+	}()
 
 	retry, num := 0, 0
 	var err error

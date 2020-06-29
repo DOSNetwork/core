@@ -118,15 +118,6 @@ func (d *DosNode) onchainLoop() {
 				switch content := event.(type) {
 				case *onchain.LogGrouping:
 					groupID := fmt.Sprintf("%x", content.GroupId)
-					if d.isGuardian {
-						go func() {
-							select {
-							case <-d.ctx.Done():
-							case <-time.After(15 * 20 * time.Second):
-								d.handleGroupDissolve()
-							}
-						}()
-					}
 					go d.handleGrouping(content.NodeId, groupID)
 				case *onchain.LogGroupDissolve:
 					groupID := fmt.Sprintf("%x", content.GroupId)
@@ -511,16 +502,35 @@ func (d *DosNode) handleBootstrap(currentBlockNumber uint64) bool {
 	return true
 }
 
-func (d *DosNode) handleGroupDissolve() {
-	pendingGroupSize, err := d.chain.NumPendingGroups()
+func (d *DosNode) handleGroupDissolve(currentBlockNumber uint64) bool {
+	gid, err := d.chain.FirstPendingGroupId()
 	if err != nil {
 		d.logger.Error(err)
-		return
+		return false
 	}
-
-	if pendingGroupSize > 0 {
+	if gid == 1 {
+		d.logger.Debug("[DOS] Empty Pending Group List, skip group dissolve...")
+		return false
+	} else if gid == 0 {
+		d.logger.Debug("[DOS] Invalid groupId, skip group dissolve...")
+		return false
+	}
+	startBlock, err := d.chain.PendingGroupStartBlock(gid)
+	if err != nil {
+		d.logger.Error(err)
+		return false
+	}
+	pgMaxLife, err := d.chain.PendingGroupMaxLife()
+	if err != nil {
+		d.logger.Error(err)
+		return false
+	}
+	if startBlock+pgMaxLife < currentBlockNumber {
+		d.logger.Info("[DOS] Signaling group dissolve ...")
 		d.chain.SignalGroupDissolve()
+		return true
 	}
+	return false
 }
 
 func (d *DosNode) isMember(groupID string) bool {
