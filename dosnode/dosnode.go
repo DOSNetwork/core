@@ -209,7 +209,7 @@ func (d *DosNode) Start() {
 						handled = d.handleBootstrap(currentBlockNumber)
 					}
 				}
-				d.logger.Debug("Node heartbeat...")
+				d.logger.Info("Node heartbeat ...")
 				time.Sleep(15 * time.Second)
 			}
 		}

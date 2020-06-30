@@ -28,7 +28,7 @@ func (f *dosFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 	var levelColor int
 	switch entry.Level {
 	case logrus.DebugLevel, logrus.TraceLevel:
-		levelColor = 31 // gray
+		levelColor = 32 // green
 	case logrus.WarnLevel:
 		levelColor = 33 // yellow
 	case logrus.ErrorLevel, logrus.FatalLevel, logrus.PanicLevel:
@@ -36,7 +36,13 @@ func (f *dosFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 	default:
 		levelColor = 36 // blue
 	}
-	return []byte(fmt.Sprintf("[%s] - \x1b[%dm%s\x1b[0m - %s\n", entry.Time.Format(f.TimestampFormat), levelColor, strings.ToUpper(entry.Level.String()), entry.Message)), nil
+	var msg string
+	if len(entry.Message) > 0 {
+		msg = entry.Message
+	} else {
+		msg, _ = entry.String()
+	}
+	return []byte(fmt.Sprintf("[%s] - \x1b[%dm%s\x1b[0m - %s\n", entry.Time.Format(f.TimestampFormat), levelColor, strings.ToUpper(entry.Level.String()), msg)), nil
 }
 
 // New returns a new logger with the given key/value .
@@ -55,10 +61,19 @@ func Init(id []byte) {
 	nodeId := byteTohex(id)
 	os.Setenv("NODEID", nodeId)
 	logrus.SetOutput(ioutil.Discard)
+	// Use INFO log level by default
+	lvl, ok := os.LookupEnv("LOG_LEVEL")
+	if !ok {
+		lvl = "info"
+	}
+	ll, err := logrus.ParseLevel(lvl)
+	if err != nil {
+		ll = logrus.InfoLevel
+	}
+	logrus.SetLevel(ll)
 
 	if logIp != "" {
 		logrus.SetLevel(logrus.DebugLevel)
-
 		hook, err := logrustash.NewHook("tcp", logIp, appSession)
 		if err != nil {
 			fmt.Println(err)

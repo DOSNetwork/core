@@ -432,7 +432,7 @@ func (d *DosNode) handleRandom(currentBlockNumber uint64) bool {
 		return false
 	}
 	if groupSize == 0 {
-		d.logger.Debug("No live working group, skipping...")
+		d.logger.Debug("No live working group, skipping update randomness ...")
 		return false
 	}
 	lastUpdatedBlock, err := d.chain.LastUpdatedBlock()
@@ -446,10 +446,10 @@ func (d *DosNode) handleRandom(currentBlockNumber uint64) bool {
 		return false
 	}
 	if lastUpdatedBlock+sysRandInterval > currentBlockNumber {
-		d.logger.Debug("System random not expired yet, skipping...")
+		d.logger.Debug("System random not expired yet, skipping update randomness ...")
 		return false
 	}
-	d.logger.Debug("Signaling system randomness refresh...")
+	d.logger.Debug("Signaling system randomness refresh ...")
 	if err := d.chain.SignalRandom(); err != nil {
 		d.logger.Error(err)
 		return false
@@ -509,10 +509,10 @@ func (d *DosNode) handleGroupDissolve(currentBlockNumber uint64) bool {
 		return false
 	}
 	if gid == 1 {
-		d.logger.Debug("Empty Pending Group List, skip group dissolve...")
+		d.logger.Debug("Empty Pending Group List, skipping group dissolve ...")
 		return false
 	} else if gid == 0 {
-		d.logger.Debug("Invalid groupId, skip group dissolve...")
+		d.logger.Debug("Invalid groupId, skipping group dissolve ...")
 		return false
 	}
 	startBlock, err := d.chain.PendingGroupStartBlock(gid)
