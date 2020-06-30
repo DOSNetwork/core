@@ -508,10 +508,10 @@ func (d *DosNode) handleGroupDissolve(currentBlockNumber uint64) bool {
 		d.logger.Error(err)
 		return false
 	}
-	if gid == 1 {
+	if gid.Cmp(big.NewInt(1)) == 0 {
 		d.logger.Debug("Empty Pending Group List, skipping group dissolve ...")
 		return false
-	} else if gid == 0 {
+	} else if gid.Cmp(big.NewInt(0)) == 0 {
 		d.logger.Debug("Invalid groupId, skipping group dissolve ...")
 		return false
 	}

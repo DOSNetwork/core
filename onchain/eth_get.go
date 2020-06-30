@@ -281,7 +281,7 @@ type PendingGroupT struct {
 	StartBlkNum *big.Int
 }
 
-func (e *ethAdaptor) PendingGroupStartBlock(groupId uint64) (result uint64, err error) {
+func (e *ethAdaptor) PendingGroupStartBlock(groupId *big.Int) (result uint64, err error) {
 	if !e.isConnecting() {
 		err = errors.New("not connecting to geth")
 	}
@@ -296,7 +296,7 @@ func (e *ethAdaptor) PendingGroupStartBlock(groupId uint64) (result uint64, err 
 			if idx == -1 {
 				err = errors.New("no client index in context")
 			} else {
-				if val, err := proxies[idx].PendingGroups(big.NewInt(int64(groupId))); err != nil {
+				if val, err := proxies[idx].PendingGroups(groupId); err != nil {
 					replyError(ctx, errc, &OnchainError{err: errors.Errorf("get err : %w", err), Idx: idx})
 				} else {
 					utils.ReportResult(ctx, outc, val)
@@ -353,7 +353,7 @@ func (e *ethAdaptor) PendingGroupMaxLife() (result uint64, err error) {
 	return
 }
 
-func (e *ethAdaptor) FirstPendingGroupId() (result uint64, err error) {
+func (e *ethAdaptor) FirstPendingGroupId() (result *big.Int, err error) {
 	if !e.isConnecting() {
 		err = errors.New("not connecting to geth")
 	}
@@ -382,7 +382,7 @@ func (e *ethAdaptor) FirstPendingGroupId() (result uint64, err error) {
 		return
 	}
 	if v, ok := r.(*big.Int); ok {
-		result = v.Uint64()
+		result = v
 	} else {
 		err = errors.New("casting error")
 	}
