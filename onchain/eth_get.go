@@ -309,7 +309,10 @@ func (e *ethAdaptor) PendingGroupStartBlock(groupId *big.Int) (result uint64, er
 	if r, err = e.get(f); err != nil {
 		return
 	}
-	if v, ok := r.(PendingGroupT); ok {
+	if v, ok := r.(struct {
+		GroupId     *big.Int
+		StartBlkNum *big.Int
+	}); ok {
 		result = v.StartBlkNum.Uint64()
 	} else {
 		err = errors.New("casting error")
