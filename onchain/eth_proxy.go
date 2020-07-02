@@ -44,8 +44,8 @@ type ethAdaptor struct {
 	httpUrls         []string
 	wsUrls           []string
 	key              *keystore.Key
-	gasPrice         int64
-	gasLimit         int64
+	gasPrice         uint64
+	gasLimit         uint64
 	connTimeout      time.Duration
 	getTimeout       time.Duration
 	setTimeout       time.Duration
@@ -76,7 +76,7 @@ func NewEthAdaptor(key *keystore.Key, config *configuration.Config, l logger) (a
 	adaptor.key = key
 	adaptor.logger = l
 	adaptor.reqQueue = make(chan *request)
-	adaptor.gasLimit = int64(gasLimitInt)
+	adaptor.gasLimit = uint64(gasLimitInt)
 	adaptor.connTimeout = 60 * time.Second
 	adaptor.getTimeout = 60 * time.Second
 	adaptor.setTimeout = 60 * time.Second
@@ -204,7 +204,7 @@ func (e *ethAdaptor) Connect(urls []string, t time.Time) (err error) {
 		ctx, cancel := context.WithCancel(e.ctx)
 		ctx = context.WithValue(ctx, "index", len(e.ctxes))
 		auth := bind.NewKeyedTransactor(e.key.PrivateKey)
-		auth.GasLimit = uint64(e.gasLimit)
+		auth.GasLimit = e.gasLimit
 		auth.Context = ctx
 
 		if bootStrapUrl != "" {

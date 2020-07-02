@@ -16,6 +16,8 @@ func (d *DosNode) startRESTServer() (err error) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", d.status)
 	mux.HandleFunc("/balance", d.balance)
+	mux.HandleFunc("/setGasPrice", d.setGasPrice)
+	mux.HandleFunc("/setGasLimit", d.setGasLimit)
 	mux.HandleFunc("/enableAdmin", d.enableAdmin)
 	mux.HandleFunc("/disableAdmin", d.disableAdmin)
 	mux.HandleFunc("/enableGuardian", d.enableGuardian)
@@ -51,13 +53,13 @@ func (d *DosNode) status(w http.ResponseWriter, r *http.Request) {
 	html = html + "TotalQuery        : " + strconv.Itoa(d.totalQuery) + "\n|"
 	html = html + "FulfilledQuery    : " + strconv.Itoa(d.fulfilledQuery) + "\n|"
 	html = html + "Group Number      : " + strconv.Itoa(d.numOfworkingGroup) + "\n|"
-	html = html + "=================================================" + "\n|"
-	//	result := d.dkg.GetGroupNumber()
+	html = html + "gasPrice          : " + strconv.FormatUint(d.chain.GetGasPrice(), 10) + "\n|"
+	html = html + "gasLimit          : " + strconv.FormatUint(d.chain.GetGasLimit(), 10) + "\n|"
 	balance, err := d.chain.Balance()
 	if err != nil {
-		html = html + "Balance  : " + err.Error() + "\n|"
+		html = html + "Balance           : " + err.Error() + "\n|"
 	} else {
-		html = html + "Balance  : " + balance.String() + "\n|"
+		html = html + "Balance           : " + balance.String() + "\n|"
 	}
 	workingGroupNum, err := d.chain.GetWorkingGroupSize()
 	if err != nil {
@@ -83,7 +85,6 @@ func (d *DosNode) status(w http.ResponseWriter, r *http.Request) {
 	} else {
 		html = html + "PendingNodeSize   : " + strconv.FormatUint(pendingNodeNum, 10) + "\n|"
 	}
-
 	curBlk, err := d.chain.CurrentBlock()
 	if err != nil {
 		html = html + "CurrentBlock      : " + err.Error() + "\n"
@@ -103,6 +104,39 @@ func (d *DosNode) balance(w http.ResponseWriter, r *http.Request) {
 		html = html + result.String()
 	}
 	w.Write([]byte(html))
+}
+
+func (d *DosNode) setGasLimit(w http.ResponseWriter, r *http.Request) {
+	gasLimits, ok := r.URL.Query()["gasLimit"]
+	if !ok || len(gasLimits) == 0 {
+		return
+	}
+	g, ok := new(big.Int).SetString(gasLimits[0], 10)
+	if !ok {
+		d.logger.Error(fmt.Errorf("GasLimit SetString error"))
+		return
+	}
+	if g.Cmp(big.NewInt(0)) == 0 {
+		d.logger.Error(fmt.Errorf("GasLimit cannot be set to 0"))
+		return
+	}
+	d.logger.Info(fmt.Sprintf("Set GasLimit to %v", g))
+	d.chain.SetGasLimit(g)
+}
+
+func (d *DosNode) setGasPrice(w http.ResponseWriter, r *http.Request) {
+	gasPrices, ok := r.URL.Query()["gasPrice"]
+	if !ok || len(gasPrices) == 0 {
+		return
+	}
+	g, ok := new(big.Int).SetString(gasPrices[0], 10)
+	if !ok {
+		d.logger.Error(fmt.Errorf("GasPrice SetString error"))
+		return
+	}
+	// Set to 0 means using estimate gas price by default
+	d.logger.Info(fmt.Sprintf("Set GasPrice to %v wei", g))
+	d.chain.SetGasPrice(g)
 }
 
 func (d *DosNode) enableAdmin(w http.ResponseWriter, r *http.Request) {

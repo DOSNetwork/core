@@ -355,6 +355,25 @@ func (e *ethAdaptor) SignalGroupDissolve() (err error) {
 	return
 }
 
+func (e *ethAdaptor) SetGasLimit(gasLimit *big.Int) {
+	if len(e.proxies) > 0 && len(e.crs) > 0 {
+		e.proxies[0].TransactOpts.GasLimit = gasLimit.Uint64()
+		e.crs[0].TransactOpts.GasLimit = gasLimit.Uint64()
+	}
+}
+
+func (e *ethAdaptor) SetGasPrice(gasPrice *big.Int) {
+	if len(e.proxies) > 0 && len(e.crs) > 0 {
+		if gasPrice.Cmp(big.NewInt(0)) == 0 {
+			e.proxies[0].TransactOpts.GasPrice = nil
+			e.crs[0].TransactOpts.GasPrice = nil
+		} else {
+			e.proxies[0].TransactOpts.GasPrice = gasPrice
+			e.crs[0].TransactOpts.GasPrice = gasPrice
+		}
+	}
+}
+
 func (e *ethAdaptor) SignalBootstrap(cid *big.Int) (err error) {
 	if !e.isConnecting() {
 		err = errors.New("not connecting to geth")

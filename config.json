@@ -1,13 +1,13 @@
 {
-    "VERSION": "v1.0-beta.23",
+    "VERSION": "v1.0.0-m",
     "NodeIP": "#REPLACE-WITH-IP",
     "NodePort": "9501",
     "ChainType": "ETH",
-    "DOSAddressBridgeAddress": "0x72840b59CeE8f0ce40f33219DDf9Ca73B6B29ab2",
+    "DOSAddressBridgeAddress": "0x98A0E7026778840Aacd28B9c03137D32e06F5ff1",
     "EthGasLimit": "1500000",
     "BootStrapIPs": [
     ],
     "ChainNodePool": [
-        "wss://rinkeby.infura.io/ws/v3/#REPLACE-WITH-INFURA-APIKEY"
+        "wss://mainnet.infura.io/ws/v3/#REPLACE-WITH-INFURA-APIKEY"
     ]
 }

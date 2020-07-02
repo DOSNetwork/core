@@ -40,7 +40,11 @@ type ProxyAdapter interface {
 	StartCommitReveal(startBlock int64, commitDuration int64, revealDuration int64, revealThreshold int64) (err error)
 	Commit(cid *big.Int, commitment [32]byte) (err error)
 	Reveal(cid *big.Int, secret *big.Int) (err error)
+	SetGasPrice(gasPrice *big.Int)
+	SetGasLimit(gasLimit *big.Int)
 	//Get functions
+	GetGasPrice() (result uint64)
+	GetGasLimit() (result uint64)
 	GroupToPick() (result uint64, err error)
 	PendingNonce() (result uint64, err error)
 	GetExpiredWorkingGroupSize() (r uint64, err error)

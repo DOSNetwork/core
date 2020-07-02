@@ -565,6 +565,25 @@ func (e *ethAdaptor) BootstrapStartThreshold() (result uint64, err error) {
 	}
 	return
 }
+
+func (e *ethAdaptor) GetGasPrice() (result uint64) {
+	if len(e.proxies) != 0 {
+		if e.proxies[0].TransactOpts.GasPrice == nil {
+			result = 0
+		} else {
+			result = e.proxies[0].TransactOpts.GasPrice.Uint64()
+		}
+	}
+	return
+}
+
+func (e *ethAdaptor) GetGasLimit() (result uint64) {
+	if len(e.proxies) != 0 {
+		result = e.proxies[0].TransactOpts.GasLimit
+	}
+	return
+}
+
 func (e *ethAdaptor) GroupPubKey(gIdx int) (result [4]*big.Int, err error) {
 	if !e.isConnecting() {
 		err = errors.New("not connecting to geth")
