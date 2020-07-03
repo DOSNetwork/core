@@ -7,11 +7,12 @@
 
 ## Prerequisites:
 ##### Cloud Server / VPS Recommendations
-- [AWS Lightsail](https://aws.amazon.com/lightsail/pricing/?opdp1=pricing) - $5 monthly plan (1 cpu, 1GB memory, 40GB ssd, 2TB bandwidth)
-- [Vultr](https://www.vultr.com/?ref=7806004-4F) - Cloud Compute $5 monthly plan (1 cpu, 1GB memory, 25GB ssd, 1TB bandwidth)
-- [Digital Ocean](https://m.do.co/c/a912bdc08b78) - Droplet $5 monthly plan (1 cpu, 25GB ssd, 1TB bandwidth)
-- [Linode](https://www.linode.com/?r=35c0c22d412b3fc8bd98b4c7c6f5ac42ae3bc2e2) - $5 monthly plan (1 cpu, 1GB memory, 25GB ssd, 1TB bandwidth)
-- .
+- [AWS Lightsail](https://aws.amazon.com/lightsail/pricing) - Linux virtual server (1 cpu, 1GB memory, 40GB ssd, 2TB bandwidth)
+- [Google Cloud Platform](https://cloud.google.com) - Compute Engine General purpose (N2)
+- [Vultr](https://www.vultr.com/products/cloud-compute/) - Cloud Compute (1 cpu, 1GB memory, 25GB ssd, 1TB bandwidth)
+- [Digital Ocean](https://www.digitalocean.com/products/droplets/) - Droplet (1 cpu, 25GB ssd, 1TB bandwidth)
+- [Linode](https://www.linode.com/products/shared/) - Shared virtual Instances (1 cpu, 1GB memory, 25GB ssd, 1TB bandwidth)
+- [Others]
 
 ##### Verified and recommended installation environment
 - Ubuntu 18.04 x64 LTS or higher 
@@ -25,46 +26,23 @@
   - Learn [how to](https://www.digitalocean.com/community/tutorials/how-to-set-up-ssh-keys-on-ubuntu-1604) setup SSH public key authentication on Ubuntu 18.04 and disable password logins.
 
 
-##### Acquire testnet ether and testnet tokens
-- Acquire testnet ether from rinkeby [faucet](https://faucet.rinkeby.io/).
-- Acquire 100,000 [testnet DOS token](https://rinkeby.etherscan.io/address/0x214e79c85744cd2ebbc64ddc0047131496871bee), (and optional - acquire several [testnet DropBurn token](https://rinkeby.etherscan.io/address/0x9bfe8f5749d90eb4049ad94cc4de9b6c4c31f822)).
-- Please fill in [this](https://docs.google.com/forms/d/e/1FAIpQLSdiWuVdyxpVozEC0uWZIj9HCBX9COBYFj8Dxp2C2qX4Qv5U9g/viewform) form to request testnet tokens.
+##### Bonding enough DOS tokens to run a node
+- Acquire at least 800,000 [DOS tokens](https://etherscan.io/address/0x70861e862e1ac0c96f853c8231826e469ead37b1), (and optional - acquire several [DropBurn token](https://etherscan.io/address/0x68423B3B0769c739D1fe4C398C3d91F0d646424f) to reduce (up to 30%) the amount of DOS tokens needed to start a node, distribution plan be out later).
 - Replace your node ip address in [config.json](https://github.com/DOSNetwork/core/blob/master/config.json#L3)
+- Node runners currently earn three types of incomes: (Self-bonded) staking rewards, (other delegators') staking reward shares, oracle request processing fees.
 
 
 ##### Register and setup Infura api key
 - Register and get [Infura api key](https://ethereumico.io/knowledge-base/infura-api-key-guide/)
-- Replace your infura api key in [config.json](https://github.com/DOSNetwork/core/blob/master/config.json#L10)
+- Replace your infura api key in [config.json](https://github.com/DOSNetwork/core/blob/master/config.json#L11)
 
 
-## Run binary from github releases
-- Install:
-    ```sh
-    $ wget https://github.com/DOSNetwork/core/releases/download/v1.0-beta.23/config.json
-    $ wget https://github.com/DOSNetwork/core/releases/download/v1.0-beta.23/dos.sh
-    $ sudo chmod +x dos.sh
-    ```
-- Use a existing keystore (optional):
-    ```sh
-    $ mkdir vault
-    $ cp oldKeyStore vault/
-    ```
-- Start:
-    ```sh
-    $ ./dos.sh start
-    ```
-- Check client status :
-    ```sh
-    $ ./dos.sh status
-    ```
-- Stop client :
-    ```sh
-    $ ./dos.sh stop
-    ```
-- Debuging an issue :
-    ```sh
-    $ ./dos.sh log
-    ```
+
+## Run with docker image
+- `docker pull dosnetwork/dosnode:v1.0.0-m`
+- 
+
+
 
 ## Building binary from source
 - [Install](https://golang.org/doc/install) Go and setup golang workingspace like below:
@@ -87,7 +65,7 @@
     $ mkdir -p $GOPATH/src/github.com/DOSNetwork
     $ cd $GOPATH/src/github.com/DOSNetwork && git clone https://github.com/DOSNetwork/core.git
     $ cd core
-    $ git checkout v1.0-beta.20
+    $ git checkout v1.0.0-m
     ```
 
 - Build:
@@ -106,23 +84,3 @@
   - `$ make updateSubmodule` to fetch latest system contracts from [repo](https://github.com/DOSNetwork/eth-contracts), instead of making contract modifications locally.
   - `$ make gen` to generate binding files for system contracts.
   - `$ make clean` to remove built binaries or unnecessary generated files.
-
-
-## Run with docker image
-- TODO
-
-
-## Status
-- [x] Verifiable Secret Sharing
-- [x] Distributed Key Generation (Pedersen's DKG approach)
-- [x] Paring Library and Threshold BLS Signature
-- [x] Distributed Randomness Generation
-- [x] Gossip & DHT Implementation
-- [x] P2P NAT Support
-- [x] Json / Xml / Html Request Parser
-- [x] Dockerization and Client Deployment Script
-- [x] Integration with Ethereum On-chain [System Contracts](https://github.com/DOSNetwork/eth-contracts)
-- [x] P2P Network Performance Tuning
-- [x] Staking & Delegation Contracts with a User-friendly Dashboard
-- [x] Network Status Scanner/Explorer
-- [ ] Test with geth lightnode mode and experiment with parity clients
