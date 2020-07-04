@@ -2,7 +2,6 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/DOSNetwork/core)](https://goreportcard.com/report/github.com/DOSNetwork/core)
 [![Maintainability](https://api.codeclimate.com/v1/badges/a2eb5767f8984835fb3b/maintainability)](https://codeclimate.com/github/DOSNetwork/core/maintainability)
 [![GoDoc](https://godoc.org/github.com/DOSNetwork/core?status.svg)](https://godoc.org/github.com/DOSNetwork/core)
-[![](https://img.shields.io/static/v1.svg?label=chat&message=Telegram&color=brightgreen)](https://t.me/joinchat/KhcP5BQXgWLyojui9BCGfQ)
 
 
 ## Prerequisites:
