@@ -1,10 +1,10 @@
 {
-    "VERSION": "v1.0.0-m",
+    "VERSION": "v1.0.1-m",
     "NodeIP": "#REPLACE-WITH-IP",
     "NodePort": "9501",
     "ChainType": "ETH",
     "DOSAddressBridgeAddress": "0x98A0E7026778840Aacd28B9c03137D32e06F5ff1",
-    "EthGasLimit": "1500000",
+    "EthGasLimit": "1200000",
     "BootStrapIPs": [
     ],
     "ChainNodePool": [

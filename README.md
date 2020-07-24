@@ -38,7 +38,7 @@
 
 
 ## Run with docker image
-- `docker pull dosnetwork/dosnode:v1.0.0-m`
+- `docker pull dosnetwork/dosnode:v1.0.1-m`
 - 
 
 
