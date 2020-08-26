@@ -1,5 +1,0 @@
-DOSIMAGE=dosnetwork/dosnode:beta
-USER=
-IP=
-SSHKEY=
-KEYSTORE=

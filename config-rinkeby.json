@@ -3,11 +3,11 @@
     "NodeIP": "#REPLACE-WITH-IP",
     "NodePort": "9501",
     "ChainType": "ETH",
-    "DOSAddressBridgeAddress": "0x98A0E7026778840Aacd28B9c03137D32e06F5ff1",
+    "DOSAddressBridgeAddress": "0xeE2e9f35c9F91571535173902E7e7B4E67deE32b",
     "EthGasLimit": "1000000",
     "BootStrapIPs": [
     ],
     "ChainNodePool": [
-        "wss://mainnet.infura.io/ws/v3/#REPLACE-WITH-INFURA-APIKEY"
+        "wss://rinkeby.infura.io/ws/v3/#REPLACE-WITH-INFURA-APIKEY"
     ]
 }
