@@ -63,8 +63,9 @@ type ProxyAdapter interface {
 	Address() (addr common.Address)
 	CurrentBlock() (r uint64, err error)
 	RefreshSystemRandomHardLimit() (limit uint64, err error)
+	CachedUpdatedBlock() (blkNum uint64, err error)
+	RelayRespondLimit() (limit uint64, err error)
 	BootstrapStartThreshold() (result uint64, err error)
-	GroupPubKey(idx int) (groupPubKeys [4]*big.Int, err error)
 	IsPendingNode(id []byte) (bool, error)
 	BootStrapUrl() string
 }
