@@ -449,6 +449,20 @@ func (d *DosNode) handleRandom(currentBlockNumber uint64) bool {
 		d.logger.Debug("System random not expired yet, skipping update randomness ...")
 		return false
 	}
+	cachedUpdatedBlock, err := d.chain.CachedUpdatedBlock()
+	if err != nil {
+		d.logger.Error(err)
+		return false
+	}
+	relayRespondLimit, err := d.chain.RelayRespondLimit()
+	if err != nil {
+		d.logger.Error(err)
+		return false
+	}
+	if cachedUpdatedBlock+relayRespondLimit > currentBlockNumber {
+		d.logger.Debug("System random is under updating, waiting for the settlment ...")
+		return false
+	}
 	d.logger.Debug("Signaling system randomness refresh ...")
 	if err := d.chain.SignalRandom(); err != nil {
 		d.logger.Error(err)

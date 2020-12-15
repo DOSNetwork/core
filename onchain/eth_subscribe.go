@@ -41,8 +41,6 @@ const (
 	SubscribeLogGroupingInitiated
 	//SubscribeDosproxyUpdateBootstrapGroups is a log type to subscribe the event UpdateGroupToPick
 	SubscribeDosproxyUpdateBootstrapGroups
-	//SubscribeDosproxyUpdateGroupSize is a log type to subscribe the event UpdateGroupSize
-	SubscribeDosproxyUpdateGroupSize
 	//SubscribeCommitrevealLogStartCommitreveal is a log type to subscribe the event StartCommitreveal
 	SubscribeCommitrevealLogStartCommitreveal
 	//SubscribeCommitrevealLogCommit is a log type to subscribe the event LogCommit
@@ -515,57 +513,6 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 						return
 					}
 					l := &LogGroupingInitiated{}
-					log = &LogCommon{
-						Tx:      i.Raw.TxHash.Hex(),
-						BlockN:  i.Raw.BlockNumber,
-						Removed: i.Raw.Removed,
-						Raw:     i.Raw,
-						log:     l,
-					}
-				}
-				select {
-				case <-ctx.Done():
-					return
-				case out <- log:
-				}
-			}
-		}()
-		return out, errc
-	},
-	SubscribeDosproxyUpdateGroupSize: func(ctx context.Context, proxy *dosproxy.DosproxySession) (chan interface{}, chan error) {
-		out := make(chan interface{})
-		errc := make(chan error)
-		opt := &bind.WatchOpts{}
-		go func() {
-			transitChan := make(chan *dosproxy.DosproxyUpdateGroupSize)
-			defer close(transitChan)
-			defer close(errc)
-			defer close(out)
-			sub, err := proxy.Contract.WatchUpdateGroupSize(opt, transitChan)
-			if err != nil {
-				replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getIndex(ctx)})
-				return
-			}
-			defer sub.Unsubscribe()
-			for {
-				var log *LogCommon
-				select {
-				case <-ctx.Done():
-					return
-				case err, ok := <-sub.Err():
-					if !ok {
-						return
-					}
-					replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getIndex(ctx)})
-					continue
-				case i, ok := <-transitChan:
-					if !ok {
-						return
-					}
-					l := &LogUpdateGroupSize{
-						OldSize: i.OldSize,
-						NewSize: i.NewSize,
-					}
 					log = &LogCommon{
 						Tx:      i.Raw.TxHash.Hex(),
 						BlockN:  i.Raw.BlockNumber,

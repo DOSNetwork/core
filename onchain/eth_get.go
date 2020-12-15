@@ -276,6 +276,78 @@ func (e *ethAdaptor) LastUpdatedBlock() (result uint64, err error) {
 	return
 }
 
+func (e *ethAdaptor) CachedUpdatedBlock() (result uint64, err error) {
+	if !e.isConnecting() {
+		err = errors.New("not connecting to geth")
+	}
+	proxies := e.proxies
+	f := func(ctx context.Context) (chan interface{}, chan error) {
+		outc := make(chan interface{})
+		errc := make(chan error)
+		go func() {
+			defer close(outc)
+			defer close(errc)
+			idx := getIndex(ctx)
+			if idx == -1 {
+				err = errors.New("no client index in context")
+			} else {
+				if val, err := proxies[idx].CachedUpdatedBlock(); err != nil {
+					replyError(ctx, errc, &OnchainError{err: errors.Errorf("get err : %w", err), Idx: idx})
+				} else {
+					utils.ReportResult(ctx, outc, val)
+				}
+			}
+		}()
+		return outc, errc
+	}
+	var r interface{}
+	if r, err = e.get(f); err != nil {
+		return
+	}
+	if v, ok := r.(*big.Int); ok {
+		result = v.Uint64()
+	} else {
+		err = errors.New("casting error")
+	}
+	return
+}
+
+func (e *ethAdaptor) RelayRespondLimit() (result uint64, err error) {
+	if !e.isConnecting() {
+		err = errors.New("not connecting to geth")
+	}
+	proxies := e.proxies
+	f := func(ctx context.Context) (chan interface{}, chan error) {
+		outc := make(chan interface{})
+		errc := make(chan error)
+		go func() {
+			defer close(outc)
+			defer close(errc)
+			idx := getIndex(ctx)
+			if idx == -1 {
+				err = errors.New("no client index in context")
+			} else {
+				if val, err := proxies[idx].RelayRespondLimit(); err != nil {
+					replyError(ctx, errc, &OnchainError{err: errors.Errorf("get err : %w", err), Idx: idx})
+				} else {
+					utils.ReportResult(ctx, outc, val)
+				}
+			}
+		}()
+		return outc, errc
+	}
+	var r interface{}
+	if r, err = e.get(f); err != nil {
+		return
+	}
+	if v, ok := r.(*big.Int); ok {
+		result = v.Uint64()
+	} else {
+		err = errors.New("casting error")
+	}
+	return
+}
+
 type PendingGroupT struct {
 	GroupId     *big.Int
 	StartBlkNum *big.Int
@@ -587,41 +659,6 @@ func (e *ethAdaptor) GetGasLimit() (result uint64) {
 	return
 }
 
-func (e *ethAdaptor) GroupPubKey(gIdx int) (result [4]*big.Int, err error) {
-	if !e.isConnecting() {
-		err = errors.New("not connecting to geth")
-	}
-	proxies := e.proxies
-	f := func(ctx context.Context) (chan interface{}, chan error) {
-		outc := make(chan interface{})
-		errc := make(chan error)
-		go func() {
-			defer close(outc)
-			defer close(errc)
-			idx := getIndex(ctx)
-			if idx == -1 {
-				err = errors.New("no client index in context")
-			} else {
-				if val, err := proxies[idx].GetGroupPubKey(big.NewInt(int64(gIdx))); err != nil {
-					replyError(ctx, errc, &OnchainError{err: errors.Errorf("get err : %w", err), Idx: idx})
-				} else {
-					utils.ReportResult(ctx, outc, val)
-				}
-			}
-		}()
-		return outc, errc
-	}
-	var r interface{}
-	if r, err = e.get(f); err != nil {
-		return
-	}
-	if v, ok := r.([4]*big.Int); ok {
-		result = v
-	} else {
-		err = errors.New("casting error")
-	}
-	return
-}
 func (e *ethAdaptor) IsPendingNode(id []byte) (result bool, err error) {
 	if !e.isConnecting() {
 		err = errors.New("not connecting to geth")
