@@ -64,7 +64,7 @@
     $ mkdir -p $GOPATH/src/github.com/DOSNetwork
     $ cd $GOPATH/src/github.com/DOSNetwork && git clone https://github.com/DOSNetwork/core.git
     $ cd core
-    $ git checkout v1.0.0-m
+    $ git checkout v1.0.2-m
     ```
 
 - Build:
