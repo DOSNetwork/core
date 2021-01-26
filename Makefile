@@ -66,6 +66,11 @@ gen: updateSubmodule
 	abigen --abi="$(DOSSTAKING_GOPATH)/Staking.abi" --bin="$(DOSSTAKING_GOPATH)/Staking.bin" --pkg staking --out $(DOSSTAKING_GOPATH)/Staking.go
 
 
+.PHONY: clean-gen
+clean-gen:
+	@ rm -f $(GENERATED_FILES)
+
+
 .PHONY: clean
 clean:
 	@ rm -f dosclient*
