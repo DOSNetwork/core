@@ -11,10 +11,10 @@ import (
 
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto/sha3"
 
 	"github.com/DOSNetwork/core/onchain"
 	"github.com/DOSNetwork/core/share"
+	"golang.org/x/crypto/sha3"
 	errors "golang.org/x/xerrors"
 )
 
@@ -307,7 +307,7 @@ func (d *DosNode) handleCR(cr *onchain.LogStartCommitReveal, randSeed *big.Int) 
 		d.logger.Error(err)
 		return
 	}
-	h := sha3.NewKeccak256()
+	h := sha3.NewLegacyKeccak256()
 	h.Write(abi.U256(sec))
 	b := h.Sum(nil)
 	hash := byte32(b)
@@ -327,7 +327,7 @@ func (d *DosNode) handleCR(cr *onchain.LogStartCommitReveal, randSeed *big.Int) 
 		waitCommit = 0
 	}
 
-	time.Sleep(time.Duration(waitCommit*15) * time.Second)
+	time.Sleep(time.Duration(waitCommit*d.chain.GetBlockTime()) * time.Second)
 	d.logger.Info("Commit")
 	d.logger.Event("Commit", map[string]interface{}{"CID": fmt.Sprintf("%x", cid)})
 	if err := d.chain.Commit(cid, *hash); err != nil {

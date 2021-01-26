@@ -312,7 +312,7 @@ func (e *ethAdaptor) SignalRandom() (err error) {
 			return err
 		}
 		e.logger.Info(fmt.Sprintf("SignalRandom tx sent: %x, waiting for confirmation...", tx.Hash()))
-		if err = CheckTransaction(e.clients[0], tx); err != nil {
+		if err = CheckTransaction(e.clients[0], e.blockTime, tx); err != nil {
 			e.logger.Error(err)
 		}
 	}
@@ -330,7 +330,7 @@ func (e *ethAdaptor) SignalGroupFormation() (err error) {
 			return err
 		}
 		e.logger.Info(fmt.Sprintf("SignalGroupFormation tx sent: %x, waiting for confirmation...", tx.Hash()))
-		if err = CheckTransaction(e.clients[0], tx); err != nil {
+		if err = CheckTransaction(e.clients[0], e.blockTime, tx); err != nil {
 			e.logger.Error(err)
 		}
 	}
@@ -348,7 +348,7 @@ func (e *ethAdaptor) SignalGroupDissolve() (err error) {
 			return err
 		}
 		e.logger.Info(fmt.Sprintf("SignalGroupDissolve tx sent: %x, waiting for confirmation...", tx.Hash()))
-		if err = CheckTransaction(e.clients[0], tx); err != nil {
+		if err = CheckTransaction(e.clients[0], e.blockTime, tx); err != nil {
 			e.logger.Error(err)
 		}
 	}
@@ -385,7 +385,7 @@ func (e *ethAdaptor) SignalBootstrap(cid *big.Int) (err error) {
 			return err
 		}
 		e.logger.Info(fmt.Sprintf("SignalBootstrap tx sent: %x, waiting for confirmation...", tx.Hash()))
-		if err = CheckTransaction(e.clients[0], tx); err != nil {
+		if err = CheckTransaction(e.clients[0], e.blockTime, tx); err != nil {
 			e.logger.Error(err)
 		}
 	}

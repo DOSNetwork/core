@@ -19,12 +19,7 @@ LDFLAGS_STATIC=-ldflags "-linkmode external -extldflags -static -w -s -X main.Ve
 LDFLAGS=-ldflags "-w -s -X main.Version=${VERSION} -X main.Build=${BUILD}"
 
 .PHONY: build
-build: vendor client
-
-
-.PHONY: vendor
-vendor:
-	@ dep ensure -vendor-only
+build: client
 
 
 .PHONY: devClient
@@ -47,7 +42,7 @@ client-docker:
 
 
 .PHONY: install
-install: vendor client
+install: client
 	go install ${LDFLAGS}
 
 
@@ -74,4 +69,3 @@ gen: updateSubmodule
 .PHONY: clean
 clean:
 	@ rm -f dosclient*
-	@ rm -f $(GENERATED_FILES)

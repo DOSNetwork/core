@@ -1,5 +1,4 @@
 # dependencies
-vendor/
 testAccounts/
 credential/
 vault/

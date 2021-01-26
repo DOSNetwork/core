@@ -9,7 +9,7 @@ import (
 
 	"github.com/DOSNetwork/core/suites"
 	"github.com/dedis/kyber"
-	"github.com/ethereum/go-ethereum/crypto/sha3"
+	"golang.org/x/crypto/sha3"
 )
 
 // NewKeyPair creates a new BLS signing key pair. The private key x is a scalar
@@ -52,7 +52,7 @@ func Verify(suite suites.Suite, X kyber.Point, msg, sig []byte) error {
 // hashToPoint hashes a message to a point on curve G1. XXX: This should be replaced
 // eventually by a proper hash-to-point mapping like Elligator.
 func hashToPoint(suite suites.Suite, msg []byte) kyber.Point {
-	hash := sha3.NewKeccak256()
+	hash := sha3.NewLegacyKeccak256()
 	var buf []byte
 	hash.Write(msg)
 	buf = hash.Sum(buf)
