@@ -47,7 +47,6 @@
 - [Install](https://golang.org/doc/install) Go and setup golang workingspace like below:
     ```sh
     $ sudo apt-get install golang 
-    $ sudo apt-get install go-dep 
     $ sudo apt-get install build-essential
     ```
     
@@ -68,7 +67,7 @@
     ```
 
 - Build:
-  - `$ make vendor` - to prepare dependencies for building 
+  - `$ GO111MODULE=on go mod download` - to download building dependencies
   - `$ make` - to build release version client
 
 - Run:
