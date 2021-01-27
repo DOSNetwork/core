@@ -25,7 +25,7 @@ build: client
 .PHONY: devClient
 # Build a development version client node
 devClient: gen
-	go build -a -o client.dev
+	go build -a -o dosclient.dev
 
 
 .PHONY: client
