@@ -20,7 +20,6 @@ import (
 
 func (d *DosNode) onchainLoop() {
 	defer d.logger.Info("End onchainLoop")
-	var watchdogInterval int
 	randSeed, _ := new(big.Int).SetString("21888242871839275222246405745257275088548364400416034343698204186575808495617", 10)
 	inactiveNodes := make(map[string]time.Time)
 	reconn := 0
@@ -45,8 +44,7 @@ func (d *DosNode) onchainLoop() {
 			onchain.SubscribeLogPublicKeyAccepted, onchain.SubscribeCommitrevealLogStartCommitreveal}
 		d.onchainEvent, onchainErrc = d.chain.SubscribeEvent(subescriptions)
 
-		watchdogInterval = 15
-		watchdog := time.NewTicker(time.Duration(watchdogInterval) * time.Second)
+		watchdog := time.NewTicker(time.Duration(d.chain.GetBlockTime()) * time.Second)
 		reconn = 0
 	L:
 		for {
@@ -254,7 +252,7 @@ func (d *DosNode) handleGrouping(participants [][]byte, groupID string) {
 	defer d.logger.TimeTrack(time.Now(), "GroupingDone", map[string]interface{}{"GroupID": groupID, "Topic": "Grouping"})
 	defer d.logger.Info(fmt.Sprintf("Grouping Done %x", groupID))
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(20*15*time.Second))
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(20*d.chain.GetBlockTime())*time.Second)
 	defer cancel()
 
 	var errcList []chan error
@@ -333,7 +331,7 @@ func (d *DosNode) handleCR(cr *onchain.LogStartCommitReveal, randSeed *big.Int) 
 	if err := d.chain.Commit(cid, *hash); err != nil {
 		d.logger.Error(err)
 	}
-	<-time.After(time.Duration(waitReveal*15) * time.Second)
+	<-time.After(time.Duration(waitReveal*d.chain.GetBlockTime()) * time.Second)
 
 	d.logger.Info("Reveal")
 	d.logger.Event("Reveal", map[string]interface{}{"CID": fmt.Sprintf("%x", cid)})
