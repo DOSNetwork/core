@@ -22,7 +22,7 @@ import (
 	"github.com/DOSNetwork/core/sign/tbls"
 	"github.com/DOSNetwork/core/suites"
 	"github.com/antchfx/xmlquery"
-	"github.com/oliveagle/jsonpath"
+	"github.com/spyzhov/ajson"
 )
 
 const (
@@ -203,16 +203,22 @@ func dataParse(rawMsg []byte, pathStr string) (msg []byte, err error) {
 	if pathStr == "" {
 		msg = rawMsg
 	} else if strings.HasPrefix(pathStr, "$") {
-		var rawMsgJson, msgJson interface{}
-		if err = json.Unmarshal(rawMsg, &rawMsgJson); err != nil {
+		var nodes []*ajson.Node
+		nodes, err = ajson.JSONPath(rawMsg, pathStr)
+		if err != nil {
 			return
 		}
-
-		if msgJson, err = jsonpath.JsonPathLookup(rawMsgJson, pathStr); err != nil {
-			return
+		results := make([]interface{}, 0)
+		for _, node := range nodes {
+			var value interface{}
+			value, err = node.Unpack()
+			if err != nil {
+				return
+			}
+			results = append(results, value)
 		}
 
-		msg, err = json.Marshal(msgJson)
+		msg, err = json.Marshal(results)
 	} else if strings.HasPrefix(pathStr, "/") {
 		var rawMsgXml *xmlquery.Node
 		if rawMsgXml, err = xmlquery.Parse(bytes.NewReader(rawMsg)); err != nil {
