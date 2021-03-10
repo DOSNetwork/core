@@ -68,7 +68,7 @@ func (d *DosNode) queryLoop() {
 }
 
 func (d *DosNode) handleQuery(ids [][]byte, pubPoly *share.PubPoly, sec *share.PriShare, groupID string, requestID, lastRand, useSeed *big.Int, url, selector string, pType uint32) {
-	queryCtx, cancel := context.WithTimeout(context.Background(), time.Duration(60*15*time.Second))
+	queryCtx, cancel := context.WithTimeout(context.Background(), time.Duration(60*d.chain.GetBlockTime())*time.Second)
 	defer cancel()
 	queryCtxWithValue := context.WithValue(context.WithValue(queryCtx, ctxKey("RequestID"), fmt.Sprintf("%x", requestID)), ctxKey("GroupID"), groupID)
 	d.logger.Event("HandleQuery", map[string]interface{}{"GroupID": groupID, "RequestID": fmt.Sprintf("%x", requestID)})

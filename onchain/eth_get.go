@@ -652,6 +652,14 @@ func (e *ethAdaptor) GetGasPrice() (result uint64) {
 	return
 }
 
+func (e *ethAdaptor) GetBlockTime() (result uint64) {
+	if e.blockTime > 0 {
+		return e.blockTime
+	} else {
+		return 14
+	}
+}
+
 func (e *ethAdaptor) GetGasLimit() (result uint64) {
 	if len(e.proxies) != 0 {
 		result = e.proxies[0].TransactOpts.GasLimit
@@ -690,7 +698,7 @@ func (e *ethAdaptor) IsPendingNode(id []byte) (result bool, err error) {
 		return
 	}
 	if v, ok := r.(common.Address); ok {
-		if v.Big().Cmp(big.NewInt(0)) == 0 {
+		if (new(big.Int).SetBytes(v.Bytes())).Cmp(big.NewInt(0)) == 0 {
 			result = false
 		} else {
 			result = true

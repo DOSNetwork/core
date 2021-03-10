@@ -44,6 +44,7 @@ type ethAdaptor struct {
 	httpUrls         []string
 	wsUrls           []string
 	key              *keystore.Key
+	blockTime        uint64
 	gasPrice         uint64
 	gasLimit         uint64
 	connTimeout      time.Duration
@@ -71,12 +72,18 @@ func NewEthAdaptor(key *keystore.Key, config *configuration.Config, l logger) (a
 	if err != nil {
 		return nil, err
 	}
+	blockTimeInt, err := strconv.Atoi(config.BlockTime)
+	if err != nil {
+		return nil, err
+	}
+
 	adaptor = &ethAdaptor{}
 	adaptor.bridgeAddr = common.HexToAddress(config.DOSAddressBridgeAddress)
 	adaptor.key = key
 	adaptor.logger = l
 	adaptor.reqQueue = make(chan *request)
 	adaptor.gasLimit = uint64(gasLimitInt)
+	adaptor.blockTime = uint64(blockTimeInt)
 	adaptor.connTimeout = 60 * time.Second
 	adaptor.getTimeout = 60 * time.Second
 	adaptor.setTimeout = 60 * time.Second

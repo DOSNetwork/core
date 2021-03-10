@@ -2,13 +2,13 @@
     "VERSION": "v1.0.2-m",
     "NodeIP": "#REPLACE-WITH-IP",
     "NodePort": "9501",
-    "ChainType": "ETH",
-    "BlockTime": "14",
+    "ChainType": "Heco",
+    "BlockTime": "3",
     "DOSAddressBridgeAddress": "0x98A0E7026778840Aacd28B9c03137D32e06F5ff1",
     "EthGasLimit": "1000000",
     "BootStrapIPs": [
     ],
     "ChainNodePool": [
-        "wss://mainnet.infura.io/ws/v3/#REPLACE-WITH-INFURA-APIKEY"
+        "wss://ws-testnet.hecochain.com"
     ]
 }

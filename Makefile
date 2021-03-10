@@ -19,18 +19,13 @@ LDFLAGS_STATIC=-ldflags "-linkmode external -extldflags -static -w -s -X main.Ve
 LDFLAGS=-ldflags "-w -s -X main.Version=${VERSION} -X main.Build=${BUILD}"
 
 .PHONY: build
-build: vendor client
-
-
-.PHONY: vendor
-vendor:
-	@ dep ensure -vendor-only
+build: client
 
 
 .PHONY: devClient
 # Build a development version client node
 devClient: gen
-	go build -a -o client.dev
+	go build -a -o dosclient.dev
 
 
 .PHONY: client
@@ -47,7 +42,7 @@ client-docker:
 
 
 .PHONY: install
-install: vendor client
+install: client
 	go install ${LDFLAGS}
 
 
@@ -71,7 +66,11 @@ gen: updateSubmodule
 	abigen --abi="$(DOSSTAKING_GOPATH)/Staking.abi" --bin="$(DOSSTAKING_GOPATH)/Staking.bin" --pkg staking --out $(DOSSTAKING_GOPATH)/Staking.go
 
 
+.PHONY: clean-gen
+clean-gen:
+	@ rm -f $(GENERATED_FILES)
+
+
 .PHONY: clean
 clean:
 	@ rm -f dosclient*
-	@ rm -f $(GENERATED_FILES)

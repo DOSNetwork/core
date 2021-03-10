@@ -210,7 +210,7 @@ func (d *DosNode) Start() {
 					}
 				}
 				d.logger.Info("Node heartbeat ...")
-				time.Sleep(15 * time.Second)
+				time.Sleep(time.Duration(d.chain.GetBlockTime()) * time.Second)
 			}
 		}
 	}()

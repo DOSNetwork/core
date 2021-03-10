@@ -44,10 +44,9 @@
 
 
 ## Building binary from source
-- [Install](https://golang.org/doc/install) Go and setup golang workingspace like below:
+- [Install](https://golang.org/doc/install) **go1.11 or higher** and setup golang workingspace like below:
     ```sh
     $ sudo apt-get install golang 
-    $ sudo apt-get install go-dep 
     $ sudo apt-get install build-essential
     ```
     
@@ -68,7 +67,8 @@
     ```
 
 - Build:
-  - `$ make vendor` - to prepare dependencies for building 
+  - `$ GO111MODULE=on go mod download` - to download building dependencies
+  - Dev dependencies: solc-v0.5.17, abigen-v1.9.18-stable
   - `$ make` - to build release version client
 
 - Run:
@@ -83,3 +83,4 @@
   - `$ make updateSubmodule` to fetch latest system contracts from [repo](https://github.com/DOSNetwork/eth-contracts), instead of making contract modifications locally.
   - `$ make gen` to generate binding files for system contracts.
   - `$ make clean` to remove built binaries or unnecessary generated files.
+  - Use [solc-select](https://github.com/crytic/solc-select) tool to select / pin to specific solidity compiler version.

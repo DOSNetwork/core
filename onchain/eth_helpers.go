@@ -268,7 +268,7 @@ func GetCurrentBlock(client *ethclient.Client) (blknum uint64, err error) {
 }
 
 // CheckTransaction return an error if the transaction is failed
-func CheckTransaction(client *ethclient.Client, tx *types.Transaction) (err error) {
+func CheckTransaction(client *ethclient.Client, blockTime uint64, tx *types.Transaction) (err error) {
 	start := time.Now()
 	receipt, err := client.TransactionReceipt(context.Background(), tx.Hash())
 	for err == ethereum.NotFound {
@@ -277,7 +277,7 @@ func CheckTransaction(client *ethclient.Client, tx *types.Transaction) (err erro
 			fmt.Println("transaction failed. tx ", fmt.Sprintf("%x", tx.Hash()))
 			return
 		}
-		time.Sleep(15 * time.Second)
+		time.Sleep(time.Duration(blockTime) * time.Second)
 		receipt, err = client.TransactionReceipt(context.Background(), tx.Hash())
 	}
 	if err != nil {
@@ -305,5 +305,15 @@ func GetBalance(client *ethclient.Client, key *keystore.Key) (balance *big.Float
 	balance.SetString(wei.String())
 	balance = balance.Quo(balance, big.NewFloat(math.Pow10(18)))
 
+	return
+}
+
+func GetChainId(client *ethclient.Client, key *keystore.Key) (chainId uint64, err error) {
+	id, err := client.ChainID(context.Background())
+	if err != nil {
+		fmt.Println("Get ChainId Error: ", err)
+		return
+	}
+	chainId = id.Uint64()
 	return
 }

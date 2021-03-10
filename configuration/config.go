@@ -29,6 +29,7 @@ type Config struct {
 	NodeIP                  string
 	NodePort                string
 	ChainType               string
+	BlockTime               string
 	DOSAddressBridgeAddress string
 	EthGasLimit             string
 	BootStrapIPs            []string
