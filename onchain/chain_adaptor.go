@@ -16,9 +16,10 @@ import (
 
 const (
 	//ETH represents the type of blockchain
-	ETH  = "ETH"
-	HECO = "Heco"
-	BSC  = "BSC"
+	ETH     = "ETH"
+	HECO    = "Heco"
+	BSC     = "BSC"
+	OKCHAIN = "Okchain"
 )
 
 //ProxyAdapter represents an unified adapter interface for different blockchain
@@ -76,7 +77,7 @@ type ProxyAdapter interface {
 //NewProxyAdapter constructs a new ProxyAdapter with the given type of blockchain and contract addresses
 func NewProxyAdapter(key *keystore.Key, config *configuration.Config) (ProxyAdapter, error) {
 	switch config.ChainType {
-	case ETH, HECO, BSC:
+	case ETH, HECO, BSC, OKCHAIN:
 		l := log.New("module", "EthProxy")
 		adaptor, err := NewEthAdaptor(key, config, l)
 		if err != nil {

@@ -1,0 +1,14 @@
+{
+    "VERSION": "v1.0.3-m",
+    "NodeIP": "#REPLACE-WITH-IP",
+    "NodePort": "9501",
+    "ChainType": "Okchain",
+    "BlockTime": "4",
+    "DOSAddressBridgeAddress": "0xD1aFEa6D7745c9d168A77Abd80124A0592B0D48e",
+    "EthGasLimit": "1000000",
+    "BootStrapIPs": [
+    ],
+    "ChainNodePool": [
+        "ws://okexchaintest.okexcn.com:8546"
+    ]
+}
