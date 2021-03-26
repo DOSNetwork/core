@@ -747,7 +747,7 @@ func (e *ethAdaptor) Balance() (result *big.Float, err error) {
 	if !e.isConnecting() {
 		err = errors.New("not connecting to geth")
 	}
-	clients := e.clients
+	clients := e.rpcClients
 	f := func(ctx context.Context) (chan interface{}, chan error) {
 		outc := make(chan interface{})
 		errc := make(chan error)
@@ -782,7 +782,7 @@ func (e *ethAdaptor) CurrentBlock() (result uint64, err error) {
 	if !e.isConnecting() {
 		err = errors.New("not connecting to geth")
 	}
-	clients := e.clients
+	clients := e.rpcClients
 	f := func(ctx context.Context) (chan interface{}, chan error) {
 		outc := make(chan interface{})
 		errc := make(chan error)
@@ -817,7 +817,7 @@ func (e *ethAdaptor) PendingNonce() (result uint64, err error) {
 	if !e.isConnecting() {
 		err = errors.New("not connecting to geth")
 	}
-	clients := e.clients
+	clients := e.rpcClients
 	f := func(ctx context.Context) (chan interface{}, chan error) {
 		outc := make(chan interface{})
 		errc := make(chan error)

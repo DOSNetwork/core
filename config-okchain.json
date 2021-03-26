@@ -1,5 +1,5 @@
 {
-    "VERSION": "v1.0.3-m",
+    "VERSION": "v1.0.4-m-t",
     "NodeIP": "#REPLACE-WITH-IP",
     "NodePort": "9501",
     "ChainType": "Okchain",
@@ -9,6 +9,7 @@
     "BootStrapIPs": [
     ],
     "ChainNodePool": [
-        "ws://okexchaintest.okexcn.com:8546"
+      "http://54.255.11.97:8545",
+      "ws://54.255.11.97:8546"
     ]
 }

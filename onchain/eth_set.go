@@ -306,13 +306,13 @@ func (e *ethAdaptor) SignalRandom() (err error) {
 		err = errors.New("not connecting to geth")
 		return
 	}
-	if len(e.proxies) != 0 && len(e.clients) != 0 {
+	if len(e.proxies) != 0 && len(e.rpcClients) != 0 {
 		tx, err := e.proxies[0].SignalRandom()
 		if err != nil {
 			return err
 		}
 		e.logger.Info(fmt.Sprintf("SignalRandom tx sent: %x, waiting for confirmation...", tx.Hash()))
-		if err = CheckTransaction(e.clients[0], e.blockTime, tx); err != nil {
+		if err = CheckTransaction(e.rpcClients[0], e.blockTime, tx); err != nil {
 			e.logger.Error(err)
 		}
 	}
@@ -324,13 +324,13 @@ func (e *ethAdaptor) SignalGroupFormation() (err error) {
 		err = errors.New("not connecting to geth")
 		return
 	}
-	if len(e.proxies) != 0 && len(e.clients) != 0 {
+	if len(e.proxies) != 0 && len(e.rpcClients) != 0 {
 		tx, err := e.proxies[0].SignalGroupFormation()
 		if err != nil {
 			return err
 		}
 		e.logger.Info(fmt.Sprintf("SignalGroupFormation tx sent: %x, waiting for confirmation...", tx.Hash()))
-		if err = CheckTransaction(e.clients[0], e.blockTime, tx); err != nil {
+		if err = CheckTransaction(e.rpcClients[0], e.blockTime, tx); err != nil {
 			e.logger.Error(err)
 		}
 	}
@@ -342,13 +342,13 @@ func (e *ethAdaptor) SignalGroupDissolve() (err error) {
 		err = errors.New("not connecting to geth")
 		return
 	}
-	if len(e.proxies) != 0 && len(e.clients) != 0 {
+	if len(e.proxies) != 0 && len(e.rpcClients) != 0 {
 		tx, err := e.proxies[0].SignalGroupDissolve()
 		if err != nil {
 			return err
 		}
 		e.logger.Info(fmt.Sprintf("SignalGroupDissolve tx sent: %x, waiting for confirmation...", tx.Hash()))
-		if err = CheckTransaction(e.clients[0], e.blockTime, tx); err != nil {
+		if err = CheckTransaction(e.rpcClients[0], e.blockTime, tx); err != nil {
 			e.logger.Error(err)
 		}
 	}
@@ -379,13 +379,13 @@ func (e *ethAdaptor) SignalBootstrap(cid *big.Int) (err error) {
 		err = errors.New("not connecting to geth")
 		return
 	}
-	if len(e.proxies) != 0 && len(e.clients) != 0 {
+	if len(e.proxies) != 0 && len(e.rpcClients) != 0 {
 		tx, err := e.proxies[0].SignalBootstrap(cid)
 		if err != nil {
 			return err
 		}
 		e.logger.Info(fmt.Sprintf("SignalBootstrap tx sent: %x, waiting for confirmation...", tx.Hash()))
-		if err = CheckTransaction(e.clients[0], e.blockTime, tx); err != nil {
+		if err = CheckTransaction(e.rpcClients[0], e.blockTime, tx); err != nil {
 			e.logger.Error(err)
 		}
 	}

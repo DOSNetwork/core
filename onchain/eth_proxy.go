@@ -41,7 +41,7 @@ type ethAdaptor struct {
 	proxyAddr        common.Address
 	commitRevealAddr common.Address
 	bootStrapUrl     string
-	httpUrls         []string
+	rpcUrls          []string
 	wsUrls           []string
 	key              *keystore.Key
 	blockTime        uint64
@@ -51,9 +51,13 @@ type ethAdaptor struct {
 	getTimeout       time.Duration
 	setTimeout       time.Duration
 	proxies          []*dosproxy.DosproxySession
+	wsProxies        []*dosproxy.DosproxySession
 	crs              []*commitreveal.CommitrevealSession
-	clients          []*ethclient.Client
+	wsCrs            []*commitreveal.CommitrevealSession
+	rpcClients       []*ethclient.Client
+	wsClients        []*ethclient.Client
 	ctxes            []context.Context
+	wsCtxes          []context.Context
 	cancels          []context.CancelFunc
 	ctx              context.Context
 	cancelFunc       context.CancelFunc
@@ -125,6 +129,14 @@ func (e *ethAdaptor) isConnecting() (result bool) {
 			return
 		}
 	}
+	for _, wsCtx := range e.wsCtxes {
+		select {
+		case <-wsCtx.Done():
+		default:
+			result = true
+			return
+		}
+	}
 	return
 }
 
@@ -134,14 +146,18 @@ func (e *ethAdaptor) Connect(urls []string, t time.Time) (err error) {
 		return
 	}
 
-	var httpUrls []string
+	var rpcUrls []string
 	var wsUrls []string
 	for _, url := range urls {
 		if strings.Contains(url, "http") {
-			httpUrls = append(httpUrls, url)
+			rpcUrls = append(rpcUrls, url)
 		} else if strings.Contains(url, "ws") {
 			wsUrls = append(wsUrls, url)
 		}
+	}
+	e.rpcUrls = rpcUrls
+	if len(rpcUrls) == 0 {
+		return errors.New("no rpc URL")
 	}
 	e.wsUrls = wsUrls
 	if len(wsUrls) == 0 {
@@ -149,7 +165,7 @@ func (e *ethAdaptor) Connect(urls []string, t time.Time) (err error) {
 	}
 
 	e.ctx, e.cancelFunc = context.WithCancel(context.Background())
-	e.clients = nil
+	e.rpcClients = nil
 	e.proxies = nil
 	e.crs = nil
 	e.ctxes = nil
@@ -158,55 +174,58 @@ func (e *ethAdaptor) Connect(urls []string, t time.Time) (err error) {
 	dialCtx, dialCancel := context.WithDeadline(e.ctx, t)
 	defer dialCancel()
 
-	results := DialToEth(dialCtx, e.wsUrls)
-	for result := range results {
-		if result.Err != nil {
-			e.logger.Error(errors.Errorf(": %w", result.Err))
+	wsResults := DialToEth(dialCtx, e.wsUrls, false)
+	rpcResults := DialToEth(dialCtx, e.rpcUrls, true)
+	wsConnected := false
+
+	for rpc := range rpcResults {
+		if rpc.Err != nil {
+			e.logger.Error(errors.Errorf(": %w", rpc.Err))
 			continue
 		}
-		client := result.Client
-		bridge, err := dosbridge.NewDosbridge(e.bridgeAddr, client)
+		rpcClient := rpc.Client
+		bridge, err := dosbridge.NewDosbridge(e.bridgeAddr, rpcClient)
 		if err != nil {
 			e.logger.Error(errors.Errorf(": %w", err))
-			client.Close()
+			rpcClient.Close()
 			continue
 		}
 		proxyAddr, err := bridge.GetProxyAddress(&bind.CallOpts{Context: dialCtx})
 		if err != nil {
 			e.logger.Error(errors.Errorf(": %w", err))
-			client.Close()
+			rpcClient.Close()
 			continue
 		}
 		commitRevealAddr, err := bridge.GetCommitRevealAddress(&bind.CallOpts{Context: dialCtx})
 		if err != nil {
 			e.logger.Error(errors.Errorf(": %w", err))
-			client.Close()
+			rpcClient.Close()
 			continue
 		}
 
 		bootStrapUrl, err := bridge.GetBootStrapUrl(&bind.CallOpts{Context: dialCtx})
 		if err != nil {
 			e.logger.Error(errors.Errorf(": %w", err))
-			client.Close()
+			rpcClient.Close()
 			continue
 		}
 
-		p, err := dosproxy.NewDosproxy(proxyAddr, client)
+		p, err := dosproxy.NewDosproxy(proxyAddr, rpcClient)
 		if err != nil {
-			err = errors.Errorf("NewDosproxy failed: %w", err)
+			err = errors.Errorf("NewDosproxy rpc failed: %w", err)
 			e.logger.Error(err)
-			client.Close()
+			rpcClient.Close()
 			continue
 		}
 
-		cr, err := commitreveal.NewCommitreveal(commitRevealAddr, client)
+		cr, err := commitreveal.NewCommitreveal(commitRevealAddr, rpcClient)
 		if err != nil {
-			err = errors.Errorf("NewCommitreveal failed : %w", err)
+			err = errors.Errorf("NewCommitreveal rpc failed : %w", err)
 			e.logger.Error(err)
-			client.Close()
+			rpcClient.Close()
 			continue
 		}
-		e.logger.Event("ConnToOnchain", map[string]interface{}{"OnchainURL": result.Url})
+		e.logger.Event("RPC_ConnToOnchain", map[string]interface{}{"OnchainURL": rpc.Url})
 
 		ctx, cancel := context.WithCancel(e.ctx)
 		ctx = context.WithValue(ctx, "index", len(e.ctxes))
@@ -217,19 +236,59 @@ func (e *ethAdaptor) Connect(urls []string, t time.Time) (err error) {
 		if bootStrapUrl != "" {
 			e.bootStrapUrl = bootStrapUrl
 		}
-		e.clients = append(e.clients, client)
+		e.rpcClients = append(e.rpcClients, rpcClient)
 		e.proxies = append(e.proxies, &dosproxy.DosproxySession{Contract: p, CallOpts: bind.CallOpts{Context: ctx}, TransactOpts: *auth})
 		e.crs = append(e.crs, &commitreveal.CommitrevealSession{Contract: cr, CallOpts: bind.CallOpts{Context: ctx}, TransactOpts: *auth})
 		e.ctxes = append(e.ctxes, ctx)
 		e.cancels = append(e.cancels, cancel)
+
+		if !wsConnected {
+			for ws := range wsResults {
+				if ws.Err != nil {
+					e.logger.Error(errors.Errorf(": %w", ws.Err))
+					continue
+				}
+				wsClient := ws.Client
+				ws_p, err := dosproxy.NewDosproxy(proxyAddr, wsClient)
+				if err != nil {
+					err = errors.Errorf("NewDosproxy ws failed: %w", err)
+					e.logger.Error(err)
+					wsClient.Close()
+					continue
+				}
+				ws_cr, err := commitreveal.NewCommitreveal(commitRevealAddr, wsClient)
+				if err != nil {
+					err = errors.Errorf("NewCommitreveal ws failed : %w", err)
+					e.logger.Error(err)
+					wsClient.Close()
+					continue
+				}
+				e.logger.Event("WS_ConnToOnchain", map[string]interface{}{"OnchainURL": ws.Url})
+
+				ctx, cancel := context.WithCancel(e.ctx)
+				ctx = context.WithValue(ctx, "wsIndex", len(e.wsCtxes))
+				auth := bind.NewKeyedTransactor(e.key.PrivateKey)
+				auth.GasLimit = e.gasLimit
+				auth.Context = ctx
+
+				e.wsClients = append(e.wsClients, wsClient)
+				e.wsProxies = append(e.wsProxies, &dosproxy.DosproxySession{Contract: ws_p, CallOpts: bind.CallOpts{Context: ctx}, TransactOpts: *auth})
+				e.wsCrs = append(e.wsCrs, &commitreveal.CommitrevealSession{Contract: ws_cr, CallOpts: bind.CallOpts{Context: ctx}, TransactOpts: *auth})
+				e.wsCtxes = append(e.wsCtxes, ctx)
+				e.cancels = append(e.cancels, cancel)
+			}
+			if len(e.wsCtxes) > 0 {
+				wsConnected = true
+			}
+		}
 	}
 
-	if len(e.proxies) == 0 {
+	if len(e.proxies) == 0 || len(e.wsProxies) == 0 {
 		err = errors.New("no proxy instance")
 		e.logger.Error(err)
 		return
 	}
-	if len(e.crs) == 0 {
+	if len(e.crs) == 0 || len(e.wsCrs) == 0 {
 		err = errors.New("no commir reveal instance")
 		e.logger.Error(err)
 		return
@@ -237,6 +296,7 @@ func (e *ethAdaptor) Connect(urls []string, t time.Time) (err error) {
 	go e.ReqLoop()
 	return
 }
+
 func (e *ethAdaptor) BootStrapUrl() string {
 	return e.bootStrapUrl
 }

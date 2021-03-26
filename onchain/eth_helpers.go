@@ -158,8 +158,8 @@ func reporeResult(ctx context.Context, out chan DialResult, result DialResult) {
 	}
 }
 
-//DialToEth is a utility function to dial to Ethereum
-func DialToEth(ctx context.Context, urlPool []string) (out chan DialResult) {
+// DialToEth is a utility function to dial to Ethereum
+func DialToEth(ctx context.Context, urlPool []string, rpcConn bool) (out chan DialResult) {
 	out = make(chan DialResult)
 	var wg sync.WaitGroup
 
@@ -170,30 +170,33 @@ func DialToEth(ctx context.Context, urlPool []string) (out chan DialResult) {
 
 		client, err := ethclient.Dial(url)
 		if err != nil {
-			//ws connect: connection timed out
+			// connection timed out
 			r.Err = errors.Errorf(": %w", err)
 			reporeResult(ctx, out, r)
 			return
 		}
 
-		if _, err := client.NetworkID(ctx); err != nil {
-			fmt.Println("NetworkID err ", err)
-			//Post http i/o timeout
-			r.Err = errors.Errorf(": %w", err)
-			reporeResult(ctx, out, r)
-			client.Close()
-			return
+		// Json-Rpc request only for rpc connection
+		if rpcConn {
+			if _, err := client.NetworkID(ctx); err != nil {
+				fmt.Println("NetworkID err ", err)
+				// Post http i/o timeout
+				r.Err = errors.Errorf(": %w", err)
+				reporeResult(ctx, out, r)
+				client.Close()
+				return
+			}
+			progress, err := client.SyncProgress(ctx)
+			if err != nil {
+				fmt.Println("SyncProgress err ", err, url)
+				return
+			}
+			if progress != nil {
+				fmt.Println("progress ", progress)
+			}
+			fmt.Println(url, "DialToEth got rpc client ")
 		}
 
-		progress, err := client.SyncProgress(ctx)
-		if err != nil {
-			fmt.Println("SyncProgress err ", err, url)
-			return
-		}
-		if progress != nil {
-			fmt.Println("progress ", progress)
-		}
-		fmt.Println(url, "DialToEthr got a client ")
 		r.Client = client
 		r.Url = url
 		reporeResult(ctx, out, r)
@@ -305,15 +308,5 @@ func GetBalance(client *ethclient.Client, key *keystore.Key) (balance *big.Float
 	balance.SetString(wei.String())
 	balance = balance.Quo(balance, big.NewFloat(math.Pow10(18)))
 
-	return
-}
-
-func GetChainId(client *ethclient.Client, key *keystore.Key) (chainId uint64, err error) {
-	id, err := client.ChainID(context.Background())
-	if err != nil {
-		fmt.Println("Get ChainId Error: ", err)
-		return
-	}
-	chainId = id.Uint64()
 	return
 }
