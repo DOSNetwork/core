@@ -9,6 +9,7 @@
     "BootStrapIPs": [
     ],
     "ChainNodePool": [
-        "wss://mainnet.infura.io/ws/v3/#REPLACE-WITH-INFURA-APIKEY"
+        "wss://mainnet.infura.io/ws/v3/#REPLACE-WITH-INFURA-APIKEY",
+        "https://mainnet.infura.io/v3/#REPLACE-WITH-INFURA-APIKEY"
     ]
 }

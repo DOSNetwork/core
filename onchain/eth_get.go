@@ -8,7 +8,6 @@ import (
 	"github.com/DOSNetwork/core/utils"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/types"
 	errors "golang.org/x/xerrors"
 )
 
@@ -168,6 +167,7 @@ func (e *ethAdaptor) GroupSize() (result uint64, err error) {
 	}
 	return
 }
+
 func (e *ethAdaptor) GetWorkingGroupSize() (result uint64, err error) {
 	if !e.isConnecting() {
 		err = errors.New("not connecting to geth")
@@ -346,11 +346,6 @@ func (e *ethAdaptor) RelayRespondLimit() (result uint64, err error) {
 		err = errors.New("casting error")
 	}
 	return
-}
-
-type PendingGroupT struct {
-	GroupId     *big.Int
-	StartBlkNum *big.Int
 }
 
 func (e *ethAdaptor) PendingGroupStartBlock(groupId *big.Int) (result uint64, err error) {
@@ -535,6 +530,7 @@ func (e *ethAdaptor) NumPendingNodes() (result uint64, err error) {
 	}
 	return
 }
+
 func (e *ethAdaptor) BootstrapEndBlk() (result uint64, err error) {
 	if !e.isConnecting() {
 		err = errors.New("not connecting to geth")
@@ -570,6 +566,7 @@ func (e *ethAdaptor) BootstrapEndBlk() (result uint64, err error) {
 	}
 	return
 }
+
 func (e *ethAdaptor) RefreshSystemRandomHardLimit() (result uint64, err error) {
 	if !e.isConnecting() {
 		err = errors.New("not connecting to geth")
@@ -605,6 +602,7 @@ func (e *ethAdaptor) RefreshSystemRandomHardLimit() (result uint64, err error) {
 	}
 	return
 }
+
 func (e *ethAdaptor) BootstrapStartThreshold() (result uint64, err error) {
 	if !e.isConnecting() {
 		err = errors.New("not connecting to geth")
@@ -708,6 +706,7 @@ func (e *ethAdaptor) IsPendingNode(id []byte) (result bool, err error) {
 	}
 	return
 }
+
 func (e *ethAdaptor) BootstrapRound() (result uint64, err error) {
 	if !e.isConnecting() {
 		err = errors.New("not connecting to geth")
@@ -743,6 +742,7 @@ func (e *ethAdaptor) BootstrapRound() (result uint64, err error) {
 	}
 	return
 }
+
 func (e *ethAdaptor) Balance() (result *big.Float, err error) {
 	if !e.isConnecting() {
 		err = errors.New("not connecting to geth")
@@ -778,6 +778,7 @@ func (e *ethAdaptor) Balance() (result *big.Float, err error) {
 	}
 	return
 }
+
 func (e *ethAdaptor) CurrentBlock() (result uint64, err error) {
 	if !e.isConnecting() {
 		err = errors.New("not connecting to geth")
@@ -793,7 +794,7 @@ func (e *ethAdaptor) CurrentBlock() (result uint64, err error) {
 			if idx == -1 {
 				err = errors.New("no client index in context")
 			} else {
-				if val, err := clients[idx].HeaderByNumber(ctx, nil); err != nil {
+				if val, err := clients[idx].BlockNumber(ctx); err != nil {
 					replyError(ctx, errc, &OnchainError{err: errors.Errorf("get err : %w", err), Idx: idx})
 				} else {
 					utils.ReportResult(ctx, outc, val)
@@ -806,13 +807,14 @@ func (e *ethAdaptor) CurrentBlock() (result uint64, err error) {
 	if r, err = e.get(f); err != nil {
 		return
 	}
-	if v, ok := r.(*types.Header); ok {
-		result = v.Number.Uint64()
+	if v, ok := r.(uint64); ok {
+		result = v
 	} else {
 		err = errors.New("casting error")
 	}
 	return
 }
+
 func (e *ethAdaptor) PendingNonce() (result uint64, err error) {
 	if !e.isConnecting() {
 		err = errors.New("not connecting to geth")
@@ -843,9 +845,10 @@ func (e *ethAdaptor) PendingNonce() (result uint64, err error) {
 	}
 	if v, ok := r.(uint64); ok {
 		result = v
+	} else if v, ok := r.(*uint64); ok { // https://github.com/okex/okexchain/blob/a6302c78cf0ba5def3bba9c9457bcefef6674f05/app/rpc/namespaces/eth/api.go#L291
+		result = *v
 	} else {
 		err = errors.New("casting error")
 	}
 	return
-
 }

@@ -9,8 +9,8 @@ import (
 	"time"
 	"unsafe"
 
-	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/math"
 
 	"github.com/DOSNetwork/core/onchain"
 	"github.com/DOSNetwork/core/share"
@@ -306,7 +306,7 @@ func (d *DosNode) handleCR(cr *onchain.LogStartCommitReveal, randSeed *big.Int) 
 		return
 	}
 	h := sha3.NewLegacyKeccak256()
-	h.Write(abi.U256(sec))
+	h.Write(math.U256Bytes(sec))
 	b := h.Sum(nil)
 	hash := byte32(b)
 	currentBlockNumber, err := d.chain.CurrentBlock()

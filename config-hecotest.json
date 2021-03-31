@@ -9,6 +9,7 @@
     "BootStrapIPs": [
     ],
     "ChainNodePool": [
-        "wss://ws-testnet.hecochain.com"
+        "wss://ws-testnet.hecochain.com",
+        "https://http-testnet.hecochain.com"
     ]
 }

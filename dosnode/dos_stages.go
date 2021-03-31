@@ -386,8 +386,14 @@ func recoverSign(ctx context.Context, signc chan *vss.Signature, suite suites.Su
 					defer logger.TimeTrack(time.Now(), "RecoverSign", map[string]interface{}{"GroupID": ctx.Value(ctxKey("GroupID")), "RequestID": ctx.Value(ctxKey("RequestID"))})
 				}
 
-				signShares = append(signShares, sign.Signature)
+				if sign == nil || sign.Signature == nil || sign.Content == nil {
+					err := errors.New("Detected nil pointer and skipped")
+					logger.Error(err)
+					errc <- err
+					continue
+				}
 
+				signShares = append(signShares, sign.Signature)
 				if len(signShares) >= nbThreshold {
 					sig, err := tbls.Recover(suite, pubPoly, sign.Content, signShares, nbThreshold, nbParticipants)
 					if err != nil {
