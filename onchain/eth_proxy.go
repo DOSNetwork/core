@@ -121,23 +121,26 @@ func (e *ethAdaptor) isConnecting() (result bool) {
 		return
 	default:
 	}
+	rpcConn, wsConn := false, false
+C1:
 	for _, ctx := range e.ctxes {
 		select {
 		case <-ctx.Done():
 		default:
-			result = true
-			return
+			rpcConn = true
+			break C1
 		}
 	}
+C2:
 	for _, wsCtx := range e.wsCtxes {
 		select {
 		case <-wsCtx.Done():
 		default:
-			result = true
-			return
+			wsConn = true
+			break C2
 		}
 	}
-	return
+	return (rpcConn && wsConn)
 }
 
 func (e *ethAdaptor) Connect(urls []string, t time.Time) (err error) {
@@ -166,9 +169,13 @@ func (e *ethAdaptor) Connect(urls []string, t time.Time) (err error) {
 
 	e.ctx, e.cancelFunc = context.WithCancel(context.Background())
 	e.rpcClients = nil
+	e.wsClients = nil
 	e.proxies = nil
+	e.wsProxies = nil
 	e.crs = nil
+	e.wsCrs = nil
 	e.ctxes = nil
+	e.wsCtxes = nil
 	e.cancels = nil
 
 	dialCtx, dialCancel := context.WithDeadline(e.ctx, t)
