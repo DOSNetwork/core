@@ -59,6 +59,7 @@ type ethAdaptor struct {
 	ctxes            []context.Context
 	wsCtxes          []context.Context
 	cancels          []context.CancelFunc
+	wsCancels        []context.CancelFunc
 	ctx              context.Context
 	cancelFunc       context.CancelFunc
 	reqQueue         chan *request
@@ -105,9 +106,9 @@ func (e *ethAdaptor) DisconnectAll() {
 	return
 }
 
-func (e *ethAdaptor) Disconnect(idx int) {
-	if e.cancels[idx] != nil {
-		e.cancels[idx]()
+func (e *ethAdaptor) DisconnectWs(idx int) {
+	if e.wsCancels[idx] != nil {
+		e.wsCancels[idx]()
 	}
 	return
 }
@@ -282,7 +283,7 @@ func (e *ethAdaptor) Connect(urls []string, t time.Time) (err error) {
 				e.wsProxies = append(e.wsProxies, &dosproxy.DosproxySession{Contract: ws_p, CallOpts: bind.CallOpts{Context: ctx}, TransactOpts: *auth})
 				e.wsCrs = append(e.wsCrs, &commitreveal.CommitrevealSession{Contract: ws_cr, CallOpts: bind.CallOpts{Context: ctx}, TransactOpts: *auth})
 				e.wsCtxes = append(e.wsCtxes, ctx)
-				e.cancels = append(e.cancels, cancel)
+				e.wsCancels = append(e.wsCancels, cancel)
 			}
 			if len(e.wsCtxes) > 0 {
 				wsConnected = true

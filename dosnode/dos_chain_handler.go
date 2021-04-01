@@ -37,12 +37,11 @@ func (d *DosNode) onchainLoop() {
 	_ = d.chain.RegisterNewNode()
 
 	for {
-		//var onchainEvent chan interface{}
-		var onchainErrc chan error
+		var onchainEventErrc chan error
 		subescriptions := []int{onchain.SubscribeLogGrouping, onchain.SubscribeLogGroupDissolve, onchain.SubscribeLogUrl,
 			onchain.SubscribeLogUpdateRandom, onchain.SubscribeLogRequestUserRandom,
 			onchain.SubscribeLogPublicKeyAccepted, onchain.SubscribeCommitrevealLogStartCommitreveal}
-		d.onchainEvent, onchainErrc = d.chain.SubscribeEvent(subescriptions)
+		d.onchainEvent, onchainEventErrc = d.chain.SubscribeEvent(subescriptions)
 
 		watchdog := time.NewTicker(time.Duration(d.chain.GetBlockTime()) * time.Second)
 		reconn = 0
@@ -98,14 +97,14 @@ func (d *DosNode) onchainLoop() {
 						}
 					}
 				}
-			case err, ok := <-onchainErrc:
+			case err, ok := <-onchainEventErrc:
 				if !ok {
-					d.logger.Info("End onchainErrc")
+					d.logger.Info("End onchainEventErrc")
 					break L
 				}
 				var oError *onchain.OnchainError
 				if errors.As(err, &oError) {
-					d.chain.Disconnect(oError.Idx)
+					d.chain.DisconnectWs(oError.Idx)
 				}
 				d.logger.Error(err)
 			case event, ok := <-d.onchainEvent:
@@ -204,10 +203,10 @@ func (d *DosNode) onchainLoop() {
 		}
 		d.logger.Info("End Drain onchainEvent")
 
-		for err = range onchainErrc {
-			d.logger.Error(fmt.Errorf("Drain onchainErrc %+v \n", err))
+		for err = range onchainEventErrc {
+			d.logger.Error(fmt.Errorf("Drain onchaineventErrc %+v \n", err))
 		}
-		d.logger.Info("End Drain onchainErrc")
+		d.logger.Info("End Drain onchainEventErrc")
 		d.chain.DisconnectAll()
 		select {
 		case <-d.ctx.Done():
