@@ -95,7 +95,7 @@ func NewEthAdaptor(key *keystore.Key, config *configuration.Config, l logger) (a
 	return
 }
 
-//End close the connection to eth and release all resources
+// Close RPC & WS connections to eth and release all resources
 func (e *ethAdaptor) DisconnectAll() {
 	e.cancelFunc()
 	for {
@@ -178,6 +178,7 @@ func (e *ethAdaptor) Connect(urls []string, t time.Time) (err error) {
 	e.ctxes = nil
 	e.wsCtxes = nil
 	e.cancels = nil
+	e.wsCancels = nil
 
 	dialCtx, dialCancel := context.WithDeadline(e.ctx, t)
 	defer dialCancel()
