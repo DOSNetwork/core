@@ -99,7 +99,7 @@ func NewEthAdaptor(key *keystore.Key, config *configuration.Config, l logger) (a
 func (e *ethAdaptor) DisconnectAll() {
 	e.cancelFunc()
 	for {
-		if !e.isConnecting() {
+		if !e.isConnecting(false) {
 			return
 		}
 	}
@@ -113,7 +113,7 @@ func (e *ethAdaptor) DisconnectWs(idx int) {
 	return
 }
 
-func (e *ethAdaptor) isConnecting() (result bool) {
+func (e *ethAdaptor) isConnecting(onlyCheckRpc bool) (result bool) {
 	if e.ctx == nil {
 		return
 	}
@@ -132,6 +132,10 @@ C1:
 			break C1
 		}
 	}
+	if onlyCheckRpc {
+		result = rpcConn
+		return
+	}
 C2:
 	for _, wsCtx := range e.wsCtxes {
 		select {
@@ -141,11 +145,12 @@ C2:
 			break C2
 		}
 	}
-	return (rpcConn && wsConn)
+	result = rpcConn && wsConn
+	return
 }
 
 func (e *ethAdaptor) Connect(urls []string, t time.Time) (err error) {
-	if e.isConnecting() {
+	if e.isConnecting(false) {
 		err = errors.Errorf("connection existing")
 		return
 	}

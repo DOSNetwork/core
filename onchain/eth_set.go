@@ -105,7 +105,7 @@ func (e *ethAdaptor) waitForReply(req *request) (err error) {
 }
 
 func (e *ethAdaptor) SetGroupSize(g uint64) (err error) {
-	if !e.isConnecting() {
+	if !e.isConnecting(true) {
 		err = errors.New("not connecting to geth")
 		return
 	}
@@ -137,7 +137,7 @@ func (e *ethAdaptor) SetGroupSize(g uint64) (err error) {
 }
 
 func (e *ethAdaptor) UpdateRandomness(sign *vss.Signature) (err error) {
-	if !e.isConnecting() {
+	if !e.isConnecting(true) {
 		err = errors.New("not connecting to geth")
 		return
 	}
@@ -170,7 +170,7 @@ func (e *ethAdaptor) UpdateRandomness(sign *vss.Signature) (err error) {
 }
 
 func (e *ethAdaptor) DataReturn(sign *vss.Signature) (err error) {
-	if !e.isConnecting() {
+	if !e.isConnecting(true) {
 		err = errors.New("not connecting to geth")
 		return
 	}
@@ -206,7 +206,7 @@ func (e *ethAdaptor) DataReturn(sign *vss.Signature) (err error) {
 }
 
 func (e *ethAdaptor) RegisterGroupPubKey(idPubkey [5]*big.Int) (err error) {
-	if !e.isConnecting() {
+	if !e.isConnecting(true) {
 		err = errors.New("not connecting to geth")
 		return
 	}
@@ -240,7 +240,7 @@ func (e *ethAdaptor) RegisterGroupPubKey(idPubkey [5]*big.Int) (err error) {
 }
 
 func (e *ethAdaptor) RegisterNewNode() (err error) {
-	if !e.isConnecting() {
+	if !e.isConnecting(true) {
 		err = errors.New("not connecting to geth")
 		return
 	}
@@ -271,7 +271,7 @@ func (e *ethAdaptor) RegisterNewNode() (err error) {
 }
 
 func (e *ethAdaptor) UnRegisterNode() (err error) {
-	if !e.isConnecting() {
+	if !e.isConnecting(true) {
 		err = errors.New("[ONCHAIN] not connecting to geth")
 		return
 	}
@@ -302,7 +302,7 @@ func (e *ethAdaptor) UnRegisterNode() (err error) {
 }
 
 func (e *ethAdaptor) SignalRandom() (err error) {
-	if !e.isConnecting() {
+	if !e.isConnecting(true) {
 		err = errors.New("not connecting to geth")
 		return
 	}
@@ -320,7 +320,7 @@ func (e *ethAdaptor) SignalRandom() (err error) {
 }
 
 func (e *ethAdaptor) SignalGroupFormation() (err error) {
-	if !e.isConnecting() {
+	if !e.isConnecting(true) {
 		err = errors.New("not connecting to geth")
 		return
 	}
@@ -338,7 +338,7 @@ func (e *ethAdaptor) SignalGroupFormation() (err error) {
 }
 
 func (e *ethAdaptor) SignalGroupDissolve() (err error) {
-	if !e.isConnecting() {
+	if !e.isConnecting(true) {
 		err = errors.New("not connecting to geth")
 		return
 	}
@@ -375,7 +375,7 @@ func (e *ethAdaptor) SetGasPrice(gasPrice *big.Int) {
 }
 
 func (e *ethAdaptor) SignalBootstrap(cid *big.Int) (err error) {
-	if !e.isConnecting() {
+	if !e.isConnecting(true) {
 		err = errors.New("not connecting to geth")
 		return
 	}
@@ -393,7 +393,7 @@ func (e *ethAdaptor) SignalBootstrap(cid *big.Int) (err error) {
 }
 
 func (e *ethAdaptor) SignalUnregister(addr common.Address) (err error) {
-	if !e.isConnecting() {
+	if !e.isConnecting(true) {
 		err = errors.New("not connecting to geth")
 		return
 	}
@@ -425,7 +425,7 @@ func (e *ethAdaptor) SignalUnregister(addr common.Address) (err error) {
 }
 
 func (e *ethAdaptor) StartCommitReveal(startBlock int64, commitDuration int64, revealDuration int64, revealThreshold int64) (err error) {
-	if !e.isConnecting() {
+	if !e.isConnecting(true) {
 		err = errors.New("not connecting to geth")
 		return
 	}
@@ -456,7 +456,7 @@ func (e *ethAdaptor) StartCommitReveal(startBlock int64, commitDuration int64, r
 }
 
 func (e *ethAdaptor) Commit(cid *big.Int, commitment [32]byte) (err error) {
-	if !e.isConnecting() {
+	if !e.isConnecting(true) {
 		err = errors.New("not connecting to geth")
 		return
 	}
@@ -487,7 +487,7 @@ func (e *ethAdaptor) Commit(cid *big.Int, commitment [32]byte) (err error) {
 }
 
 func (e *ethAdaptor) Reveal(cid *big.Int, secret *big.Int) (err error) {
-	if !e.isConnecting() {
+	if !e.isConnecting(true) {
 		err = errors.New("not connecting to geth")
 		return
 	}

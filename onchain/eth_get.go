@@ -14,7 +14,7 @@ import (
 type getFunc func(ctx context.Context) (chan interface{}, chan error)
 
 func (e *ethAdaptor) get(f getFunc) (result interface{}, err error) {
-	if !e.isConnecting() {
+	if !e.isConnecting(true) {
 		err = errors.New("not connecting to geth")
 		return
 	}
@@ -60,7 +60,7 @@ func (e *ethAdaptor) get(f getFunc) (result interface{}, err error) {
 
 // GroupToPick returns the groupToPick value
 func (e *ethAdaptor) GroupToPick() (result uint64, err error) {
-	if !e.isConnecting() {
+	if !e.isConnecting(true) {
 		err = errors.New("not connecting to geth")
 	}
 	proxies := e.proxies
@@ -97,7 +97,7 @@ func (e *ethAdaptor) GroupToPick() (result uint64, err error) {
 
 // GetExpiredWorkingGroupSize returns the GetExpiredWorkingGroupSize value
 func (e *ethAdaptor) GetExpiredWorkingGroupSize() (result uint64, err error) {
-	if !e.isConnecting() {
+	if !e.isConnecting(true) {
 		err = errors.New("not connecting to geth")
 	}
 	proxies := e.proxies
@@ -133,7 +133,7 @@ func (e *ethAdaptor) GetExpiredWorkingGroupSize() (result uint64, err error) {
 }
 
 func (e *ethAdaptor) GroupSize() (result uint64, err error) {
-	if !e.isConnecting() {
+	if !e.isConnecting(true) {
 		err = errors.New("not connecting to geth")
 	}
 	proxies := e.proxies
@@ -169,7 +169,7 @@ func (e *ethAdaptor) GroupSize() (result uint64, err error) {
 }
 
 func (e *ethAdaptor) GetWorkingGroupSize() (result uint64, err error) {
-	if !e.isConnecting() {
+	if !e.isConnecting(true) {
 		err = errors.New("not connecting to geth")
 	}
 	proxies := e.proxies
@@ -205,7 +205,7 @@ func (e *ethAdaptor) GetWorkingGroupSize() (result uint64, err error) {
 }
 
 func (e *ethAdaptor) LastGroupFormationRequestId() (result uint64, err error) {
-	if !e.isConnecting() {
+	if !e.isConnecting(true) {
 		err = errors.New("not connecting to geth")
 	}
 	proxies := e.proxies
@@ -241,7 +241,7 @@ func (e *ethAdaptor) LastGroupFormationRequestId() (result uint64, err error) {
 }
 
 func (e *ethAdaptor) LastUpdatedBlock() (result uint64, err error) {
-	if !e.isConnecting() {
+	if !e.isConnecting(true) {
 		err = errors.New("not connecting to geth")
 	}
 	proxies := e.proxies
@@ -277,7 +277,7 @@ func (e *ethAdaptor) LastUpdatedBlock() (result uint64, err error) {
 }
 
 func (e *ethAdaptor) CachedUpdatedBlock() (result uint64, err error) {
-	if !e.isConnecting() {
+	if !e.isConnecting(true) {
 		err = errors.New("not connecting to geth")
 	}
 	proxies := e.proxies
@@ -313,7 +313,7 @@ func (e *ethAdaptor) CachedUpdatedBlock() (result uint64, err error) {
 }
 
 func (e *ethAdaptor) RelayRespondLimit() (result uint64, err error) {
-	if !e.isConnecting() {
+	if !e.isConnecting(true) {
 		err = errors.New("not connecting to geth")
 	}
 	proxies := e.proxies
@@ -349,7 +349,7 @@ func (e *ethAdaptor) RelayRespondLimit() (result uint64, err error) {
 }
 
 func (e *ethAdaptor) PendingGroupStartBlock(groupId *big.Int) (result uint64, err error) {
-	if !e.isConnecting() {
+	if !e.isConnecting(true) {
 		err = errors.New("not connecting to geth")
 	}
 	proxies := e.proxies
@@ -388,7 +388,7 @@ func (e *ethAdaptor) PendingGroupStartBlock(groupId *big.Int) (result uint64, er
 }
 
 func (e *ethAdaptor) PendingGroupMaxLife() (result uint64, err error) {
-	if !e.isConnecting() {
+	if !e.isConnecting(true) {
 		err = errors.New("not connecting to geth")
 	}
 	proxies := e.proxies
@@ -424,7 +424,7 @@ func (e *ethAdaptor) PendingGroupMaxLife() (result uint64, err error) {
 }
 
 func (e *ethAdaptor) FirstPendingGroupId() (result *big.Int, err error) {
-	if !e.isConnecting() {
+	if !e.isConnecting(true) {
 		err = errors.New("not connecting to geth")
 	}
 	proxies := e.proxies
@@ -460,7 +460,7 @@ func (e *ethAdaptor) FirstPendingGroupId() (result *big.Int, err error) {
 }
 
 func (e *ethAdaptor) NumPendingGroups() (result uint64, err error) {
-	if !e.isConnecting() {
+	if !e.isConnecting(true) {
 		err = errors.New("not connecting to geth")
 	}
 	proxies := e.proxies
@@ -496,7 +496,7 @@ func (e *ethAdaptor) NumPendingGroups() (result uint64, err error) {
 }
 
 func (e *ethAdaptor) NumPendingNodes() (result uint64, err error) {
-	if !e.isConnecting() {
+	if !e.isConnecting(true) {
 		err = errors.New("not connecting to geth")
 	}
 	proxies := e.proxies
@@ -532,7 +532,7 @@ func (e *ethAdaptor) NumPendingNodes() (result uint64, err error) {
 }
 
 func (e *ethAdaptor) BootstrapEndBlk() (result uint64, err error) {
-	if !e.isConnecting() {
+	if !e.isConnecting(true) {
 		err = errors.New("not connecting to geth")
 	}
 	proxies := e.proxies
@@ -568,7 +568,7 @@ func (e *ethAdaptor) BootstrapEndBlk() (result uint64, err error) {
 }
 
 func (e *ethAdaptor) RefreshSystemRandomHardLimit() (result uint64, err error) {
-	if !e.isConnecting() {
+	if !e.isConnecting(true) {
 		err = errors.New("not connecting to geth")
 	}
 	proxies := e.proxies
@@ -604,7 +604,7 @@ func (e *ethAdaptor) RefreshSystemRandomHardLimit() (result uint64, err error) {
 }
 
 func (e *ethAdaptor) BootstrapStartThreshold() (result uint64, err error) {
-	if !e.isConnecting() {
+	if !e.isConnecting(true) {
 		err = errors.New("not connecting to geth")
 	}
 	proxies := e.proxies
@@ -666,7 +666,7 @@ func (e *ethAdaptor) GetGasLimit() (result uint64) {
 }
 
 func (e *ethAdaptor) IsPendingNode(id []byte) (result bool, err error) {
-	if !e.isConnecting() {
+	if !e.isConnecting(true) {
 		err = errors.New("not connecting to geth")
 	}
 	proxies := e.proxies
@@ -708,7 +708,7 @@ func (e *ethAdaptor) IsPendingNode(id []byte) (result bool, err error) {
 }
 
 func (e *ethAdaptor) BootstrapRound() (result uint64, err error) {
-	if !e.isConnecting() {
+	if !e.isConnecting(true) {
 		err = errors.New("not connecting to geth")
 	}
 	proxies := e.proxies
@@ -744,7 +744,7 @@ func (e *ethAdaptor) BootstrapRound() (result uint64, err error) {
 }
 
 func (e *ethAdaptor) Balance() (result *big.Float, err error) {
-	if !e.isConnecting() {
+	if !e.isConnecting(true) {
 		err = errors.New("not connecting to geth")
 	}
 	clients := e.rpcClients
@@ -780,7 +780,7 @@ func (e *ethAdaptor) Balance() (result *big.Float, err error) {
 }
 
 func (e *ethAdaptor) CurrentBlock() (result uint64, err error) {
-	if !e.isConnecting() {
+	if !e.isConnecting(true) {
 		err = errors.New("not connecting to geth")
 	}
 	clients := e.rpcClients
@@ -816,7 +816,7 @@ func (e *ethAdaptor) CurrentBlock() (result uint64, err error) {
 }
 
 func (e *ethAdaptor) PendingNonce() (result uint64, err error) {
-	if !e.isConnecting() {
+	if !e.isConnecting(true) {
 		err = errors.New("not connecting to geth")
 	}
 	clients := e.rpcClients
