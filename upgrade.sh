@@ -1,6 +1,6 @@
 #!/bin/bash
 
-export DOSTAG="v1.0.2-m"
+export DOSTAG="v1.0.4-m"
 
 sudo rm -f vault/dosclient.pid
 sudo docker stop $(docker ps -a -q)
