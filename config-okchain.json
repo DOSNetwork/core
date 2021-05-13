@@ -1,5 +1,5 @@
 {
-    "VERSION": "v1.0.4-m-t",
+    "VERSION": "v1.0.4-m",
     "NodeIP": "#REPLACE-WITH-IP",
     "NodePort": "9501",
     "ChainType": "Okchain",
