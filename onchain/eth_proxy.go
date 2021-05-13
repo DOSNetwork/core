@@ -2,6 +2,7 @@ package onchain
 
 import (
 	"context"
+	"math/big"
 	"strconv"
 	"strings"
 	"time"
@@ -45,8 +46,8 @@ type ethAdaptor struct {
 	wsUrls           []string
 	key              *keystore.Key
 	blockTime        uint64
-	gasPrice         uint64
 	gasLimit         uint64
+	gasPrice         uint64
 	connTimeout      time.Duration
 	getTimeout       time.Duration
 	setTimeout       time.Duration
@@ -77,6 +78,10 @@ func NewEthAdaptor(key *keystore.Key, config *configuration.Config, l logger) (a
 	if err != nil {
 		return nil, err
 	}
+	gasPriceInt, err := strconv.Atoi(config.EthGasPrice)
+	if err != nil {
+		return nil, err
+	}
 	blockTimeInt, err := strconv.Atoi(config.BlockTime)
 	if err != nil {
 		return nil, err
@@ -88,6 +93,7 @@ func NewEthAdaptor(key *keystore.Key, config *configuration.Config, l logger) (a
 	adaptor.logger = l
 	adaptor.reqQueue = make(chan *request)
 	adaptor.gasLimit = uint64(gasLimitInt)
+	adaptor.gasPrice = uint64(gasPriceInt)
 	adaptor.blockTime = uint64(blockTimeInt)
 	adaptor.connTimeout = 60 * time.Second
 	adaptor.getTimeout = 60 * time.Second
@@ -245,6 +251,9 @@ func (e *ethAdaptor) Connect(urls []string, t time.Time) (err error) {
 		ctx = context.WithValue(ctx, "index", len(e.ctxes))
 		auth := bind.NewKeyedTransactor(e.key.PrivateKey)
 		auth.GasLimit = e.gasLimit
+		if e.gasPrice != 0 {
+			auth.GasPrice = big.NewInt(int64(e.gasPrice))
+		}
 		auth.Context = ctx
 
 		if bootStrapUrl != "" {
@@ -283,6 +292,9 @@ func (e *ethAdaptor) Connect(urls []string, t time.Time) (err error) {
 				ctx = context.WithValue(ctx, "wsIndex", len(e.wsCtxes))
 				auth := bind.NewKeyedTransactor(e.key.PrivateKey)
 				auth.GasLimit = e.gasLimit
+				if e.gasPrice != 0 {
+					auth.GasPrice = big.NewInt(int64(e.gasPrice))
+				}
 				auth.Context = ctx
 
 				e.wsClients = append(e.wsClients, wsClient)

@@ -356,20 +356,22 @@ func (e *ethAdaptor) SignalGroupDissolve() (err error) {
 }
 
 func (e *ethAdaptor) SetGasLimit(gasLimit *big.Int) {
-	if len(e.proxies) > 0 && len(e.crs) > 0 {
-		e.proxies[0].TransactOpts.GasLimit = gasLimit.Uint64()
-		e.crs[0].TransactOpts.GasLimit = gasLimit.Uint64()
+	e.gasLimit = gasLimit.Uint64()
+	for i := 0; i < len(e.proxies) && i < len(e.crs); i++ {
+		e.proxies[i].TransactOpts.GasLimit = gasLimit.Uint64()
+		e.crs[i].TransactOpts.GasLimit = gasLimit.Uint64()
 	}
 }
 
 func (e *ethAdaptor) SetGasPrice(gasPrice *big.Int) {
-	if len(e.proxies) > 0 && len(e.crs) > 0 {
+	e.gasPrice = gasPrice.Uint64()
+	for i := 0; i < len(e.proxies) && i < len(e.crs); i++ {
 		if gasPrice.Cmp(big.NewInt(0)) == 0 {
-			e.proxies[0].TransactOpts.GasPrice = nil
-			e.crs[0].TransactOpts.GasPrice = nil
+			e.proxies[i].TransactOpts.GasPrice = nil
+			e.crs[i].TransactOpts.GasPrice = nil
 		} else {
-			e.proxies[0].TransactOpts.GasPrice = gasPrice
-			e.crs[0].TransactOpts.GasPrice = gasPrice
+			e.proxies[i].TransactOpts.GasPrice = gasPrice
+			e.crs[i].TransactOpts.GasPrice = gasPrice
 		}
 	}
 }

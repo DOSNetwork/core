@@ -6,6 +6,7 @@
     "BlockTime": "14",
     "DOSAddressBridgeAddress": "0x98A0E7026778840Aacd28B9c03137D32e06F5ff1",
     "EthGasLimit": "1000000",
+    "EthGasPrice": "0",
     "BootStrapIPs": [
     ],
     "ChainNodePool": [
