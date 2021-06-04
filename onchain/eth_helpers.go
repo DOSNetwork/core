@@ -19,11 +19,6 @@ import (
 	"github.com/ethereum/go-ethereum/light"
 )
 
-const (
-	checkSyncInterval = 15
-	syncBlockDiff     = 3
-)
-
 type DialResult struct {
 	Client *ethclient.Client
 	Url    string
@@ -158,8 +153,8 @@ func reporeResult(ctx context.Context, out chan DialResult, result DialResult) {
 	}
 }
 
-//DialToEth is a utility function to dial to Ethereum
-func DialToEth(ctx context.Context, urlPool []string) (out chan DialResult) {
+// DialToEth is a utility function to dial to Ethereum
+func DialToEth(ctx context.Context, urlPool []string, rpcConn bool) (out chan DialResult) {
 	out = make(chan DialResult)
 	var wg sync.WaitGroup
 
@@ -170,30 +165,35 @@ func DialToEth(ctx context.Context, urlPool []string) (out chan DialResult) {
 
 		client, err := ethclient.Dial(url)
 		if err != nil {
-			//ws connect: connection timed out
+			// connection timed out
 			r.Err = errors.Errorf(": %w", err)
 			reporeResult(ctx, out, r)
 			return
 		}
 
-		if _, err := client.NetworkID(ctx); err != nil {
-			fmt.Println("NetworkID err ", err)
-			//Post http i/o timeout
-			r.Err = errors.Errorf(": %w", err)
-			reporeResult(ctx, out, r)
-			client.Close()
-			return
+		// Json-Rpc request only for rpc connection
+		if rpcConn {
+			if _, err := client.NetworkID(ctx); err != nil {
+				fmt.Println("NetworkID err ", err)
+				// Post http i/o timeout
+				r.Err = errors.Errorf(": %w", err)
+				reporeResult(ctx, out, r)
+				client.Close()
+				return
+			}
+			progress, err := client.SyncProgress(ctx)
+			if err != nil {
+				fmt.Println("SyncProgress err ", err, url)
+				return
+			}
+			if progress != nil {
+				fmt.Println("progress ", progress)
+			}
+			fmt.Println(url, "DialToEth got rpc client")
+		} else {
+			fmt.Println(url, "DialToEth got websocket client")
 		}
 
-		progress, err := client.SyncProgress(ctx)
-		if err != nil {
-			fmt.Println("SyncProgress err ", err, url)
-			return
-		}
-		if progress != nil {
-			fmt.Println("progress ", progress)
-		}
-		fmt.Println(url, "DialToEthr got a client ")
 		r.Client = client
 		r.Url = url
 		reporeResult(ctx, out, r)
@@ -227,19 +227,18 @@ func CheckSync(ctx context.Context, cs chan *ethclient.Client) chan *ethclient.C
 		size++
 		go func(client *ethclient.Client) {
 			defer wg.Done()
-			var blk *types.Block
+			var height uint64
 			var progress *ethereum.SyncProgress
 			var err error
-			if blk, err = client.BlockByNumber(ctx, nil); err != nil {
+			if height, err = client.BlockNumber(ctx); err != nil {
 				fmt.Println("CheckSync error ", err)
 				if err.Error() == light.ErrNoPeers.Error() {
 					fmt.Println("CheckSync error ErrNoPeers ", err)
 				}
 				return
 			}
-			highestBlkN := blk.NumberU64()
+			fmt.Println("Current height ", height)
 
-			fmt.Println("highestBlkN ", highestBlkN)
 			if progress, err = client.SyncProgress(ctx); err != nil {
 				fmt.Println("SyncProgress err ", err)
 				return
@@ -256,23 +255,12 @@ func CheckSync(ctx context.Context, cs chan *ethclient.Client) chan *ethclient.C
 	return out
 }
 
-// GetCurrentBlock returns a block number of latest known header from the
-// current canonical chain.
-func GetCurrentBlock(client *ethclient.Client) (blknum uint64, err error) {
-	var header *types.Header
-	header, err = client.HeaderByNumber(context.Background(), nil)
-	if err == nil {
-		blknum = header.Number.Uint64()
-	}
-	return
-}
-
 // CheckTransaction return an error if the transaction is failed
 func CheckTransaction(client *ethclient.Client, blockTime uint64, tx *types.Transaction) (err error) {
 	start := time.Now()
 	receipt, err := client.TransactionReceipt(context.Background(), tx.Hash())
 	for err == ethereum.NotFound {
-		if time.Since(start).Minutes() > 30 {
+		if time.Since(start) > time.Duration(blockTime)*time.Second*128 {
 			err = errors.New("transaction not found")
 			fmt.Println("transaction failed. tx ", fmt.Sprintf("%x", tx.Hash()))
 			return
@@ -300,20 +288,7 @@ func GetBalance(client *ethclient.Client, key *keystore.Key) (balance *big.Float
 	if err != nil {
 		return
 	}
-
-	balance = new(big.Float)
-	balance.SetString(wei.String())
+	balance = new(big.Float).SetInt(wei)
 	balance = balance.Quo(balance, big.NewFloat(math.Pow10(18)))
-
-	return
-}
-
-func GetChainId(client *ethclient.Client, key *keystore.Key) (chainId uint64, err error) {
-	id, err := client.ChainID(context.Background())
-	if err != nil {
-		fmt.Println("Get ChainId Error: ", err)
-		return
-	}
-	chainId = id.Uint64()
 	return
 }

@@ -32,6 +32,7 @@ type Config struct {
 	BlockTime               string
 	DOSAddressBridgeAddress string
 	EthGasLimit             string
+	EthGasPrice             string
 	BootStrapIPs            []string
 	ChainNodePool           []string
 }

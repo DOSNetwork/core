@@ -26,7 +26,7 @@ const (
 type ProxyAdapter interface {
 	Connect(urls []string, deadline time.Time) (err error)
 	DisconnectAll()
-	Disconnect(idx int)
+	DisconnectWs(idx int)
 	SubscribeEvent(subscribeTypes []int) (chan interface{}, chan error)
 	//Set functions
 	SetGroupSize(g uint64) (err error)

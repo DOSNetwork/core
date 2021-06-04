@@ -103,32 +103,30 @@ func (e *ethAdaptor) SubscribeEvent(subscribeTypes []int) (chan interface{}, cha
 	var errcs []chan error
 	for _, subscribeType := range subscribeTypes {
 		if subscribeType >= SubscribeCommitrevealLogStartCommitreveal {
-			for i := 0; i < len(e.crs); i++ {
-				if e.crs[i] == nil ||
-					e.ctxes[i] == nil {
+			for i := 0; i < len(e.wsCrs); i++ {
+				if e.wsCrs[i] == nil || e.wsCtxes[i] == nil {
 					continue
 				}
 				select {
-				case <-e.ctxes[i].Done():
+				case <-e.wsCtxes[i].Done():
 					continue
 				default:
 				}
-				out, errc := crTable[subscribeType](e.ctxes[i], e.crs[i])
+				out, errc := crTable[subscribeType](e.wsCtxes[i], e.wsCrs[i])
 				eventList = append(eventList, out)
 				errcs = append(errcs, errc)
 			}
 		} else {
-			for i := 0; i < len(e.proxies); i++ {
-				if e.proxies[i] == nil ||
-					e.ctxes[i] == nil {
+			for i := 0; i < len(e.wsProxies); i++ {
+				if e.wsProxies[i] == nil || e.wsCtxes[i] == nil {
 					continue
 				}
 				select {
-				case <-e.ctxes[i].Done():
+				case <-e.wsCtxes[i].Done():
 					continue
 				default:
 				}
-				out, errc := proxyTable[subscribeType](e.ctxes[i], e.proxies[i])
+				out, errc := proxyTable[subscribeType](e.wsCtxes[i], e.wsProxies[i])
 				eventList = append(eventList, out)
 				errcs = append(errcs, errc)
 			}
@@ -147,6 +145,18 @@ func getIndex(ctx context.Context) (idx int) {
 	}
 	return
 }
+
+func getWsIndex(ctx context.Context) (idx int) {
+	if v := ctx.Value("wsIndex"); v != nil {
+		if i, ok := v.(int); ok {
+			idx = i
+		} else {
+			idx = -1
+		}
+	}
+	return
+}
+
 func replyError(ctx context.Context, errc chan error, err error) {
 	select {
 	case <-ctx.Done():
@@ -167,7 +177,7 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 			defer close(out)
 			sub, err := proxy.Contract.WatchLogUpdateRandom(opt, transitChan)
 			if err != nil {
-				replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getIndex(ctx)})
+				replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getWsIndex(ctx)})
 				return
 			}
 			defer sub.Unsubscribe()
@@ -183,7 +193,7 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 						return
 					}
 					fmt.Print(fmt.Errorf("[Onchain] sub.Err %+v \n", err))
-					replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getIndex(ctx)})
+					replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getWsIndex(ctx)})
 					continue
 				case i, ok := <-transitChan:
 					if !ok {
@@ -223,7 +233,7 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 
 			sub, err := proxy.Contract.WatchLogUrl(opt, transitChan)
 			if err != nil {
-				replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getIndex(ctx)})
+				replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getWsIndex(ctx)})
 				return
 			}
 			defer sub.Unsubscribe()
@@ -236,7 +246,7 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 					if !ok {
 						return
 					}
-					replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getIndex(ctx)})
+					replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getWsIndex(ctx)})
 					continue
 				case i, ok := <-transitChan:
 					if !ok {
@@ -279,7 +289,7 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 
 			sub, err := proxy.Contract.WatchLogRequestUserRandom(opt, transitChan)
 			if err != nil {
-				replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getIndex(ctx)})
+				replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getWsIndex(ctx)})
 
 				return
 			}
@@ -293,7 +303,7 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 					if !ok {
 						return
 					}
-					replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getIndex(ctx)})
+					replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getWsIndex(ctx)})
 					continue
 				case i, ok := <-transitChan:
 					if !ok {
@@ -334,7 +344,7 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 
 			sub, err := proxy.Contract.WatchLogValidationResult(opt, transitChan)
 			if err != nil {
-				replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getIndex(ctx)})
+				replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getWsIndex(ctx)})
 
 				return
 			}
@@ -348,7 +358,7 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 					if !ok {
 						return
 					}
-					replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getIndex(ctx)})
+					replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getWsIndex(ctx)})
 					continue
 				case i, ok := <-transitChan:
 					if !ok {
@@ -390,7 +400,7 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 			defer close(out)
 			sub, err := proxy.Contract.WatchLogInsufficientPendingNode(opt, transitChan)
 			if err != nil {
-				replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getIndex(ctx)})
+				replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getWsIndex(ctx)})
 
 				return
 			}
@@ -404,7 +414,7 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 					if !ok {
 						return
 					}
-					replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getIndex(ctx)})
+					replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getWsIndex(ctx)})
 					continue
 				case i, ok := <-transitChan:
 					if !ok {
@@ -441,7 +451,7 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 			defer close(out)
 			sub, err := proxy.Contract.WatchLogInsufficientWorkingGroup(opt, transitChan)
 			if err != nil {
-				replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getIndex(ctx)})
+				replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getWsIndex(ctx)})
 
 				return
 			}
@@ -455,7 +465,7 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 					if !ok {
 						return
 					}
-					replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getIndex(ctx)})
+					replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getWsIndex(ctx)})
 					continue
 				case i, ok := <-transitChan:
 					if !ok {
@@ -492,7 +502,7 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 			defer close(out)
 			sub, err := proxy.Contract.WatchLogGroupingInitiated(opt, transitChan)
 			if err != nil {
-				replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getIndex(ctx)})
+				replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getWsIndex(ctx)})
 
 				return
 			}
@@ -506,7 +516,7 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 					if !ok {
 						return
 					}
-					replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getIndex(ctx)})
+					replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getWsIndex(ctx)})
 					continue
 				case i, ok := <-transitChan:
 					if !ok {
@@ -541,7 +551,7 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 			defer close(out)
 			sub, err := proxy.Contract.WatchLogGrouping(opt, transitChan)
 			if err != nil {
-				replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getIndex(ctx)})
+				replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getWsIndex(ctx)})
 
 				return
 			}
@@ -555,7 +565,7 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 					if !ok {
 						return
 					}
-					replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getIndex(ctx)})
+					replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getWsIndex(ctx)})
 					continue
 				case i, ok := <-transitChan:
 					if !ok {
@@ -598,7 +608,7 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 			defer close(out)
 			sub, err := proxy.Contract.WatchLogPublicKeyAccepted(opt, transitChan)
 			if err != nil {
-				replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getIndex(ctx)})
+				replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getWsIndex(ctx)})
 
 				return
 			}
@@ -612,7 +622,7 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 					if !ok {
 						return
 					}
-					replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getIndex(ctx)})
+					replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getWsIndex(ctx)})
 					continue
 				case i, ok := <-transitChan:
 					if !ok {
@@ -650,7 +660,7 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 			defer close(out)
 			sub, err := proxy.Contract.WatchLogPublicKeySuggested(opt, transitChan)
 			if err != nil {
-				replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getIndex(ctx)})
+				replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getWsIndex(ctx)})
 
 				return
 			}
@@ -664,7 +674,7 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 					if !ok {
 						return
 					}
-					replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getIndex(ctx)})
+					replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getWsIndex(ctx)})
 					continue
 				case i, ok := <-transitChan:
 					if !ok {
@@ -702,7 +712,7 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 			defer close(out)
 			sub, err := proxy.Contract.WatchLogGroupDissolve(opt, transitChan)
 			if err != nil {
-				replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getIndex(ctx)})
+				replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getWsIndex(ctx)})
 
 				return
 			}
@@ -716,7 +726,7 @@ var proxyTable = []func(ctx context.Context, proxy *dosproxy.DosproxySession) (c
 					if !ok {
 						return
 					}
-					replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getIndex(ctx)})
+					replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getWsIndex(ctx)})
 					continue
 				case i, ok := <-transitChan:
 					if !ok {
@@ -755,7 +765,7 @@ var crTable = []func(ctx context.Context, cr *commitreveal.CommitrevealSession) 
 			defer close(out)
 			sub, err := cr.Contract.WatchLogStartCommitReveal(opt, transitChan)
 			if err != nil {
-				replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getIndex(ctx)})
+				replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getWsIndex(ctx)})
 
 				return
 			}
@@ -769,7 +779,7 @@ var crTable = []func(ctx context.Context, cr *commitreveal.CommitrevealSession) 
 					if !ok {
 						return
 					}
-					replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getIndex(ctx)})
+					replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getWsIndex(ctx)})
 					continue
 				case i, ok := <-transitChan:
 					if !ok {
@@ -810,7 +820,7 @@ var crTable = []func(ctx context.Context, cr *commitreveal.CommitrevealSession) 
 			defer close(out)
 			sub, err := cr.Contract.WatchLogCommit(opt, transitChan)
 			if err != nil {
-				replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getIndex(ctx)})
+				replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getWsIndex(ctx)})
 
 				return
 			}
@@ -824,7 +834,7 @@ var crTable = []func(ctx context.Context, cr *commitreveal.CommitrevealSession) 
 					if !ok {
 						return
 					}
-					replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getIndex(ctx)})
+					replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getWsIndex(ctx)})
 					continue
 				case i, ok := <-transitChan:
 					if !ok {
@@ -863,7 +873,7 @@ var crTable = []func(ctx context.Context, cr *commitreveal.CommitrevealSession) 
 			defer close(out)
 			sub, err := cr.Contract.WatchLogReveal(opt, transitChan)
 			if err != nil {
-				replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getIndex(ctx)})
+				replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getWsIndex(ctx)})
 
 				return
 			}
@@ -877,7 +887,7 @@ var crTable = []func(ctx context.Context, cr *commitreveal.CommitrevealSession) 
 					if !ok {
 						return
 					}
-					replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getIndex(ctx)})
+					replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getWsIndex(ctx)})
 					continue
 				case i, ok := <-transitChan:
 					if !ok {
@@ -916,7 +926,7 @@ var crTable = []func(ctx context.Context, cr *commitreveal.CommitrevealSession) 
 			defer close(out)
 			sub, err := cr.Contract.WatchLogRandom(opt, transitChan)
 			if err != nil {
-				replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getIndex(ctx)})
+				replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getWsIndex(ctx)})
 
 				return
 			}
@@ -930,7 +940,7 @@ var crTable = []func(ctx context.Context, cr *commitreveal.CommitrevealSession) 
 					if !ok {
 						return
 					}
-					replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getIndex(ctx)})
+					replyError(ctx, errc, &OnchainError{err: errors.Errorf("SubscribeEvent err: %w", err), Idx: getWsIndex(ctx)})
 					continue
 				case i, ok := <-transitChan:
 					if !ok {
