@@ -1,16 +1,17 @@
 {
     "VERSION": "v1.0.4-m",
-    "NodeIP": "#REPLACE-WITH-IP",
+    "NodeIP": "10.0.0.21",
     "NodePort": "9501",
-    "ChainType": "ETH",
-    "BlockTime": "14",
-    "DOSAddressBridgeAddress": "0x98A0E7026778840Aacd28B9c03137D32e06F5ff1",
+    "ChainID": "256",
+    "ChainType": "Heco",
+    "BlockTime": "3",
+    "DOSAddressBridgeAddress": "0x797D0f474dDcAa8F4066A263684B540C074801b3",
     "EthGasLimit": "1000000",
     "EthGasPrice": "0",
     "BootStrapIPs": [
     ],
     "ChainNodePool": [
-        "wss://mainnet.infura.io/ws/v3/#REPLACE-WITH-INFURA-APIKEY",
-        "https://mainnet.infura.io/v3/#REPLACE-WITH-INFURA-APIKEY"
+        "wss://ws-testnet.hecochain.com",
+        "https://http-testnet.hecochain.com"
     ]
 }
