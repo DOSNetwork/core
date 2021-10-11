@@ -1,0 +1,17 @@
+{
+    "VERSION": "v1.0.4-m",
+    "NodeIP": "#REPLACE-WITH-IP",
+    "NodePort": "9501",
+    "ChainID": "56",
+    "ChainType": "BSC",
+    "BlockTime": "3",
+    "DOSAddressBridgeAddress": "0x70157cf10404170EEc183043354D0a886Fa51d73",
+    "EthGasLimit": "1000000",
+    "EthGasPrice": "0",
+    "BootStrapIPs": [
+    ],
+    "ChainNodePool": [
+        "https://bsc-dataseed1.defibit.io/",
+        "#REPLACE-WITH: https://docs.binance.org/smart-chain/developer/rpc.html#3rd-party-provider"
+    ]
+}

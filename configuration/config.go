@@ -28,10 +28,12 @@ type Config struct {
 	VERSION                 string
 	NodeIP                  string
 	NodePort                string
+	ChainID                 string
 	ChainType               string
 	BlockTime               string
 	DOSAddressBridgeAddress string
 	EthGasLimit             string
+	EthGasPrice             string
 	BootStrapIPs            []string
 	ChainNodePool           []string
 }
