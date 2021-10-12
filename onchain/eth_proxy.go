@@ -45,6 +45,7 @@ type ethAdaptor struct {
 	rpcUrls          []string
 	wsUrls           []string
 	key              *keystore.Key
+	chainID          *big.Int
 	blockTime        uint64
 	gasLimit         uint64
 	gasPrice         uint64
@@ -88,6 +89,9 @@ func NewEthAdaptor(key *keystore.Key, config *configuration.Config, l logger) (a
 	}
 
 	adaptor = &ethAdaptor{}
+	chainID := new(big.Int)
+	chainID.SetString(config.ChainID, 10) // octal
+	adaptor.chainID = chainID
 	adaptor.bridgeAddr = common.HexToAddress(config.DOSAddressBridgeAddress)
 	adaptor.key = key
 	adaptor.logger = l
@@ -249,7 +253,7 @@ func (e *ethAdaptor) Connect(urls []string, t time.Time) (err error) {
 
 		ctx, cancel := context.WithCancel(e.ctx)
 		ctx = context.WithValue(ctx, "index", len(e.ctxes))
-		auth := bind.NewKeyedTransactor(e.key.PrivateKey)
+		auth, err := bind.NewKeyedTransactorWithChainID(e.key.PrivateKey, e.chainID)
 		auth.GasLimit = e.gasLimit
 		if e.gasPrice != 0 {
 			auth.GasPrice = big.NewInt(int64(e.gasPrice))
@@ -290,7 +294,7 @@ func (e *ethAdaptor) Connect(urls []string, t time.Time) (err error) {
 
 				ctx, cancel := context.WithCancel(e.ctx)
 				ctx = context.WithValue(ctx, "wsIndex", len(e.wsCtxes))
-				auth := bind.NewKeyedTransactor(e.key.PrivateKey)
+				auth, err := bind.NewKeyedTransactorWithChainID(e.key.PrivateKey, e.chainID)
 				auth.GasLimit = e.gasLimit
 				if e.gasPrice != 0 {
 					auth.GasPrice = big.NewInt(int64(e.gasPrice))

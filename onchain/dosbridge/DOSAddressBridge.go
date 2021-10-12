@@ -4,6 +4,7 @@
 package dosbridge
 
 import (
+	"errors"
 	"math/big"
 	"strings"
 
@@ -17,6 +18,7 @@ import (
 
 // Reference imports to suppress errors if they are not otherwise used.
 var (
+	_ = errors.New
 	_ = big.NewInt
 	_ = strings.NewReader
 	_ = ethereum.NotFound
@@ -26,20 +28,31 @@ var (
 	_ = event.NewSubscription
 )
 
+// DosbridgeMetaData contains all meta data concerning the Dosbridge contract.
+var DosbridgeMetaData = &bind.MetaData{
+	ABI: "[{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"string\",\"name\":\"previousURL\",\"type\":\"string\"},{\"indexed\":false,\"internalType\":\"string\",\"name\":\"newURL\",\"type\":\"string\"}],\"name\":\"BootStrapUrlUpdated\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"previousAddr\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"newAddr\",\"type\":\"address\"}],\"name\":\"CommitRevealAddressUpdated\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"previousOwner\",\"type\":\"address\"}],\"name\":\"OwnershipRenounced\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"previousOwner\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"previousPayment\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"newPayment\",\"type\":\"address\"}],\"name\":\"PaymentAddressUpdated\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"previousProxy\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"newProxy\",\"type\":\"address\"}],\"name\":\"ProxyAddressUpdated\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"previousStaking\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"newStaking\",\"type\":\"address\"}],\"name\":\"StakingAddressUpdated\",\"type\":\"event\"},{\"constant\":true,\"inputs\":[],\"name\":\"getBootStrapUrl\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"getCommitRevealAddress\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"getPaymentAddress\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"getProxyAddress\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"getStakingAddress\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"isOwner\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[],\"name\":\"renounceOwnership\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"string\",\"name\":\"url\",\"type\":\"string\"}],\"name\":\"setBootStrapUrl\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"newAddr\",\"type\":\"address\"}],\"name\":\"setCommitRevealAddress\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"newAddr\",\"type\":\"address\"}],\"name\":\"setPaymentAddress\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"newAddr\",\"type\":\"address\"}],\"name\":\"setProxyAddress\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"newAddr\",\"type\":\"address\"}],\"name\":\"setStakingAddress\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
+	Bin: "0x6080604052600080546001600160a01b03191633179055610907806100256000396000f3fe608060405234801561001057600080fd5b50600436106100ea5760003560e01c80637b08cd031161008c5780639d265e58116100665780639d265e5814610269578063b7e982be14610271578063f2fde38b146102ee578063f4e0d9ac14610314576100ea565b80637b08cd031461021f5780638da5cb5b146102455780638f32d59b1461024d576100ea565b80634400bc07116100c85780634400bc071461012357806346a7dadc146101cb5780635e1e1004146101f1578063715018a614610217576100ea565b80630e9ed68b146100ef5780631ae0433c1461011357806343a73d9a1461011b575b600080fd5b6100f761033a565b604080516001600160a01b039092168252519081900360200190f35b6100f761034a565b6100f7610359565b6101c96004803603602081101561013957600080fd5b81019060208101813564010000000081111561015457600080fd5b82018360208201111561016657600080fd5b8035906020019184600183028401116401000000008311171561018857600080fd5b91908080601f016020809104026020016040519081016040528093929190818152602001838380828437600092019190915250929550610368945050505050565b005b6101c9600480360360208110156101e157600080fd5b50356001600160a01b03166104a5565b6101c96004803603602081101561020757600080fd5b50356001600160a01b0316610520565b6101c961059b565b6101c96004803603602081101561023557600080fd5b50356001600160a01b03166105f4565b6100f761066f565b61025561067e565b604080519115158252519081900360200190f35b6100f761068f565b61027961069e565b6040805160208082528351818301528351919283929083019185019080838360005b838110156102b357818101518382015260200161029b565b50505050905090810190601f1680156102e05780820380516001836020036101000a031916815260200191505b509250505060405180910390f35b6101c96004803603602081101561030457600080fd5b50356001600160a01b0316610734565b6101c96004803603602081101561032a57600080fd5b50356001600160a01b0316610751565b6004546001600160a01b03165b90565b6002546001600160a01b031690565b6001546001600160a01b031690565b61037061067e565b61037957600080fd5b6040805181815260058054600260001961010060018416150201909116049282018390527fc2194dd450e596fc07061b41e1cb9e4d38bd372ed38c6f909979d464f71cde7c92909184918190602082019060608301908690801561041e5780601f106103f35761010080835404028352916020019161041e565b820191906000526020600020905b81548152906001019060200180831161040157829003601f168201915b5050838103825284518152845160209182019186019080838360005b8381101561045257818101518382015260200161043a565b50505050905090810190601f16801561047f5780820380516001836020036101000a031916815260200191505b5094505050505060405180910390a180516104a190600590602084019061083a565b5050565b6104ad61067e565b6104b657600080fd5b600154604080516001600160a01b039283168152918316602083015280517fafa5c16901af5d392255707d27b3e2687e79a18df187b9f1525e7f0fc2144f6f9281900390910190a1600180546001600160a01b0319166001600160a01b0392909216919091179055565b61052861067e565b61053157600080fd5b600354604080516001600160a01b039283168152918316602083015280517fb3d3f832f05d764f8934189cba7879e2dd829dd3f92749ec959339fd5cd8b0be9281900390910190a1600380546001600160a01b0319166001600160a01b0392909216919091179055565b6105a361067e565b6105ac57600080fd5b600080546040516001600160a01b03909116917ff8df31144d9c2f0f6b59d69b8b98abd5459d07f2742c4df920b25aae33c6482091a2600080546001600160a01b0319169055565b6105fc61067e565b61060557600080fd5b600254604080516001600160a01b039283168152918316602083015280517f23b082fc42fcc9c7d42de567b56abef6a737aa2600b8036ee5c304086a2545c39281900390910190a1600280546001600160a01b0319166001600160a01b0392909216919091179055565b6000546001600160a01b031690565b6000546001600160a01b0316331490565b6003546001600160a01b031690565b60058054604080516020601f600260001961010060018816150201909516949094049384018190048102820181019092528281526060939092909183018282801561072a5780601f106106ff5761010080835404028352916020019161072a565b820191906000526020600020905b81548152906001019060200180831161070d57829003601f168201915b5050505050905090565b61073c61067e565b61074557600080fd5b61074e816107cc565b50565b61075961067e565b61076257600080fd5b600454604080516001600160a01b039283168152918316602083015280517f03fbfa1263b46c684780f3c24be11a2e189a59bedf0e316a7eae861cc769eb4f9281900390910190a1600480546001600160a01b0319166001600160a01b0392909216919091179055565b6001600160a01b0381166107df57600080fd5b600080546040516001600160a01b03808516939216917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e091a3600080546001600160a01b0319166001600160a01b0392909216919091179055565b828054600181600116156101000203166002900490600052602060002090601f016020900481019282601f1061087b57805160ff19168380011785556108a8565b828001600101855582156108a8579182015b828111156108a857825182559160200191906001019061088d565b506108b49291506108b8565b5090565b61034791905b808211156108b457600081556001016108be56fea265627a7a72315820df4dfc812716bbcc980d3e18688b9bb09820906604fccac5a60ef6891323ecbe64736f6c63430005110032",
+}
+
 // DosbridgeABI is the input ABI used to generate the binding from.
-const DosbridgeABI = "[{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"string\",\"name\":\"previousURL\",\"type\":\"string\"},{\"indexed\":false,\"internalType\":\"string\",\"name\":\"newURL\",\"type\":\"string\"}],\"name\":\"BootStrapUrlUpdated\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"previousAddr\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"newAddr\",\"type\":\"address\"}],\"name\":\"CommitRevealAddressUpdated\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"previousOwner\",\"type\":\"address\"}],\"name\":\"OwnershipRenounced\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"previousOwner\",\"type\":\"address\"},{\"indexed\":true,\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"OwnershipTransferred\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"previousPayment\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"newPayment\",\"type\":\"address\"}],\"name\":\"PaymentAddressUpdated\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"previousProxy\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"newProxy\",\"type\":\"address\"}],\"name\":\"ProxyAddressUpdated\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"previousStaking\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"newStaking\",\"type\":\"address\"}],\"name\":\"StakingAddressUpdated\",\"type\":\"event\"},{\"constant\":true,\"inputs\":[],\"name\":\"getBootStrapUrl\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"getCommitRevealAddress\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"getPaymentAddress\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"getProxyAddress\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"getStakingAddress\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"isOwner\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[],\"name\":\"renounceOwnership\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"string\",\"name\":\"url\",\"type\":\"string\"}],\"name\":\"setBootStrapUrl\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"newAddr\",\"type\":\"address\"}],\"name\":\"setCommitRevealAddress\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"newAddr\",\"type\":\"address\"}],\"name\":\"setPaymentAddress\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"newAddr\",\"type\":\"address\"}],\"name\":\"setProxyAddress\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"newAddr\",\"type\":\"address\"}],\"name\":\"setStakingAddress\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"newOwner\",\"type\":\"address\"}],\"name\":\"transferOwnership\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]"
+// Deprecated: Use DosbridgeMetaData.ABI instead.
+var DosbridgeABI = DosbridgeMetaData.ABI
 
 // DosbridgeBin is the compiled bytecode used for deploying new contracts.
-var DosbridgeBin = "0x6080604052600080546001600160a01b03191633179055610907806100256000396000f3fe608060405234801561001057600080fd5b50600436106100ea5760003560e01c80637b08cd031161008c5780639d265e58116100665780639d265e5814610269578063b7e982be14610271578063f2fde38b146102ee578063f4e0d9ac14610314576100ea565b80637b08cd031461021f5780638da5cb5b146102455780638f32d59b1461024d576100ea565b80634400bc07116100c85780634400bc071461012357806346a7dadc146101cb5780635e1e1004146101f1578063715018a614610217576100ea565b80630e9ed68b146100ef5780631ae0433c1461011357806343a73d9a1461011b575b600080fd5b6100f761033a565b604080516001600160a01b039092168252519081900360200190f35b6100f761034a565b6100f7610359565b6101c96004803603602081101561013957600080fd5b81019060208101813564010000000081111561015457600080fd5b82018360208201111561016657600080fd5b8035906020019184600183028401116401000000008311171561018857600080fd5b91908080601f016020809104026020016040519081016040528093929190818152602001838380828437600092019190915250929550610368945050505050565b005b6101c9600480360360208110156101e157600080fd5b50356001600160a01b03166104a5565b6101c96004803603602081101561020757600080fd5b50356001600160a01b0316610520565b6101c961059b565b6101c96004803603602081101561023557600080fd5b50356001600160a01b03166105f4565b6100f761066f565b61025561067e565b604080519115158252519081900360200190f35b6100f761068f565b61027961069e565b6040805160208082528351818301528351919283929083019185019080838360005b838110156102b357818101518382015260200161029b565b50505050905090810190601f1680156102e05780820380516001836020036101000a031916815260200191505b509250505060405180910390f35b6101c96004803603602081101561030457600080fd5b50356001600160a01b0316610734565b6101c96004803603602081101561032a57600080fd5b50356001600160a01b0316610751565b6004546001600160a01b03165b90565b6002546001600160a01b031690565b6001546001600160a01b031690565b61037061067e565b61037957600080fd5b6040805181815260058054600260001961010060018416150201909116049282018390527fc2194dd450e596fc07061b41e1cb9e4d38bd372ed38c6f909979d464f71cde7c92909184918190602082019060608301908690801561041e5780601f106103f35761010080835404028352916020019161041e565b820191906000526020600020905b81548152906001019060200180831161040157829003601f168201915b5050838103825284518152845160209182019186019080838360005b8381101561045257818101518382015260200161043a565b50505050905090810190601f16801561047f5780820380516001836020036101000a031916815260200191505b5094505050505060405180910390a180516104a190600590602084019061083a565b5050565b6104ad61067e565b6104b657600080fd5b600154604080516001600160a01b039283168152918316602083015280517fafa5c16901af5d392255707d27b3e2687e79a18df187b9f1525e7f0fc2144f6f9281900390910190a1600180546001600160a01b0319166001600160a01b0392909216919091179055565b61052861067e565b61053157600080fd5b600354604080516001600160a01b039283168152918316602083015280517fb3d3f832f05d764f8934189cba7879e2dd829dd3f92749ec959339fd5cd8b0be9281900390910190a1600380546001600160a01b0319166001600160a01b0392909216919091179055565b6105a361067e565b6105ac57600080fd5b600080546040516001600160a01b03909116917ff8df31144d9c2f0f6b59d69b8b98abd5459d07f2742c4df920b25aae33c6482091a2600080546001600160a01b0319169055565b6105fc61067e565b61060557600080fd5b600254604080516001600160a01b039283168152918316602083015280517f23b082fc42fcc9c7d42de567b56abef6a737aa2600b8036ee5c304086a2545c39281900390910190a1600280546001600160a01b0319166001600160a01b0392909216919091179055565b6000546001600160a01b031690565b6000546001600160a01b0316331490565b6003546001600160a01b031690565b60058054604080516020601f600260001961010060018816150201909516949094049384018190048102820181019092528281526060939092909183018282801561072a5780601f106106ff5761010080835404028352916020019161072a565b820191906000526020600020905b81548152906001019060200180831161070d57829003601f168201915b5050505050905090565b61073c61067e565b61074557600080fd5b61074e816107cc565b50565b61075961067e565b61076257600080fd5b600454604080516001600160a01b039283168152918316602083015280517f03fbfa1263b46c684780f3c24be11a2e189a59bedf0e316a7eae861cc769eb4f9281900390910190a1600480546001600160a01b0319166001600160a01b0392909216919091179055565b6001600160a01b0381166107df57600080fd5b600080546040516001600160a01b03808516939216917f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e091a3600080546001600160a01b0319166001600160a01b0392909216919091179055565b828054600181600116156101000203166002900490600052602060002090601f016020900481019282601f1061087b57805160ff19168380011785556108a8565b828001600101855582156108a8579182015b828111156108a857825182559160200191906001019061088d565b506108b49291506108b8565b5090565b61034791905b808211156108b457600081556001016108be56fea265627a7a72315820df4dfc812716bbcc980d3e18688b9bb09820906604fccac5a60ef6891323ecbe64736f6c63430005110032"
+// Deprecated: Use DosbridgeMetaData.Bin instead.
+var DosbridgeBin = DosbridgeMetaData.Bin
 
 // DeployDosbridge deploys a new Ethereum contract, binding an instance of Dosbridge to it.
 func DeployDosbridge(auth *bind.TransactOpts, backend bind.ContractBackend) (common.Address, *types.Transaction, *Dosbridge, error) {
-	parsed, err := abi.JSON(strings.NewReader(DosbridgeABI))
+	parsed, err := DosbridgeMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}
+	if parsed == nil {
+		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
+	}
 
-	address, tx, contract, err := bind.DeployContract(auth, parsed, common.FromHex(DosbridgeBin), backend)
+	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(DosbridgeBin), backend)
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}
@@ -154,7 +167,7 @@ func bindDosbridge(address common.Address, caller bind.ContractCaller, transacto
 // sets the output to result. The result type might be a single field for simple
 // returns, a slice of interfaces for anonymous returns and a struct for named
 // returns.
-func (_Dosbridge *DosbridgeRaw) Call(opts *bind.CallOpts, result interface{}, method string, params ...interface{}) error {
+func (_Dosbridge *DosbridgeRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
 	return _Dosbridge.Contract.DosbridgeCaller.contract.Call(opts, result, method, params...)
 }
 
@@ -173,7 +186,7 @@ func (_Dosbridge *DosbridgeRaw) Transact(opts *bind.TransactOpts, method string,
 // sets the output to result. The result type might be a single field for simple
 // returns, a slice of interfaces for anonymous returns and a struct for named
 // returns.
-func (_Dosbridge *DosbridgeCallerRaw) Call(opts *bind.CallOpts, result interface{}, method string, params ...interface{}) error {
+func (_Dosbridge *DosbridgeCallerRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
 	return _Dosbridge.Contract.contract.Call(opts, result, method, params...)
 }
 
@@ -192,12 +205,17 @@ func (_Dosbridge *DosbridgeTransactorRaw) Transact(opts *bind.TransactOpts, meth
 //
 // Solidity: function getBootStrapUrl() view returns(string)
 func (_Dosbridge *DosbridgeCaller) GetBootStrapUrl(opts *bind.CallOpts) (string, error) {
-	var (
-		ret0 = new(string)
-	)
-	out := ret0
-	err := _Dosbridge.contract.Call(opts, out, "getBootStrapUrl")
-	return *ret0, err
+	var out []interface{}
+	err := _Dosbridge.contract.Call(opts, &out, "getBootStrapUrl")
+
+	if err != nil {
+		return *new(string), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(string)).(*string)
+
+	return out0, err
+
 }
 
 // GetBootStrapUrl is a free data retrieval call binding the contract method 0xb7e982be.
@@ -218,12 +236,17 @@ func (_Dosbridge *DosbridgeCallerSession) GetBootStrapUrl() (string, error) {
 //
 // Solidity: function getCommitRevealAddress() view returns(address)
 func (_Dosbridge *DosbridgeCaller) GetCommitRevealAddress(opts *bind.CallOpts) (common.Address, error) {
-	var (
-		ret0 = new(common.Address)
-	)
-	out := ret0
-	err := _Dosbridge.contract.Call(opts, out, "getCommitRevealAddress")
-	return *ret0, err
+	var out []interface{}
+	err := _Dosbridge.contract.Call(opts, &out, "getCommitRevealAddress")
+
+	if err != nil {
+		return *new(common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+
+	return out0, err
+
 }
 
 // GetCommitRevealAddress is a free data retrieval call binding the contract method 0x1ae0433c.
@@ -244,12 +267,17 @@ func (_Dosbridge *DosbridgeCallerSession) GetCommitRevealAddress() (common.Addre
 //
 // Solidity: function getPaymentAddress() view returns(address)
 func (_Dosbridge *DosbridgeCaller) GetPaymentAddress(opts *bind.CallOpts) (common.Address, error) {
-	var (
-		ret0 = new(common.Address)
-	)
-	out := ret0
-	err := _Dosbridge.contract.Call(opts, out, "getPaymentAddress")
-	return *ret0, err
+	var out []interface{}
+	err := _Dosbridge.contract.Call(opts, &out, "getPaymentAddress")
+
+	if err != nil {
+		return *new(common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+
+	return out0, err
+
 }
 
 // GetPaymentAddress is a free data retrieval call binding the contract method 0x9d265e58.
@@ -270,12 +298,17 @@ func (_Dosbridge *DosbridgeCallerSession) GetPaymentAddress() (common.Address, e
 //
 // Solidity: function getProxyAddress() view returns(address)
 func (_Dosbridge *DosbridgeCaller) GetProxyAddress(opts *bind.CallOpts) (common.Address, error) {
-	var (
-		ret0 = new(common.Address)
-	)
-	out := ret0
-	err := _Dosbridge.contract.Call(opts, out, "getProxyAddress")
-	return *ret0, err
+	var out []interface{}
+	err := _Dosbridge.contract.Call(opts, &out, "getProxyAddress")
+
+	if err != nil {
+		return *new(common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+
+	return out0, err
+
 }
 
 // GetProxyAddress is a free data retrieval call binding the contract method 0x43a73d9a.
@@ -296,12 +329,17 @@ func (_Dosbridge *DosbridgeCallerSession) GetProxyAddress() (common.Address, err
 //
 // Solidity: function getStakingAddress() view returns(address)
 func (_Dosbridge *DosbridgeCaller) GetStakingAddress(opts *bind.CallOpts) (common.Address, error) {
-	var (
-		ret0 = new(common.Address)
-	)
-	out := ret0
-	err := _Dosbridge.contract.Call(opts, out, "getStakingAddress")
-	return *ret0, err
+	var out []interface{}
+	err := _Dosbridge.contract.Call(opts, &out, "getStakingAddress")
+
+	if err != nil {
+		return *new(common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+
+	return out0, err
+
 }
 
 // GetStakingAddress is a free data retrieval call binding the contract method 0x0e9ed68b.
@@ -322,12 +360,17 @@ func (_Dosbridge *DosbridgeCallerSession) GetStakingAddress() (common.Address, e
 //
 // Solidity: function isOwner() view returns(bool)
 func (_Dosbridge *DosbridgeCaller) IsOwner(opts *bind.CallOpts) (bool, error) {
-	var (
-		ret0 = new(bool)
-	)
-	out := ret0
-	err := _Dosbridge.contract.Call(opts, out, "isOwner")
-	return *ret0, err
+	var out []interface{}
+	err := _Dosbridge.contract.Call(opts, &out, "isOwner")
+
+	if err != nil {
+		return *new(bool), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(bool)).(*bool)
+
+	return out0, err
+
 }
 
 // IsOwner is a free data retrieval call binding the contract method 0x8f32d59b.
@@ -348,12 +391,17 @@ func (_Dosbridge *DosbridgeCallerSession) IsOwner() (bool, error) {
 //
 // Solidity: function owner() view returns(address)
 func (_Dosbridge *DosbridgeCaller) Owner(opts *bind.CallOpts) (common.Address, error) {
-	var (
-		ret0 = new(common.Address)
-	)
-	out := ret0
-	err := _Dosbridge.contract.Call(opts, out, "owner")
-	return *ret0, err
+	var out []interface{}
+	err := _Dosbridge.contract.Call(opts, &out, "owner")
+
+	if err != nil {
+		return *new(common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+
+	return out0, err
+
 }
 
 // Owner is a free data retrieval call binding the contract method 0x8da5cb5b.
@@ -648,6 +696,7 @@ func (_Dosbridge *DosbridgeFilterer) ParseBootStrapUrlUpdated(log types.Log) (*D
 	if err := _Dosbridge.contract.UnpackLog(event, "BootStrapUrlUpdated", log); err != nil {
 		return nil, err
 	}
+	event.Raw = log
 	return event, nil
 }
 
@@ -782,6 +831,7 @@ func (_Dosbridge *DosbridgeFilterer) ParseCommitRevealAddressUpdated(log types.L
 	if err := _Dosbridge.contract.UnpackLog(event, "CommitRevealAddressUpdated", log); err != nil {
 		return nil, err
 	}
+	event.Raw = log
 	return event, nil
 }
 
@@ -925,6 +975,7 @@ func (_Dosbridge *DosbridgeFilterer) ParseOwnershipRenounced(log types.Log) (*Do
 	if err := _Dosbridge.contract.UnpackLog(event, "OwnershipRenounced", log); err != nil {
 		return nil, err
 	}
+	event.Raw = log
 	return event, nil
 }
 
@@ -1077,6 +1128,7 @@ func (_Dosbridge *DosbridgeFilterer) ParseOwnershipTransferred(log types.Log) (*
 	if err := _Dosbridge.contract.UnpackLog(event, "OwnershipTransferred", log); err != nil {
 		return nil, err
 	}
+	event.Raw = log
 	return event, nil
 }
 
@@ -1211,6 +1263,7 @@ func (_Dosbridge *DosbridgeFilterer) ParsePaymentAddressUpdated(log types.Log) (
 	if err := _Dosbridge.contract.UnpackLog(event, "PaymentAddressUpdated", log); err != nil {
 		return nil, err
 	}
+	event.Raw = log
 	return event, nil
 }
 
@@ -1345,6 +1398,7 @@ func (_Dosbridge *DosbridgeFilterer) ParseProxyAddressUpdated(log types.Log) (*D
 	if err := _Dosbridge.contract.UnpackLog(event, "ProxyAddressUpdated", log); err != nil {
 		return nil, err
 	}
+	event.Raw = log
 	return event, nil
 }
 
@@ -1479,5 +1533,6 @@ func (_Dosbridge *DosbridgeFilterer) ParseStakingAddressUpdated(log types.Log) (
 	if err := _Dosbridge.contract.UnpackLog(event, "StakingAddressUpdated", log); err != nil {
 		return nil, err
 	}
+	event.Raw = log
 	return event, nil
 }

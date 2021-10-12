@@ -1,7 +1,8 @@
 {
-    "VERSION": "v1.0.4-m",
+    "VERSION": "v1.0.5-m",
     "NodeIP": "#REPLACE-WITH-IP",
     "NodePort": "9501",
+    "ChainID": "128",
     "ChainType": "Heco",
     "BlockTime": "3",
     "DOSAddressBridgeAddress": "0x9Ee7F642d3955ecf17D7223705DCb285dbA679fc",

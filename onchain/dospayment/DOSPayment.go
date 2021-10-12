@@ -4,6 +4,7 @@
 package dospayment
 
 import (
+	"errors"
 	"math/big"
 	"strings"
 
@@ -17,6 +18,7 @@ import (
 
 // Reference imports to suppress errors if they are not otherwise used.
 var (
+	_ = errors.New
 	_ = big.NewInt
 	_ = strings.NewReader
 	_ = ethereum.NotFound
@@ -26,20 +28,31 @@ var (
 	_ = event.NewSubscription
 )
 
+// DospaymentMetaData contains all meta data concerning the Dospayment contract.
+var DospaymentMetaData = &bind.MetaData{
+	ABI: "[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_bridgeAddr\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"_guardianFundsAddr\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"_tokenAddr\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"payer\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"tokenAddr\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"requestID\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"serviceType\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"fee\",\"type\":\"uint256\"}],\"name\":\"LogChargeServiceFee\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"nodeAddr\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"tokenAddr\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"feeForSubmitter\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"}],\"name\":\"LogClaimGuardianFee\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"nodeAddr\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"tokenAddr\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"requestID\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"serviceType\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"fee\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"bool\",\"name\":\"isSubmitter\",\"type\":\"bool\"}],\"name\":\"LogRecordServiceFee\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"payer\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"tokenAddr\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"requestID\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"serviceType\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"fee\",\"type\":\"uint256\"}],\"name\":\"LogRefundServiceFee\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"oldAdmin\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"newAdmin\",\"type\":\"address\"}],\"name\":\"UpdatePaymentAdmin\",\"type\":\"event\"},{\"constant\":true,\"inputs\":[],\"name\":\"admin\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"bridgeAddr\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"payer\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"requestID\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"serviceType\",\"type\":\"uint256\"}],\"name\":\"chargeServiceFee\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"guardianAddr\",\"type\":\"address\"}],\"name\":\"claimGuardianReward\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"defaultGuardianFee\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"defaultSubmitterCut\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"defaultSystemRandomFee\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"defaultTokenAddr\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"defaultUserQueryFee\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"defaultUserRandomFee\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"name\":\"feeLists\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"submitterCut\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"guardianFee\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"address\",\"name\":\"tokenAddr\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"serviceType\",\"type\":\"uint256\"}],\"name\":\"getServiceTypeFee\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"guardianFundsAddr\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"guardianFundsTokenAddr\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"address\",\"name\":\"payer\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"serviceType\",\"type\":\"uint256\"}],\"name\":\"hasServiceFee\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"_bridgeAddr\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"_guardianFundsAddr\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"_tokenAddr\",\"type\":\"address\"}],\"name\":\"initialize\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"address\",\"name\":\"tokenAddr\",\"type\":\"address\"}],\"name\":\"isSupportedToken\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[],\"name\":\"nodeClaim\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"nodeClaim\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"address\",\"name\":\"nodeAddr\",\"type\":\"address\"}],\"name\":\"nodeFeeBalance\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"address\",\"name\":\"nodeAddr\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"tokenAddr\",\"type\":\"address\"}],\"name\":\"nodeFeeBalance\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"requestID\",\"type\":\"uint256\"}],\"name\":\"paymentInfo\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"name\":\"paymentMethods\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"payments\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"payer\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"tokenAddr\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"serviceType\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"requestID\",\"type\":\"uint256\"},{\"internalType\":\"address\",\"name\":\"submitter\",\"type\":\"address\"},{\"internalType\":\"address[]\",\"name\":\"workers\",\"type\":\"address[]\"}],\"name\":\"recordServiceFee\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"requestID\",\"type\":\"uint256\"}],\"name\":\"refundServiceFee\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"newAdmin\",\"type\":\"address\"}],\"name\":\"setAdmin\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"tokenAddr\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"submitterCut\",\"type\":\"uint256\"}],\"name\":\"setFeeDividend\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"tokenAddr\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"fee\",\"type\":\"uint256\"}],\"name\":\"setGuardianFee\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"fundsAddr\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"tokenAddr\",\"type\":\"address\"}],\"name\":\"setGuardianFunds\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"payer\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"tokenAddr\",\"type\":\"address\"}],\"name\":\"setPaymentMethod\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"tokenAddr\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"serviceType\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"fee\",\"type\":\"uint256\"}],\"name\":\"setServiceFee\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
+	Bin: "0x608060405234801561001057600080fd5b5060405162001eed38038062001eed8339818101604052606081101561003557600080fd5b508051602082015160409092015190919061005a8383836001600160e01b0361006216565b50505061016d565b6007546001600160a01b031615801561008457506008546001600160a01b0316155b6100d5576040805162461bcd60e51b815260206004820152601360248201527f616c72656164792d696e697469616c697a656400000000000000000000000000604482015290519081900360640190fd5b60008054336001600160a01b03199182161782556007805482166001600160a01b039687161790556005805482169486169490941790935560068054841692909416918217909355600880549092168117909155815260026020818152604080842084805291829052808420674563918244f40000908190556001808652828620829055848652919094208490556004908201550155565b611d70806200017d6000396000f3fe608060405234801561001057600080fd5b50600436106101f05760003560e01c80637aa9181b1161010f578063c60be4fd116100a2578063eebede8311610071578063eebede8314610674578063f39a19bf146106a0578063f851a440146106c6578063fa2c775e146106ce576101f0565b8063c60be4fd14610374578063cb7ca88c14610374578063d95eaa7a14610609578063e365036614610648576101f0565b8063a93eb110116100de578063a93eb1101461054f578063b73a3f8f14610575578063c0c53b8b146105a3578063c0f14e46146105db576101f0565b80637aa9181b1461040e5780638403f7dc1461044057806387d81789146104f857806391874ef714610547576101f0565b80634a0a382f11610187578063694732c611610156578063694732c6146103ba5780636dfa72b014610374578063704b6c02146103e0578063746c73fd14610406576101f0565b80634a0a382f14610374578063571028e31461037c5780635a1fa503146103845780636059775a146103b2576101f0565b80632c097993116101c35780632c09799314610298578063310ae824146102c45780633157f16d146103025780633939c40114610342576101f0565b806302b8b587146101f55780631efa5a981461021957806323ff34cb14610238578063240028e81461025e575b600080fd5b6101fd6106d6565b604080516001600160a01b039092168252519081900360200190f35b6102366004803603602081101561022f57600080fd5b50356106e5565b005b6102366004803603602081101561024e57600080fd5b50356001600160a01b0316610972565b6102846004803603602081101561027457600080fd5b50356001600160a01b0316610bf4565b604080519115158252519081900360200190f35b610236600480360360408110156102ae57600080fd5b506001600160a01b038135169060200135610ca6565b6102f0600480360360408110156102da57600080fd5b506001600160a01b038135169060200135610d62565b60408051918252519081900360200190f35b61031f6004803603602081101561031857600080fd5b5035610e31565b604080516001600160a01b03909316835260208301919091528051918290030190f35b6102366004803603606081101561035857600080fd5b506001600160a01b038135169060208101359060400135610e58565b6102f0610f1b565b6102f0610f27565b6102366004803603604081101561039a57600080fd5b506001600160a01b0381358116916020013516610f2c565b6101fd610ffc565b6101fd600480360360208110156103d057600080fd5b50356001600160a01b031661100b565b610236600480360360208110156103f657600080fd5b50356001600160a01b0316611026565b6102f06110ee565b6102366004803603606081101561042457600080fd5b506001600160a01b03813516906020810135906040013561110e565b6102366004803603606081101561045657600080fd5b8135916001600160a01b036020820135169181019060608101604082013564010000000081111561048657600080fd5b82018360208201111561049857600080fd5b803590602001918460208302840111640100000000831117156104ba57600080fd5b919080806020026020016040519081016040528093929190818152602001838360200280828437600092019190915250929550611412945050505050565b6105156004803603602081101561050e57600080fd5b5035611813565b604080516001600160a01b03958616815293909416602084015282840191909152606082015290519081900360800190f35b6101fd611849565b6102f06004803603602081101561056557600080fd5b50356001600160a01b0316611858565b6102366004803603604081101561058b57600080fd5b506001600160a01b0381358116916020013516611872565b610236600480360360608110156105b957600080fd5b506001600160a01b0381358116916020810135821691604090910135166118f7565b6102f0600480360360408110156105f157600080fd5b506001600160a01b03813581169160200135166119f8565b61062f6004803603602081101561061f57600080fd5b50356001600160a01b0316611a23565b6040805192835260208301919091528051918290030190f35b6102846004803603604081101561065e57600080fd5b506001600160a01b038135169060200135611a3f565b6102366004803603604081101561068a57600080fd5b506001600160a01b038135169060200135611b74565b6102f0600480360360208110156106b657600080fd5b50356001600160a01b0316611c31565b6101fd611c4c565b6101fd611c5b565b6008546001600160a01b031681565b6000546001600160a01b03163314610730576040805162461bcd60e51b815260206004820152600960248201526837b7363ca0b236b4b760b91b604482015290519081900360640190fd5b600081815260036020819052604090912001548190610786576040805162461bcd60e51b815260206004820152600d60248201526c1b9bcb5999594b585b5bdd5b9d609a1b604482015290519081900360640190fd5b6000818152600360205260409020546001600160a01b03166107df576040805162461bcd60e51b815260206004820152600d60248201526c6e6f2d70617965722d696e666f60981b604482015290519081900360640190fd5b6000818152600360205260409020600101546001600160a01b031661083f576040805162461bcd60e51b81526020600482015260116024820152706e6f2d6665652d746f6b656e2d696e666f60781b604482015290519081900360640190fd5b6000828152600360208181526040808420928301805460028501805460018701805488546001600160a01b0319808216909a55988116909155918890559690925582516001600160a01b039586168082529590921693820184905281830188905260608201869052608082018190529151919493917fde0a5183bfc8c743f7b95ecaaf7815e8f82d8ae05ca1ade1eac1ff9d961a2eaa9181900360a00190a1816001600160a01b031663a9059cbb82866040518363ffffffff1660e01b815260040180836001600160a01b03166001600160a01b0316815260200182815260200192505050602060405180830381600087803b15801561093e57600080fd5b505af1158015610952573d6000803e3d6000fd5b505050506040513d602081101561096857600080fd5b5050505050505050565b600760009054906101000a90046001600160a01b03166001600160a01b03166343a73d9a6040518163ffffffff1660e01b815260040160206040518083038186803b1580156109c057600080fd5b505afa1580156109d4573d6000803e3d6000fd5b505050506040513d60208110156109ea57600080fd5b50516001600160a01b03163314610a3d576040805162461bcd60e51b81526020600482015260126024820152716e6f742d66726f6d2d646f732d70726f787960701b604482015290519081900360640190fd5b6005546001600160a01b0316610a9a576040805162461bcd60e51b815260206004820152601c60248201527f6e6f742d76616c69642d677561726469616e2d66756e642d6164647200000000604482015290519081900360640190fd5b6006546001600160a01b0316610af7576040805162461bcd60e51b815260206004820152601d60248201527f6e6f742d76616c69642d677561726469616e2d746f6b656e2d61646472000000604482015290519081900360640190fd5b6006546001600160a01b039081166000818152600260208181526040928390209091015482519486168552908401929092528281018290523360608401525190917f47ad88344c408450ef0ccab93ed97dd83af7a27dedfaa205c0725cfc4ca819cd919081900360800190a1600654600554604080516323b872dd60e01b81526001600160a01b039283166004820152858316602482015260448101859052905191909216916323b872dd9160648083019260209291908290030181600087803b158015610bc457600080fd5b505af1158015610bd8573d6000803e3d6000fd5b505050506040513d6020811015610bee57600080fd5b50505050565b60006001600160a01b038216610c0c57506000610ca1565b6001600160a01b0382166000908152600260209081526040808320838052909152902054610c3c57506000610ca1565b6001600160a01b038216600090815260026020908152604080832060018452909152902054610c6d57506000610ca1565b6001600160a01b0382166000908152600260208181526040808420928452919052902054610c9d57506000610ca1565b5060015b919050565b6000546001600160a01b03163314610cf1576040805162461bcd60e51b815260206004820152600960248201526837b7363ca0b236b4b760b91b604482015290519081900360640190fd5b6001600160a01b038216610d43576040805162461bcd60e51b81526020600482015260146024820152733737ba16bb30b634b216ba37b5b2b716b0b2323960611b604482015290519081900360640190fd5b6001600160a01b03909116600090815260026020526040902060010155565b60006001600160a01b03831615801590610d9757506001600160a01b0383166000908152600260208190526040909120015415155b8015610dbd57506001600160a01b03831660009081526002602052604090206001015415155b610e05576040805162461bcd60e51b81526020600482015260146024820152733737ba16bb30b634b216ba37b5b2b716b0b2323960611b604482015290519081900360640190fd5b506001600160a01b03821660009081526002602090815260408083208484529091529020545b92915050565b600090815260036020819052604090912060018101549101546001600160a01b0390911691565b6000546001600160a01b03163314610ea3576040805162461bcd60e51b815260206004820152600960248201526837b7363ca0b236b4b760b91b604482015290519081900360640190fd5b6001600160a01b038316610ef5576040805162461bcd60e51b81526020600482015260146024820152733737ba16bb30b634b216ba37b5b2b716b0b2323960611b604482015290519081900360640190fd5b6001600160a01b0390921660009081526002602090815260408083209383529290522055565b674563918244f4000081565b600481565b6000546001600160a01b03163314610f77576040805162461bcd60e51b815260206004820152600960248201526837b7363ca0b236b4b760b91b604482015290519081900360640190fd5b80610f8181610bf4565b610fcd576040805162461bcd60e51b81526020600482015260186024820152773737ba16b9bab83837b93a32b216ba37b5b2b716b0b2323960411b604482015290519081900360640190fd5b50600580546001600160a01b039384166001600160a01b03199182161790915560068054929093169116179055565b6005546001600160a01b031681565b6001602052600090815260409020546001600160a01b031681565b6000546001600160a01b03163314611071576040805162461bcd60e51b815260206004820152600960248201526837b7363ca0b236b4b760b91b604482015290519081900360640190fd5b6001600160a01b03811661108457600080fd5b600054604080516001600160a01b039283168152918316602083015280517fe0be0cc9c5ea7d7a7f3909ad261ab0e0fbc9aae3fe819864f60d81d91286dc309281900390910190a1600080546001600160a01b0319166001600160a01b0392909216919091179055565b6008546000906111099033906001600160a01b031681611c6a565b905090565b600760009054906101000a90046001600160a01b03166001600160a01b03166343a73d9a6040518163ffffffff1660e01b815260040160206040518083038186803b15801561115c57600080fd5b505afa158015611170573d6000803e3d6000fd5b505050506040513d602081101561118657600080fd5b50516001600160a01b031633146111d9576040805162461bcd60e51b81526020600482015260126024820152716e6f742d66726f6d2d646f732d70726f787960701b604482015290519081900360640190fd5b600060016000856001600160a01b03166001600160a01b0316815260200190815260200160002060009054906101000a90046001600160a01b03169050600060026000836001600160a01b03166001600160a01b0316815260200190815260200160002060000160008481526020019081526020016000205490506040518060800160405280866001600160a01b03168152602001836001600160a01b03168152602001848152602001828152506003600086815260200190815260200160002060008201518160000160006101000a8154816001600160a01b0302191690836001600160a01b0316021790555060208201518160010160006101000a8154816001600160a01b0302191690836001600160a01b0316021790555060408201518160020155606082015181600301559050507fa94e9ce5d0a7b76275efad947367b7999d9900f23bec1377d98f522ecad1b7ba858386868560405180866001600160a01b03166001600160a01b03168152602001856001600160a01b03166001600160a01b031681526020018481526020018381526020018281526020019550505050505060405180910390a1604080516323b872dd60e01b81526001600160a01b038781166004830152306024830152604482018490529151918416916323b872dd916064808201926020929091908290030181600087803b1580156113df57600080fd5b505af11580156113f3573d6000803e3d6000fd5b505050506040513d602081101561140957600080fd5b50505050505050565b600760009054906101000a90046001600160a01b03166001600160a01b03166343a73d9a6040518163ffffffff1660e01b815260040160206040518083038186803b15801561146057600080fd5b505afa158015611474573d6000803e3d6000fd5b505050506040513d602081101561148a57600080fd5b50516001600160a01b031633146114dd576040805162461bcd60e51b81526020600482015260126024820152716e6f742d66726f6d2d646f732d70726f787960701b604482015290519081900360640190fd5b600083815260036020819052604090912001548390611533576040805162461bcd60e51b815260206004820152600d60248201526c1b9bcb5999594b585b5bdd5b9d609a1b604482015290519081900360640190fd5b6000818152600360205260409020546001600160a01b031661158c576040805162461bcd60e51b815260206004820152600d60248201526c6e6f2d70617965722d696e666f60981b604482015290519081900360640190fd5b6000818152600360205260409020600101546001600160a01b03166115ec576040805162461bcd60e51b81526020600482015260116024820152706e6f2d6665652d746f6b656e2d696e666f60781b604482015290519081900360640190fd5b60008481526003602081815260408084206001808201805495830180546002808601805487546001600160a01b0319908116909855968a1690945592899055908890556001600160a01b0396871680895291865284882080840154978c16808a5260048852868a20848b528852988690208054600a909304988902928301905585519889529588018290528785018c9052606088018490526080880181905260a08801929092529251929591939290917f4758b94d44e129dcef9dc829628a55e921926b4383f3261f968ee8f9373571e7919081900360c00190a1600060018851038360010154600a038602816116df57fe5b04905060005b885181101561180657896001600160a01b031689828151811061170457fe5b60200260200101516001600160a01b0316146117fe5781600460008b848151811061172b57fe5b60200260200101516001600160a01b03166001600160a01b031681526020019081526020016000206000896001600160a01b03166001600160a01b03168152602001908152602001600020600082825401925050819055507f4758b94d44e129dcef9dc829628a55e921926b4383f3261f968ee8f9373571e78982815181106117b057fe5b602090810291909101810151604080516001600160a01b039283168152918b16928201929092528082018e90526060810188905260808101859052600060a082015290519081900360c00190a15b6001016116e5565b5050505050505050505050565b600360208190526000918252604090912080546001820154600283015492909301546001600160a01b0391821693909116919084565b6007546001600160a01b031681565b600854600090610e2b9083906001600160a01b03166119f8565b8061187c81610bf4565b6118c8576040805162461bcd60e51b81526020600482015260186024820152773737ba16b9bab83837b93a32b216ba37b5b2b716b0b2323960411b604482015290519081900360640190fd5b506001600160a01b03918216600090815260016020526040902080546001600160a01b03191691909216179055565b6007546001600160a01b031615801561191957506008546001600160a01b0316155b611960576040805162461bcd60e51b8152602060048201526013602482015272185b1c9958591e4b5a5b9a5d1a585b1a5e9959606a1b604482015290519081900360640190fd5b60008054336001600160a01b03199182161782556007805482166001600160a01b039687161790556005805482169486169490941790935560068054841692909416918217909355600880549092168117909155815260026020818152604080842084805291829052808420674563918244f40000908190556001808652828620829055848652919094208490556004908201550155565b6001600160a01b03918216600090815260046020908152604080832093909416825291909152205490565b6002602081905260009182526040909120600181015491015482565b600754604080516321d39ecd60e11b815290516000926001600160a01b0316916343a73d9a916004808301926020929190829003018186803b158015611a8457600080fd5b505afa158015611a98573d6000803e3d6000fd5b505050506040513d6020811015611aae57600080fd5b50516001600160a01b0384811691161415611acb57506001610e2b565b6001600160a01b03808416600081815260016020908152604080832054909416808352600282528483208784528252918490205484516370a0823160e01b815260048101949094529351919392839285926370a082319260248082019391829003018186803b158015611b3d57600080fd5b505afa158015611b51573d6000803e3d6000fd5b505050506040513d6020811015611b6757600080fd5b5051101595945050505050565b6000546001600160a01b03163314611bbf576040805162461bcd60e51b815260206004820152600960248201526837b7363ca0b236b4b760b91b604482015290519081900360640190fd5b6001600160a01b038216611c11576040805162461bcd60e51b81526020600482015260146024820152733737ba16bb30b634b216ba37b5b2b716b0b2323960611b604482015290519081900360640190fd5b6001600160a01b0390911660009081526002602081905260409091200155565b600854600090610e2b9033906001600160a01b031684611c6a565b6000546001600160a01b031681565b6006546001600160a01b031681565b6001600160a01b0380841660009081526004602090815260408083209386168352929052908120548015611d33576001600160a01b038086166000908152600460208181526040808420898616808652908352818520859055815163a9059cbb60e01b8152958916938601939093526024850186905251919363a9059cbb93604480830194928390030190829087803b158015611d0657600080fd5b505af1158015611d1a573d6000803e3d6000fd5b505050506040513d6020811015611d3057600080fd5b50505b94935050505056fea265627a7a7231582088be7a92b146d4639c93b15382f33440a84888c1f510613fe892436ac6df06d564736f6c63430005110032",
+}
+
 // DospaymentABI is the input ABI used to generate the binding from.
-const DospaymentABI = "[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"_bridgeAddr\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"_guardianFundsAddr\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"_tokenAddr\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"payer\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"tokenAddr\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"requestID\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"serviceType\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"fee\",\"type\":\"uint256\"}],\"name\":\"LogChargeServiceFee\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"nodeAddr\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"tokenAddr\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"feeForSubmitter\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"sender\",\"type\":\"address\"}],\"name\":\"LogClaimGuardianFee\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"nodeAddr\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"tokenAddr\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"requestID\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"serviceType\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"fee\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"bool\",\"name\":\"isSubmitter\",\"type\":\"bool\"}],\"name\":\"LogRecordServiceFee\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"payer\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"tokenAddr\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"requestID\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"serviceType\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"fee\",\"type\":\"uint256\"}],\"name\":\"LogRefundServiceFee\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"internalType\":\"address\",\"name\":\"oldAdmin\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"address\",\"name\":\"newAdmin\",\"type\":\"address\"}],\"name\":\"UpdatePaymentAdmin\",\"type\":\"event\"},{\"constant\":true,\"inputs\":[],\"name\":\"admin\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"bridgeAddr\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"payer\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"requestID\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"serviceType\",\"type\":\"uint256\"}],\"name\":\"chargeServiceFee\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"guardianAddr\",\"type\":\"address\"}],\"name\":\"claimGuardianReward\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"defaultGuardianFee\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"defaultSubmitterCut\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"defaultSystemRandomFee\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"defaultTokenAddr\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"defaultUserQueryFee\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"defaultUserRandomFee\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"name\":\"feeLists\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"submitterCut\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"guardianFee\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"address\",\"name\":\"tokenAddr\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"serviceType\",\"type\":\"uint256\"}],\"name\":\"getServiceTypeFee\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"guardianFundsAddr\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"guardianFundsTokenAddr\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"address\",\"name\":\"payer\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"serviceType\",\"type\":\"uint256\"}],\"name\":\"hasServiceFee\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"_bridgeAddr\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"_guardianFundsAddr\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"_tokenAddr\",\"type\":\"address\"}],\"name\":\"initialize\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"address\",\"name\":\"tokenAddr\",\"type\":\"address\"}],\"name\":\"isSupportedToken\",\"outputs\":[{\"internalType\":\"bool\",\"name\":\"\",\"type\":\"bool\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[],\"name\":\"nodeClaim\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"to\",\"type\":\"address\"}],\"name\":\"nodeClaim\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"address\",\"name\":\"nodeAddr\",\"type\":\"address\"}],\"name\":\"nodeFeeBalance\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"address\",\"name\":\"nodeAddr\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"tokenAddr\",\"type\":\"address\"}],\"name\":\"nodeFeeBalance\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"requestID\",\"type\":\"uint256\"}],\"name\":\"paymentInfo\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"name\":\"paymentMethods\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"name\":\"payments\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"payer\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"tokenAddr\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"serviceType\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"amount\",\"type\":\"uint256\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"requestID\",\"type\":\"uint256\"},{\"internalType\":\"address\",\"name\":\"submitter\",\"type\":\"address\"},{\"internalType\":\"address[]\",\"name\":\"workers\",\"type\":\"address[]\"}],\"name\":\"recordServiceFee\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"requestID\",\"type\":\"uint256\"}],\"name\":\"refundServiceFee\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"newAdmin\",\"type\":\"address\"}],\"name\":\"setAdmin\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"tokenAddr\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"submitterCut\",\"type\":\"uint256\"}],\"name\":\"setFeeDividend\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"tokenAddr\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"fee\",\"type\":\"uint256\"}],\"name\":\"setGuardianFee\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"fundsAddr\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"tokenAddr\",\"type\":\"address\"}],\"name\":\"setGuardianFunds\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"payer\",\"type\":\"address\"},{\"internalType\":\"address\",\"name\":\"tokenAddr\",\"type\":\"address\"}],\"name\":\"setPaymentMethod\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"internalType\":\"address\",\"name\":\"tokenAddr\",\"type\":\"address\"},{\"internalType\":\"uint256\",\"name\":\"serviceType\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"fee\",\"type\":\"uint256\"}],\"name\":\"setServiceFee\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]"
+// Deprecated: Use DospaymentMetaData.ABI instead.
+var DospaymentABI = DospaymentMetaData.ABI
 
 // DospaymentBin is the compiled bytecode used for deploying new contracts.
-var DospaymentBin = "0x608060405234801561001057600080fd5b5060405162001ef038038062001ef08339818101604052606081101561003557600080fd5b508051602082015160409092015190919061005a8383836001600160e01b0361006216565b50505061016e565b6007546001600160a01b031615801561008457506008546001600160a01b0316155b6100d5576040805162461bcd60e51b815260206004820152601360248201527f616c72656164792d696e697469616c697a656400000000000000000000000000604482015290519081900360640190fd5b60008054336001600160a01b03199182161782556007805482166001600160a01b0396871617905560058054821694861694909417909355600680548416929094169182179093556008805490921681179091558152600260208181526040808420848052918290528084206802b5e3af16b1880000908190556001808652828620829055848652919094208490556004908201550155565b611d72806200017e6000396000f3fe608060405234801561001057600080fd5b50600436106101f05760003560e01c80637aa9181b1161010f578063c60be4fd116100a2578063eebede8311610071578063eebede8314610674578063f39a19bf146106a0578063f851a440146106c6578063fa2c775e146106ce576101f0565b8063c60be4fd14610374578063cb7ca88c14610374578063d95eaa7a14610609578063e365036614610648576101f0565b8063a93eb110116100de578063a93eb1101461054f578063b73a3f8f14610575578063c0c53b8b146105a3578063c0f14e46146105db576101f0565b80637aa9181b1461040e5780638403f7dc1461044057806387d81789146104f857806391874ef714610547576101f0565b80634a0a382f11610187578063694732c611610156578063694732c6146103ba5780636dfa72b014610374578063704b6c02146103e0578063746c73fd14610406576101f0565b80634a0a382f14610374578063571028e31461037c5780635a1fa503146103845780636059775a146103b2576101f0565b80632c097993116101c35780632c09799314610298578063310ae824146102c45780633157f16d146103025780633939c40114610342576101f0565b806302b8b587146101f55780631efa5a981461021957806323ff34cb14610238578063240028e81461025e575b600080fd5b6101fd6106d6565b604080516001600160a01b039092168252519081900360200190f35b6102366004803603602081101561022f57600080fd5b50356106e5565b005b6102366004803603602081101561024e57600080fd5b50356001600160a01b0316610972565b6102846004803603602081101561027457600080fd5b50356001600160a01b0316610bf4565b604080519115158252519081900360200190f35b610236600480360360408110156102ae57600080fd5b506001600160a01b038135169060200135610ca6565b6102f0600480360360408110156102da57600080fd5b506001600160a01b038135169060200135610d62565b60408051918252519081900360200190f35b61031f6004803603602081101561031857600080fd5b5035610e31565b604080516001600160a01b03909316835260208301919091528051918290030190f35b6102366004803603606081101561035857600080fd5b506001600160a01b038135169060208101359060400135610e58565b6102f0610f1b565b6102f0610f28565b6102366004803603604081101561039a57600080fd5b506001600160a01b0381358116916020013516610f2d565b6101fd610ffd565b6101fd600480360360208110156103d057600080fd5b50356001600160a01b031661100c565b610236600480360360208110156103f657600080fd5b50356001600160a01b0316611027565b6102f06110ef565b6102366004803603606081101561042457600080fd5b506001600160a01b03813516906020810135906040013561110f565b6102366004803603606081101561045657600080fd5b8135916001600160a01b036020820135169181019060608101604082013564010000000081111561048657600080fd5b82018360208201111561049857600080fd5b803590602001918460208302840111640100000000831117156104ba57600080fd5b919080806020026020016040519081016040528093929190818152602001838360200280828437600092019190915250929550611413945050505050565b6105156004803603602081101561050e57600080fd5b5035611814565b604080516001600160a01b03958616815293909416602084015282840191909152606082015290519081900360800190f35b6101fd61184a565b6102f06004803603602081101561056557600080fd5b50356001600160a01b0316611859565b6102366004803603604081101561058b57600080fd5b506001600160a01b0381358116916020013516611873565b610236600480360360608110156105b957600080fd5b506001600160a01b0381358116916020810135821691604090910135166118f8565b6102f0600480360360408110156105f157600080fd5b506001600160a01b03813581169160200135166119fa565b61062f6004803603602081101561061f57600080fd5b50356001600160a01b0316611a25565b6040805192835260208301919091528051918290030190f35b6102846004803603604081101561065e57600080fd5b506001600160a01b038135169060200135611a41565b6102366004803603604081101561068a57600080fd5b506001600160a01b038135169060200135611b76565b6102f0600480360360208110156106b657600080fd5b50356001600160a01b0316611c33565b6101fd611c4e565b6101fd611c5d565b6008546001600160a01b031681565b6000546001600160a01b03163314610730576040805162461bcd60e51b815260206004820152600960248201526837b7363ca0b236b4b760b91b604482015290519081900360640190fd5b600081815260036020819052604090912001548190610786576040805162461bcd60e51b815260206004820152600d60248201526c1b9bcb5999594b585b5bdd5b9d609a1b604482015290519081900360640190fd5b6000818152600360205260409020546001600160a01b03166107df576040805162461bcd60e51b815260206004820152600d60248201526c6e6f2d70617965722d696e666f60981b604482015290519081900360640190fd5b6000818152600360205260409020600101546001600160a01b031661083f576040805162461bcd60e51b81526020600482015260116024820152706e6f2d6665652d746f6b656e2d696e666f60781b604482015290519081900360640190fd5b6000828152600360208181526040808420928301805460028501805460018701805488546001600160a01b0319808216909a55988116909155918890559690925582516001600160a01b039586168082529590921693820184905281830188905260608201869052608082018190529151919493917fde0a5183bfc8c743f7b95ecaaf7815e8f82d8ae05ca1ade1eac1ff9d961a2eaa9181900360a00190a1816001600160a01b031663a9059cbb82866040518363ffffffff1660e01b815260040180836001600160a01b03166001600160a01b0316815260200182815260200192505050602060405180830381600087803b15801561093e57600080fd5b505af1158015610952573d6000803e3d6000fd5b505050506040513d602081101561096857600080fd5b5050505050505050565b600760009054906101000a90046001600160a01b03166001600160a01b03166343a73d9a6040518163ffffffff1660e01b815260040160206040518083038186803b1580156109c057600080fd5b505afa1580156109d4573d6000803e3d6000fd5b505050506040513d60208110156109ea57600080fd5b50516001600160a01b03163314610a3d576040805162461bcd60e51b81526020600482015260126024820152716e6f742d66726f6d2d646f732d70726f787960701b604482015290519081900360640190fd5b6005546001600160a01b0316610a9a576040805162461bcd60e51b815260206004820152601c60248201527f6e6f742d76616c69642d677561726469616e2d66756e642d6164647200000000604482015290519081900360640190fd5b6006546001600160a01b0316610af7576040805162461bcd60e51b815260206004820152601d60248201527f6e6f742d76616c69642d677561726469616e2d746f6b656e2d61646472000000604482015290519081900360640190fd5b6006546001600160a01b039081166000818152600260208181526040928390209091015482519486168552908401929092528281018290523360608401525190917f47ad88344c408450ef0ccab93ed97dd83af7a27dedfaa205c0725cfc4ca819cd919081900360800190a1600654600554604080516323b872dd60e01b81526001600160a01b039283166004820152858316602482015260448101859052905191909216916323b872dd9160648083019260209291908290030181600087803b158015610bc457600080fd5b505af1158015610bd8573d6000803e3d6000fd5b505050506040513d6020811015610bee57600080fd5b50505050565b60006001600160a01b038216610c0c57506000610ca1565b6001600160a01b0382166000908152600260209081526040808320838052909152902054610c3c57506000610ca1565b6001600160a01b038216600090815260026020908152604080832060018452909152902054610c6d57506000610ca1565b6001600160a01b0382166000908152600260208181526040808420928452919052902054610c9d57506000610ca1565b5060015b919050565b6000546001600160a01b03163314610cf1576040805162461bcd60e51b815260206004820152600960248201526837b7363ca0b236b4b760b91b604482015290519081900360640190fd5b6001600160a01b038216610d43576040805162461bcd60e51b81526020600482015260146024820152733737ba16bb30b634b216ba37b5b2b716b0b2323960611b604482015290519081900360640190fd5b6001600160a01b03909116600090815260026020526040902060010155565b60006001600160a01b03831615801590610d9757506001600160a01b0383166000908152600260208190526040909120015415155b8015610dbd57506001600160a01b03831660009081526002602052604090206001015415155b610e05576040805162461bcd60e51b81526020600482015260146024820152733737ba16bb30b634b216ba37b5b2b716b0b2323960611b604482015290519081900360640190fd5b506001600160a01b03821660009081526002602090815260408083208484529091529020545b92915050565b600090815260036020819052604090912060018101549101546001600160a01b0390911691565b6000546001600160a01b03163314610ea3576040805162461bcd60e51b815260206004820152600960248201526837b7363ca0b236b4b760b91b604482015290519081900360640190fd5b6001600160a01b038316610ef5576040805162461bcd60e51b81526020600482015260146024820152733737ba16bb30b634b216ba37b5b2b716b0b2323960611b604482015290519081900360640190fd5b6001600160a01b0390921660009081526002602090815260408083209383529290522055565b6802b5e3af16b188000081565b600481565b6000546001600160a01b03163314610f78576040805162461bcd60e51b815260206004820152600960248201526837b7363ca0b236b4b760b91b604482015290519081900360640190fd5b80610f8281610bf4565b610fce576040805162461bcd60e51b81526020600482015260186024820152773737ba16b9bab83837b93a32b216ba37b5b2b716b0b2323960411b604482015290519081900360640190fd5b50600580546001600160a01b039384166001600160a01b03199182161790915560068054929093169116179055565b6005546001600160a01b031681565b6001602052600090815260409020546001600160a01b031681565b6000546001600160a01b03163314611072576040805162461bcd60e51b815260206004820152600960248201526837b7363ca0b236b4b760b91b604482015290519081900360640190fd5b6001600160a01b03811661108557600080fd5b600054604080516001600160a01b039283168152918316602083015280517fe0be0cc9c5ea7d7a7f3909ad261ab0e0fbc9aae3fe819864f60d81d91286dc309281900390910190a1600080546001600160a01b0319166001600160a01b0392909216919091179055565b60085460009061110a9033906001600160a01b031681611c6c565b905090565b600760009054906101000a90046001600160a01b03166001600160a01b03166343a73d9a6040518163ffffffff1660e01b815260040160206040518083038186803b15801561115d57600080fd5b505afa158015611171573d6000803e3d6000fd5b505050506040513d602081101561118757600080fd5b50516001600160a01b031633146111da576040805162461bcd60e51b81526020600482015260126024820152716e6f742d66726f6d2d646f732d70726f787960701b604482015290519081900360640190fd5b600060016000856001600160a01b03166001600160a01b0316815260200190815260200160002060009054906101000a90046001600160a01b03169050600060026000836001600160a01b03166001600160a01b0316815260200190815260200160002060000160008481526020019081526020016000205490506040518060800160405280866001600160a01b03168152602001836001600160a01b03168152602001848152602001828152506003600086815260200190815260200160002060008201518160000160006101000a8154816001600160a01b0302191690836001600160a01b0316021790555060208201518160010160006101000a8154816001600160a01b0302191690836001600160a01b0316021790555060408201518160020155606082015181600301559050507fa94e9ce5d0a7b76275efad947367b7999d9900f23bec1377d98f522ecad1b7ba858386868560405180866001600160a01b03166001600160a01b03168152602001856001600160a01b03166001600160a01b031681526020018481526020018381526020018281526020019550505050505060405180910390a1604080516323b872dd60e01b81526001600160a01b038781166004830152306024830152604482018490529151918416916323b872dd916064808201926020929091908290030181600087803b1580156113e057600080fd5b505af11580156113f4573d6000803e3d6000fd5b505050506040513d602081101561140a57600080fd5b50505050505050565b600760009054906101000a90046001600160a01b03166001600160a01b03166343a73d9a6040518163ffffffff1660e01b815260040160206040518083038186803b15801561146157600080fd5b505afa158015611475573d6000803e3d6000fd5b505050506040513d602081101561148b57600080fd5b50516001600160a01b031633146114de576040805162461bcd60e51b81526020600482015260126024820152716e6f742d66726f6d2d646f732d70726f787960701b604482015290519081900360640190fd5b600083815260036020819052604090912001548390611534576040805162461bcd60e51b815260206004820152600d60248201526c1b9bcb5999594b585b5bdd5b9d609a1b604482015290519081900360640190fd5b6000818152600360205260409020546001600160a01b031661158d576040805162461bcd60e51b815260206004820152600d60248201526c6e6f2d70617965722d696e666f60981b604482015290519081900360640190fd5b6000818152600360205260409020600101546001600160a01b03166115ed576040805162461bcd60e51b81526020600482015260116024820152706e6f2d6665652d746f6b656e2d696e666f60781b604482015290519081900360640190fd5b60008481526003602081815260408084206001808201805495830180546002808601805487546001600160a01b0319908116909855968a1690945592899055908890556001600160a01b0396871680895291865284882080840154978c16808a5260048852868a20848b528852988690208054600a909304988902928301905585519889529588018290528785018c9052606088018490526080880181905260a08801929092529251929591939290917f4758b94d44e129dcef9dc829628a55e921926b4383f3261f968ee8f9373571e7919081900360c00190a1600060018851038360010154600a038602816116e057fe5b04905060005b885181101561180757896001600160a01b031689828151811061170557fe5b60200260200101516001600160a01b0316146117ff5781600460008b848151811061172c57fe5b60200260200101516001600160a01b03166001600160a01b031681526020019081526020016000206000896001600160a01b03166001600160a01b03168152602001908152602001600020600082825401925050819055507f4758b94d44e129dcef9dc829628a55e921926b4383f3261f968ee8f9373571e78982815181106117b157fe5b602090810291909101810151604080516001600160a01b039283168152918b16928201929092528082018e90526060810188905260808101859052600060a082015290519081900360c00190a15b6001016116e6565b5050505050505050505050565b600360208190526000918252604090912080546001820154600283015492909301546001600160a01b0391821693909116919084565b6007546001600160a01b031681565b600854600090610e2b9083906001600160a01b03166119fa565b8061187d81610bf4565b6118c9576040805162461bcd60e51b81526020600482015260186024820152773737ba16b9bab83837b93a32b216ba37b5b2b716b0b2323960411b604482015290519081900360640190fd5b506001600160a01b03918216600090815260016020526040902080546001600160a01b03191691909216179055565b6007546001600160a01b031615801561191a57506008546001600160a01b0316155b611961576040805162461bcd60e51b8152602060048201526013602482015272185b1c9958591e4b5a5b9a5d1a585b1a5e9959606a1b604482015290519081900360640190fd5b60008054336001600160a01b03199182161782556007805482166001600160a01b0396871617905560058054821694861694909417909355600680548416929094169182179093556008805490921681179091558152600260208181526040808420848052918290528084206802b5e3af16b1880000908190556001808652828620829055848652919094208490556004908201550155565b6001600160a01b03918216600090815260046020908152604080832093909416825291909152205490565b6002602081905260009182526040909120600181015491015482565b600754604080516321d39ecd60e11b815290516000926001600160a01b0316916343a73d9a916004808301926020929190829003018186803b158015611a8657600080fd5b505afa158015611a9a573d6000803e3d6000fd5b505050506040513d6020811015611ab057600080fd5b50516001600160a01b0384811691161415611acd57506001610e2b565b6001600160a01b03808416600081815260016020908152604080832054909416808352600282528483208784528252918490205484516370a0823160e01b815260048101949094529351919392839285926370a082319260248082019391829003018186803b158015611b3f57600080fd5b505afa158015611b53573d6000803e3d6000fd5b505050506040513d6020811015611b6957600080fd5b5051101595945050505050565b6000546001600160a01b03163314611bc1576040805162461bcd60e51b815260206004820152600960248201526837b7363ca0b236b4b760b91b604482015290519081900360640190fd5b6001600160a01b038216611c13576040805162461bcd60e51b81526020600482015260146024820152733737ba16bb30b634b216ba37b5b2b716b0b2323960611b604482015290519081900360640190fd5b6001600160a01b0390911660009081526002602081905260409091200155565b600854600090610e2b9033906001600160a01b031684611c6c565b6000546001600160a01b031681565b6006546001600160a01b031681565b6001600160a01b0380841660009081526004602090815260408083209386168352929052908120548015611d35576001600160a01b038086166000908152600460208181526040808420898616808652908352818520859055815163a9059cbb60e01b8152958916938601939093526024850186905251919363a9059cbb93604480830194928390030190829087803b158015611d0857600080fd5b505af1158015611d1c573d6000803e3d6000fd5b505050506040513d6020811015611d3257600080fd5b50505b94935050505056fea265627a7a723158206deccb44e2f3ac3292c9bc03ea1be3f855fee264b26dfa173af62140bf07c2ba64736f6c63430005110032"
+// Deprecated: Use DospaymentMetaData.Bin instead.
+var DospaymentBin = DospaymentMetaData.Bin
 
 // DeployDospayment deploys a new Ethereum contract, binding an instance of Dospayment to it.
 func DeployDospayment(auth *bind.TransactOpts, backend bind.ContractBackend, _bridgeAddr common.Address, _guardianFundsAddr common.Address, _tokenAddr common.Address) (common.Address, *types.Transaction, *Dospayment, error) {
-	parsed, err := abi.JSON(strings.NewReader(DospaymentABI))
+	parsed, err := DospaymentMetaData.GetAbi()
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}
+	if parsed == nil {
+		return common.Address{}, nil, nil, errors.New("GetABI returned nil")
+	}
 
-	address, tx, contract, err := bind.DeployContract(auth, parsed, common.FromHex(DospaymentBin), backend, _bridgeAddr, _guardianFundsAddr, _tokenAddr)
+	address, tx, contract, err := bind.DeployContract(auth, *parsed, common.FromHex(DospaymentBin), backend, _bridgeAddr, _guardianFundsAddr, _tokenAddr)
 	if err != nil {
 		return common.Address{}, nil, nil, err
 	}
@@ -154,7 +167,7 @@ func bindDospayment(address common.Address, caller bind.ContractCaller, transact
 // sets the output to result. The result type might be a single field for simple
 // returns, a slice of interfaces for anonymous returns and a struct for named
 // returns.
-func (_Dospayment *DospaymentRaw) Call(opts *bind.CallOpts, result interface{}, method string, params ...interface{}) error {
+func (_Dospayment *DospaymentRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
 	return _Dospayment.Contract.DospaymentCaller.contract.Call(opts, result, method, params...)
 }
 
@@ -173,7 +186,7 @@ func (_Dospayment *DospaymentRaw) Transact(opts *bind.TransactOpts, method strin
 // sets the output to result. The result type might be a single field for simple
 // returns, a slice of interfaces for anonymous returns and a struct for named
 // returns.
-func (_Dospayment *DospaymentCallerRaw) Call(opts *bind.CallOpts, result interface{}, method string, params ...interface{}) error {
+func (_Dospayment *DospaymentCallerRaw) Call(opts *bind.CallOpts, result *[]interface{}, method string, params ...interface{}) error {
 	return _Dospayment.Contract.contract.Call(opts, result, method, params...)
 }
 
@@ -192,12 +205,17 @@ func (_Dospayment *DospaymentTransactorRaw) Transact(opts *bind.TransactOpts, me
 //
 // Solidity: function admin() view returns(address)
 func (_Dospayment *DospaymentCaller) Admin(opts *bind.CallOpts) (common.Address, error) {
-	var (
-		ret0 = new(common.Address)
-	)
-	out := ret0
-	err := _Dospayment.contract.Call(opts, out, "admin")
-	return *ret0, err
+	var out []interface{}
+	err := _Dospayment.contract.Call(opts, &out, "admin")
+
+	if err != nil {
+		return *new(common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+
+	return out0, err
+
 }
 
 // Admin is a free data retrieval call binding the contract method 0xf851a440.
@@ -218,12 +236,17 @@ func (_Dospayment *DospaymentCallerSession) Admin() (common.Address, error) {
 //
 // Solidity: function bridgeAddr() view returns(address)
 func (_Dospayment *DospaymentCaller) BridgeAddr(opts *bind.CallOpts) (common.Address, error) {
-	var (
-		ret0 = new(common.Address)
-	)
-	out := ret0
-	err := _Dospayment.contract.Call(opts, out, "bridgeAddr")
-	return *ret0, err
+	var out []interface{}
+	err := _Dospayment.contract.Call(opts, &out, "bridgeAddr")
+
+	if err != nil {
+		return *new(common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+
+	return out0, err
+
 }
 
 // BridgeAddr is a free data retrieval call binding the contract method 0x91874ef7.
@@ -244,12 +267,17 @@ func (_Dospayment *DospaymentCallerSession) BridgeAddr() (common.Address, error)
 //
 // Solidity: function defaultGuardianFee() view returns(uint256)
 func (_Dospayment *DospaymentCaller) DefaultGuardianFee(opts *bind.CallOpts) (*big.Int, error) {
-	var (
-		ret0 = new(*big.Int)
-	)
-	out := ret0
-	err := _Dospayment.contract.Call(opts, out, "defaultGuardianFee")
-	return *ret0, err
+	var out []interface{}
+	err := _Dospayment.contract.Call(opts, &out, "defaultGuardianFee")
+
+	if err != nil {
+		return *new(*big.Int), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
+
+	return out0, err
+
 }
 
 // DefaultGuardianFee is a free data retrieval call binding the contract method 0x6dfa72b0.
@@ -270,12 +298,17 @@ func (_Dospayment *DospaymentCallerSession) DefaultGuardianFee() (*big.Int, erro
 //
 // Solidity: function defaultSubmitterCut() view returns(uint256)
 func (_Dospayment *DospaymentCaller) DefaultSubmitterCut(opts *bind.CallOpts) (*big.Int, error) {
-	var (
-		ret0 = new(*big.Int)
-	)
-	out := ret0
-	err := _Dospayment.contract.Call(opts, out, "defaultSubmitterCut")
-	return *ret0, err
+	var out []interface{}
+	err := _Dospayment.contract.Call(opts, &out, "defaultSubmitterCut")
+
+	if err != nil {
+		return *new(*big.Int), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
+
+	return out0, err
+
 }
 
 // DefaultSubmitterCut is a free data retrieval call binding the contract method 0x571028e3.
@@ -296,12 +329,17 @@ func (_Dospayment *DospaymentCallerSession) DefaultSubmitterCut() (*big.Int, err
 //
 // Solidity: function defaultSystemRandomFee() view returns(uint256)
 func (_Dospayment *DospaymentCaller) DefaultSystemRandomFee(opts *bind.CallOpts) (*big.Int, error) {
-	var (
-		ret0 = new(*big.Int)
-	)
-	out := ret0
-	err := _Dospayment.contract.Call(opts, out, "defaultSystemRandomFee")
-	return *ret0, err
+	var out []interface{}
+	err := _Dospayment.contract.Call(opts, &out, "defaultSystemRandomFee")
+
+	if err != nil {
+		return *new(*big.Int), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
+
+	return out0, err
+
 }
 
 // DefaultSystemRandomFee is a free data retrieval call binding the contract method 0xcb7ca88c.
@@ -322,12 +360,17 @@ func (_Dospayment *DospaymentCallerSession) DefaultSystemRandomFee() (*big.Int, 
 //
 // Solidity: function defaultTokenAddr() view returns(address)
 func (_Dospayment *DospaymentCaller) DefaultTokenAddr(opts *bind.CallOpts) (common.Address, error) {
-	var (
-		ret0 = new(common.Address)
-	)
-	out := ret0
-	err := _Dospayment.contract.Call(opts, out, "defaultTokenAddr")
-	return *ret0, err
+	var out []interface{}
+	err := _Dospayment.contract.Call(opts, &out, "defaultTokenAddr")
+
+	if err != nil {
+		return *new(common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+
+	return out0, err
+
 }
 
 // DefaultTokenAddr is a free data retrieval call binding the contract method 0x02b8b587.
@@ -348,12 +391,17 @@ func (_Dospayment *DospaymentCallerSession) DefaultTokenAddr() (common.Address, 
 //
 // Solidity: function defaultUserQueryFee() view returns(uint256)
 func (_Dospayment *DospaymentCaller) DefaultUserQueryFee(opts *bind.CallOpts) (*big.Int, error) {
-	var (
-		ret0 = new(*big.Int)
-	)
-	out := ret0
-	err := _Dospayment.contract.Call(opts, out, "defaultUserQueryFee")
-	return *ret0, err
+	var out []interface{}
+	err := _Dospayment.contract.Call(opts, &out, "defaultUserQueryFee")
+
+	if err != nil {
+		return *new(*big.Int), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
+
+	return out0, err
+
 }
 
 // DefaultUserQueryFee is a free data retrieval call binding the contract method 0xc60be4fd.
@@ -374,12 +422,17 @@ func (_Dospayment *DospaymentCallerSession) DefaultUserQueryFee() (*big.Int, err
 //
 // Solidity: function defaultUserRandomFee() view returns(uint256)
 func (_Dospayment *DospaymentCaller) DefaultUserRandomFee(opts *bind.CallOpts) (*big.Int, error) {
-	var (
-		ret0 = new(*big.Int)
-	)
-	out := ret0
-	err := _Dospayment.contract.Call(opts, out, "defaultUserRandomFee")
-	return *ret0, err
+	var out []interface{}
+	err := _Dospayment.contract.Call(opts, &out, "defaultUserRandomFee")
+
+	if err != nil {
+		return *new(*big.Int), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
+
+	return out0, err
+
 }
 
 // DefaultUserRandomFee is a free data retrieval call binding the contract method 0x4a0a382f.
@@ -403,13 +456,22 @@ func (_Dospayment *DospaymentCaller) FeeLists(opts *bind.CallOpts, arg0 common.A
 	SubmitterCut *big.Int
 	GuardianFee  *big.Int
 }, error) {
-	ret := new(struct {
+	var out []interface{}
+	err := _Dospayment.contract.Call(opts, &out, "feeLists", arg0)
+
+	outstruct := new(struct {
 		SubmitterCut *big.Int
 		GuardianFee  *big.Int
 	})
-	out := ret
-	err := _Dospayment.contract.Call(opts, out, "feeLists", arg0)
-	return *ret, err
+	if err != nil {
+		return *outstruct, err
+	}
+
+	outstruct.SubmitterCut = *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
+	outstruct.GuardianFee = *abi.ConvertType(out[1], new(*big.Int)).(**big.Int)
+
+	return *outstruct, err
+
 }
 
 // FeeLists is a free data retrieval call binding the contract method 0xd95eaa7a.
@@ -436,12 +498,17 @@ func (_Dospayment *DospaymentCallerSession) FeeLists(arg0 common.Address) (struc
 //
 // Solidity: function getServiceTypeFee(address tokenAddr, uint256 serviceType) view returns(uint256)
 func (_Dospayment *DospaymentCaller) GetServiceTypeFee(opts *bind.CallOpts, tokenAddr common.Address, serviceType *big.Int) (*big.Int, error) {
-	var (
-		ret0 = new(*big.Int)
-	)
-	out := ret0
-	err := _Dospayment.contract.Call(opts, out, "getServiceTypeFee", tokenAddr, serviceType)
-	return *ret0, err
+	var out []interface{}
+	err := _Dospayment.contract.Call(opts, &out, "getServiceTypeFee", tokenAddr, serviceType)
+
+	if err != nil {
+		return *new(*big.Int), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
+
+	return out0, err
+
 }
 
 // GetServiceTypeFee is a free data retrieval call binding the contract method 0x310ae824.
@@ -462,12 +529,17 @@ func (_Dospayment *DospaymentCallerSession) GetServiceTypeFee(tokenAddr common.A
 //
 // Solidity: function guardianFundsAddr() view returns(address)
 func (_Dospayment *DospaymentCaller) GuardianFundsAddr(opts *bind.CallOpts) (common.Address, error) {
-	var (
-		ret0 = new(common.Address)
-	)
-	out := ret0
-	err := _Dospayment.contract.Call(opts, out, "guardianFundsAddr")
-	return *ret0, err
+	var out []interface{}
+	err := _Dospayment.contract.Call(opts, &out, "guardianFundsAddr")
+
+	if err != nil {
+		return *new(common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+
+	return out0, err
+
 }
 
 // GuardianFundsAddr is a free data retrieval call binding the contract method 0x6059775a.
@@ -488,12 +560,17 @@ func (_Dospayment *DospaymentCallerSession) GuardianFundsAddr() (common.Address,
 //
 // Solidity: function guardianFundsTokenAddr() view returns(address)
 func (_Dospayment *DospaymentCaller) GuardianFundsTokenAddr(opts *bind.CallOpts) (common.Address, error) {
-	var (
-		ret0 = new(common.Address)
-	)
-	out := ret0
-	err := _Dospayment.contract.Call(opts, out, "guardianFundsTokenAddr")
-	return *ret0, err
+	var out []interface{}
+	err := _Dospayment.contract.Call(opts, &out, "guardianFundsTokenAddr")
+
+	if err != nil {
+		return *new(common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+
+	return out0, err
+
 }
 
 // GuardianFundsTokenAddr is a free data retrieval call binding the contract method 0xfa2c775e.
@@ -514,12 +591,17 @@ func (_Dospayment *DospaymentCallerSession) GuardianFundsTokenAddr() (common.Add
 //
 // Solidity: function hasServiceFee(address payer, uint256 serviceType) view returns(bool)
 func (_Dospayment *DospaymentCaller) HasServiceFee(opts *bind.CallOpts, payer common.Address, serviceType *big.Int) (bool, error) {
-	var (
-		ret0 = new(bool)
-	)
-	out := ret0
-	err := _Dospayment.contract.Call(opts, out, "hasServiceFee", payer, serviceType)
-	return *ret0, err
+	var out []interface{}
+	err := _Dospayment.contract.Call(opts, &out, "hasServiceFee", payer, serviceType)
+
+	if err != nil {
+		return *new(bool), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(bool)).(*bool)
+
+	return out0, err
+
 }
 
 // HasServiceFee is a free data retrieval call binding the contract method 0xe3650366.
@@ -540,12 +622,17 @@ func (_Dospayment *DospaymentCallerSession) HasServiceFee(payer common.Address, 
 //
 // Solidity: function isSupportedToken(address tokenAddr) view returns(bool)
 func (_Dospayment *DospaymentCaller) IsSupportedToken(opts *bind.CallOpts, tokenAddr common.Address) (bool, error) {
-	var (
-		ret0 = new(bool)
-	)
-	out := ret0
-	err := _Dospayment.contract.Call(opts, out, "isSupportedToken", tokenAddr)
-	return *ret0, err
+	var out []interface{}
+	err := _Dospayment.contract.Call(opts, &out, "isSupportedToken", tokenAddr)
+
+	if err != nil {
+		return *new(bool), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(bool)).(*bool)
+
+	return out0, err
+
 }
 
 // IsSupportedToken is a free data retrieval call binding the contract method 0x240028e8.
@@ -566,12 +653,17 @@ func (_Dospayment *DospaymentCallerSession) IsSupportedToken(tokenAddr common.Ad
 //
 // Solidity: function nodeFeeBalance(address nodeAddr) view returns(uint256)
 func (_Dospayment *DospaymentCaller) NodeFeeBalance(opts *bind.CallOpts, nodeAddr common.Address) (*big.Int, error) {
-	var (
-		ret0 = new(*big.Int)
-	)
-	out := ret0
-	err := _Dospayment.contract.Call(opts, out, "nodeFeeBalance", nodeAddr)
-	return *ret0, err
+	var out []interface{}
+	err := _Dospayment.contract.Call(opts, &out, "nodeFeeBalance", nodeAddr)
+
+	if err != nil {
+		return *new(*big.Int), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
+
+	return out0, err
+
 }
 
 // NodeFeeBalance is a free data retrieval call binding the contract method 0xa93eb110.
@@ -592,12 +684,17 @@ func (_Dospayment *DospaymentCallerSession) NodeFeeBalance(nodeAddr common.Addre
 //
 // Solidity: function nodeFeeBalance(address nodeAddr, address tokenAddr) view returns(uint256)
 func (_Dospayment *DospaymentCaller) NodeFeeBalance0(opts *bind.CallOpts, nodeAddr common.Address, tokenAddr common.Address) (*big.Int, error) {
-	var (
-		ret0 = new(*big.Int)
-	)
-	out := ret0
-	err := _Dospayment.contract.Call(opts, out, "nodeFeeBalance0", nodeAddr, tokenAddr)
-	return *ret0, err
+	var out []interface{}
+	err := _Dospayment.contract.Call(opts, &out, "nodeFeeBalance0", nodeAddr, tokenAddr)
+
+	if err != nil {
+		return *new(*big.Int), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(*big.Int)).(**big.Int)
+
+	return out0, err
+
 }
 
 // NodeFeeBalance0 is a free data retrieval call binding the contract method 0xc0f14e46.
@@ -618,16 +715,18 @@ func (_Dospayment *DospaymentCallerSession) NodeFeeBalance0(nodeAddr common.Addr
 //
 // Solidity: function paymentInfo(uint256 requestID) view returns(address, uint256)
 func (_Dospayment *DospaymentCaller) PaymentInfo(opts *bind.CallOpts, requestID *big.Int) (common.Address, *big.Int, error) {
-	var (
-		ret0 = new(common.Address)
-		ret1 = new(*big.Int)
-	)
-	out := &[]interface{}{
-		ret0,
-		ret1,
+	var out []interface{}
+	err := _Dospayment.contract.Call(opts, &out, "paymentInfo", requestID)
+
+	if err != nil {
+		return *new(common.Address), *new(*big.Int), err
 	}
-	err := _Dospayment.contract.Call(opts, out, "paymentInfo", requestID)
-	return *ret0, *ret1, err
+
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+	out1 := *abi.ConvertType(out[1], new(*big.Int)).(**big.Int)
+
+	return out0, out1, err
+
 }
 
 // PaymentInfo is a free data retrieval call binding the contract method 0x3157f16d.
@@ -648,12 +747,17 @@ func (_Dospayment *DospaymentCallerSession) PaymentInfo(requestID *big.Int) (com
 //
 // Solidity: function paymentMethods(address ) view returns(address)
 func (_Dospayment *DospaymentCaller) PaymentMethods(opts *bind.CallOpts, arg0 common.Address) (common.Address, error) {
-	var (
-		ret0 = new(common.Address)
-	)
-	out := ret0
-	err := _Dospayment.contract.Call(opts, out, "paymentMethods", arg0)
-	return *ret0, err
+	var out []interface{}
+	err := _Dospayment.contract.Call(opts, &out, "paymentMethods", arg0)
+
+	if err != nil {
+		return *new(common.Address), err
+	}
+
+	out0 := *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+
+	return out0, err
+
 }
 
 // PaymentMethods is a free data retrieval call binding the contract method 0x694732c6.
@@ -679,15 +783,26 @@ func (_Dospayment *DospaymentCaller) Payments(opts *bind.CallOpts, arg0 *big.Int
 	ServiceType *big.Int
 	Amount      *big.Int
 }, error) {
-	ret := new(struct {
+	var out []interface{}
+	err := _Dospayment.contract.Call(opts, &out, "payments", arg0)
+
+	outstruct := new(struct {
 		Payer       common.Address
 		TokenAddr   common.Address
 		ServiceType *big.Int
 		Amount      *big.Int
 	})
-	out := ret
-	err := _Dospayment.contract.Call(opts, out, "payments", arg0)
-	return *ret, err
+	if err != nil {
+		return *outstruct, err
+	}
+
+	outstruct.Payer = *abi.ConvertType(out[0], new(common.Address)).(*common.Address)
+	outstruct.TokenAddr = *abi.ConvertType(out[1], new(common.Address)).(*common.Address)
+	outstruct.ServiceType = *abi.ConvertType(out[2], new(*big.Int)).(**big.Int)
+	outstruct.Amount = *abi.ConvertType(out[3], new(*big.Int)).(**big.Int)
+
+	return *outstruct, err
+
 }
 
 // Payments is a free data retrieval call binding the contract method 0x87d81789.
@@ -1121,6 +1236,7 @@ func (_Dospayment *DospaymentFilterer) ParseLogChargeServiceFee(log types.Log) (
 	if err := _Dospayment.contract.UnpackLog(event, "LogChargeServiceFee", log); err != nil {
 		return nil, err
 	}
+	event.Raw = log
 	return event, nil
 }
 
@@ -1257,6 +1373,7 @@ func (_Dospayment *DospaymentFilterer) ParseLogClaimGuardianFee(log types.Log) (
 	if err := _Dospayment.contract.UnpackLog(event, "LogClaimGuardianFee", log); err != nil {
 		return nil, err
 	}
+	event.Raw = log
 	return event, nil
 }
 
@@ -1395,6 +1512,7 @@ func (_Dospayment *DospaymentFilterer) ParseLogRecordServiceFee(log types.Log) (
 	if err := _Dospayment.contract.UnpackLog(event, "LogRecordServiceFee", log); err != nil {
 		return nil, err
 	}
+	event.Raw = log
 	return event, nil
 }
 
@@ -1532,6 +1650,7 @@ func (_Dospayment *DospaymentFilterer) ParseLogRefundServiceFee(log types.Log) (
 	if err := _Dospayment.contract.UnpackLog(event, "LogRefundServiceFee", log); err != nil {
 		return nil, err
 	}
+	event.Raw = log
 	return event, nil
 }
 
@@ -1666,5 +1785,6 @@ func (_Dospayment *DospaymentFilterer) ParseUpdatePaymentAdmin(log types.Log) (*
 	if err := _Dospayment.contract.UnpackLog(event, "UpdatePaymentAdmin", log); err != nil {
 		return nil, err
 	}
+	event.Raw = log
 	return event, nil
 }
