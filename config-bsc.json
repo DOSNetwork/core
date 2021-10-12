@@ -1,5 +1,5 @@
 {
-    "VERSION": "v1.0.4-m",
+    "VERSION": "v1.0.5-m",
     "NodeIP": "#REPLACE-WITH-IP",
     "NodePort": "9501",
     "ChainID": "56",

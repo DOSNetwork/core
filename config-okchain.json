@@ -1,7 +1,8 @@
 {
-    "VERSION": "v1.0.4-m",
+    "VERSION": "v1.0.5-m",
     "NodeIP": "#REPLACE-WITH-IP",
     "NodePort": "9501",
+    "ChainID": "66",
     "ChainType": "Okchain",
     "BlockTime": "4",
     "DOSAddressBridgeAddress": "0xD1aFEa6D7745c9d168A77Abd80124A0592B0D48e",
