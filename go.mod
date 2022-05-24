@@ -9,11 +9,10 @@ require (
 	github.com/armon/go-metrics v0.0.0-20190430140413-ec5e00d3c878 // indirect
 	github.com/bshuster-repo/logrus-logstash-hook v0.4.1
 	github.com/cespare/cp v1.1.1 // indirect
-	github.com/deckarep/golang-set v1.7.1 // indirect
 	github.com/dedis/fixbuf v1.0.2
 	github.com/dedis/kyber v0.0.0-20181211160045-59837fd0c24b
 	github.com/dedis/protobuf v1.0.3
-	github.com/ethereum/go-ethereum v1.10.9
+	github.com/ethereum/go-ethereum v1.10.17
 	github.com/fastly/go-utils v0.0.0-20180712184237-d95a45783239 // indirect
 	github.com/gballet/go-libpcsclite v0.0.0-20191108122812-4678299bea08 // indirect
 	github.com/golang/protobuf v1.4.3
@@ -21,9 +20,9 @@ require (
 	github.com/hashicorp/go-sockaddr v1.0.2 // indirect
 	github.com/hashicorp/memberlist v0.1.4 // indirect
 	github.com/hashicorp/serf v0.8.3
-	github.com/huin/goupnp v1.0.2
+	github.com/huin/goupnp v1.0.3-0.20220313090229-ca81a64b4204
 	github.com/jackpal/gateway v1.0.5
-	github.com/jackpal/go-nat-pmp v1.0.2-0.20160603034137-1fa385a6f458
+	github.com/jackpal/go-nat-pmp v1.0.2
 	github.com/jehiah/go-strftime v0.0.0-20171201141054-1d33003b3869 // indirect
 	github.com/jonboulle/clockwork v0.2.2 // indirect
 	github.com/lestrrat-go/file-rotatelogs v2.2.0+incompatible
