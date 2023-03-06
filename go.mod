@@ -4,8 +4,7 @@ go 1.13
 
 require (
 	github.com/allegro/bigcache v1.2.1 // indirect
-	github.com/antchfx/xmlquery v0.0.0-20181204011708-431a9e9e7c44
-	github.com/antchfx/xpath v0.0.0-20181208024549-4bbdf6db12aa // indirect
+	github.com/antchfx/xmlquery v1.3.1
 	github.com/armon/go-metrics v0.0.0-20190430140413-ec5e00d3c878 // indirect
 	github.com/bshuster-repo/logrus-logstash-hook v0.4.1
 	github.com/cespare/cp v1.1.1 // indirect
